@@ -2,7 +2,7 @@
 import numpy as np
 
 from stock_shared.vo.userCoinInfo import UserCoinInfo
-from app.domain.dto.userOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 """
 momentum :: 
 횡보장(ATR 낮음): Momentum 점수 비중 ↑ (오실레이터 매매)

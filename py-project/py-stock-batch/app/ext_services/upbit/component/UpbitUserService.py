@@ -1,6 +1,6 @@
 from stock_shared.dao.userMasterDao import UserMasterDao
 from stock_shared.vo.userCoinInfo import UserCoinInfo
-from app.domain.dto.userOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 
 
 class UpbitUserService:

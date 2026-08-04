@@ -11,11 +11,11 @@ import pprint
 
 from app.config.database import dbConn
 from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
-from app.domain.dto.userOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.batches.services.stockService import StockService
 from app.batches.services.userService import UserService
-from app.ext_services.kis.component.KospiStrategy1 import KospiStrategy1
-from app.ext_services.kis.component.KisBacktester import KisBacktester
+from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.backtester import KisBacktester
 
 session = dbConn.get_session()
 daoImpl = TradeCandleDataDao()

@@ -6,7 +6,7 @@ from app.common.constants.Literal import Literal
 from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.config.database import dbConn
-from app.domain.dto.userOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.batches.services.stockService import StockService
 from app.batches.services.userService import UserService
 from app.ext_services.kis.KisEngine import KisEngine

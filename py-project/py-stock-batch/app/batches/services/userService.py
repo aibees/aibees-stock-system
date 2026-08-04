@@ -1,7 +1,7 @@
 
 
 from stock_shared.dao.userMasterDao import UserMasterDao
-from app.domain.dto.userOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 
 
 def extractor(x) -> UserOptionMeta:

@@ -24,10 +24,10 @@ import pprint
 
 from app.config.database import dbConn
 from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
-from app.domain.dto.userOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.batches.services.userService import UserService
-from app.ext_services.kis.component.KospiStrategy2 import KospiStrategy2
-from app.ext_services.kis.component.KisBacktester import KisBacktester
+from stock_shared.strategy.kospi2 import KospiStrategy2
+from stock_shared.strategy.backtester import KisBacktester
 
 # ══════════════════════════════════════════════════════════════════
 # 여기만 바꾸면 됨

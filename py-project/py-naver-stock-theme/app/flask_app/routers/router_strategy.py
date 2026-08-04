@@ -26,11 +26,11 @@ from flask import Blueprint, g, request
 from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
 from app.domains.dao.userOptionsDao import UserOptionsDao
-from app.domains.vo.UserOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.ext_services.kis.KisEngine import KisEngine
 from app.flask_app.routers.router_oauth import require_auth
 from app.flask_app.utils.apiResponse import ApiResponse
-from app.services.kis.KisBacktester import KisBacktester
+from stock_shared.strategy.backtester import KisBacktester
 from app.services.kis.KisStockService import KisStockService
 from app.services.strategy.backtestService import BacktestService
 

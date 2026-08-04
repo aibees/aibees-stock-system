@@ -39,32 +39,32 @@ services:
       - BUY_TIME=09:00
       - KIS_ALLOW_FILE_FALLBACK=false
       - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
-    networks: { aibees: { ipv4_address: 172.21.1.11 } }
+#    networks: { aibees: { ipv4_address: 172.21.1.11 } }
 #
-#  kis-user2:
-#    <<: *worker-common
-#    container_name: kis-user2
-#    environment:
-#      - KIS_USER_ID=2
-#      - KIS_VIRTUAL=true
-#      - DRY_RUN=true
-#      - BUY_TIME=09:00
-#      - KIS_ALLOW_FILE_FALLBACK=false
-#      - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
+  kis-user2:
+    <<: *worker-common
+    container_name: kis-user2
+    environment:
+      - KIS_USER_ID=2
+      - KIS_VIRTUAL=false
+      - DRY_RUN=false
+      - BUY_TIME=09:00
+      - KIS_ALLOW_FILE_FALLBACK=false
+      - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
 #    networks: { aibees: { ipv4_address: 172.21.1.12 } }
-#
-#  kis-user3:
-#    <<: *worker-common
-#    container_name: kis-user3
-#    environment:
-#      - KIS_USER_ID=3
-#      - KIS_VIRTUAL=true
-#      - DRY_RUN=true
-#      - BUY_TIME=09:00
-#      - KIS_ALLOW_FILE_FALLBACK=false
-#      - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
+
+  kis-user3:
+    <<: *worker-common
+    container_name: kis-user3
+    environment:
+      - KIS_USER_ID=3
+      - KIS_VIRTUAL=false
+      - DRY_RUN=false
+      - BUY_TIME=09:00
+      - KIS_ALLOW_FILE_FALLBACK=false
+      - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
 #    networks: { aibees: { ipv4_address: 172.21.1.13 } }
 
-networks:
-  aibees:
-    external: true
+#networks:
+#  aibees:
+#    external: true

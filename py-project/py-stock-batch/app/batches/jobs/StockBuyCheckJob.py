@@ -11,7 +11,7 @@ from app.common.utils.smtpUtils import emailUtils
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.kis.keyLoader import list_kis_user_ids
 from app.ext_services.kis.component.KisStockService import KisService
-from app.ext_services.kis.component.KospiStrategy1 import KospiStrategy1
+from stock_shared.strategy.kospi1 import KospiStrategy1
 from dto.userOptionMeta import UserOptionMeta
 
 

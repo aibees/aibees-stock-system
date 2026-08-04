@@ -16,7 +16,7 @@ upbitService.py — Upbit 잔고 조회 서비스
 import logging
 
 from app.domains.dao.userDetailDao import UserDetailDao
-from app.domains.vo.UserOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.ext_services.upbit.upbitEngine import CcxtUpbit
 
 logging.basicConfig(level=logging.ERROR)

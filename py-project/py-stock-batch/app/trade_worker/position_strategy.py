@@ -14,7 +14,7 @@ from app.batches.services.userService import UserService
 from app.config.contextManager import get_session
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.ext_services.kis.component.KisStockService import KisService
-from app.ext_services.kis.component.KospiStrategy1 import KospiStrategy1
+from stock_shared.strategy.kospi1 import KospiStrategy1
 
 log = logging.getLogger("trade_worker.strategy")
 

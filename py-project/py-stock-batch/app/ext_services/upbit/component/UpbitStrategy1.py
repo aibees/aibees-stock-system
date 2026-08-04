@@ -1,6 +1,6 @@
 from stock_shared.vo.userCoinInfo import UserCoinInfo
-from app.domain.dto.userOptionMeta import UserOptionMeta
-from app.ext_services.StockStrategy import StockStrategy, Action
+from stock_shared.dto.userOptionMeta import UserOptionMeta
+from stock_shared.strategy.base import StockStrategy, Action
 
 
 class UpbitStrategy1(StockStrategy):

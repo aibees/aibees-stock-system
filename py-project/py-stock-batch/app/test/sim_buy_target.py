@@ -27,11 +27,11 @@ from sqlalchemy import text
 from app.config.database import dbConn
 from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
 from stock_shared.vo.userCoinInfo import UserCoinInfo
-from app.domain.dto.userOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.batches.services.userService import UserService
-from app.ext_services.kis.component.KospiStrategy1 import KospiStrategy1
-from app.ext_services.kis.component.KisBacktester import KisBacktester
-from app.ext_services.StockStrategy import Action
+from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.backtester import KisBacktester
+from stock_shared.strategy.base import Action
 
 # ══════════════════════════════════════════════════════════════════
 # 설정

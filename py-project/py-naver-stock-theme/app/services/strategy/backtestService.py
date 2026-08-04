@@ -12,12 +12,12 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from app.domains.vo.UserOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.yf.yfEngine import yfEngine
-from app.services.kis.KisBacktester import KisBacktester
+from stock_shared.strategy.backtester import KisBacktester
 from app.services.kis.KisStockService import KisStockService
-from app.services.kis.KospiStrategy import KospiStrategy1
+from stock_shared.strategy.kospi1 import KospiStrategy1
 from app.utils.constants.Literal import Literal
 
 # compute_indicator_df 보조 윈도우 기본값.

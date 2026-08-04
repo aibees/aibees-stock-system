@@ -13,9 +13,9 @@ trade_candle_data(또는 동일 스키마의 dict 리스트)를 시간순으로 
 - 한 종목당 동시에 1 포지션, 전액 진입(수익률은 트레이드별 % 복리 집계).
 """
 from stock_shared.vo.userCoinInfo import UserCoinInfo
-from app.domain.dto.userOptionMeta import UserOptionMeta
-from app.ext_services.StockStrategy import Action
-from app.ext_services.kis.component.KospiStrategy1 import KospiStrategy1
+from stock_shared.dto.userOptionMeta import UserOptionMeta
+from stock_shared.strategy.base import Action
+from stock_shared.strategy.kospi1 import KospiStrategy1
 
 
 class KisBacktester:

@@ -1,11 +1,9 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from app.config.database import dbConn
 from stock_shared.vo.userCoinInfo import UserCoinInfo
-from app.domain.dto.userOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 
-session = dbConn.get_session()
 
 class Action(Enum):
     HOLD = 0

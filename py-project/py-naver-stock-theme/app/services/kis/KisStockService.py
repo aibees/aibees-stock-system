@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from scipy.signal import argrelextrema
 
-from app.domains.vo.UserOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 
 
 class KisStockService:

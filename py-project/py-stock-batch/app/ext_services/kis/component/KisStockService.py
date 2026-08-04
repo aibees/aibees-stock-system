@@ -8,7 +8,7 @@ from app.domain.dao.userTestDao import UserTestDao
 
 matplotlib.use('Agg')
 from stock_shared.dao.userMasterDao import UserMasterDao
-from app.domain.dto.userOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 
 kst = pytz.timezone("Asia/Seoul")
 choices = ['G', 'D']

@@ -396,8 +396,8 @@ SELL_PROFIT=11, SELL_STOP_LOSS=12, SELL_TRAIL=13, SELL_STOP_PROFIT=14, SELL_TIME
 | 테이블 모델 | `app/domain/model/tradeCandleData.py`, `app/domain/model/batchBackTestLog.py` |
 | DAO(조회/upsert) | `app/domain/dao/tradeCandleDataDao.py` |
 | 지표 계산 | `app/ext_services/kis/component/KisStockService.py` |
-| 백테스트 엔진 | `app/ext_services/kis/component/KisBacktester.py` |
-| 전략 | `app/ext_services/kis/component/KospiStrategy1.py`, `app/ext_services/StockStrategy.py` |
+| 백테스트 엔진 | `shared/stock_shared/strategy/backtester.py` |
+| 전략 | `shared/stock_shared/strategy/kospi1.py`, `shared/stock_shared/strategy/base.py` |
 | 적재 러너 | `app/test/test_5.py` |
 | 백테스트 러너 | `app/test/test_backtest.py` |
 | DTO | `app/domain/dto/userCoinInfo.py`, `app/domain/dto/userOptionMeta.py` |

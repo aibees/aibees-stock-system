@@ -2,7 +2,7 @@
 
 worker 매도 로직(`KospiStrategy1`)의 유저별 튜닝 파라미터를 조정하는 설정 화면 스펙.
 
-- 대상 전략: `app/ext_services/kis/component/KospiStrategy1.py` (`get_action_in_active`)
+- 대상 전략: `shared/stock_shared/strategy/kospi1.py` (`get_action_in_active`)
 - 실행 엔진: `app/trade_worker/sell_executor.py`, 설정: `app/trade_worker/config.py`
 - 저장 위치: `user_options` 테이블의 `s1_*` 컬럼 (유저별 override)
 - 적용 시점: worker `SellStrategy.__init__` → `KospiStrategy1.configure(user_meta)` 가 `s1_*` 값으로 클래스 기본값을 덮어씀. **null이면 전략 클래스 기본값 사용.**

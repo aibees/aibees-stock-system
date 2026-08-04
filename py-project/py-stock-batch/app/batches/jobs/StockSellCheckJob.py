@@ -7,10 +7,10 @@ from app.batches.services.userService import UserService
 from app.common.utils.smtpUtils import emailUtils
 from app.common.utils.telegramUtils import telegramUtils
 from stock_shared.vo.userCoinInfo import UserCoinInfo
-from app.domain.dto.userOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.kis.component.KisStockService import KisService
-from app.ext_services.kis.component.KospiStrategy1 import KospiStrategy1
+from stock_shared.strategy.kospi1 import KospiStrategy1
 
 
 class StockSellCheckJob(Job):
