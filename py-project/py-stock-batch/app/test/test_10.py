@@ -90,8 +90,6 @@ def _plot(coin_code: str, rows: list, result: dict, out_dir: str = PLOT_DIR) -> 
     import matplotlib
     matplotlib.use('Agg')  # 화면 없는 환경에서도 파일 저장
     import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
-    from datetime import datetime
 
     n = len(rows)
     x = list(range(n))

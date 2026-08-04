@@ -1,36 +1,24 @@
-# docker compose yml
-
-version: "3.8"
+# py-stock-web — Flask API 전용 compose
+#
+# 이미지는 build_docker.sh 가 py-project/ 컨텍스트에서 미리 빌드한다(py-stock-web).
+# MCP 서버는 여기가 아니라 docker-compose.mcp.yml + run_docker_mcp.sh 로 따로 운영한다.
+#
+# aibees 네트워크 고정 IP 배정 현황(중복 금지):
+#   172.21.1.4  stock-web-flask-app   (이 파일)
+#   172.21.1.5  stock-batch-flask-app (py-stock-batch/docker-compose.yml)
+#   172.21.1.6  stock-vue-app         (stock-vue/docker-compose.yml)
+#   172.21.1.7  stock-web-mcp-server  (docker-compose.mcp.yml)
+#   172.21.1.11 kis-user1             (py-stock-batch/docker-compose.pykis.yml)
 
 services:
     app:
-        #build:
-        #    context: ..
-        #    dockerfile: py-naver-stock-theme/Dockerfile
         image: py-stock-web
         container_name: stock-web-flask-app
         working_dir: /workdir
         networks:
             aibees:
                 ipv4_address: 172.21.1.4
-
-    mcp:
-        image: py-stock-web          # Flask 앱과 동일 이미지 사용
-        container_name: stock-web-mcp-server
-        working_dir: /workdir
-        command: ["poetry", "run", "python", "-m", "app.mcp_server"]
-        environment:
-            - MCP_HOST=0.0.0.0
-            - MCP_PORT=5558
-            - MCP_BASE_URL=https://stock.aibeesworld.com  # OAuth discovery에 노출되는 URL
-            - MCP_JWT_SECRET=${MCP_JWT_SECRET}
-            - MCP_CLIENT_ID=${MCP_CLIENT_ID}
-            - MCP_CLIENT_SECRET=${MCP_CLIENT_SECRET}
-            - MCP_TOKEN_TTL=3600
-            - MCP_ALLOW_DYNAMIC_REGISTRATION=false
-        networks:
-            aibees:
-                ipv4_address: 172.21.1.5
+        restart: unless-stopped
 
 networks:
     aibees:

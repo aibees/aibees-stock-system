@@ -1,7 +1,11 @@
-# docker-compose.mcp.yml
-# MCP 서버 전용 compose — Flask(docker-compose.yml)와 독립적으로 운영
-
-version: "3.8"
+# py-stock-mcp — MCP 서버 전용 compose
+# Flask(docker-compose.yml)와 독립적으로 운영한다. 배포는 run_docker_mcp.sh.
+#
+# 시크릿(MCP_JWT_SECRET / MCP_CLIENT_ID / MCP_CLIENT_SECRET / MARIA_AUTH_TOKEN)은
+# 같은 디렉토리의 .env.mcp 에서 주입된다. (.env.mcp.example 참고, git 커밋 금지)
+#
+# 고정 IP: 172.21.1.7 — nginx-mcp.conf 의 proxy_pass 와 반드시 일치해야 한다.
+# 전체 IP 배정 현황은 docker-compose.yml 주석 참조.
 
 services:
     mcp:

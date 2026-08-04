@@ -143,7 +143,7 @@ poetry run gunicorn -w 1 -b 0.0.0.0:5557 app.main:flaskApp
 
 ```bash
 # 이미지 빌드 + 기동 (어느 디렉터리에서 실행해도 됨)
-sh build_docker.sh
+sh deploy_docker.sh
 ```
 
 수동으로 할 경우, 빌드 컨텍스트는 상위 `py-project/` 입니다.

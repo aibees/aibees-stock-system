@@ -1,6 +1,5 @@
 import pprint
 import time
-import numpy as np
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
@@ -9,11 +8,11 @@ from app.batches.jobs.job import Job
 from app.batches.services.stockService import StockService
 from app.batches.services.userService import UserService
 from app.common.utils.smtpUtils import emailUtils
-from app.domain.dto.userOptionMeta import UserOptionMeta
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.kis.keyLoader import list_kis_user_ids
 from app.ext_services.kis.component.KisStockService import KisService
 from app.ext_services.kis.component.KospiStrategy1 import KospiStrategy1
+from dto.userOptionMeta import UserOptionMeta
 
 
 class StockBuyCheckJob(Job):

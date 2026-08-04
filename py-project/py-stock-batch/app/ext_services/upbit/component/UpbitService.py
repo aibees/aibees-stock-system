@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.signal import argrelextrema
-import io, pytz, pprint, matplotlib, traceback
+import io, pytz,  matplotlib
 
 from app.common.constants.Literal import Literal
 from app.domain.dao.userTestDao import UserTestDao

@@ -1,14 +1,11 @@
-import pprint
 from abc import ABC, abstractmethod
 from enum import Enum
 
 from app.config.database import dbConn
-from app.domain.dao.userTestDao import UserTestDao
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.domain.dto.userOptionMeta import UserOptionMeta
 
 session = dbConn.get_session()
-testDaoImpl = UserTestDao()
 
 class Action(Enum):
     HOLD = 0
@@ -37,29 +34,6 @@ class StockStrategy(ABC):
         self.k_tp_atr = 4.0       # 진입가 + 4*ATR = 목표 익절 (≈2R)
         self.max_hold_bars = 10   # 타임 스탑: 보유 봉수 한도
         self.time_stop_band = 0.015  # 타임 스탑 발동 시 정체 판정 수익률 밴드(±1.5%)
-
-    def log_trade(self, symbol, action_type, market_price, qty, total_amount, remain_qty, krw_balance, dt,
-                  sma_checker, rsi_checker, macd_checker, stk_checker, obv_checker, score, note=None):
-        log_param = {
-            "user_id": 1,
-            "coin_symbol": symbol,
-            "action_type": action_type,
-            "order_time": dt,
-            "exec_time": dt,
-            "price": market_price,
-            "quantity": qty,
-            "total_amount": total_amount,
-            "remain_qty": remain_qty,   # 현재 구현에서는 "보유 잔량" 용도로 사용
-            "krw_balance": krw_balance,
-            "note": note,
-            "sma_checker": sma_checker,
-            "rsi_checker": rsi_checker,
-            "macd_checker": macd_checker,
-            "stk_checker": stk_checker,
-            "obv_checker": obv_checker,
-            "score": score,
-        }
-        testDaoImpl.insert_trade_log(session, log_param)
 
     def get_result_with_action(self, trade_data: list[dict], user_info: UserOptionMeta) -> dict:
         prev_info = UserCoinInfo.from_dict(trade_data[len(trade_data)-2])

@@ -1,5 +1,11 @@
 __pycache__/
+*.pyc
 
+.venv/
 .vscode/
+.idea/
+.DS_Store
 
+# 시크릿 — .env.mcp.example 만 커밋한다
 .env
+.env.mcp

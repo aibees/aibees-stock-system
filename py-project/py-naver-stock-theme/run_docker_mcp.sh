@@ -30,7 +30,7 @@ docker compose -f "$PROJ/docker-compose.mcp.yml" up -d
 echo ""
 echo "✅ MCP server started"
 echo "   Container : $CONTAINER"
-echo "   Internal  : http://172.21.1.5:5558/mcp"
+echo "   Internal  : http://172.21.1.7:5558/mcp"
 echo "   External  : https://stock.aibeesworld.com/mcp"
 echo ""
 echo "   Log 확인  : docker logs -f $CONTAINER"

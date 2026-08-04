@@ -6,6 +6,7 @@ trade_buy_target_stock(매수추천 누적) 기반 실전 시뮬레이션. 매�
   - 대기(무포지션): 당일(ymd) 매수추천이 있으면 '1순위(rank_no)' 종목을 당일 종가에 매수.
                    추천 없으면 pass.
   - 보유중: 매일 KospiStrategy1.get_action_in_active 로 매도판단. SELL 계열이면 당일 종가 매도.
+             진입일(체결일)에도 매도판단 수행(bars_held=0, peak 갱신 없이 1회).
   - 매도한 날은 재매수 안 함. 다음날부터 다시 추천 1순위 탐색. 반복.
   - 체결가: 매수·매도 모두 '당일 종가'.
   - 포지션 상태(entry_price/entry_atr/peak/bars_held/bars_since_peak) 갱신 규칙은
@@ -174,19 +175,19 @@ def run(start: str = START_DATE, end: str = END_DATE,
         ui.bars_held = 0
         mode = 'HOLD'
 
-    for di, d in enumerate(days):
-        ymd = d.replace('-', '')
+    def _eval_sell(d, advance: bool):
+        """매도판정 1회. advance=True 면 포지션 상태(peak/bars) 선갱신.
+        진입일(체결일)은 advance=False — _open_position 에서 이미 초기값 세팅됨(bars_held=0)."""
+        nonlocal code, entry_price, entry_date, mode
+        rows, by_date = _candles(code)
+        if d not in by_date:
+            return  # 해당 종목 그날 미거래(휴장/데이터 없음) → 다음날
+        idx, cur_row = by_date[d]
+        prev_row = rows[idx - 1] if idx > 0 else rows[idx]
+        cur = UserCoinInfo.from_dict(cur_row)
+        prev = UserCoinInfo.from_dict(prev_row)
 
-        # ── 보유중: 매도판단 (매수/매도 같은 날 동시수행 안 함) ──────────
-        if mode == 'HOLD':
-            rows, by_date = _candles(code)
-            if d not in by_date:
-                continue  # 해당 종목 그날 미거래(휴장/데이터 없음) → 다음날
-            idx, cur_row = by_date[d]
-            prev_row = rows[idx - 1] if idx > 0 else rows[idx]
-            cur = UserCoinInfo.from_dict(cur_row)
-            prev = UserCoinInfo.from_dict(prev_row)
-
+        if advance:
             # 포지션 상태 갱신 (KisBacktester 와 동일)
             prev_peak = ui.peak_high
             ui.peak_high = max(ui.peak_high, cur.high)
@@ -194,20 +195,28 @@ def run(start: str = START_DATE, end: str = END_DATE,
             ui.bars_since_peak = 0 if ui.peak_high > prev_peak else ui.bars_since_peak + 1
             ui.bars_held += 1
 
-            res = strategy.get_action_with_prev('active', prev, cur, ui)
-            action = res.get('result_action') or Action[res.get('action_type', 'HOLD')]
-            if action in SELL_ACTIONS:
-                exit_price = float(cur.close)
-                gross = (exit_price - entry_price) / entry_price if entry_price > 0 else 0.0
-                trades.append({
-                    'coin': code, 'stock_name': names.get(code, ''),
-                    'entry_dt': entry_date, 'entry_price': entry_price,
-                    'entry_action': 'BUY', 'exit_dt': d, 'exit_price': exit_price,
-                    'exit_reason': action.name, 'bars_held': ui.bars_held,
-                    'ret_gross': gross, 'ret_net': gross - 2 * fee_rate,
-                })
-                mode = 'FLAT'
-                code = entry_price = entry_date = None
+        res = strategy.get_action_with_prev('active', prev, cur, ui)
+        action = res.get('result_action') or Action[res.get('action_type', 'HOLD')]
+        if action in SELL_ACTIONS:
+            exit_price = float(cur.close)
+            gross = (exit_price - entry_price) / entry_price if entry_price > 0 else 0.0
+            trades.append({
+                'coin': code, 'stock_name': names.get(code, ''),
+                'entry_dt': entry_date, 'entry_price': entry_price,
+                'entry_action': 'BUY', 'exit_dt': d, 'exit_price': exit_price,
+                'exit_reason': action.name, 'bars_held': ui.bars_held,
+                'ret_gross': gross, 'ret_net': gross - 2 * fee_rate,
+            })
+            mode = 'FLAT'
+            code = entry_price = entry_date = None
+            ui.has_position = False
+
+    for di, d in enumerate(days):
+        ymd = d.replace('-', '')
+
+        # ── 보유중: 매도판단 (매수/매도 같은 날 동시수행 안 함) ──────────
+        if mode == 'HOLD':
+            _eval_sell(d, advance=True)
             continue  # 매도했든 아니든 그날은 재매수 안 함
 
         # ── 다음날 시가 체결 대기 (ENTRY_PRICE='next_open', 1일만 유효) ───
@@ -220,6 +229,7 @@ def run(start: str = START_DATE, end: str = END_DATE,
                     mode = 'FLAT'                       # 폐기 → 아래 FLAT 스캔(오늘 추천 새로)
                 else:
                     _open_position(pend_code, row, o_px, d)  # 다음날 시가 매수
+                    _eval_sell(d, advance=False)             # 진입일에도 매도판정
                     continue
             else:
                 # 후보가 다음 거래일에 안 나옴(휴장/데이터 없음) → 폐기(당일 추천 새로 봄)
@@ -246,6 +256,7 @@ def run(start: str = START_DATE, end: str = END_DATE,
                 mode = 'PENDING'                      # 다음 거래일 시가에 체결
             else:
                 _open_position(code_sel, cand_row, float(cand_row['close']), d)  # 당일 종가 매수
+                _eval_sell(d, advance=False)                                     # 진입일에도 매도판정
             continue
 
     # ── 종료 시 미청산 포지션 정리 (마지막날 종가) ────────────────────

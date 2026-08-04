@@ -9,7 +9,7 @@ class EmailSender:
         self.__settingSender()
     
     def __settingSender(self):
-        with open('./smtp.key') as f:
+        with open('./spec_keys/smtp.key') as f:
             keyLines = f.readlines()
             self.sender_mail = keyLines[0].strip()
             self.sender_pswd = keyLines[1].strip()

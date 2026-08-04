@@ -65,7 +65,7 @@
 
 ### 3.3 진입 후 규칙
 
-- 진입한 날(체결일)에는 **매도 판정을 하지 않음**(`bars_held=0`, 다음 거래일부터 매도판정).
+- 진입한 날(체결일)에도 **매도 판정을 수행**한다. (이전의 "진입일 매도판정 제외" 규칙은 폐기)
 
 ### 3.4 진입 관련 파라미터
 
@@ -79,7 +79,7 @@
 
 ## 4. 매도(청산) 분기조건 — `KospiStrategy1.get_action_in_active`
 
-보유 중 매일(진입일 제외) 판정. **우선순위 순서**대로 먼저 걸리는 것이 발동. (아래는 `KospiStrategy1` 기본값; `user_options.s1_*` 로 오버라이드 가능)
+보유 중 매일(진입일 포함) 판정. **우선순위 순서**대로 먼저 걸리는 것이 발동. (아래는 `KospiStrategy1` 기본값; `user_options.s1_*` 로 오버라이드 가능)
 
 전제 계산:
 - `entry` = `entry_price`(없으면 `avg_price`)
@@ -136,7 +136,9 @@ peak_close  = 체결일 close
 bars_since_peak = 0
 bars_held   = 0
 ```
-보유 매일(매도판정 전):
+진입일에도 위 초기값(`bars_held=0`) 그대로 매도판정 수행.
+
+보유 매일(진입일 다음 거래일부터, 매도판정 전):
 ```
 prev_peak = peak_high
 peak_high  = max(peak_high, 오늘 high)

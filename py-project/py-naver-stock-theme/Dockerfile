@@ -1,37 +1,33 @@
-## pytnon-batch
-## NAVER STOCK THEME Crawling
+## py-stock-web — NAVER STOCK THEME / Flask API
+##
+## 빌드 컨텍스트는 py-project/ 다. shared(공용 ORM/DAO)가 컨텍스트에 포함되어야
+## poetry 의 path dependency('../shared')가 해석된다.
+##   docker build -f py-naver-stock-theme/Dockerfile -t py-stock-web .   (py-project/ 에서)
+## build_docker.sh 가 알아서 py-project/ 로 이동해 실행한다.
 
 FROM python:3.12.3
 
-ENV POETRY_VERSION=1.8.2
+ENV POETRY_VERSION=1.8.2 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
 RUN pip install -U "poetry==$POETRY_VERSION"
 
 WORKDIR /workdir
 
-# copy source code
-# shared 를 먼저 복사한다 (poetry path dependency '../shared' 해석에 필요).
-# 빌드 컨텍스트는 py-project/ 이므로 'docker build -f <이 파일> .' 을
-# py-project 디렉터리에서 실행해야 한다.
+# WORKDIR 가 /workdir 이므로 pyproject 의 '../shared' 는 /shared 로 해석된다.
 COPY shared /shared
 
 COPY py-naver-stock-theme/pyproject.toml py-naver-stock-theme/poetry.lock /workdir/
 
-RUN poetry lock
-RUN poetry config virtualenvs.create false && poetry install --no-interaction --no-ansi
+# poetry.lock 의 고정 버전을 유지한 채 메타데이터만 갱신.
+# (--no-update 없이 'poetry lock' 을 돌리면 락이 무의미해져 빌드마다 버전이 달라진다)
+RUN poetry lock --no-update \
+ && poetry config virtualenvs.create false \
+ && poetry install --no-interaction --no-ansi
 
 COPY py-naver-stock-theme/ /workdir/
 
-# Python 경로 설정
-ENV PYTHONPATH=/usr/local/bin/python3.12
+EXPOSE 5556
 
-# Poetry 바이너리 권한 확인 및 설정
-RUN chmod +x /usr/local/bin/poetry
-
-# Poetry가 설치된 Python을 사용하도록 설정
-RUN sed -i '1s|^.*$|#!/usr/local/bin/python3.12|' /usr/local/bin/poetry
-
-# 권한과 바이너리 위치 확인
-RUN ls -l /usr/local/bin/poetry
-
-# run command
 CMD ["poetry", "run", "gunicorn", "-k", "gevent", "--timeout", "180", "-w", "4", "-b", "0.0.0.0:5556", "app.main:flaskApp"]

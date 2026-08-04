@@ -15,7 +15,6 @@ from app.domain.dto.userOptionMeta import UserOptionMeta
 from app.batches.services.stockService import StockService
 from app.batches.services.userService import UserService
 from app.ext_services.kis.component.KospiStrategy1 import KospiStrategy1
-from app.ext_services.kis.component.KospiStrategy2 import KospiStrategy2
 from app.ext_services.kis.component.KisBacktester import KisBacktester
 
 session = dbConn.get_session()

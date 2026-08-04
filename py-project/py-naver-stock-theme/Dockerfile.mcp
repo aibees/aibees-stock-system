@@ -1,29 +1,31 @@
-## MCP Server (Streamable HTTP + OAuth 2.1)
-## 기존 Dockerfile과 동일 베이스 이미지 사용, CMD만 MCP 서버로 변경
+## py-stock-mcp — MCP Server (Streamable HTTP + OAuth 2.1)
+##
+## Flask 이미지(Dockerfile)와 동일 베이스, CMD 만 MCP 서버로 교체.
+## 빌드 컨텍스트는 py-project/ 다 (shared 가 포함되어야 '../shared' 가 해석된다).
+##   docker build -f py-naver-stock-theme/Dockerfile.mcp -t py-stock-mcp .   (py-project/ 에서)
+## run_docker_mcp.sh 가 알아서 py-project/ 로 이동해 실행한다.
 
 FROM python:3.12.3
 
-ENV POETRY_VERSION=1.8.2
+ENV POETRY_VERSION=1.8.2 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
 RUN pip install -U "poetry==$POETRY_VERSION"
 
 WORKDIR /workdir
 
-# shared 를 먼저 복사한다 (poetry path dependency '../shared' 해석에 필요).
-# 빌드 컨텍스트는 py-project/ 이므로 'docker build -f <이 파일> .' 을
-# py-project 디렉터리에서 실행해야 한다.
+# WORKDIR 가 /workdir 이므로 pyproject 의 '../shared' 는 /shared 로 해석된다.
 COPY shared /shared
 
 COPY py-naver-stock-theme/pyproject.toml py-naver-stock-theme/poetry.lock /workdir/
 
-RUN poetry lock
-RUN poetry config virtualenvs.create false && poetry install --no-interaction --no-ansi
+# poetry.lock 의 고정 버전 유지 (Dockerfile 주석 참조)
+RUN poetry lock --no-update \
+ && poetry config virtualenvs.create false \
+ && poetry install --no-interaction --no-ansi
 
 COPY py-naver-stock-theme/ /workdir/
-
-ENV PYTHONPATH=/usr/local/bin/python3.12
-
-RUN chmod +x /usr/local/bin/poetry
-RUN sed -i '1s|^.*$|#!/usr/local/bin/python3.12|' /usr/local/bin/poetry
 
 EXPOSE 5558
 

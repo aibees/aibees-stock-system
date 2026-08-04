@@ -16,7 +16,7 @@ from app.ext_services.kis.keyLoader import resolve_kis_creds
 class KisEngine:
     """KIS 실전투자 전용 엔진. (모의투자 미지원)"""
 
-    def __init__(self, key_path: str = "kis.key", user_id=None):
+    def __init__(self, key_path: str = "./spec_keys/kis.key", user_id=None):
         # 1. 자격증명 해석 (실전)
         #    - user_id(인자) 또는 KIS_USER_ID(env) → DB(user_detail) 조회
         #    - 없으면 kis.key 파일 로딩 (하위호환)
