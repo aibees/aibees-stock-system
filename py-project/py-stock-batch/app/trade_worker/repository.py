@@ -24,14 +24,17 @@ log = logging.getLogger("trade_worker.repo")
 _KST = timezone("Asia/Seoul")
 
 
-def _rate_to_float(rate) -> float:
-    """trade_buy_target_stock.rate 예: '12.5%' → 12.5. 파싱 실패 시 +inf(후순위)."""
-    if rate is None:
-        return float("inf")
-    try:
-        return float(str(rate).replace("%", "").strip())
-    except (ValueError, AttributeError):
-        return float("inf")
+def _buy_target_order_key(row) -> tuple[float, float]:
+    """매수타겟 정렬 키 — score 내림차순, 동률이면 rank_no 오름차순.
+
+    오름차순 sort 로 두 방향을 함께 표현하려고 score 만 부호를 뒤집는다.
+    score/rank_no 가 NULL 인 행은 어느 쪽이든 항상 후순위(+inf)로 밀린다.
+    """
+    score = row.get("score")
+    rank_no = row.get("rank_no")
+    score_key = -float(score) if score is not None else float("inf")
+    rank_key = float(rank_no) if rank_no is not None else float("inf")
+    return (score_key, rank_key)
 
 
 class Repository:
@@ -54,17 +57,25 @@ class Repository:
         return row["ymd"] if row and row["ymd"] else None
 
     def get_buy_targets(self, ymd: str) -> list[dict]:
-        """해당 ymd 추천 전체를 rate 오름차순(과열최저 우선)으로 정렬해 반환.
-        nxt_flag(master_stock): 'Y'=NXT 대상(통합 라우팅), 그 외=KRX 전용."""
+        """해당 ymd 추천 전체를 **score 내림차순**(최고점이 1순위)으로 정렬해 반환.
+        동률이면 rank_no 오름차순으로 tie-break.
+
+        SQL ORDER BY 대신 파이썬 정렬을 쓰는 이유: score/rank_no 가 nullable 이라
+        DB 별 NULL 정렬 위치가 갈리는데, NULL 은 방향과 무관하게 항상 후순위여야 한다.
+        (rate 는 '12.5%' 형태의 varchar 라 애초에 SQL 정렬 대상이 될 수 없다)
+
+        nxt_flag(master_stock): 'Y'=NXT 대상(통합 라우팅), 그 외=KRX 전용.
+        """
         sql = text(
-            "SELECT t.ymd, t.stock_code, t.stock_name, t.rate, t.close, ms.nxt_flag "
+            "SELECT t.ymd, t.stock_code, t.stock_name, t.rate, t.close, "
+            "       t.score, t.rank_no, ms.nxt_flag "
             "FROM trade_buy_target_stock t "
             "LEFT JOIN master_stock ms ON ms.stock_code = t.stock_code "
             "WHERE t.ymd = :ymd"
         )
         with get_session() as s:
             rows = [dict(r) for r in s.execute(sql, {"ymd": ymd}).mappings().all()]
-        rows.sort(key=lambda r: _rate_to_float(r.get("rate")))
+        rows.sort(key=_buy_target_order_key)
         return rows
 
     # ── worker 전용 포지션 테이블(trade_worker_position) ─────────────

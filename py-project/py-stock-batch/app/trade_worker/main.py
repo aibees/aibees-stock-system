@@ -41,12 +41,20 @@ def _kst_converter(timestamp):
     return datetime.fromtimestamp(timestamp, _KST).timetuple()
 
 
+# force=True 필수.
+#   위쪽 import 로 딸려오는 pykis 가 import 시점에 인자 없는 logging.basicConfig() 를
+#   호출해 루트 로거에 핸들러를 붙이고 레벨을 WARNING 으로 굳혀버린다.
+#   basicConfig 는 루트에 핸들러가 이미 있으면 no-op 이라, force 없이는
+#   이 설정이 통째로 무시되어 trade_worker 의 INFO 로그가 전부 사라진다.
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    force=True,
 )
 # 컨테이너 TZ(UTC) 무관하게 로그 시각을 KST 로 출력
 logging.Formatter.converter = staticmethod(_kst_converter)
+# pykis 는 자체 핸들러를 갖고 있어 propagate 를 두면 같은 줄이 두 번 찍힌다.
+logging.getLogger("pykis").propagate = False
 log = logging.getLogger("trade_worker")
 
 _stop = threading.Event()
@@ -116,46 +124,45 @@ def _boot_balance_check(cfg, broker, repo):
         except Exception:  # noqa: BLE001
             pass
 
-def _reconcile_positions(cfg, broker, repo, strategy):
-    """부팅 시 실제 계좌 보유종목을 trade_worker_position(HOLDING)으로 반영.
-      - 실제 보유인데 테이블에 없음 → HOLDING 신규 등록(평단=계좌 평균단가) + 초기 라인
-      - 테이블 HOLDING인데 실제 미보유 → 외부청산으로 종료(SOLD)
+def _reconcile_positions(cfg, broker, repo):
+    """부팅 시 **worker 가 직접 매수한 포지션**(trade_worker_position)만 계좌와 대조한다.
+
+      - 테이블 HOLDING인데 실제 미보유 → 외부청산으로 종료(SOLD)   ← 안전장치
       - 수량 불일치 → 실제 수량으로 갱신
-    ※ KIS balance 엔 실제 매수일 정보가 없어 entry_ymd 는 부팅일로 기록(타임스탑은 그 시점부터 카운트).
+
+    ※ 수동매수(HTS·MTS 등 타채널) 보유종목은 **흡수하지 않는다**.
+      worker 는 자기가 산 것만 감시·매도한다. 계좌 실제 보유 전체는
+      user_holdings(wallet_sync) 에 미러링되며 그쪽이 조회용 정본이다.
     """
-    if not cfg.reconcile_holdings_on_boot:
-        return
     holdings = broker.account_holdings()
     if holdings is None:
-        log.warning("[부팅] 보유종목 조회 실패 → 포지션 반영 skip")
+        log.warning("[부팅] 보유종목 조회 실패 → 포지션 대조 skip")
         return
     held = {h["symbol"]: h for h in holdings}
     rows = repo.get_holding_positions(cfg.user_id)
     holding = {p["stock_code"]: p for p in rows}
 
-    # 1) 실제 보유 → 테이블에 없으면 등록(adopt)
-    for code, h in held.items():
-        if code in holding:
-            # 수량 불일치 보정
-            if Decimal(str(holding[code].get("hold_qty") or 0)) != Decimal(str(h["qty"])):
-                repo.update_position_qty(cfg.user_id, code, Decimal(str(h["qty"])))
-                log.info("[부팅] %s 수량 보정 → %s", code, h["qty"])
+    # 1) AUTO 포지션 수량 보정 (부분 체결/부분 매도 반영)
+    for code, p in holding.items():
+        h = held.get(code)
+        if h is None:
             continue
-        repo.open_position(cfg.user_id, code, h.get("name") or "",
-                           Decimal(str(h["avg_price"])), Decimal(str(h["qty"])))
-        if strategy:
-            try:
-                lines = strategy.initial_lines(code, float(h["avg_price"]))
-                repo.update_position_state(cfg.user_id, code, lines)
-            except Exception as e:  # noqa: BLE001
-                log.warning("[부팅] %s 초기 라인 계산 실패: %s", code, e)
-        log.info("[부팅] 보유종목 %s(%s) → HOLDING 반영 (평단=%s qty=%s)",
-                 h.get("name"), code, h["avg_price"], h["qty"])
+        if Decimal(str(p.get("hold_qty") or 0)) != Decimal(str(h["qty"])):
+            repo.update_position_qty(cfg.user_id, code, Decimal(str(h["qty"])))
+            log.info("[부팅] %s 수량 보정 → %s", code, h["qty"])
 
     # 2) 테이블 HOLDING인데 실제 미보유 → 외부청산 종료
+    #    (worker 가 산 종목을 사용자가 HTS 로 먼저 판 경우. 정리하지 않으면
+    #     이미 판 종목에 매도 주문을 반복해 연속 실패 → 자동 비활성으로 이어진다)
     for code in holding.keys() - held.keys():
         repo.close_position(cfg.user_id, code, Decimal(0), Decimal(0), "EXTERNAL_CLOSED")
         log.warning("[부팅] %s 실제 미보유 → 포지션 종료(외부청산)", code)
+
+    # 3) 흡수하지 않은 계좌 보유(수동매수) 는 감시 대상이 아님을 명시적으로 남긴다
+    untracked = held.keys() - holding.keys()
+    if untracked:
+        log.info("[부팅] 감시 제외(수동보유) %d종목: %s",
+                 len(untracked), ", ".join(sorted(untracked)))
 
 
 def main():
@@ -183,8 +190,9 @@ def main():
     # 부팅 시 실제 계좌 예수금 확인 + DB user_wallet 대조/동기화 + 보유종목 표시
     _boot_balance_check(cfg, broker, repo)
 
-    # 부팅 시 실제 보유종목을 trade_worker_position(HOLDING)으로 반영
-    _reconcile_positions(cfg, broker, repo, strategy)
+    # 부팅 시 worker 자기 포지션만 계좌와 대조(수량 보정 / 외부청산 정리).
+    # 수동매수 보유종목은 흡수하지 않는다.
+    _reconcile_positions(cfg, broker, repo)
 
     # 체결통보 구독(주문번호별 체결 누적) — 로깅 훅은 매도엔진에 위임
     broker.start_fill_tracking(on_event=sell._on_execution)
@@ -215,8 +223,17 @@ def main():
         except Exception as e:  # noqa: BLE001
             log.exception("개장 루틴 실패: %s", e)
 
-    scheduler.add_job(_open_routine, CronTrigger(hour=cfg.buy_hour, minute=cfg.buy_minute),
+    # ※ CronTrigger 에 timezone 을 반드시 명시할 것.
+    #   APScheduler 3.x 의 BaseScheduler._create_trigger 는 "이미 생성된 trigger 인스턴스"를
+    #   그대로 반환한다(=scheduler.timezone 을 주입하지 않는다). timezone 이 주입되는 건
+    #   add_job(func, 'cron', hour=..) 처럼 문자열 alias 로 넘겼을 때뿐이다.
+    #   따라서 여기서 생략하면 CronTrigger 는 get_localzone() = 컨테이너 TZ(UTC) 로 떨어져
+    #   09:00 이 09:00 UTC(=18:00 KST) 로 돌아 "장운영시간이 아닙니다"(KIOK0320) 가 난다.
+    scheduler.add_job(_open_routine,
+                      CronTrigger(hour=cfg.buy_hour, minute=cfg.buy_minute, timezone=_KST),
                       id="open_routine", max_instances=1)
+    log.info("개장 루틴 등록: 매일 %02d:%02d (KST) · 주말/휴장일 skip",
+             cfg.buy_hour, cfg.buy_minute)
 
     # 계좌 예수금·보유종목 주기 갱신 (기본 10초). WALLET_POLL_SEC<=0 이면 비활성.
     #   reconcile_wallet: 실제 KIS 계좌 조회 → user_wallet(예수금·보유평가·총자산) + user_holdings 갱신.
@@ -254,8 +271,13 @@ def main():
         scheduler.add_job(_poll_wallet, IntervalTrigger(seconds=cfg.wallet_poll_sec),
                           id="wallet_poll", max_instances=1, coalesce=True)
         log.info("계좌 주기 갱신 등록: %d초마다", cfg.wallet_poll_sec)
+    else:
+        log.info("계좌 주기 갱신 비활성 (WALLET_POLL_SEC=%d)", cfg.wallet_poll_sec)
 
     scheduler.start()
+    for j in scheduler.get_jobs():
+        log.info("스케줄러 job=%s · trigger=%s · 다음 실행=%s",
+                 j.id, j.trigger, j.next_run_time)
 
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)

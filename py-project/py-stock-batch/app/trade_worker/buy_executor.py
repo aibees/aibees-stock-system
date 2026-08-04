@@ -2,9 +2,10 @@
 매수 엔진 — 장 시작(09:00) 1회 실행.
 
 로직 (docs_buy_target_sim_spec.md §3, §6):
-  1. 1포지션 원칙: active 보유가 있으면 매수 안 함.
+  1. 1포지션 원칙: **worker 보유분**(trade_worker_position HOLDING)이 있으면 매수 안 함.
+     수동매수 보유종목은 worker 관심사가 아니므로 카운트하지 않는다(예수금만 공유).
   2. 매수 가능 판정: user_wallet 잔고 > 0 (현금/watch 상태).
-  3. 전날 매수타겟 중 과열최저(rate 오름차순) 1종목 선택.
+  3. 전날 매수타겟 중 **score 내림차순**(동률 시 rank_no 오름차순) 1종목 선택.
   4. 시장가(시초가)로 가용 예산 전량 매수.
   5. 체결 → active 등록 · 잔고 차감 · trade_log.
 """
@@ -42,7 +43,7 @@ class BuyExecutor:
             self.wlog.info("[매수] 잔고 %s → 매수 불가", balance)
             return
 
-        # 3) 전날 타겟(과열최저 정렬)
+        # 3) 전날 타겟(score 내림차순 · 동률 시 rank_no 오름차순)
         #    직전 영업일을 KIS 휴장일 API로 동적 산출해 하한으로 사용(공휴일·연휴 반영).
         #    조회 실패(None)면 repo 가 요일 heuristic 으로 fallback.
         floor_ymd = self.broker.prev_trading_day()
@@ -104,7 +105,7 @@ class BuyExecutor:
 
             # 5) 체결 반영 (부분체결이면 체결수량만) → trade_worker_position 에 HOLDING 신규
             self.repo.open_position(uid, code, name, fill_px, res.filled_qty)
-            # 초기 손절/익절 라인 즉시 세팅(진입일엔 매도판정 안 함)
+            # 초기 손절/익절 라인 즉시 세팅(진입일에도 매도판정 대상 — 3.3 규칙 폐기)
             if self.strategy:
                 try:
                     lines = self.strategy.initial_lines(code, float(fill_px))

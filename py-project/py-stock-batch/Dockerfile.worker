@@ -5,6 +5,11 @@
 
 FROM python:3.12.3
 
+# 컨테이너 기본 TZ 를 KST 로. (코드는 명시적 KST 를 쓰지만, tzinfo 를 생략한
+# 라이브러리 코드가 get_localzone() 으로 UTC 에 떨어지는 사고를 막는 2차 방어선)
+ENV TZ=Asia/Seoul
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 ENV POETRY_VERSION=1.8.2
 RUN pip install -U "poetry==$POETRY_VERSION"
 
