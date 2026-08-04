@@ -1,4 +1,4 @@
-from app.domain.model.masterStock import MasterStock
+from stock_shared.models.masterStock import MasterStock
 from app.domain.model.masterThemeCode import MasterThemeCode
 from app.domain.model.masterThemeGroup import MasterThemeGroup
 

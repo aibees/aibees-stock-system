@@ -1,8 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.dialects.mysql import DECIMAL
-from sqlalchemy.ext.declarative import declarative_base
 
-Base = declarative_base()
+from stock_shared.base import Base
 
 class TradeLogTest(Base):
     __tablename__ = 'trade_log_test'

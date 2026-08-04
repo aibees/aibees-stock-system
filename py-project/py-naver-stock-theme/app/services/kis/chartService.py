@@ -5,7 +5,7 @@ from app.config.db.database import dbConn
 from app.utils.mariaEnv import MariaEnv
 from app.services.kis.oauthService import KisAuthService
 from app.domains.dao.masterHolidayDao import MasterHolidayDao
-from app.domains.dao.masterStockDao import MasterStockDao
+from stock_shared.dao.masterStockDao import MasterStockDao
 
 mariaEnv = MariaEnv()
 

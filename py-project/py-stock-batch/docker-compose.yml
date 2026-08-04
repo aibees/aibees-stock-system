@@ -5,8 +5,8 @@ version: "3.8"
 services:
     app:
         #build:
-        #    context: .
-        #    dockerfile: Dockerfile
+        #    context: ..
+        #    dockerfile: py-stock-batch/Dockerfile
         image: py-stock-batch
         container_name: stock-batch-flask-app
         working_dir: /workdir

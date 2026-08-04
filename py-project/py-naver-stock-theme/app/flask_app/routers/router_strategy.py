@@ -23,8 +23,8 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, g, request
 
-from app.domains.dao.masterStockDao import MasterStockDao
-from app.domains.dao.tradeCandleDataDao import TradeCandleDataDao
+from stock_shared.dao.masterStockDao import MasterStockDao
+from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
 from app.domains.dao.userOptionsDao import UserOptionsDao
 from app.domains.vo.UserOptionMeta import UserOptionMeta
 from app.ext_services.kis.KisEngine import KisEngine
@@ -310,7 +310,7 @@ def post_backtest_ingest():
             computed = kisStockSvc.compute_indicator_df(ohlcv, _DEFAULT_USER_INFO_FOR_INGEST)
             computed.fillna(0.0, inplace=True)
 
-            from app.domains.vo.UserCoinInfo import UserCoinInfo
+            from stock_shared.vo.userCoinInfo import UserCoinInfo
             count = 0
             for row in computed.itertuples(index=False):
                 ci = UserCoinInfo()

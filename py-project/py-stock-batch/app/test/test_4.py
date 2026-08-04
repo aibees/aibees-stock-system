@@ -1,5 +1,5 @@
-from app.domain.dao.tradeCandleDataDao import TradeCandleDataDao
-from app.domain.dto.userCoinInfo import UserCoinInfo
+from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
+from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.upbit.UpbitCcxt import CcxtUpbit
 from datetime import datetime

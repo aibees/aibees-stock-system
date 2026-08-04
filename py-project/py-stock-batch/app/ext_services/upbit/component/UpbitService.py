@@ -11,10 +11,10 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.patches import Rectangle
 from datetime import datetime, timedelta
-from app.domain.dao.userMasterDao import UserMasterDao
+from stock_shared.dao.userMasterDao import UserMasterDao
 from app.domain.dto.userOptionMeta import UserOptionMeta
 
-from app.domain.dto.userCoinInfo import UserCoinInfo
+from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.common.utils.mailTemplateUtils import mailUtils as mail
 from app.common.utils.commUtils import _is_number_like, _fmt
 

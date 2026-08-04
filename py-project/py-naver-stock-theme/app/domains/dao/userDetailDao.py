@@ -1,6 +1,6 @@
 from sqlalchemy import select
 
-from app.domains.models.userDetail import UserDetail
+from stock_shared.models.userDetail import UserDetail
 
 import logging
 

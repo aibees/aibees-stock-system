@@ -6,7 +6,7 @@ from app.batches.services.stockService import StockService
 from app.batches.services.userService import UserService
 from app.common.utils.smtpUtils import emailUtils
 from app.common.utils.telegramUtils import telegramUtils
-from app.domain.dto.userCoinInfo import UserCoinInfo
+from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.domain.dto.userOptionMeta import UserOptionMeta
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.kis.component.KisStockService import KisService

@@ -12,7 +12,7 @@ trade_candle_data(또는 동일 스키마의 dict 리스트)를 시간순으로 
 - 다음 봉이 없는 경우(마지막 봉 시그널)에는 현재 종가로 체결.
 - 한 종목당 동시에 1 포지션, 전액 진입(수익률은 트레이드별 % 복리 집계).
 """
-from app.domain.dto.userCoinInfo import UserCoinInfo
+from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.domain.dto.userOptionMeta import UserOptionMeta
 from app.ext_services.StockStrategy import Action
 from app.ext_services.kis.component.KospiStrategy1 import KospiStrategy1

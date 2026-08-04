@@ -89,11 +89,24 @@ DB 스키마가 바뀌면 모델도 DB 기준으로 갱신한다. 손으로 고�
 | 메서드 | 원본 | 사유 |
 |---|---|---|
 | `MasterStockDao.update_stock_finance_info` | py-stock-batch | `master_stock` 에 없는 `per`/`pbr`/`roe` 참조. 호출처 없음 |
-| `UserMasterDao.select_user_by_phone` | py-naver-stock-theme | `user_master` 에 없는 `type` 컬럼 참조. **호출처 있음** (`authService.py:52`) |
 
-`select_user_by_phone` 은 호출처가 살아 있으므로 마이그레이션 시 함께 정리해야 한다.
-로그인 타입은 `user_login_type.login_type` 이므로 `select_user_authinfo()` 를 쓰거나
-`UserLoginType` 을 조인하는 형태로 새로 구현할 것.
+## 버그 수정
+
+`UserMasterDao.select_user_by_phone` (py-naver-stock-theme, oAuth 로그인 경로)은
+`user_master` 에 없는 `type` 컬럼을 참조해 호출 시 `AttributeError` 가 나던 코드였다.
+로그인 타입의 정본이 `user_login_type.login_type` 이므로 조인 방식으로 재구현했다.
+
+```python
+select(UserMaster)
+  .join(UserLoginType, UserMaster.user_id == UserLoginType.user_id)
+  .where(
+      UserMaster.user_phone == param["user_phone"],
+      UserLoginType.login_type == param["type"].upper(),
+      UserLoginType.enabled_flag == "Y",
+  )
+```
+
+호출측(`authService.oAuthProcess`) 시그니처는 그대로라 수정이 필요 없다.
 
 ## 동작이 바뀐 부분
 

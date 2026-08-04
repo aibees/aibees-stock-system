@@ -1,8 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.dialects.mysql import insert
 
-from app.domains.dao.baseDao import BaseDao
-from app.domains.models.userWallet import UserWallet
+from stock_shared.dao.baseDao import BaseDao
+from stock_shared.models.userWallet import UserWallet
 
 import logging
 logging.basicConfig(level=logging.ERROR)

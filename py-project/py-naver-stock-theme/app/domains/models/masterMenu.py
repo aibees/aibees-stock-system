@@ -1,7 +1,6 @@
 from sqlalchemy import Column, BigInteger, Integer, DateTime, String
-from sqlalchemy.ext.declarative import declarative_base
 
-Base = declarative_base()
+from stock_shared.base import Base
 
 class MasterMenu(Base):
     __tablename__ = 'master_menu'

@@ -46,6 +46,27 @@ class UserMasterDao(BaseDao):
             for um, ult, ud in results
         ]
 
+    def select_user_by_phone(self, session, param):
+        """
+        전화번호 + 로그인타입 기준 사용자 조회 (oAuth 로그인용).
+
+        주의: 원본(py-naver-stock-theme)은 `UserMaster.type` 을 참조했으나
+        user_master 에는 해당 컬럼이 없어 호출 시 AttributeError 가 났다.
+        로그인 타입의 정본은 user_login_type.login_type 이므로 조인으로 재구현했다.
+        (login_type 은 DB 에 대문자로 저장된다: EMAIL / KAKAO / NAVER)
+        """
+        stmt = (
+            select(UserMaster)
+            .join(UserLoginType, UserMaster.user_id == UserLoginType.user_id)
+            .where(
+                UserMaster.user_phone == param["user_phone"],
+                UserLoginType.login_type == param["type"].upper(),
+                UserLoginType.enabled_flag == "Y",
+            )
+        )
+        result = session.execute(stmt).scalars().first()
+        return result.to_dict() if result else None
+
     def select_user_id_by_email(self, session, email: str):
         """이메일로 user_id 단건 조회."""
         stmt = select(UserMaster.user_id).where(UserMaster.email == email)

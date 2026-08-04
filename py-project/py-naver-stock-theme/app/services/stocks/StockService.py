@@ -1,6 +1,6 @@
 import pandas as pd
 
-from app.domains.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
+from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
 from app.ext_services.kis.KisEngine import KisEngine
 from app.services.stocks.StockModService import StockModService
 from app.utils.constants.Literal import Literal

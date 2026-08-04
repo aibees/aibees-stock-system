@@ -21,10 +21,9 @@ refreshToken을 DB에 저장해 서버 측 폐기(revoke)를 가능하게 하는
 """
 
 from sqlalchemy import Column, String, Integer, DateTime, Boolean
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
-Base = declarative_base()
+from stock_shared.base import Base
 
 
 class UserRefreshToken(Base):

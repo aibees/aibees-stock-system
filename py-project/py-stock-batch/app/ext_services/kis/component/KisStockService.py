@@ -7,7 +7,7 @@ from app.common.constants.Literal import Literal
 from app.domain.dao.userTestDao import UserTestDao
 
 matplotlib.use('Agg')
-from app.domain.dao.userMasterDao import UserMasterDao
+from stock_shared.dao.userMasterDao import UserMasterDao
 from app.domain.dto.userOptionMeta import UserOptionMeta
 
 kst = pytz.timezone("Asia/Seoul")

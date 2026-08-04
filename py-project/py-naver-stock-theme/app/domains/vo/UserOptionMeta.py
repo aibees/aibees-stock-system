@@ -2,7 +2,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from app.domains.vo.UserCoinInfo import UserCoinInfo
+from stock_shared.vo.userCoinInfo import UserCoinInfo
 
 
 def _to_plain(obj: Any) -> Any:

@@ -23,7 +23,7 @@ KospiStrategy2 단일 종목 백테스트 러너.
 import pprint
 
 from app.config.database import dbConn
-from app.domain.dao.tradeCandleDataDao import TradeCandleDataDao
+from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
 from app.domain.dto.userOptionMeta import UserOptionMeta
 from app.batches.services.userService import UserService
 from app.ext_services.kis.component.KospiStrategy2 import KospiStrategy2
@@ -229,7 +229,7 @@ def diagnose(coin_code: str = STOCK_CODE, only_hma_upturn: bool = True,
     현재 STRATEGY_OVERRIDES 설정 기준으로 판정하므로, 설정을 바꿔가며
     '이 조합이면 동그라미 지점을 잡는지'를 표로 확인할 수 있다.
     """
-    from app.domain.dto.userCoinInfo import UserCoinInfo
+    from stock_shared.vo.userCoinInfo import UserCoinInfo
     rows = daoImpl.select_candle_data(session, {
         'coin_code': coin_code, 'start_date': start_date, 'end_date': end_date})
     if not rows:

@@ -2,7 +2,7 @@ import logging
 import traceback, pprint
 from flask import Blueprint, request, g
 
-from app.domains.dao.masterStockDao import MasterStockDao
+from stock_shared.dao.masterStockDao import MasterStockDao
 from app.flask_app.utils.apiResponse import ApiResponse
 from app.services.stocks.StockService import StockService
 from app.utils.constants.Literal import Literal

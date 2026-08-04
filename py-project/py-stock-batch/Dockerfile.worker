@@ -11,14 +11,19 @@ RUN pip install -U "poetry==$POETRY_VERSION"
 WORKDIR /workdir
 
 # 의존성만 먼저 (레이어 캐시)
-COPY pyproject.toml poetry.lock /workdir/
+# shared 를 먼저 복사한다 (poetry path dependency '../shared' 해석에 필요).
+# 빌드 컨텍스트는 py-project/ 이므로 'docker build -f <이 파일> .' 을
+# py-project 디렉터리에서 실행해야 한다.
+COPY shared /shared
+
+COPY py-stock-batch/pyproject.toml py-stock-batch/poetry.lock /workdir/
 RUN poetry lock
 RUN poetry config virtualenvs.create false && poetry install --no-interaction --no-ansi --no-root
 
 # 소스는 app 패키지만 복사.
 #  - 시크릿(aes.key/kis.key)·데이터(*.png 등)는 이미지에 굽지 않는다.
 #  - aes.key 는 런타임에 read-only 로 마운트한다(compose 참고).
-COPY app /workdir/app
+COPY py-stock-batch/app /workdir/app
 
 # 데몬 진입점 (유저당 1 프로세스, KIS_USER_ID 로 구분)
 CMD ["poetry", "run", "python", "-m", "app.trade_worker.main"]

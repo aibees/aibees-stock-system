@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from app.domains.vo.UserCoinInfo import UserCoinInfo
+from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.domains.vo.UserOptionMeta import UserOptionMeta
 
 class Action(Enum):

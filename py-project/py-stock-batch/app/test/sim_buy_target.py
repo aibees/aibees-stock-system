@@ -24,8 +24,8 @@ import sys
 from sqlalchemy import text
 
 from app.config.database import dbConn
-from app.domain.dao.tradeCandleDataDao import TradeCandleDataDao
-from app.domain.dto.userCoinInfo import UserCoinInfo
+from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
+from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.domain.dto.userOptionMeta import UserOptionMeta
 from app.batches.services.userService import UserService
 from app.ext_services.kis.component.KospiStrategy1 import KospiStrategy1

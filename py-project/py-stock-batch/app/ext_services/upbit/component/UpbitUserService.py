@@ -1,5 +1,5 @@
-from app.domain.dao.userMasterDao import UserMasterDao
-from app.domain.dto.userCoinInfo import UserCoinInfo
+from stock_shared.dao.userMasterDao import UserMasterDao
+from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.domain.dto.userOptionMeta import UserOptionMeta
 
 

@@ -1,7 +1,7 @@
 from app.domain.model.batchBackTestLog import TradeLog
-from app.domain.model.userInterestGroups import UserInterestGroups
-from app.domain.model.userInterestStocks import UserInterestStocks
-from app.domain.model.userWallet import UserWallet
+from stock_shared.models.userInterestGroups import UserInterestGroups
+from stock_shared.models.userInterestStocks import UserInterestStocks
+from stock_shared.models.userWallet import UserWallet
 
 from sqlalchemy import select, update, and_, func, desc, delete, insert
 

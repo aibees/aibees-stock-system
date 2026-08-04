@@ -1,4 +1,4 @@
-from app.domains.models.userInterestGroups import UserInterestGroups
+from stock_shared.models.userInterestGroups import UserInterestGroups
 
 from sqlalchemy import select, update, and_, func, delete
 from sqlalchemy.dialects.mysql import insert

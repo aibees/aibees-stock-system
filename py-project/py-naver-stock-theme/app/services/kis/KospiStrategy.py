@@ -1,4 +1,4 @@
-from app.domains.vo.UserCoinInfo import UserCoinInfo
+from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.domains.vo.UserOptionMeta import UserOptionMeta
 from app.services.kis.StockStrategy import StockStrategy, Action
 

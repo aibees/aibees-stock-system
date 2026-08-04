@@ -1,15 +1,15 @@
 from sqlalchemy import select, and_
 from sqlalchemy.dialects.mysql import insert
 
-from app.domains.dao.baseDao import BaseDao
-from app.domains.models.userInterestStocks import UserInterestStock
+from stock_shared.dao.baseDao import BaseDao
+from stock_shared.models.userInterestStocks import UserInterestStocks
 
 import logging
 logging.basicConfig(level=logging.ERROR)
 
 
 class UserInterestStocksDao(BaseDao):
-    model = UserInterestStock
+    model = UserInterestStocks
 
     def __init__(self):
         self.__name__ = 'UserInterestStocksDao'
@@ -21,8 +21,8 @@ class UserInterestStocksDao(BaseDao):
     # select by group_id
     # ================================================================
     def select_by_group(self, session, group_id: int):
-        stmt = select(UserInterestStock).where(
-            UserInterestStock.group_id == group_id
+        stmt = select(UserInterestStocks).where(
+            UserInterestStocks.group_id == group_id
         )
         results = session.execute(stmt).scalars().all()
         return [obj.to_dict() for obj in results]
@@ -30,10 +30,10 @@ class UserInterestStocksDao(BaseDao):
     # select enabled stocks by group_id
     # ================================================================
     def select_enabled_by_group(self, session, group_id: int):
-        stmt = select(UserInterestStock).where(
+        stmt = select(UserInterestStocks).where(
             and_(
-                UserInterestStock.group_id == group_id,
-                UserInterestStock.enabled_flag == 'Y',
+                UserInterestStocks.group_id == group_id,
+                UserInterestStocks.enabled_flag == 'Y',
             )
         )
         results = session.execute(stmt).scalars().all()
@@ -42,7 +42,7 @@ class UserInterestStocksDao(BaseDao):
     # insert
     # ================================================================
     def insert(self, session, data: dict) -> None:
-        stmt = insert(UserInterestStock).values(
+        stmt = insert(UserInterestStocks).values(
             group_id=data['group_id'],
             stock_code=data['stock_code'],
             status=data.get('status', 'ACTIVE'),

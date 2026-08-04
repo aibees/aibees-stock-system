@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt  # PyJWT 패키지 (pyproject.toml에 PyJWT = "^2.8.0" 추가됨)
 
-from app.domains.dao.userMasterDao import UserMasterDao
+from stock_shared.dao.userMasterDao import UserMasterDao
 from app.domains.dao.userRefreshTokenDao import UserRefreshTokenDao  # [신규] refreshToken DAO
 from app.exceptions import ResetRequiredException  # 단일 출처 임포트 — 이 파일에서 직접 정의하지 않음
 

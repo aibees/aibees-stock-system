@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from flask import Blueprint, request, g
 
-from app.domains.dao.batchJobMasterDao import BatchJobMasterDao
+from stock_shared.dao.batchJobMasterDao import BatchJobMasterDao
 from app.domains.dao.nBatchLogDao import BatchLogDao
 from app.flask_app.utils.apiResponse import ApiResponse
 from app.config.db.database import dbConn

@@ -1,4 +1,4 @@
-from app.domain.dto.userCoinInfo import UserCoinInfo
+from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.domain.dto.userOptionMeta import UserOptionMeta
 from app.ext_services.StockStrategy import StockStrategy, Action
 

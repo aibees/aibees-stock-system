@@ -1,5 +1,5 @@
 from app.batches.jobs.job import Job
-from app.domain.dao.userMasterDao import UserMasterDao
+from stock_shared.dao.userMasterDao import UserMasterDao
 from app.domain.dao.userTestDao import UserTestDao
 from app.domain.dto.userOptionMeta import UserOptionMeta
 from app.ext_services.upbit.component.UpbitService import UpbitService

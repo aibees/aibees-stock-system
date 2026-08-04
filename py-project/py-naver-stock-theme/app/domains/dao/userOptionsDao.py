@@ -1,10 +1,10 @@
 from sqlalchemy import select, update
 from sqlalchemy.dialects.mysql import insert
 
-from app.domains.dao.baseDao import BaseDao
-from app.domains.models.userOptions import UserOptions
-from app.domains.models.userMaster import UserMaster
-from app.domains.models.userDetail import UserDetail
+from stock_shared.dao.baseDao import BaseDao
+from stock_shared.models.userOptions import UserOptions
+from stock_shared.models.userMaster import UserMaster
+from stock_shared.models.userDetail import UserDetail
 
 import logging
 logging.basicConfig(level=logging.ERROR)

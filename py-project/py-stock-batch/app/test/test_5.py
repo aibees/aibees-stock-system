@@ -3,8 +3,8 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 
 from app.common.constants.Literal import Literal
-from app.domain.dao.tradeCandleDataDao import TradeCandleDataDao
-from app.domain.dto.userCoinInfo import UserCoinInfo
+from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
+from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.config.database import dbConn
 from app.domain.dto.userOptionMeta import UserOptionMeta
 from app.batches.services.stockService import StockService

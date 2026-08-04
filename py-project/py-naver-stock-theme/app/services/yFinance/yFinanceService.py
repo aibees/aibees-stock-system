@@ -2,7 +2,7 @@ import yfinance as yf
 import pandas as pd
 import json
 
-from app.domains.dao.masterStockDao import MasterStockDao
+from stock_shared.dao.masterStockDao import MasterStockDao
 
 class YFinanceService:
     def __init__(self):

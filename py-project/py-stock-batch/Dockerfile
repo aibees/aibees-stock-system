@@ -9,12 +9,17 @@ RUN pip install -U "poetry==$POETRY_VERSION"
 WORKDIR /workdir
 
 # copy source code
-COPY pyproject.toml poetry.lock /workdir/
+# shared 를 먼저 복사한다 (poetry path dependency '../shared' 해석에 필요).
+# 빌드 컨텍스트는 py-project/ 이므로 'docker build -f <이 파일> .' 을
+# py-project 디렉터리에서 실행해야 한다.
+COPY shared /shared
+
+COPY py-stock-batch/pyproject.toml py-stock-batch/poetry.lock /workdir/
 
 RUN poetry lock
 RUN poetry config virtualenvs.create false && poetry install --no-interaction --no-ansi
 
-COPY . /workdir
+COPY py-stock-batch/ /workdir/
 
 # Python 경로 설정
 ENV PYTHONPATH=/usr/local/bin/python3.12

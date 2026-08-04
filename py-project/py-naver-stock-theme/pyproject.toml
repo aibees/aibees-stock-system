@@ -6,6 +6,7 @@ readme = "README.md"
 authors = ["aibees <aibees1129@naver.com>"]
 
 [tool.poetry.dependencies]
+stock-shared = { path = "../shared", develop = true }
 beautifulsoup4 = "^4.13.4"
 sqlalchemy = "^2.0.41"
 pymysql = "^1.1.1"

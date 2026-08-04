@@ -1,7 +1,6 @@
 from sqlalchemy import Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
 
-Base = declarative_base()
+from stock_shared.base import Base
 
 class Campaign(Base):
     __tablename__ = 'campaign'

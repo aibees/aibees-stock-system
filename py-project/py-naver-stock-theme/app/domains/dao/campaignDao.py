@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.dialects.mysql import insert
 
-from app.domains.dao.baseDao import BaseDao
+from stock_shared.dao.baseDao import BaseDao
 from app.domains.models.campaign import Campaign
 
 import logging

@@ -10,7 +10,7 @@ KIS 백테스트 러너.
 import pprint
 
 from app.config.database import dbConn
-from app.domain.dao.tradeCandleDataDao import TradeCandleDataDao
+from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
 from app.domain.dto.userOptionMeta import UserOptionMeta
 from app.batches.services.stockService import StockService
 from app.batches.services.userService import UserService

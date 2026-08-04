@@ -1,4 +1,4 @@
-from app.domain.model.nStockBatchLog import NStockBatchLog
+from stock_shared.models.nStockBatchLog import NStockBatchLog
 from sqlalchemy import select, update, and_, func
 from sqlalchemy.dialects.mysql import insert
 from datetime import datetime

@@ -4,7 +4,7 @@ from enum import Enum
 
 from app.config.database import dbConn
 from app.domain.dao.userTestDao import UserTestDao
-from app.domain.dto.userCoinInfo import UserCoinInfo
+from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.domain.dto.userOptionMeta import UserOptionMeta
 
 session = dbConn.get_session()

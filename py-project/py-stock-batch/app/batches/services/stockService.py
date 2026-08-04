@@ -1,7 +1,7 @@
-from app.domain.dao.masterStockDao import MasterStockDao
-from app.domain.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
+from stock_shared.dao.masterStockDao import MasterStockDao
+from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
 from app.domain.dao.tradeSellTargetStockDao import TradeSellTargetStockDao
-from app.domain.dao.stockSellRequestDao import StockSellRequestDao
+from stock_shared.dao.stockSellRequestDao import StockSellRequestDao
 
 
 class StockService:

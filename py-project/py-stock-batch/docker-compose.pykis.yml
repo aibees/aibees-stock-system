@@ -19,8 +19,9 @@
 x-worker-common: &worker-common
   image: py-stock-worker
   build:
-    context: .
-    dockerfile: Dockerfile.worker
+    # 컨텍스트는 py-project/ (shared 포함). 실행: py-project 에서 docker compose -f py-stock-batch/docker-compose.pykis.yml build
+    context: ..
+    dockerfile: py-stock-batch/Dockerfile.worker
   working_dir: /workdir
   volumes:
     - ./aes.key:/workdir/aes.key:ro     # 3대 공통 (KIS key 복호화), 이미지엔 안 굽음

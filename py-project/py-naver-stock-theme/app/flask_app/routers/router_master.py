@@ -3,7 +3,7 @@ import datetime
 from datetime import datetime
 from flask import Blueprint, request, g
 
-from app.domains.dao.masterStockDao import MasterStockDao
+from stock_shared.dao.masterStockDao import MasterStockDao
 from app.domains.dao.masterMenuDao import MasterInfosDao
 from app.flask_app.utils.apiResponse import ApiResponse
 

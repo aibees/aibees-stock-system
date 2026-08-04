@@ -8,7 +8,7 @@ KisBacktester.py — KIS 전용 백테스트 엔진
 - 한 종목 동시 1 포지션, 전액 진입
 - vol_avg / downtrend_ratio: DB 미저장이므로 run_one에서 즉석 계산하여 주입
 """
-from app.domains.vo.UserCoinInfo import UserCoinInfo
+from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.domains.vo.UserOptionMeta import UserOptionMeta
 from app.services.kis.StockStrategy import Action
 from app.services.kis.KospiStrategy import KospiStrategy1

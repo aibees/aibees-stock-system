@@ -7,7 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from pytz import timezone
 
 from app.config.contextManager import get_session
-from app.domain.dao.batchJobMasterDao import BatchJobMasterDao
+from stock_shared.dao.batchJobMasterDao import BatchJobMasterDao
 
 
 # ──────────────────────────────────────────────────────────────

@@ -20,7 +20,7 @@ router_sell_request.py — 매도신호 신청 (stock_sell_request) 라우터
 import logging
 from flask import Blueprint, request, g
 
-from app.domains.dao.stockSellRequestDao import StockSellRequestDao
+from stock_shared.dao.stockSellRequestDao import StockSellRequestDao
 from app.flask_app.routers.router_oauth import require_auth
 from app.flask_app.utils.apiResponse import ApiResponse
 
