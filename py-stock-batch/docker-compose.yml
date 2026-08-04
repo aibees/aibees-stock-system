@@ -1,0 +1,21 @@
+# docker compose yml
+
+version: "3.8"
+
+services:
+    app:
+        #build:
+        #    context: .
+        #    dockerfile: Dockerfile
+        image: py-stock-batch
+        container_name: stock-batch-flask-app
+        working_dir: /workdir
+        ports:
+          - "5557:5557"
+        networks:
+            aibees:
+                ipv4_address: 172.21.1.5
+
+networks:
+    aibees:
+        external: true

@@ -1,0 +1,25 @@
+## MCP Server (Streamable HTTP + OAuth 2.1)
+## 기존 Dockerfile과 동일 베이스 이미지 사용, CMD만 MCP 서버로 변경
+
+FROM python:3.12.3
+
+ENV POETRY_VERSION=1.8.2
+RUN pip install -U "poetry==$POETRY_VERSION"
+
+WORKDIR /workdir
+
+COPY pyproject.toml poetry.lock /workdir/
+
+RUN poetry lock
+RUN poetry config virtualenvs.create false && poetry install --no-interaction --no-ansi
+
+COPY . /workdir
+
+ENV PYTHONPATH=/usr/local/bin/python3.12
+
+RUN chmod +x /usr/local/bin/poetry
+RUN sed -i '1s|^.*$|#!/usr/local/bin/python3.12|' /usr/local/bin/poetry
+
+EXPOSE 5558
+
+CMD ["poetry", "run", "python", "-m", "app.main", "mcp"]

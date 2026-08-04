@@ -1,0 +1,13 @@
+# 빌드 컨텍스트 슬림화 (메인/worker 공통)
+# ※ *.key 는 제외하지 않는다 — 메인 py-stock-batch 이미지는 aes.key/kis.key 를 COPY 로 굽는다.
+#   (worker 이미지는 Dockerfile.worker 가 'COPY app' 만 하므로 시크릿이 애초에 안 들어감)
+.venv
+.git
+.idea
+.claude
+**/__pycache__
+*.pyc
+*.pyo
+# 대용량/런타임 불필요 산출물
+*.png
+docs_cache

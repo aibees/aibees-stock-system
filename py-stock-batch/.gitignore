@@ -1,0 +1,6 @@
+**/*.pyc
+# push 토큰(커밋 금지)
+.pr_token
+.claude/settings.local.json
+
+*.sql

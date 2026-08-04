@@ -1,0 +1,37 @@
+# docker compose yml
+
+version: "3.8"
+
+services:
+    app:
+        #build:
+        #    context: .
+        #    dockerfile: Dockerfile
+        image: py-stock-web
+        container_name: stock-web-flask-app
+        working_dir: /workdir
+        networks:
+            aibees:
+                ipv4_address: 172.21.1.4
+
+    mcp:
+        image: py-stock-web          # Flask 앱과 동일 이미지 사용
+        container_name: stock-web-mcp-server
+        working_dir: /workdir
+        command: ["poetry", "run", "python", "-m", "app.mcp_server"]
+        environment:
+            - MCP_HOST=0.0.0.0
+            - MCP_PORT=5558
+            - MCP_BASE_URL=https://stock.aibeesworld.com  # OAuth discovery에 노출되는 URL
+            - MCP_JWT_SECRET=${MCP_JWT_SECRET}
+            - MCP_CLIENT_ID=${MCP_CLIENT_ID}
+            - MCP_CLIENT_SECRET=${MCP_CLIENT_SECRET}
+            - MCP_TOKEN_TTL=3600
+            - MCP_ALLOW_DYNAMIC_REGISTRATION=false
+        networks:
+            aibees:
+                ipv4_address: 172.21.1.5
+
+networks:
+    aibees:
+        external: true

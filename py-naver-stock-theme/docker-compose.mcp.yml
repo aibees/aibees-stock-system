@@ -1,0 +1,26 @@
+# docker-compose.mcp.yml
+# MCP 서버 전용 compose — Flask(docker-compose.yml)와 독립적으로 운영
+
+version: "3.8"
+
+services:
+    mcp:
+        image: py-stock-mcp
+        container_name: stock-web-mcp-server
+        working_dir: /workdir
+        env_file:
+            - .env.mcp
+        environment:
+            - MCP_HOST=0.0.0.0
+            - MCP_PORT=5558
+            - MCP_BASE_URL=https://stock.aibeesworld.com
+            - MCP_TOKEN_TTL=3600
+            - MCP_ALLOW_DYNAMIC_REGISTRATION=false
+        networks:
+            aibees:
+                ipv4_address: 172.21.1.7
+        restart: unless-stopped
+
+networks:
+    aibees:
+        external: true

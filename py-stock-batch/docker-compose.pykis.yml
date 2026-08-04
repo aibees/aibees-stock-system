@@ -1,0 +1,69 @@
+# 유저별 트레이딩 worker (같은 py-stock-batch 이미지, 상시 daemon)
+#
+# 모델:
+#   - 메인(py-stock-batch, docker-compose.yml)은 daily 배치:
+#       StockBuyCheckJob(매수타겟 선정) + StockSellCheckJob(매도 기준선·상태 갱신)
+#   - worker(아래)는 유저 1명당 1 프로세스로 상시 실행:
+#       매수 엔진(09:00 시장가) + 매도 엔진(실시간 소켓 라인 감시)
+#
+# 안전장치(기본값): DRY_RUN=true(로그만), KIS_VIRTUAL=true(모의).
+#   실주문 전환은 각 worker 의 env 를 명시적으로 바꿔야 한다.
+#
+# 실행 (메인 py-stock-batch 와 **별개 이미지**로 독립 배포):
+#   docker build -f Dockerfile.worker -t py-stock-worker .
+#   docker compose -f docker-compose.pykis.yml up -d --build
+#   ※ DB_URL 은 아래 environment 에 하드코딩됨(별도 주입 불필요).
+#
+# 진입점: 이미지 CMD 가 데몬(python -m app.trade_worker.main). 유일한 차이는 KIS_USER_ID.
+
+x-worker-common: &worker-common
+  image: py-stock-worker
+  build:
+    context: .
+    dockerfile: Dockerfile.worker
+  working_dir: /workdir
+  volumes:
+    - ./aes.key:/workdir/aes.key:ro     # 3대 공통 (KIS key 복호화), 이미지엔 안 굽음
+    - ./smtp.key:/workdir/smtp.key:ro   # 이메일 fallback 발신 계정 (텔레그램 실패 시)
+  restart: unless-stopped
+
+services:
+  kis-user1:
+    <<: *worker-common
+    container_name: kis-user1
+    environment:
+      - KIS_USER_ID=1            # ← 컨테이너마다 이 값만 다름
+      - KIS_VIRTUAL=false         # 모의 (실전 전환 시 false)
+      - DRY_RUN=false             # 로그만 (실주문 전환 시 false)
+      - BUY_TIME=09:00
+      - KIS_ALLOW_FILE_FALLBACK=false
+      - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
+    networks: { aibees: { ipv4_address: 172.21.1.11 } }
+#
+#  kis-user2:
+#    <<: *worker-common
+#    container_name: kis-user2
+#    environment:
+#      - KIS_USER_ID=2
+#      - KIS_VIRTUAL=true
+#      - DRY_RUN=true
+#      - BUY_TIME=09:00
+#      - KIS_ALLOW_FILE_FALLBACK=false
+#      - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
+#    networks: { aibees: { ipv4_address: 172.21.1.12 } }
+#
+#  kis-user3:
+#    <<: *worker-common
+#    container_name: kis-user3
+#    environment:
+#      - KIS_USER_ID=3
+#      - KIS_VIRTUAL=true
+#      - DRY_RUN=true
+#      - BUY_TIME=09:00
+#      - KIS_ALLOW_FILE_FALLBACK=false
+#      - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
+#    networks: { aibees: { ipv4_address: 172.21.1.13 } }
+
+networks:
+  aibees:
+    external: true
