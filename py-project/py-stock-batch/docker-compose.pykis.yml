@@ -36,7 +36,11 @@ services:
       - KIS_USER_ID=1            # ← 컨테이너마다 이 값만 다름
       - KIS_VIRTUAL=false         # 모의 (실전 전환 시 false)
       - DRY_RUN=false             # 로그만 (실주문 전환 시 false)
-      - BUY_TIME=09:00
+      - BUY_TIME=09:00           # KRX 정규장 시장가 매수
+      - NXT_PREMARKET=true        # NXT 프리마켓 선매수 라운드
+      - NXT_BUY_TIME=08:00        # 프리마켓 08:00~08:50 (지정가만 가능)
+      - NXT_LIMIT_SLIP_PCT=2.0    # 매수 지정가 = 전일종가 +2%
+      - SELL_LIMIT_SLIP_PCT=1.0   # NXT 장외 매도 지정가 = 체결가 -1%
       - KIS_ALLOW_FILE_FALLBACK=false
       - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
 #    networks: { aibees: { ipv4_address: 172.21.1.11 } }
@@ -48,7 +52,11 @@ services:
       - KIS_USER_ID=2
       - KIS_VIRTUAL=false
       - DRY_RUN=false
-      - BUY_TIME=09:00
+      - BUY_TIME=09:00           # KRX 정규장 시장가 매수
+      - NXT_PREMARKET=true        # NXT 프리마켓 선매수 라운드
+      - NXT_BUY_TIME=08:00        # 프리마켓 08:00~08:50 (지정가만 가능)
+      - NXT_LIMIT_SLIP_PCT=2.0    # 매수 지정가 = 전일종가 +2%
+      - SELL_LIMIT_SLIP_PCT=1.0   # NXT 장외 매도 지정가 = 체결가 -1%
       - KIS_ALLOW_FILE_FALLBACK=false
       - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
 #    networks: { aibees: { ipv4_address: 172.21.1.12 } }
@@ -60,7 +68,11 @@ services:
       - KIS_USER_ID=3
       - KIS_VIRTUAL=false
       - DRY_RUN=false
-      - BUY_TIME=09:00
+      - BUY_TIME=09:00           # KRX 정규장 시장가 매수
+      - NXT_PREMARKET=true        # NXT 프리마켓 선매수 라운드
+      - NXT_BUY_TIME=08:00        # 프리마켓 08:00~08:50 (지정가만 가능)
+      - NXT_LIMIT_SLIP_PCT=2.0    # 매수 지정가 = 전일종가 +2%
+      - SELL_LIMIT_SLIP_PCT=1.0   # NXT 장외 매도 지정가 = 체결가 -1%
       - KIS_ALLOW_FILE_FALLBACK=false
       - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
 #    networks: { aibees: { ipv4_address: 172.21.1.13 } }

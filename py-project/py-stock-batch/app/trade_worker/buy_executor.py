@@ -28,13 +28,24 @@ class BuyExecutor:
         # 모든 로그는 trade_worker_log DB 테이블에 시간순 적재
         self.wlog = WorkerLogger(repo, cfg.user_id, "buy")
 
-    def run(self):
+    def run(self, premarket: bool = False):
+        """premarket=False: KRX 정규장 09:00 · 시장가 · 후보 전체를 순회.
+        premarket=True : NXT 프리마켓 08:00 · **지정가** · score 1위가 NXT 대상일 때만 1회 시도.
+
+        프리마켓에서 1위만 보는 이유: 후보를 훑어 내려가면 score 1위(KRX 전용)를 두고
+        하위 종목을 사버리게 되고, 1포지션 원칙 때문에 09:00 에 1위를 살 기회가 사라진다.
+        프리마켓 라운드는 '1위가 마침 NXT면 일찍 잡는다'는 보너스로만 동작한다."""
         uid = self.cfg.user_id
-        self.wlog.info("[매수] 시작 user_id=%s (%s)", uid, self.cfg.mode)
+        tag = "NXT프리마켓" if premarket else "정규장"
+        self.wlog.info("[매수] 시작 user_id=%s (%s · %s)", uid, self.cfg.mode, tag)
 
         # 1) 1포지션 원칙 (worker 보유분 기준)
-        if self.repo.get_holding_positions(uid):
-            self.wlog.info("[매수] 보유 종목 존재 → 매수 skip (1포지션)")
+        #    exclusive_flag='Y' 는 카운트에서 제외 — 신규 매수를 막지 않는 포지션이다.
+        #    (매도 감시·부팅 대조는 이 플래그와 무관하게 전량을 본다)
+        blocking = self.repo.get_holding_positions(uid, exclude_exclusive=True)
+        if blocking:
+            self.wlog.info("[매수] 보유 종목 존재 → 매수 skip (1포지션): %s",
+                           ", ".join(p["stock_code"] for p in blocking))
             return
 
         # 2) 현금 확인
@@ -53,22 +64,49 @@ class BuyExecutor:
             return
         targets = self.repo.get_buy_targets(ymd)
 
-        # 4) 시세 조회 가능한 첫 종목에 시장가 매수
+        # 3-1) 프리마켓 라운드는 score 1위가 NXT 대상일 때만 성립
+        if premarket:
+            if not targets:
+                self.wlog.info("[매수] 매수타겟 없음")
+                return
+            top = targets[0]
+            if top.get("nxt_flag") != "Y":
+                self.wlog.info("[매수] 1위 %s(%s) NXT 미대상(nxt_flag=%s) → 프리마켓 skip, 09:00 대기",
+                               top.get("stock_name"), top["stock_code"], top.get("nxt_flag"))
+                return
+            targets = [top]
+
+        # 4) 시세 조회 가능한 첫 종목에 매수 (정규장=시장가 / 프리마켓=지정가)
         budget = Decimal(balance) * Decimal(str(self.cfg.buy_budget_ratio))
         for tgt in targets:
             code = tgt["stock_code"]
             name = tgt.get("stock_name") or ""
             nxt = (tgt.get("nxt_flag") == "Y")   # NXT 대상 → 통합(UN/SOR), 아니면 KRX(J/KRX)
-            try:
-                price = self.broker.current_price(code, nxt=nxt)
-            except Exception as e:  # noqa: BLE001
-                self.wlog.warn("[매수] %s 시세 조회 실패: %s → 다음 후보", code, e)
-                continue
+
+            if premarket:
+                # 프리마켓 지정가 = 전일 종가 × (1+slip%) → 호가단위 내림.
+                # 현재가(UN) 조회는 프리마켓 초반 체결 전이면 비어 있을 수 있어 쓰지 않는다.
+                close = tgt.get("close")
+                if not close or Decimal(str(close)) <= 0:
+                    self.wlog.warn("[매수] %s 전일종가 없음 → 프리마켓 skip", code)
+                    return
+                price = self.broker.align_price(
+                    Decimal(str(close)) * (1 + Decimal(str(self.cfg.nxt_limit_slip_pct)) / 100))
+                self.wlog.info("[매수] %s 프리마켓 지정가=%s (전일종가=%s +%s%%)",
+                               code, price, close, self.cfg.nxt_limit_slip_pct)
+            else:
+                try:
+                    price = self.broker.current_price(code, nxt=nxt)
+                except Exception as e:  # noqa: BLE001
+                    self.wlog.warn("[매수] %s 시세 조회 실패: %s → 다음 후보", code, e)
+                    continue
             if price <= 0:
                 continue
 
             # 수량 산정: 매수가능조회(주문가능현금·최대매수수량) 우선, 실패 시 예수금//price fallback
-            max_qty, cash = self.broker.orderable(code, price)
+            #   프리마켓은 실제로 낼 지정가(ORD_DVSN=00) 기준으로 조회해야 수량이 맞는다.
+            max_qty, cash = self.broker.orderable(code, price,
+                                                  ord_dvsn="00" if premarket else "01")
             if max_qty is not None:
                 qty = int(int(max_qty) * Decimal(str(self.cfg.buy_budget_ratio)))
                 self.wlog.info("[매수] %s 매수가능: 최대수량=%s 주문가능현금=%s → 수량=%s", code, max_qty, cash, qty)
@@ -79,7 +117,10 @@ class BuyExecutor:
                 self.wlog.info("[매수] %s 매수 가능 수량 0 (price=%s) → 다음 후보", code, price)
                 continue
 
-            res = self.broker.wait_fill(self.broker.buy_market(code, Decimal(qty), price, nxt=nxt))
+            if premarket:
+                res = self.broker.wait_fill(self.broker.buy_limit_nxt(code, Decimal(qty), price))
+            else:
+                res = self.broker.wait_fill(self.broker.buy_market(code, Decimal(qty), price, nxt=nxt))
 
             # 미체결(PENDING)이면 즉시 취소하지 않고 설정 횟수만큼 추가 대기하며 재확인.
             # wait_fill 은 재호출해도 누적 체결(_fills)을 이어서 보므로 부분→전량 체결도 반영됨.
@@ -124,7 +165,7 @@ class BuyExecutor:
                            name, code, res.filled_qty, fill_px, final_balance, res.status)
             if self.notifier:
                 self.notifier.trade("BUY", name, code, res.filled_qty, fill_px, final_balance,
-                                    note=f"과열최저 rate={tgt.get('rate')} · {res.status}")
+                                    note=f"{tag} score={tgt.get('score')} · {res.status}")
             return
 
         self.wlog.info("[매수] 체결 가능한 후보 없음 (ymd=%s, 후보=%d)", ymd, len(targets))

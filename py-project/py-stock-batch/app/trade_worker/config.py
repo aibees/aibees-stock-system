@@ -7,7 +7,11 @@ worker 는 유저 1명당 1 프로세스(상시 daemon)로 뜬다. KIS_USER_ID �
 |------|------|------|
 | KIS_USER_ID   | (필수) | 이 worker 가 담당할 유저 id (1/2/3) |
 | DRY_RUN       | true   | true 면 실제 주문 대신 로그만 남김 (최우선 안전장치) |
-| BUY_TIME      | 09:00  | 매수 엔진 실행 시각 (장 시작) |
+| BUY_TIME      | 09:00  | 매수 엔진 실행 시각 (KRX 정규장 시작, 시장가) |
+| NXT_PREMARKET | true   | NXT 프리마켓 선매수 라운드 사용 여부 |
+| NXT_BUY_TIME  | 08:00  | NXT 프리마켓 매수 시각 (프리마켓 08:00~08:50) |
+| NXT_LIMIT_SLIP_PCT | 2.0 | 프리마켓 매수 지정가 = 전일종가 × (1+이 비율%) 후 호가단위 내림 |
+| SELL_LIMIT_SLIP_PCT | 1.0 | NXT 장외(프리/애프터) 매도 지정가 = 체결가 × (1-이 비율%). 즉시 체결 유도 |
 | MARKET        | KR     | 시장 코드 |
 | BUY_BUDGET_RATIO | 0.98 | 매수 시 현금의 사용 비율 (수수료/호가 여유) |
 | SYNC_WALLET_ON_BOOT | true | 부팅 시 실제 예수금으로 user_wallet 동기화 |
@@ -35,6 +39,11 @@ class WorkerConfig:
     dry_run: bool
     buy_hour: int
     buy_minute: int
+    nxt_premarket: bool
+    nxt_buy_hour: int
+    nxt_buy_minute: int
+    nxt_limit_slip_pct: float
+    sell_limit_slip_pct: float
     market: str
     buy_budget_ratio: float
     sync_wallet_on_boot: bool
@@ -59,11 +68,19 @@ def load() -> WorkerConfig:
     buy_time = os.getenv("BUY_TIME", "09:00")
     hh, mm = (buy_time.split(":") + ["0"])[:2]
 
+    nxt_time = os.getenv("NXT_BUY_TIME", "08:00")
+    nhh, nmm = (nxt_time.split(":") + ["0"])[:2]
+
     return WorkerConfig(
         user_id=int(uid),
         dry_run=_bool(os.getenv("DRY_RUN"), False),
         buy_hour=int(hh),
         buy_minute=int(mm),
+        nxt_premarket=_bool(os.getenv("NXT_PREMARKET"), True),
+        nxt_buy_hour=int(nhh),
+        nxt_buy_minute=int(nmm),
+        nxt_limit_slip_pct=float(os.getenv("NXT_LIMIT_SLIP_PCT", "2.0")),
+        sell_limit_slip_pct=float(os.getenv("SELL_LIMIT_SLIP_PCT", "1.0")),
         market=os.getenv("MARKET", "KR"),
         buy_budget_ratio=float(os.getenv("BUY_BUDGET_RATIO", "0.98")),
         sync_wallet_on_boot=_bool(os.getenv("SYNC_WALLET_ON_BOOT"), True),

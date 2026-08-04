@@ -80,7 +80,16 @@ class Repository:
 
     # ── worker 전용 포지션 테이블(trade_worker_position) ─────────────
     #   trade_sell_target_stock 와 무관. worker 가 직접 매수한 HOLDING 만 다룬다.
-    def get_holding_positions(self, user_id: int) -> list[dict]:
+    def get_holding_positions(self, user_id: int, exclude_exclusive: bool = False) -> list[dict]:
+        """HOLDING 포지션 목록.
+
+        exclude_exclusive=True 는 **매수 1포지션 카운트 전용**이다.
+        exclusive_flag='Y' 는 "이 종목은 보유 중이어도 신규 매수를 막지 않는다"는 뜻일 뿐,
+        손절/익절 감시 대상에서 빼겠다는 뜻이 아니다.
+        매도 감시(sell_executor)와 부팅 대조(_reconcile_positions)는 반드시 기본값(False)으로
+        전량을 봐야 한다. 여기서 걸러버리면 그 종목은 실시간 라인 감시가 꺼져
+        손절선 없이 방치되고, 부팅 시 수량 보정·외부청산 정리도 되지 않는다.
+        """
         sql = text(
             "SELECT p.position_id, "
             "       p.user_id, "
@@ -104,7 +113,7 @@ class Repository:
             "  LEFT JOIN master_stock ms ON ms.stock_code = p.stock_code"
             " WHERE p.user_id = :uid      "
             "   AND p.status = 'HOLDING'  "
-            "   AND COALESCE(p.exclusive_flag, 'N') != 'Y'"
+            + ("   AND COALESCE(p.exclusive_flag, 'N') != 'Y'" if exclude_exclusive else "")
         )
         with get_session() as s:
             return [dict(r) for r in s.execute(sql, {"uid": user_id}).mappings().all()]

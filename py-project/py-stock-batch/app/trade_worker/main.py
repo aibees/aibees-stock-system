@@ -6,7 +6,9 @@ trade_worker 진입점 (유저 1명당 1 프로세스, 상시 daemon).
 
 구성:
   - KisEngine(user_id) 으로 자기 유저 KIS 실전 세션 생성 (keyLoader → DB key).
-  - 매수 엔진: APScheduler cron(BUY_TIME, 기본 09:00) → 개장 일봉정리 + 시장가 매수.
+  - 매수 엔진(이중화):
+      · NXT_BUY_TIME(기본 08:00) → NXT 프리마켓 지정가 선매수(1위가 NXT 대상일 때만).
+      · BUY_TIME(기본 09:00)     → 개장 일봉정리 + KRX 정규장 시장가 매수.
   - 매도 엔진: 실시간 소켓 구독(stop/target/trail 라인 감시).
   - 안전장치: DRY_RUN 기본 true (실주문 전 로그만).
 
@@ -220,6 +222,11 @@ def main():
             sell.reload_positions()      # HOLDING 포지션 재적재(감시 대상 갱신)
             sell.refresh_positions()     # KospiStrategy1로 라인/액션 재계산 + SELL이면 즉시 매도
             buy.run()                    # 매수
+            # 매수는 이 루틴의 마지막이라, 여기서 다시 적재하지 않으면 당일 산 종목이
+            # sell 의 감시 대상(positions)·소켓 구독에 들어가지 않는다.
+            # → 진입 당일 하루 종일 손절/익절이 돌지 않는 사각지대가 생긴다.
+            # reset_sold=False: 위 refresh 에서 이미 판 종목의 _sold 마킹을 지우지 않는다.
+            sell.reload_positions(reset_sold=False)
         except Exception as e:  # noqa: BLE001
             log.exception("개장 루틴 실패: %s", e)
 
@@ -234,6 +241,34 @@ def main():
                       id="open_routine", max_instances=1)
     log.info("개장 루틴 등록: 매일 %02d:%02d (KST) · 주말/휴장일 skip",
              cfg.buy_hour, cfg.buy_minute)
+
+    # ── NXT 프리마켓 선매수 라운드 (08:00) ──────────────────────────
+    #   넥스트레이드 프리마켓은 08:00~08:50, **지정가 호가만** 허용한다.
+    #   매수만 수행한다. 매도(라인 재계산·즉시매도)는 09:00 루틴에 그대로 둔다 —
+    #   보유종목이 KRX 전용이면 이 시간대 매도 주문이 '장운영시간이 아닙니다'로 실패한다.
+    def _premarket_routine():
+        now_kst = datetime.now(_KST)
+        if now_kst.weekday() >= 5:
+            return
+        trading = broker.is_trading_day()
+        if trading is False:
+            log.info("[프리마켓] 휴장일(%s) → skip", now_kst.strftime("%Y-%m-%d"))
+            return
+        try:
+            buy.run(premarket=True)
+            sell.reload_positions(reset_sold=False)   # 프리마켓 체결분 즉시 감시 등록
+        except Exception as e:  # noqa: BLE001
+            log.exception("프리마켓 루틴 실패: %s", e)
+
+    if cfg.nxt_premarket:
+        scheduler.add_job(_premarket_routine,
+                          CronTrigger(hour=cfg.nxt_buy_hour, minute=cfg.nxt_buy_minute,
+                                      timezone=_KST),
+                          id="premarket_routine", max_instances=1)
+        log.info("NXT 프리마켓 매수 등록: 매일 %02d:%02d (KST) · 지정가(전일종가+%s%%) · 1위가 NXT 대상일 때만",
+                 cfg.nxt_buy_hour, cfg.nxt_buy_minute, cfg.nxt_limit_slip_pct)
+    else:
+        log.info("NXT 프리마켓 매수 비활성(NXT_PREMARKET=false)")
 
     # 계좌 예수금·보유종목 주기 갱신 (기본 10초). WALLET_POLL_SEC<=0 이면 비활성.
     #   reconcile_wallet: 실제 KIS 계좌 조회 → user_wallet(예수금·보유평가·총자산) + user_holdings 갱신.

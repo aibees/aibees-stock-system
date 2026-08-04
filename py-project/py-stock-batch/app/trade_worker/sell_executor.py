@@ -7,6 +7,13 @@
   - 개장 시(apply_open_signals): 일봉 신호(OBV 데드크로스·타임스탑 등으로 action_type 이
     SELL 계열로 마킹된) 포지션을 정리. (일봉 지표는 실시간 판정 불가)
 
+거래 세션 분리 (broker.market_session):
+  - NXT 대상(master_stock.nxt_flag='Y'): 08:00~08:50 프리마켓(지정가) · 09:00~15:20 메인(시장가)
+    · 15:20~15:30 KRX 단독(시장가) · 15:30~20:00 애프터마켓(지정가)
+  - KRX 전용: 09:00~15:30 만 (시장가)
+  통합 실시간 스트림(H0UNCNT0)은 장외에도 틱이 오므로, 세션 가드 없이는 KRX 가 닫힌
+  시간에 SOR 시장가가 나가 거부되고 연속 실패로 종목이 자동 비활성된다.
+
 체결 → sold 처리 · 잔고 증가 · trade_log.
 """
 import threading
@@ -41,6 +48,7 @@ class SellExecutor:
         self._cooldown: dict[str, float] = {}  # 실패 후 재시도 금지 만료시각(폭주 방지)
         self._fail_count: dict[str, int] = {}  # 종목별 연속 실패 횟수
         self._disabled: set[str] = set()       # 연속 실패로 자동 비활성(수동 확인 필요)
+        self._untradable_log: dict[str, float] = {}  # 장외 라인돌파 로그 throttle 만료시각
         self._lock = threading.Lock()
 
     # ── 구독 시작 ────────────────────────────────────────────────────
@@ -53,12 +61,15 @@ class SellExecutor:
     - 감시 대상 = worker 가 직접 매수한 HOLDING 만 (trade_sell_target_stock 과 무관)
     - _sold 초기화(당일 리셋), 미구독 종목만 신규 시세 구독
     """
-    def reload_positions(self):
+    def reload_positions(self, reset_sold: bool = True):
+        """reset_sold=False 는 **매수 직후 재적재 전용**.
+        당일 이미 판 종목의 _sold 마킹을 지우지 않기 위해서다."""
         # trade_worker_position 에서 HOLDING 상태의 종목들
         holding = self.repo.get_holding_positions(self.cfg.user_id)
 
         self.positions = {p["stock_code"]: p for p in holding}
-        self._sold = set()
+        if reset_sold:
+            self._sold = set()
         # self.wlog.info("[매도] HOLDING(감시대상) %d종목 · 실시간시세 구독중 %d종목",
         #                len(holding), len(self._subscribed))
         for code, pos in self.positions.items():
@@ -82,6 +93,16 @@ class SellExecutor:
             except Exception as e:  # noqa: BLE001
                 self.wlog.warn("[매도] %s 구독 해제 실패: %s", symbol, e)
 
+    # ── 세션 가드 ────────────────────────────────────────────────────
+    def _session(self, pos: dict):
+        """이 종목이 지금 주문 가능한 세션인지. NXT 대상과 KRX 전용은 창이 다르다.
+          - NXT 대상 : 08:00~08:50(지정가) · 09:00~15:20 · 15:20~15:30 · 15:30~20:00(지정가)
+          - KRX 전용 : 09:00~15:30 만
+        통합 스트림(H0UNCNT0)은 장외에도 틱을 뿜기 때문에 이 가드가 없으면
+        KRX 닫힌 시간에 SOR 시장가가 나가 '장운영시간이 아닙니다'로 거부되고,
+        _register_fail 이 쌓여 종목이 자동 비활성(_disabled)까지 간다."""
+        return self.broker.market_session(pos.get("nxt_flag") == "Y")
+
     # ── 실시간 라인 돌파 ─────────────────────────────────────────────
     def on_price(self, symbol: str, price: Decimal):
         pos = self.positions.get(symbol)
@@ -92,9 +113,24 @@ class SellExecutor:
         if cd and time.time() < cd:
             return
         reason = self._hit_line(pos, price)
-        if reason:
-            self.wlog.info("[매도] 라인 돌파 %s @%s (%s)", symbol, price, reason)
-            self._do_sell(symbol, pos, price, reason)
+        if not reason:
+            return
+        sess = self._session(pos)
+        if not sess.tradable:
+            # 주문 불가 시간대(예: NXT 08:50~09:00 휴식, 20:00 이후). 실패로 세지 않는다.
+            self._warn_untradable(symbol, reason, sess)
+            return
+        self.wlog.info("[매도] 라인 돌파 %s @%s (%s · %s)", symbol, price, reason, sess.name)
+        self._do_sell(symbol, pos, price, reason, sess)
+
+    def _warn_untradable(self, symbol: str, reason: str, sess):
+        """장외 라인돌파 로그 — 소켓 틱마다 찍히면 폭주하므로 종목당 60초 1회로 제한."""
+        now = time.time()
+        if now < self._untradable_log.get(symbol, 0):
+            return
+        self._untradable_log[symbol] = now + 60
+        self.wlog.info("[매도] %s 라인 돌파(%s) 감지했으나 %s → 주문 보류",
+                       symbol, reason, sess.name)
 
     @staticmethod
     def _hit_line(pos: dict, price: Decimal) -> str | None:
@@ -143,12 +179,16 @@ class SellExecutor:
                            state.get("trail_line"), state.get("bars_held"))
             if action != "HOLD":
                 nxt = (pos.get("nxt_flag") == "Y")
+                sess = self._session(pos)
+                if not sess.tradable:
+                    self.wlog.info("[매도] %s 일봉신호(%s) 이지만 %s → 주문 보류", code, action, sess.name)
+                    continue
                 try:
                     price = self.broker.current_price(code, nxt=nxt)
                 except Exception as e:  # noqa: BLE001
                     self.wlog.warn("[매도] %s 개장 시세 실패: %s", code, e)
                     price = _toDecimal(state.get("target_price")) or Decimal(0)
-                self._do_sell(code, pos, price, action)
+                self._do_sell(code, pos, price, action, sess)
 
     # ── 실제 보유수량 조회 ───────────────────────────────────────────
     def _actual_qty(self, symbol: str):
@@ -175,7 +215,7 @@ class SellExecutor:
                 self.notifier.send("⚠ 매도 실패 경보", f"{symbol} 매도 {c}회 실패로 자동 비활성됨")
 
     # ── 매도 실행 ────────────────────────────────────────────────────
-    def _do_sell(self, symbol: str, pos: dict, price: Decimal, reason: str):
+    def _do_sell(self, symbol: str, pos: dict, price: Decimal, reason: str, sess=None):
         # 동시성 가드: 소켓 콜백이 여러 틱 동시 진입해도 종목당 1건만 진행.
         with self._lock:
             if symbol in self._sold or symbol in self._inflight or symbol in self._disabled:
@@ -202,9 +242,25 @@ class SellExecutor:
                 self._register_fail(symbol, "매도수량 0")
                 return
 
+            sess = sess or self._session(pos)
+            if not sess.tradable:
+                self.wlog.info("[매도] %s %s → 주문 보류(실패로 세지 않음)", symbol, sess.name)
+                return
+
+            # 지정가 세션(NXT 프리/애프터마켓)은 시장가가 없다.
+            # 손절/익절은 체결 속도가 생명이므로 체결가보다 한 틱 아래로 걸어 즉시 체결을 유도한다.
+            order_px = price
+            if sess.limit_only:
+                order_px = self.broker.align_price(
+                    price * (1 - Decimal(str(self.cfg.sell_limit_slip_pct)) / 100))
+                if order_px <= 0:
+                    self._register_fail(symbol, f"지정가 산출 실패(price={price})")
+                    return
+                self.wlog.info("[매도] %s %s 지정가=%s (체결가=%s -%s%%)",
+                               symbol, sess.name, order_px, price, self.cfg.sell_limit_slip_pct)
             try:
-                nxt = (pos.get("nxt_flag") == "Y")   # NXT 대상 → SOR, 아니면 KRX
-                res = self.broker.wait_fill(self.broker.sell_market(symbol, qty, price, nxt=nxt))
+                res = self.broker.wait_fill(
+                    self.broker.order_in_session("SELL", symbol, qty, order_px, sess))
             except Exception as e:  # noqa: BLE001  (KIS API 오류·수량초과·rate limit 등)
                 self._register_fail(symbol, f"주문 예외: {e}")
                 return

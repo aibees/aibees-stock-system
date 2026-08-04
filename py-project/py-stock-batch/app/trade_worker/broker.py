@@ -30,6 +30,19 @@ def _ono(order_number) -> Optional[str]:
     return str(n) if n else str(order_number)
 
 
+@dataclass(frozen=True)
+class MarketSession:
+    """지금 이 종목을 어느 거래소에 어떤 호가유형으로 낼 수 있는지."""
+    tradable: bool
+    exchange: str        # KRX / NXT / SOR
+    ord_dvsn: str        # '01'=시장가 / '00'=지정가
+    name: str            # 로그용 세션명
+
+    @property
+    def limit_only(self) -> bool:
+        return self.ord_dvsn == "00"
+
+
 @dataclass
 class OrderResult:
     symbol: str
@@ -130,13 +143,15 @@ class Broker:
             return None
 
     # ── 매수가능조회 (주문가능금액·주문가능수량) ────────────────────
-    def orderable(self, symbol: str, price: Optional[Decimal] = None):
+    def orderable(self, symbol: str, price: Optional[Decimal] = None, ord_dvsn: str = "01"):
         """매수가능조회(inquire-psbl-order, TTTC8908R) → (qty:int, amount:Decimal) 또는 (None, None).
 
         KIS 공식 가이드 기준(미수 미사용):
           - 매수가능금액 = nrcvb_buy_amt(미수없는매수금액)   ※ ord_psbl_cash(주문가능현금)는 예수금 성격
           - 매수가능수량 = nrcvb_buy_qty(미수없는매수수량)
-          - ORD_DVSN 은 반드시 01(시장가). 00(지정가)은 종목증거금율이 반영되지 않아 수량이 과다 계산됨.
+          - ORD_DVSN 은 기본 01(시장가). 00(지정가)은 종목증거금율이 반영되지 않아 수량이 과다 계산되므로
+            정규장에서는 반드시 01 을 쓴다. NXT 프리마켓처럼 지정가만 허용되는 세션에 한해
+            ord_dvsn='00' + 실제 지정가(price)를 넘겨 그 가격 기준 수량을 받는다.
         pykis 의 orderable_amount() 는 amount=ord_psbl_cash / qty=max_buy_qty(미수 사용) 로
         매핑돼 있어 직접 REST 를 호출한다."""
         try:
@@ -149,7 +164,7 @@ class Broker:
                     "ACNT_PRDT_CD": account.code,
                     "PDNO": symbol,
                     "ORD_UNPR": str(int(price)) if price else "0",
-                    "ORD_DVSN": "01",             # 01=시장가(종목증거금율 반영)
+                    "ORD_DVSN": ord_dvsn,         # 01=시장가(종목증거금율 반영) / 00=지정가
                     "CMA_EVLU_AMT_ICLD_YN": "N",  # CMA평가금액 미포함
                     "OVRS_ICLD_YN": "N",          # 해외 미포함
                 },
@@ -255,12 +270,85 @@ class Broker:
             avg = (f["amount"] / eq) if eq > 0 else Decimal(0)
             return eq, avg, f["rejected"], f["reason"]
 
+    # ── 거래 세션 판정 (NXT / KRX 분리) ─────────────────────────────
+    #   KRX  : 09:00~15:30 정규장(시장가 가능)
+    #   NXT  : 프리마켓 08:00~08:50 · 메인 09:00~15:20 · 애프터마켓 15:30~20:00
+    #          프리/애프터마켓은 **지정가 호가만** 허용 → ORD_DVSN='00', 거래소 'NXT' 고정.
+    #          (이 시간대 KRX 는 닫혀 있어 SOR 통합 라우팅이 성립하지 않는다)
+    #   메인 세션은 SOR(KRX+NXT 통합 최선체결) 로 시장가.
+    #   NXT 메인은 15:20 에 끝나므로 15:20~15:30 은 KRX 단독 시장가로 넘긴다.
+    @staticmethod
+    def market_session(nxt: bool, now: Optional[datetime] = None) -> "MarketSession":
+        """(nxt_flag 기준) 지금 이 종목을 주문할 수 있는 세션. 불가면 tradable=False."""
+        now = now or datetime.now(_KST)
+        if now.weekday() >= 5:
+            return MarketSession(False, "", "", "주말")
+        hm = now.hour * 60 + now.minute
+
+        if nxt and 8 * 60 <= hm < 8 * 60 + 50:
+            return MarketSession(True, "NXT", "00", "NXT프리마켓")
+        if 9 * 60 <= hm < 15 * 60 + 20:
+            return MarketSession(True, "SOR" if nxt else "KRX", "01", "정규장")
+        if 15 * 60 + 20 <= hm < 15 * 60 + 30:
+            # NXT 메인 종료, KRX 만 열려 있음
+            return MarketSession(True, "KRX", "01", "정규장(KRX단독)")
+        if nxt and 15 * 60 + 30 <= hm < 20 * 60:
+            return MarketSession(True, "NXT", "00", "NXT애프터마켓")
+        return MarketSession(False, "", "", "장운영시간외")
+
+    # ── 호가단위 ────────────────────────────────────────────────────
+    # 2023.1 호가가격단위 개편 기준(유가증권·코스닥 동일 7단계).
+    # 지정가 주문은 호가단위에 맞지 않으면 거부되므로 반드시 정렬해서 보낸다.
+    _TICKS = ((2_000, 1), (5_000, 5), (20_000, 10), (50_000, 50),
+              (200_000, 100), (500_000, 500))
+
+    @classmethod
+    def tick_size(cls, price: Decimal) -> int:
+        for upper, tick in cls._TICKS:
+            if price < upper:
+                return tick
+        return 1_000
+
+    @classmethod
+    def align_price(cls, price: Decimal) -> Decimal:
+        """지정가를 호가단위로 내림 정렬. 매수 지정가는 내림이 안전
+        (올림하면 상한가를 넘겨 거부될 수 있다)."""
+        price = Decimal(price)
+        tick = Decimal(cls.tick_size(price))
+        return (price // tick) * tick
+
     # ── 주문 ────────────────────────────────────────────────────────
     def buy_market(self, symbol: str, qty: Decimal, ref_price: Decimal, nxt: bool = True) -> OrderResult:
         return self._order("BUY", symbol, qty, ref_price, nxt)
 
     def sell_market(self, symbol: str, qty: Decimal, ref_price: Decimal, nxt: bool = True) -> OrderResult:
         return self._order("SELL", symbol, qty, ref_price, nxt)
+
+    def order_in_session(self, side: str, symbol: str, qty: Decimal,
+                         ref_price: Decimal, sess: MarketSession) -> OrderResult:
+        """세션(MarketSession)이 정해준 거래소·호가유형으로 주문.
+
+        지정가 세션(NXT 프리/애프터마켓)이면 ref_price 를 호가단위로 정렬해 그대로 지정가로 낸다.
+        호출측이 이미 슬리피지를 반영한 가격을 넘겨준다(매수=위로, 매도=아래로).
+        """
+        qty = Decimal(qty)
+        px = self.align_price(ref_price) if sess.limit_only else Decimal(0)
+        order = self._order_rest(side, symbol, qty, sess.exchange,
+                                 ord_dvsn=sess.ord_dvsn, ord_unpr=px)
+        order_no = _ono(getattr(order, "order_number", None) or order)
+        log.info("[LIVE] %s 주문 접수 %s qty=%s %s=%s order=%s exch=%s (%s)",
+                 side, symbol, qty,
+                 "지정가" if sess.limit_only else "시장가",
+                 px if sess.limit_only else "-",
+                 order_no, sess.exchange, sess.name)
+        return OrderResult(symbol, side, qty,
+                           px if sess.limit_only else Decimal(ref_price),
+                           order_no, False, raw=order)
+
+    def buy_limit_nxt(self, symbol: str, qty: Decimal, limit_price: Decimal) -> OrderResult:
+        """NXT 프리마켓(08:00~08:50) 전용 지정가 매수. order_in_session 의 얇은 래퍼."""
+        return self.order_in_session("BUY", symbol, qty, limit_price,
+                                     MarketSession(True, "NXT", "00", "NXT프리마켓"))
 
     def _order(self, side: str, symbol: str, qty: Decimal, ref_price: Decimal, nxt: bool = True) -> OrderResult:
         qty = Decimal(qty)
@@ -273,10 +361,12 @@ class Broker:
                  side, symbol, qty, order_no, exchange)
         return OrderResult(symbol, side, qty, Decimal(ref_price), order_no, False, raw=order)
 
-    def _order_rest(self, side: str, symbol: str, qty: Decimal, exchange: str):
+    def _order_rest(self, side: str, symbol: str, qty: Decimal, exchange: str,
+                    ord_dvsn: str = "01", ord_unpr: Decimal | int = 0):
         """KIS REST order-cash 직접 호출 + EXCG_ID_DVSN_CD(KRX/NXT/SOR) 라우팅.
         pykis 의 인증/토큰/hashkey/도메인 파이프라인(kis.fetch)을 그대로 재사용하고,
-        body 에 거래소 구분만 추가한다. 시장가(ORD_DVSN='01', ORD_UNPR='0'), 전량 qty."""
+        body 에 거래소 구분만 추가한다.
+        기본 시장가(ORD_DVSN='01', ORD_UNPR='0'), 지정가는 '00' + 실제 가격."""
         from pykis.api.account.order import KisDomesticOrder, DOMESTIC_ORDER_API_CODES
         account = self.kis.primary  # KisAccountNumber (CANO/ACNT_PRDT_CD)
         return self.kis.fetch(
@@ -284,9 +374,9 @@ class Broker:
             api=DOMESTIC_ORDER_API_CODES[(True, side.lower())],  # 실전 TTTC0802U/0801U
             body={
                 "PDNO": symbol,
-                "ORD_DVSN": "01",              # 01=시장가
+                "ORD_DVSN": ord_dvsn,          # 01=시장가 / 00=지정가
                 "ORD_QTY": str(int(qty)),
-                "ORD_UNPR": "0",
+                "ORD_UNPR": str(int(ord_unpr)),
                 "EXCG_ID_DVSN_CD": exchange,   # KRX / NXT / SOR
             },
             form=[account],
