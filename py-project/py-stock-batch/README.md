@@ -142,11 +142,17 @@ poetry run gunicorn -w 1 -b 0.0.0.0:5557 app.main:flaskApp
 ## 🐳 Docker 실행
 
 ```bash
-# 이미지 빌드
+# 이미지 빌드 + 기동 (어느 디렉터리에서 실행해도 됨)
 sh build_docker.sh
+```
 
-# 컨테이너 기동 (포트 5557)
-docker compose up -d
+수동으로 할 경우, 빌드 컨텍스트는 상위 `py-project/` 입니다.
+공용 패키지 `shared` 가 컨텍스트에 포함되어야 poetry path dependency 가 해석됩니다.
+
+```bash
+cd ..                                    # py-project/
+docker build -f py-stock-batch/Dockerfile -t py-stock-batch .
+docker compose -f py-stock-batch/docker-compose.yml up -d   # 포트 5557
 ```
 
 > `docker-compose.yml`은 외부 네트워크 `aibees`를 사용합니다. 환경에 맞게 조정하세요.

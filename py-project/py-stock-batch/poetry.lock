@@ -2914,6 +2914,23 @@ pymysql = ["pymysql"]
 sqlcipher = ["sqlcipher3_binary"]
 
 [[package]]
+name = "stock-shared"
+version = "0.1.0"
+description = "py-naver-stock-theme / py-stock-batch 공용 ORM 모델 및 DAO"
+optional = false
+python-versions = "^3.12"
+groups = ["main"]
+files = []
+develop = true
+
+[package.dependencies]
+SQLAlchemy = "*"
+
+[package.source]
+type = "directory"
+url = "../shared"
+
+[[package]]
 name = "tqdm"
 version = "4.67.3"
 description = "Fast, Extensible Progress Meter"
@@ -3285,4 +3302,4 @@ repair = ["scipy (>=1.6.3)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12.3"
-content-hash = "1dfdf9a63a2ff550a7ab09b94d0e605982feda0d02a47b5e768bdb4db38d840d"
+content-hash = "ed536c4d9031ba7a6d84bc6923a64eb2f0f15550c3c36852cdd25583203e49ba"

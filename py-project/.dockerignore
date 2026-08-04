@@ -1,4 +1,16 @@
 # 빌드 컨텍스트 슬림화 (context = py-project/)
+#
+# 이 파일 하나가 py-project/ 를 컨텍스트로 쓰는 모든 이미지에 적용된다.
+# (py-stock-web, py-stock-batch, py-stock-worker, py-stock-mcp)
+# Docker 는 컨텍스트 루트의 .dockerignore 만 읽으므로 하위 프로젝트에
+# .dockerignore 를 둬도 무시된다.
+#
+# ※ *.key 는 제외하지 않는다 — 메인 py-stock-batch 이미지는 aes.key/kis.key 를
+#   COPY 로 굽는다. (worker 이미지는 Dockerfile.worker 가 'COPY app' 만 하므로
+#   시크릿이 애초에 들어가지 않는다)
+#
+# ※ shared/ 는 절대 제외하면 안 된다. poetry path dependency 해석에 필요하다.
+
 **/.venv
 **/.git
 **/.idea
@@ -7,6 +19,7 @@
 **/*.pyc
 **/*.pyo
 **/.pytest_cache
+
 # 대용량/런타임 불필요 산출물
 **/*.png
 **/docs_cache

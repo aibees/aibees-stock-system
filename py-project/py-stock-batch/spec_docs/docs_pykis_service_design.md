@@ -50,8 +50,9 @@
 
 ### 적용 순서
 ① `sql/20260727_add_kis_keys.sql` → ② `python -m scripts.import_kis_key --user-id N --key-file kis.key`(유저별)
-→ ③ `docker build -f Dockerfile.worker -t py-stock-worker .` (또는 `./build_worker.sh`)
-→ ④ `DB_URL=... docker compose -f docker-compose.pykis.yml up -d`
+→ ③ `./build_worker.sh` (권장) — 또는 `py-project/` 에서
+   `docker build -f py-stock-batch/Dockerfile.worker -t py-stock-worker .`
+→ ④ `DB_URL=... docker compose -f py-stock-batch/docker-compose.pykis.yml up -d` (py-project/ 에서)
 → ⑤ `docker logs -f kis-user1` 로 부팅 잔고 동기화·매수/매도 로그 확인(DRY_RUN) → ⑥ 모의(`KIS_VIRTUAL`)로 실주문 검증 → ⑦ 실전 전환.
 
 > 메인 py-stock-batch(`Dockerfile`→`docker-compose.yml`)와 worker(`Dockerfile.worker`→`docker-compose.pykis.yml`)는 **완전히 별개 이미지·배포 파이프라인**이다.

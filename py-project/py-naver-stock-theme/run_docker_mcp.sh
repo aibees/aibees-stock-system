@@ -4,6 +4,11 @@
 
 set -e
 
+# py-project/ 로 이동한다. 여기가 docker 빌드 컨텍스트이며,
+# shared(공용 ORM/DAO)가 포함되어야 poetry path dependency('../shared')가 해석된다.
+cd "$(dirname "$0")/.."
+
+PROJ="py-naver-stock-theme"
 IMAGE="py-stock-mcp"
 CONTAINER="stock-web-mcp-server"
 
@@ -17,10 +22,10 @@ echo "▶ MCP Docker image removing..."
 docker rmi $IMAGE 2>/dev/null && echo "  removed $IMAGE" || echo "  (not found)"
 
 echo "▶ Building new $IMAGE from Dockerfile.mcp ..."
-docker build -f Dockerfile.mcp -t $IMAGE .
+docker build -f "$PROJ/Dockerfile.mcp" -t $IMAGE .
 
 echo "▶ Starting MCP server via docker-compose.mcp.yml ..."
-docker-compose -f docker-compose.mcp.yml up -d
+docker compose -f "$PROJ/docker-compose.mcp.yml" up -d
 
 echo ""
 echo "✅ MCP server started"

@@ -10,12 +10,16 @@
 
 set -euo pipefail
 
-# 스크립트가 있는 디렉토리(=레포 루트)로 이동
-cd "$(dirname "$0")"
+# py-project/ 로 이동한다.
+# 여기가 docker 빌드 컨텍스트이며, shared(공용 ORM/DAO)가 포함되어야
+# poetry 의 path dependency('../shared')가 해석된다.
+# (git 명령은 레포 어디서든 동작하므로 pull 에는 영향 없다)
+cd "$(dirname "$0")/.."
 
+PROJ="py-stock-batch"
 IMAGE="py-stock-worker"
-DOCKERFILE="Dockerfile.worker"
-COMPOSE="docker-compose.pykis.yml"
+DOCKERFILE="$PROJ/Dockerfile.worker"
+COMPOSE="$PROJ/docker-compose.pykis.yml"
 BRANCH="${1:-}"
 
 log() { echo -e "\n\033[1;32m▶ $*\033[0m"; }
