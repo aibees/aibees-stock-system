@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "stock-shared"
+version = "0.1.0"
+description = "py-naver-stock-theme / py-stock-batch 공용 ORM 모델 및 DAO"
+readme = "README.md"
+authors = ["aibees <aibees1129@naver.com>"]
+packages = [{ include = "stock_shared" }]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+SQLAlchemy = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,169 @@
+import logging
+from datetime import datetime, timedelta
+
+from sqlalchemy import and_, select, update
+from sqlalchemy.dialects.mysql import insert
+
+from stock_shared.dao.baseDao import BaseDao
+from stock_shared.models.tradeBuyTargetStock import TradeBuyTargetStock
+
+logging.basicConfig(level=logging.ERROR)
+
+# py-naver-stock-theme 의 Literal 상수와 동일한 값.
+# shared 는 특정 프로젝트 모듈에 의존하지 않기 위해 값을 직접 정의한다.
+_YMD = "ymd"
+_STOCK_CODE = "stock_code"
+_ISO_DATE_FORMAT = "%Y%m%d"
+
+# upsert 시 PK(ymd, stock_code) 를 제외하고 갱신하는 컬럼
+_UPSERT_COLS = (
+    "stock_name",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "rate",
+    "action_type",
+    "macd_cross",
+    "obv_cross",
+    "is_vol_limit",
+    "is_under_bb_upper",
+    "is_over_on_mid",
+    "is_vol_surge",
+    "is_bb_mid_breakout",
+    "eps",
+    "pbr",
+    "per",
+    "roe",
+    "peg",
+    "score",
+    "rank_no",
+)
+
+
+class TradeBuyTargetStockDao(BaseDao):
+    model = TradeBuyTargetStock
+
+    def __init__(self):
+        self.__name__ = "TradeBuyTargetStockDao"
+
+    # ------------------------------------------------------------------
+    # select
+    # ------------------------------------------------------------------
+    def select_trade_buy_target_daily(self, session, data: dict):
+        """일자별 매수타겟 조회 (rank_no 순)."""
+        ymd = data.get(_YMD, datetime.today().strftime(_ISO_DATE_FORMAT))
+
+        stmt = (
+            select(TradeBuyTargetStock)
+            .where(TradeBuyTargetStock.ymd == ymd)
+            .order_by(TradeBuyTargetStock.rank_no)
+        )
+        results = session.execute(stmt).scalars().all()
+        return [item.to_dict() for item in results]
+
+    def select_stock_master_list(self, session, param: dict) -> list:
+        """일자별 매수타겟 조회 (stock_code 순, 배치용)."""
+        stmt = (
+            select(TradeBuyTargetStock)
+            .where(TradeBuyTargetStock.ymd == param.get(_YMD))
+            .order_by(TradeBuyTargetStock.stock_code.asc())
+        )
+        result = session.execute(stmt).scalars().all()
+        return [obj.to_dict() for obj in result]
+
+    def select_trade_recent_record(self, session, data: dict) -> dict:
+        """직전 30일(전일까지) 내 해당 종목의 최근 1건 조회."""
+        stock_code = data.get(_STOCK_CODE, None)
+        if not stock_code:
+            raise Exception("no stock code")
+
+        today = datetime.today()
+        date_from = (today - timedelta(days=30)).strftime(_ISO_DATE_FORMAT)
+        date_to = (today - timedelta(days=1)).strftime(_ISO_DATE_FORMAT)
+
+        stmt = (
+            select(TradeBuyTargetStock)
+            .where(
+                TradeBuyTargetStock.stock_code == stock_code,
+                TradeBuyTargetStock.ymd.between(date_from, date_to),
+            )
+            .order_by(TradeBuyTargetStock.ymd.desc())
+            .limit(1)
+        )
+        result = session.execute(stmt).scalars().first()
+        return result.to_dict() if result else None
+
+    # ------------------------------------------------------------------
+    # insert / update / delete
+    # ------------------------------------------------------------------
+    def delete_by_ymd(self, session, ymd: str) -> int:
+        """해당 일자 전체 삭제."""
+        return (
+            session.query(TradeBuyTargetStock)
+            .filter(TradeBuyTargetStock.ymd == ymd)
+            .delete()
+        )
+
+    def upsert_trade_buy_target_stock(self, session, data_list: list[dict]):
+        """
+        ymd + stock_code 기준 Upsert.
+
+        입력 dict 는 중첩 구조를 가진다:
+          d['todayStock'] : open/high/low/close/volume/rate
+          d['indicator']  : macd_cross/obv_cross/is_* 플래그
+          d['fin']        : eps/pbr/per/roe/peg
+          d['score'], d['rank_no'] 는 랭킹 산정 후 일괄 저장 경로에서만 채워진다.
+        """
+        if not data_list:
+            logging.info("Upsert할 데이터가 없습니다.")
+            return
+
+        for d in data_list:
+            row = {
+                "ymd": d["ymd"],
+                "stock_code": d["stock_code"],
+                "stock_name": d["stock_name"],
+                "action_type": d["action_type"],
+                "open": d["todayStock"]["open"],
+                "high": d["todayStock"]["high"],
+                "low": d["todayStock"]["low"],
+                "close": d["todayStock"]["close"],
+                "volume": d["todayStock"]["volume"],
+                "rate": d["todayStock"]["rate"],
+                "macd_cross": d["indicator"]["macd_cross"],
+                "obv_cross": d["indicator"]["obv_cross"],
+                "is_vol_limit": d["indicator"]["is_vol_limit"],
+                "is_under_bb_upper": d["indicator"]["is_under_bb_upper"],
+                "is_over_on_mid": d["indicator"]["is_over_on_mid"],
+                "is_vol_surge": d["indicator"]["is_vol_surge"],
+                "is_bb_mid_breakout": d["indicator"]["is_bb_mid_breakout"],
+                "eps": d["fin"]["eps"],
+                "pbr": d["fin"]["pbr"],
+                "per": d["fin"]["per"],
+                "roe": d["fin"]["roe"],
+                "peg": d["fin"]["peg"],
+                "score": d.get("score"),
+                "rank_no": d.get("rank_no"),
+            }
+
+            stmt = insert(TradeBuyTargetStock).values(row)
+            upsert_stmt = stmt.on_duplicate_key_update(
+                **{c: stmt.inserted[c] for c in _UPSERT_COLS}
+            )
+            session.execute(upsert_stmt)
+
+    def update_rank(self, session, ymd: str, stock_code: str, score, rank_no) -> None:
+        """이미 저장된 매수타겟 행의 종합점수/순위만 갱신."""
+        stmt = (
+            update(TradeBuyTargetStock)
+            .where(
+                and_(
+                    TradeBuyTargetStock.ymd == ymd,
+                    TradeBuyTargetStock.stock_code == stock_code,
+                )
+            )
+            .values(score=score, rank_no=rank_no)
+        )
+        session.execute(stmt)
