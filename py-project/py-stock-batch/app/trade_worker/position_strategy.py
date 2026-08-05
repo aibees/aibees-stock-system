@@ -35,6 +35,9 @@ class SellStrategy:
         self.strategy = KospiStrategy1()
         with get_session() as s:                # s1_* 파라미터 포함 유저 옵션
             self.user_meta = UserService().get_user_options(s, user_id)
+        # user_options 의 s1_* 로 전략 기본값을 덮어쓴다. 이 호출이 빠지면
+        # 화면에서 조정한 손절/익절/트레일링 값이 worker 에 전혀 반영되지 않는다.
+        self.strategy.configure(self.user_meta)
 
     # ── 일봉 지표 계산 (공통) ────────────────────────────────────────
     def _indicators(self, code: str):
@@ -69,17 +72,20 @@ class SellStrategy:
         advance = (pos.get("last_check_ymd") != today)   # 하루 1회만 봉수/피크 전진
 
         entry = _f(pos.get("entry_price"))
-        old_pc = _f(pos.get("peak_close") or entry)
         old_ph = _f(pos.get("peak_high") or entry)
         old_bsp = int(pos.get("bars_since_peak") or 0)
         old_bars = int(pos.get("bars_held") or 0)
 
-        curr_close, curr_high = _f(curr.get("close")), _f(curr.get("high"))
-        new_pc = max(old_pc, curr_close)
-        new_ph = max(old_ph, curr_high)
+        # ── 고점 갱신 (peak_high 단일 기준) ────────────────────────────
+        # 평시엔 SellExecutor 가 소켓 체결가로 실시간 갱신하고 세션 종료 시 flush 한다.
+        # 여기서는 그 값을 신뢰하되, **전일 확정봉(prev)의 high 로 한 번 보정**한다.
+        # worker 재시작·주말 공백·소켓 끊김 구간에서 놓친 고점을 복구하기 위한 안전망.
+        # curr(당일 봉)는 09:00 시점이라 아직 시가 근처지만 포함해도 손해는 없다.
+        curr_high, prev_high = _f(curr.get("high")), _f(prev.get("high"))
+        new_ph = max(old_ph, prev_high, curr_high)
         if advance:
             bars_held = old_bars + 1
-            bars_since_peak = 0 if (new_ph > old_ph or new_pc > old_pc) else old_bsp + 1
+            bars_since_peak = 0 if new_ph > old_ph else old_bsp + 1
         else:
             bars_held, bars_since_peak = old_bars, old_bsp
 
@@ -89,7 +95,6 @@ class SellStrategy:
         um.avg_price = entry
         um.entry_atr = _f(pos.get("entry_atr"))
         um.bars_held = bars_held
-        um.peak_close = new_pc
         um.peak_high = new_ph
         um.bars_since_peak = bars_since_peak
 
@@ -98,11 +103,13 @@ class SellStrategy:
         result = self.strategy.get_action_in_active(prev_i, coin, um)
         ctx = result.get("sell_ctx", {})
 
-        trail_line = self._calc_trail(entry, new_pc, new_ph, _f(curr.get("atr")) or um.entry_atr)
+        # 실시간 감시가 쓸 ATR. SellExecutor 가 장중 라인 재계산에 재사용하도록 state 로 넘긴다.
+        atr_now = _f(curr.get("atr")) or um.entry_atr
+        trail_line = self._calc_trail(entry, new_ph, atr_now)
         state = {
             "bars_held": bars_held,
-            "peak_close": round(new_pc, 4),
             "peak_high": round(new_ph, 4),
+            "last_atr": atr_now,
             "bars_since_peak": bars_since_peak,
             "last_check_ymd": today,
             "stop_price": ctx.get("stop_price"),
@@ -114,15 +121,16 @@ class SellStrategy:
         }
         return result, state
 
-    def _calc_trail(self, entry, peak_close, peak_high, atr):
+    def _calc_trail(self, entry, peak_high, atr):
         """트레일링 라인(활성 시). 실시간 감시용으로 항상 계산해 저장.
 
+        고점 기준은 peak_high 단일(구 trail_basis 선택 제거).
         라인 산출식은 전략(KospiStrategy1._trail_line_of)에 위임한다.
         여기서 식을 복제하면 드로다운 캡 같은 변경이 실시간 감시에만 누락된다.
+        ※ SellExecutor._advance_peak 이 장중에 같은 식으로 재계산한다.
         """
         s = self.strategy
-        basis = getattr(s, "trail_basis", "close")
-        peak = peak_close if basis == "close" else peak_high
+        peak = peak_high
         if entry <= 0:
             return None
         peak_gain = (peak - entry) / entry

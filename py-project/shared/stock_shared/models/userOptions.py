@@ -50,6 +50,8 @@ class UserOptions(Base):
     s1_trail_activate_pct = Column(DECIMAL(6, 4), nullable=True)
     s1_k_trail_atr = Column(DECIMAL(6, 2), nullable=True)
     s1_trail_floor_pct = Column(DECIMAL(6, 4), nullable=True)
+    s1_trail_drawdown_pct = Column(DECIMAL(6, 4), nullable=True)
+    s1_trail_dual = Column(TINYINT(1), nullable=True)
     s1_time_stop_extend = Column(TINYINT(1), nullable=True)
     s1_time_stop_band = Column(DECIMAL(6, 4), nullable=True)
     s1_time_stop_grace = Column(Integer, nullable=True)
@@ -97,6 +99,8 @@ class UserOptions(Base):
             "s1_trail_activate_pct": self.s1_trail_activate_pct,
             "s1_k_trail_atr": self.s1_k_trail_atr,
             "s1_trail_floor_pct": self.s1_trail_floor_pct,
+            "s1_trail_drawdown_pct": self.s1_trail_drawdown_pct,
+            "s1_trail_dual": self.s1_trail_dual,
             "s1_time_stop_extend": self.s1_time_stop_extend,
             "s1_time_stop_band": self.s1_time_stop_band,
             "s1_time_stop_grace": self.s1_time_stop_grace,

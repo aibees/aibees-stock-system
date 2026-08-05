@@ -240,7 +240,6 @@ const emaillogin = async () => {
         }
     } catch (err) {
         const msg = err?.error?.message ?? err?.message ?? '로그인에 실패했습니다.'
-        alert(msg)
     } finally {
         isLoading.value = false; // [추가] 성공·실패 무관하게 로딩 종료
     }

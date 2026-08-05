@@ -38,12 +38,14 @@ class KospiStrategy1(StockStrategy):
         self.surge_bypass_mult = 2.0     # 급증 판정 배수 (전봉 거래량 대비). 2.0 = 2배
 
         # ── #1 트레일링(샹들리에) 스탑 ───────────────────────────────────────
-        # 고점 - k*ATR 아래로 종가가 내려오면 전량 청산. 진입 직후·초기 변동성
-        # (특히 윗꼬리)에서의 휩쏘를 막기 위해 '고점 기준 수익 +activate%' 도달
-        # 이후에만 활성화. trail_basis='close'는 종가 고점을 기준으로 삼아
-        # 장중 꼬리(예: 128660 04/06 장중 3900 후 종가 3510)에 둔감하다.
+        # 고점 - k*ATR 아래로 내려오면 전량 청산. 진입 직후·초기 변동성에서의
+        # 휩쏘를 막기 위해 '고점 기준 수익 +activate%' 도달 이후에만 활성화.
+        #
+        # 고점 기준은 **peak_high 단일**이다(구 trail_basis 'close'/'high' 선택 제거).
+        # 라이브에서는 SellExecutor 가 소켓 체결가로 peak_high 를 실시간 갱신하고,
+        # 백테스트에서는 각 봉의 high 로 갱신한다. 종가 고점 개념은 쓰지 않는다.
+        # ※ user_options.s1_trail_basis 컬럼은 롤백 대비로 남겨두되 참조하지 않는다.
         self.use_trailing       = True
-        self.trail_basis        = 'close'  # 'close'=종가 고점 / 'high'=장중 고점
         self.trail_activate_pct = 0.08     # 고점수익 +8% 도달해야 트레일링 ON
         self.k_trail_atr        = 3.0      # 고점 - k*ATR (작을수록 타이트=빨리 매도). 종목 튜닝 포인트
         self.trail_floor_pct    = 0.10     # ATR 미산출 시 대체: 고점 대비 -10%
@@ -118,7 +120,7 @@ class KospiStrategy1(StockStrategy):
             'downtrend_surge_bypass': _bool(user_info.s1_downtrend_surge_bypass),
             'surge_bypass_mult':      _f(user_info.s1_surge_bypass_mult),
             'use_trailing':           _bool(user_info.s1_use_trailing),
-            'trail_basis':            user_info.s1_trail_basis if user_info.s1_trail_basis else None,
+            # s1_trail_basis 는 더 이상 참조하지 않는다(peak_high 단일 기준).
             'trail_activate_pct':     _f(user_info.s1_trail_activate_pct),
             'k_trail_atr':            _f(user_info.s1_k_trail_atr),
             'trail_floor_pct':        _f(user_info.s1_trail_floor_pct),
@@ -199,7 +201,7 @@ class KospiStrategy1(StockStrategy):
     # 매도 판별 (전량 매도 정책 / 분할 없음)
     #  우선순위: 1.손절(-5% or OBV 데드크로스) > 2.익절(+30%)
     #          > 3.트레일링(#1, max(고점-k*ATR, 고점*(1-dd%))) > 4.동적 타임스탑(#4)
-    #  포지션 상태(entry_price/bars_held/peak_close/bars_since_peak)는
+    #  포지션 상태(entry_price/bars_held/peak_high/bars_since_peak)는
     #  백테스트 엔진이 진입 시 세팅하고 매 봉 갱신해야 한다.
     # ──────────────────────────────────────────────────────────────────
     def get_action_in_active(self, prev_info: UserCoinInfo, coin_info: UserCoinInfo, user_info: UserOptionMeta) -> dict:
@@ -219,8 +221,9 @@ class KospiStrategy1(StockStrategy):
         price_stop_valid = (close <= stop_price) and not is_above_ema20
 
         # ── 트레일링(#1) 기준선 산출 ──────────────────────────────
-        peak = (user_info.peak_close if self.trail_basis == 'close' else user_info.peak_high) \
-               or close
+        # 고점은 peak_high 단일 기준. 라이브는 소켓 체결가로, 백테스트는 봉 high 로
+        # 갱신된 값이 들어온다.
+        peak = user_info.peak_high or close
         atr = float(coin_info.atr) if (coin_info.atr and float(coin_info.atr) > 0) \
               else float(user_info.entry_atr or 0)
         trail_line, trail_src = self._trail_line_of(peak, atr)
@@ -249,7 +252,7 @@ class KospiStrategy1(StockStrategy):
                                            'trail_line': round(trail_line, 2),
                                            'trail_src': trail_src,
                                            'peak_gain': str(round(peak_gain * 100, 2)) + '%',
-                                           'trail_basis': self.trail_basis})
+                                           'trail_basis': 'peak_high'})
 
         # ── 4. 동적 타임스탑(#4) : 보유한도 도달 시에만 평가 ───────────────
         #  추세 생존(수익+20일선 위+최근 신고가) 이면 보류→트레일/손절에 위임,

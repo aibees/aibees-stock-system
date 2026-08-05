@@ -253,10 +253,11 @@ const S1_GROUPS = [
     ]},
     { title: '트레일링 스탑', fields: [
         { k: 's1_use_trailing', label: '트레일링 스탑 사용', type: 'bool', def: 1 },
-        { k: 's1_trail_basis', label: '트레일링 기준', type: 'select', options: ['close', 'high'], def: 'close' },
         { k: 's1_trail_activate_pct', label: '트레일링 활성화 수익 기준', type: 'decimal', def: 0.08 },
         { k: 's1_k_trail_atr', label: '샹들리에 ATR 배수', type: 'decimal', def: 3.0 },
         { k: 's1_trail_floor_pct', label: 'ATR 미산출시 대체 하락폭', type: 'decimal', def: 0.10 },
+        { k: 's1_trail_drawdown_pct', label: '고점 대비 하락폭(미설정=미사용)', type: 'decimal', def: '' },
+        { k: 's1_trail_dual', label: 'ATR 라인과 이중 감시', type: 'bool', def: 1 },
     ]},
     { title: '타임스탑', fields: [
         { k: 's1_time_stop_extend', label: '타임스탑 연장 허용', type: 'bool', def: 1 },

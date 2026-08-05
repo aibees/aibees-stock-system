@@ -3,9 +3,17 @@
 
 판정 분리 (docs_buy_target_sim_spec.md §4 기준):
   - 실시간(소켓): 체결가가 stop_price / target_price / trail_line 을 돌파하면 즉시 매도.
-    (라인 값은 daily 배치 StockSellCheckJob 이 미리 계산·저장)
-  - 개장 시(apply_open_signals): 일봉 신호(OBV 데드크로스·타임스탑 등으로 action_type 이
+  - 개장 시(refresh_positions): 일봉 신호(OBV 데드크로스·타임스탑 등으로 action_type 이
     SELL 계열로 마킹된) 포지션을 정리. (일봉 지표는 실시간 판정 불가)
+
+트레일링 고점(peak_high) 생명주기:
+  1) 매수 체결   : repository.open_position 이 peak_high = 진입가로 초기화
+  2) 장중        : on_price → _advance_peak 이 **메모리에서만** 갱신하고 trail_line 재계산.
+                   틱마다 DB 를 때리지 않는다(_peak_dirty 로 변경분만 표시).
+  3) 세션 종료   : flush_peaks() 가 메모리 peak_high / trail_line 을 DB 에 1회 저장.
+                   KRX 전용은 15:30, NXT 대상은 20:00 이후(main.py cron).
+  4) 다음날 부팅 : reload_positions 가 DB 에서 다시 읽어 메모리로 이어받는다.
+  고점 기준은 peak_high 단일이다. 구 trail_basis('close'/'high') 선택 개념은 제거됐다.
 
 거래 세션 분리 (broker.market_session):
   - NXT 대상(master_stock.nxt_flag='Y'): 08:00~08:50 프리마켓(지정가) · 09:00~15:20 메인(시장가)
@@ -49,6 +57,8 @@ class SellExecutor:
         self._fail_count: dict[str, int] = {}  # 종목별 연속 실패 횟수
         self._disabled: set[str] = set()       # 연속 실패로 자동 비활성(수동 확인 필요)
         self._untradable_log: dict[str, float] = {}  # 장외 라인돌파 로그 throttle 만료시각
+        self._peak_dirty: set[str] = set()     # 장중 고점이 갱신돼 flush 대상인 종목
+        self._peak_log: dict[str, float] = {}  # 고점 갱신 로그 throttle 만료시각
         self._lock = threading.Lock()
 
     # ── 구독 시작 ────────────────────────────────────────────────────
@@ -67,7 +77,26 @@ class SellExecutor:
         # trade_worker_position 에서 HOLDING 상태의 종목들
         holding = self.repo.get_holding_positions(self.cfg.user_id)
 
-        self.positions = {p["stock_code"]: p for p in holding}
+        fresh = {p["stock_code"]: p for p in holding}
+        # DB 재적재로 장중 메모리 고점이 날아가지 않도록 이어붙인다.
+        # (프리마켓 매수 직후 등 세션 도중에도 reload 가 불린다)
+        with self._lock:
+            for code, new_pos in fresh.items():
+                old = self.positions.get(code)
+                if not old:
+                    continue
+                for key in ("peak_high", "trail_line", "last_atr"):
+                    old_v, new_v = old.get(key), new_pos.get(key)
+                    if old_v is None:
+                        continue
+                    # peak_high 는 더 높은 쪽을 유지, 나머지는 메모리 값 우선
+                    if key == "peak_high" and new_v is not None:
+                        new_pos[key] = max(float(old_v), float(new_v))
+                    else:
+                        new_pos[key] = old_v
+            self.positions = fresh
+            # 더 이상 보유하지 않는 종목의 dirty 마킹 정리
+            self._peak_dirty &= set(fresh)
         if reset_sold:
             self._sold = set()
         # self.wlog.info("[매도] HOLDING(감시대상) %d종목 · 실시간시세 구독중 %d종목",
@@ -108,6 +137,11 @@ class SellExecutor:
         pos = self.positions.get(symbol)
         if not pos or symbol in self._sold or symbol in self._inflight or symbol in self._disabled:
             return
+
+        # 고점 갱신 + 트레일 라인 재계산을 먼저 한다.
+        # 쿨다운 중이라도 고점 추적은 계속해야 라인이 뒤처지지 않는다.
+        self._advance_peak(symbol, pos, price)
+
         # 실패 쿨다운 중이면 재시도 금지(폭주 방지)
         cd = self._cooldown.get(symbol)
         if cd and time.time() < cd:
@@ -131,6 +165,78 @@ class SellExecutor:
         self._untradable_log[symbol] = now + 60
         self.wlog.info("[매도] %s 라인 돌파(%s) 감지했으나 %s → 주문 보류",
                        symbol, reason, sess.name)
+
+    # ── 실시간 고점 추적 ─────────────────────────────────────────────
+    def _advance_peak(self, symbol: str, pos: dict, price: Decimal):
+        """소켓 체결가로 peak_high 를 갱신하고 트레일 라인을 재계산한다.
+
+        DB 쓰기는 하지 않는다(장 종료 시 flush_peaks 가 일괄 저장).
+        라인 산출식은 daily 평가와 동일하게 KospiStrategy1._trail_line_of 에 위임한다.
+        """
+        if not self.strategy:
+            return
+        s = self.strategy.strategy          # KospiStrategy1
+        if not getattr(s, "use_trailing", True):
+            return
+
+        entry = float(pos.get("entry_price") or 0)
+        if entry <= 0:
+            return
+        p = float(price)
+
+        with self._lock:
+            prev_peak = float(pos.get("peak_high") or entry)
+            if p <= prev_peak:
+                return                       # 고점 갱신 없음 → 재계산 불필요
+            pos["peak_high"] = p
+            self._peak_dirty.add(symbol)
+
+            # 활성화 게이트: 고점수익이 trail_activate_pct 이상일 때만 라인을 세운다.
+            if (p - entry) / entry < getattr(s, "trail_activate_pct", 0.08):
+                return
+
+            # ATR 은 daily 평가가 남긴 last_atr 우선, 없으면 진입 시점 ATR.
+            atr = float(pos.get("last_atr") or pos.get("entry_atr") or 0)
+            line, src = s._trail_line_of(p, atr)
+            pos["trail_line"] = round(line, 2)
+
+        self._log_peak(symbol, p, pos.get("trail_line"), src)
+
+    def _log_peak(self, symbol: str, peak: float, line, src: str):
+        """고점 갱신 로그 — 틱마다 찍으면 폭주하므로 종목당 30초 1회."""
+        now = time.time()
+        if now < self._peak_log.get(symbol, 0):
+            return
+        self._peak_log[symbol] = now + 30
+        self.wlog.info("[매도] %s 고점 갱신 %s → trail=%s (%s)", symbol, peak, line, src)
+
+    def flush_peaks(self, tag: str = ""):
+        """장중 메모리에 쌓인 peak_high / trail_line 을 DB 에 저장.
+
+        세션 종료 후 1회 호출(main.py cron). 다음날 reload_positions 가 이 값을
+        다시 읽어 감시를 이어간다. 호출 시점 이후의 틱은 다시 dirty 로 쌓인다.
+        """
+        with self._lock:
+            targets = list(self._peak_dirty)
+            self._peak_dirty.clear()
+
+        saved = 0
+        for code in targets:
+            pos = self.positions.get(code)
+            if not pos:
+                continue
+            state = {"peak_high": round(float(pos.get("peak_high") or 0), 4)}
+            if pos.get("trail_line") is not None:
+                state["trail_line"] = pos["trail_line"]
+            try:
+                self.repo.update_position_state(self.cfg.user_id, code, state)
+                saved += 1
+            except Exception as e:  # noqa: BLE001
+                self.wlog.warn("[매도] %s 고점 저장 실패: %s", code, e)
+                with self._lock:
+                    self._peak_dirty.add(code)   # 다음 flush 에서 재시도
+        if saved:
+            self.wlog.info("[매도] 고점 flush%s: %d종목 저장", f"({tag})" if tag else "", saved)
 
     @staticmethod
     def _hit_line(pos: dict, price: Decimal) -> str | None:
@@ -165,14 +271,18 @@ class SellExecutor:
                 continue
             # DB 라인/상태 갱신 + 메모리 포지션 갱신(realtime 감시에 반영)
             self.repo.update_position_state(self.cfg.user_id, code, state)
-            pos.update({
-                "stop_price": state.get("stop_price"),
-                "target_price": state.get("target_price"),
-                "trail_line": state.get("trail_line"),
-                "bars_held": state.get("bars_held"),
-                "peak_close": state.get("peak_close"),
-                "peak_high": state.get("peak_high"),
-            })
+            with self._lock:
+                pos.update({
+                    "stop_price": state.get("stop_price"),
+                    "target_price": state.get("target_price"),
+                    "trail_line": state.get("trail_line"),
+                    "bars_held": state.get("bars_held"),
+                    "peak_high": state.get("peak_high"),
+                    # 장중 _advance_peak 이 라인 재계산에 쓸 ATR
+                    "last_atr": state.get("last_atr"),
+                })
+                # evaluate 가 DB 와 메모리를 방금 일치시켰다 → dirty 해제
+                self._peak_dirty.discard(code)
             action = (result or {}).get("action_type", "HOLD")
             self.wlog.info("[매도] %s 평가: %s (stop=%s target=%s trail=%s bars=%s)",
                            code, action, state.get("stop_price"), state.get("target_price"),

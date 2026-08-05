@@ -44,7 +44,8 @@ WHITELIST = {
         's1_vol_ma_window', 's1_vol_ma_mult', 's1_regime_window', 's1_regime_threshold',
         's1_strict_need_macd_up', 's1_loose_need_vol_surge', 's1_surge_relax_mult',
         's1_downtrend_surge_bypass', 's1_surge_bypass_mult', 's1_use_trailing',
-        's1_trail_basis', 's1_trail_activate_pct', 's1_k_trail_atr', 's1_trail_floor_pct',
+        's1_trail_activate_pct', 's1_k_trail_atr', 's1_trail_floor_pct',
+        's1_trail_drawdown_pct', 's1_trail_dual',
         's1_time_stop_extend', 's1_time_stop_band', 's1_time_stop_grace',
         's1_max_hold_bars_hard', 's1_obv_dead_min_bars',
         # 관리자 전용

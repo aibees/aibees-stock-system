@@ -90,10 +90,11 @@ _S1_COLS: dict[str, str] = {
     's1_downtrend_surge_bypass': 'tinyint',
     's1_surge_bypass_mult':    'decimal',
     's1_use_trailing':         'tinyint',
-    's1_trail_basis':          'varchar',
     's1_trail_activate_pct':   'decimal',
     's1_k_trail_atr':          'decimal',
     's1_trail_floor_pct':      'decimal',
+    's1_trail_drawdown_pct':   'decimal',
+    's1_trail_dual':           'tinyint',
     's1_time_stop_extend':     'tinyint',
     's1_time_stop_band':       'decimal',
     's1_time_stop_grace':      'int',
@@ -150,8 +151,6 @@ def _validate_s1_body(body: dict):
             clean[k] = float(v)
 
         elif col_type == 'varchar':
-            if k == 's1_trail_basis' and v not in ('close', 'high'):
-                return None, _error('INVALID_FIELD', 's1_trail_basis 는 close 또는 high 이어야 합니다.')
             clean[k] = str(v)
 
     return clean, None

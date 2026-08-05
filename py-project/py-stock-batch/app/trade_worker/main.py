@@ -270,6 +270,33 @@ def main():
     else:
         log.info("NXT 프리마켓 매수 비활성(NXT_PREMARKET=false)")
 
+    # ── 세션 종료 시 고점(peak_high) flush ──────────────────────────
+    #   장중에는 SellExecutor 가 소켓 체결가로 peak_high 를 메모리에서만 갱신한다
+    #   (틱마다 DB UPDATE 를 하면 부하가 감당되지 않는다).
+    #   세션이 닫히는 시점에 1회 저장해 다음날 reload_positions 가 이어받게 한다.
+    #     · 15:31 : KRX 마감(15:30) 직후 — KRX 전용 종목의 당일 고점 확정
+    #     · 20:01 : NXT 애프터마켓 마감(20:00) 직후 — NXT 대상 종목까지 확정
+    #   두 job 모두 전 종목을 훑지만 flush_peaks 는 dirty 로 표시된 종목만 쓰므로
+    #   15:31 에 저장된 종목은 20:01 에 중복 저장되지 않는다(그 사이 고점 갱신분만 저장).
+    def _flush_peaks(tag: str):
+        now_kst = datetime.now(_KST)
+        if now_kst.weekday() >= 5:
+            return
+        if not _is_trading_day_cached(now_kst):
+            return
+        try:
+            sell.flush_peaks(tag)
+        except Exception as e:  # noqa: BLE001
+            log.exception("고점 flush(%s) 실패: %s", tag, e)
+
+    scheduler.add_job(lambda: _flush_peaks("KRX마감"),
+                      CronTrigger(hour=15, minute=31, timezone=_KST),
+                      id="peak_flush_krx", max_instances=1)
+    scheduler.add_job(lambda: _flush_peaks("NXT마감"),
+                      CronTrigger(hour=20, minute=1, timezone=_KST),
+                      id="peak_flush_nxt", max_instances=1)
+    log.info("고점 flush 등록: 15:31 / 20:01 (KST) · 주말·휴장일 skip")
+
     # 계좌 예수금·보유종목 주기 갱신 (기본 10초). WALLET_POLL_SEC<=0 이면 비활성.
     #   reconcile_wallet: 실제 KIS 계좌 조회 → user_wallet(예수금·보유평가·총자산) + user_holdings 갱신.
     #   coalesce=True/max_instances=1 : 지연 시 폴링이 밀려 쌓이지 않도록 1건만 유지.
@@ -321,6 +348,13 @@ def main():
     _stop.wait()
 
     scheduler.shutdown(wait=False)
+
+    # 종료 직전 고점 flush — 배포·재시작이 장중에 일어나도 당일 고점을 잃지 않는다.
+    try:
+        sell.flush_peaks("종료")
+    except Exception as e:  # noqa: BLE001
+        log.warning("종료 시 고점 flush 실패: %s", e)
+
     log.info("trade_worker 종료")
 
 

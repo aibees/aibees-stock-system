@@ -5,7 +5,7 @@ import os
 class Database:
     def __init__(self):
         self.engine = create_engine(
-            os.getenv("DB_URL", "mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock"),
+            os.getenv("DB_URL", "mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock_dev"),
             echo=False,
             pool_pre_ping=True,
             pool_recycle=1800,
