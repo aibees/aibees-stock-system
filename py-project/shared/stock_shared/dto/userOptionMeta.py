@@ -116,6 +116,8 @@ class UserOptionMeta:
         self.s1_trail_activate_pct    = None
         self.s1_k_trail_atr           = None
         self.s1_trail_floor_pct       = None
+        self.s1_trail_drawdown_pct    = None   # 고점 대비 단순 -x% 라인 (0.05=-5%). None=미사용
+        self.s1_trail_dual            = None   # 1=ATR/drawdown 이중화(먼저 닿는 쪽) 0=drawdown 단독
         self.s1_time_stop_extend      = None
         self.s1_time_stop_band        = None
         self.s1_time_stop_grace       = None

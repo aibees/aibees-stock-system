@@ -115,7 +115,11 @@ class SellStrategy:
         return result, state
 
     def _calc_trail(self, entry, peak_close, peak_high, atr):
-        """트레일링 라인(활성 시). 실시간 감시용으로 항상 계산해 저장."""
+        """트레일링 라인(활성 시). 실시간 감시용으로 항상 계산해 저장.
+
+        라인 산출식은 전략(KospiStrategy1._trail_line_of)에 위임한다.
+        여기서 식을 복제하면 드로다운 캡 같은 변경이 실시간 감시에만 누락된다.
+        """
         s = self.strategy
         basis = getattr(s, "trail_basis", "close")
         peak = peak_close if basis == "close" else peak_high
@@ -124,6 +128,5 @@ class SellStrategy:
         peak_gain = (peak - entry) / entry
         if not getattr(s, "use_trailing", True) or peak_gain < getattr(s, "trail_activate_pct", 0.08):
             return None
-        if atr and atr > 0:
-            return peak - getattr(s, "k_trail_atr", 3.0) * atr
-        return peak * (1 - getattr(s, "trail_floor_pct", 0.10))
+        line, _src = s._trail_line_of(peak, atr)
+        return line
