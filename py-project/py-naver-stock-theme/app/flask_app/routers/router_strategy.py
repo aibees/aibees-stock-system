@@ -49,9 +49,23 @@ masterStockDaoImpl = MasterStockDao()
 backtestSvc        = BacktestService()
 kisStockSvc        = KisStockService()
 kisBacktester      = KisBacktester()
-kisEngine          = KisEngine(virtual=False)
 paramGuideSvc      = StrategyParamGuideService()
 paramGuideDao      = MasterStrategyParamDao()
+
+
+def _kis_engine() -> KisEngine:
+    """KIS 엔진 지연 생성.
+
+    예전엔 모듈 레벨에서 `kisEngine = KisEngine(virtual=False)` 로 만들었는데,
+    그 생성자가 user_detail 조회(DB) + PyKis 실전 인증(외부 네트워크)을 수행한다.
+    즉 **blueprint import 만으로 KIS 로그인이 일어나** gunicorn worker 4개가
+    부팅 중 각각 인증을 시도했고, DB/KIS 어느 쪽이든 삐끗하면 앱이 아예 못 떴다.
+    실제로 쓰는 곳은 /backtest/ingest 하나뿐이다.
+
+    KisEngine 은 virtual 플래그별 싱글톤이라 매번 불러도 인스턴스는 하나다.
+    """
+    return KisEngine(virtual=False)
+
 
 # 관리자 user_id — 파라미터 메타(master_strategy_param) 편집 권한
 ADMIN_USER_ID = 1
@@ -532,7 +546,7 @@ def post_backtest_ingest():
         code = stock.get('stock_code')
         name = stock.get('stock_name', code)
         try:
-            ohlcv = kisEngine.getOHLCV(code, start_date, end_date)
+            ohlcv = _kis_engine().getOHLCV(code, start_date, end_date)
             if ohlcv is None or ohlcv.empty:
                 results.append({'code': code, 'status': 'skip', 'reason': '데이터 없음'})
                 continue

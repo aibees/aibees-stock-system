@@ -57,6 +57,13 @@ logging.basicConfig(
 logging.Formatter.converter = staticmethod(_kst_converter)
 # pykis 는 자체 핸들러를 갖고 있어 propagate 를 두면 같은 줄이 두 번 찍힌다.
 logging.getLogger("pykis").propagate = False
+# APScheduler executor 는 job 실행마다 "Running job"/"executed successfully" 를
+# INFO 로 찍는다. _poll_wallet(30초)·_poll_settings(60초) 때문에 하루 수천 줄이
+# 쌓여 정작 봐야 할 매수/매도 로그가 묻힌다.
+#   → WARNING 으로 올려 정상 실행 로그만 끊는다.
+#     job 예외("Job raised an exception")는 ERROR 라 그대로 남는다.
+#   scheduler 로거(job 등록·시작)는 부팅 때 1회뿐이라 INFO 유지.
+logging.getLogger("apscheduler.executors").setLevel(logging.WARNING)
 log = logging.getLogger("trade_worker")
 
 _stop = threading.Event()
