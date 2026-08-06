@@ -226,6 +226,12 @@ def main():
         if trading is None:
             log.warning("[개장] 개장일 확인 실패 → 평일이므로 진행")
         try:
+            # 매수/매도 판정 전에 설정을 강제로 다시 읽는다. **_poll_settings 에 맡기면 안 된다.**
+            #   폴링은 _POLL_START_HOUR(08시) 게이트 때문에 08시 전에는 즉시 return 하고,
+            #   매수 cron 은 08:00:00 정각이라 첫 유효 폴링이 매수보다 늦게 도는 레이스가 있다.
+            #   (2026-08-07 실제 사고: 08:00:00 매수가 기본 정렬로 나가고
+            #    08:00:35 에야 설정이 로드돼 유저의 s1_buy_order 가 반영되지 않았다)
+            sell.apply_settings_change()
             sell.reload_positions()      # HOLDING 포지션 재적재(감시 대상 갱신)
             sell.refresh_positions()     # KospiStrategy1로 라인/액션 재계산 + SELL이면 즉시 매도
             buy.run()                    # 매수
@@ -262,6 +268,9 @@ def main():
             log.info("[프리마켓] 휴장일(%s) → skip", now_kst.strftime("%Y-%m-%d"))
             return
         try:
+            # 개장 루틴과 동일하게, 매수 직전 설정 강제 재로드 (위 _open_routine 주석 참조).
+            # 프리마켓은 targets[0] 하나만 보므로 정렬이 틀리면 아예 다른 종목을 산다.
+            sell.apply_settings_change()
             buy.run(premarket=True)
             sell.reload_positions(reset_sold=False)   # 프리마켓 체결분 즉시 감시 등록
         except Exception as e:  # noqa: BLE001
