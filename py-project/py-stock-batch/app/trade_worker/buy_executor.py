@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from app.trade_worker.broker import Broker
 from app.trade_worker.config import WorkerConfig
-from app.trade_worker.repository import Repository
+from app.trade_worker.repository import Repository, describe_buy_order
 from app.trade_worker.wallet_sync import reconcile_wallet
 from app.trade_worker.worklog import WorkerLogger
 
@@ -27,6 +27,15 @@ class BuyExecutor:
         self.strategy = strategy          # SellStrategy (초기 라인 계산용)
         # 모든 로그는 trade_worker_log DB 테이블에 시간순 적재
         self.wlog = WorkerLogger(repo, cfg.user_id, "buy")
+
+    def _buy_order_spec(self) -> str | None:
+        """유저 매수타겟 정렬 스펙(user_options.s1_buy_order).
+
+        user_meta 는 SellStrategy 가 이미 들고 있어(UserService.get_user_options)
+        재조회하지 않는다. strategy 미주입(단위테스트 등)이면 None → repo 기본값.
+        """
+        meta = getattr(self.strategy, "user_meta", None)
+        return getattr(meta, "s1_buy_order", None) if meta else None
 
     def run(self, premarket: bool = False):
         """premarket=False: KRX 정규장 09:00 · 시장가 · 후보 전체를 순회.
@@ -54,7 +63,7 @@ class BuyExecutor:
             self.wlog.info("[매수] 잔고 %s → 매수 불가", balance)
             return
 
-        # 3) 전날 타겟(score 내림차순 · 동률 시 rank_no 오름차순)
+        # 3) 전날 타겟을 유저 정렬 기준(user_options.s1_buy_order)으로 정렬
         #    직전 영업일을 KIS 휴장일 API로 동적 산출해 하한으로 사용(공휴일·연휴 반영).
         #    조회 실패(None)면 repo 가 요일 heuristic 으로 fallback.
         floor_ymd = self.broker.prev_trading_day()
@@ -62,9 +71,15 @@ class BuyExecutor:
         if not ymd:
             self.wlog.info("[매수] 매수타겟 없음")
             return
-        targets = self.repo.get_buy_targets(ymd)
 
-        # 3-1) 프리마켓 라운드는 score 1위가 NXT 대상일 때만 성립
+        # 정렬 1순위 = 매수 종목이므로, 설정값이 아니라 **실제 적용된** 정렬을 남긴다
+        # (오타·미지원 필드는 repo 가 조용히 걸러내고 기본값으로 되돌리기 때문).
+        order_spec = self._buy_order_spec()
+        targets = self.repo.get_buy_targets(ymd, order_spec=order_spec)
+        self.wlog.info("[매수] 타겟 %d건 (ymd=%s · 정렬=%s)",
+                       len(targets), ymd, describe_buy_order(order_spec))
+
+        # 3-1) 프리마켓 라운드는 정렬 1위가 NXT 대상일 때만 성립
         if premarket:
             if not targets:
                 self.wlog.info("[매수] 매수타겟 없음")

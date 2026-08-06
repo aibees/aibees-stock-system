@@ -24,17 +24,122 @@ log = logging.getLogger("trade_worker.repo")
 _KST = timezone("Asia/Seoul")
 
 
-def _buy_target_order_key(row) -> tuple[float, float]:
-    """매수타겟 정렬 키 — score 내림차순, 동률이면 rank_no 오름차순.
+# ──────────────────────────────────────────────────────────────────
+#  매수타겟 정렬 — 유저별 개인화 (user_options.s1_buy_order)
+#
+#  스펙 문자열: "필드[:방향],필드[:방향],..."
+#      예) "score:desc,volume:desc,rank_no:asc"
+#          "volume,rate"          ← 방향 생략 시 필드별 기본방향 사용
+#  앞의 키가 동률일 때만 다음 키로 tie-break 한다.
+#
+#  ★ 정렬 항목 추가 방법 = _ORDER_FIELDS 에 한 줄 추가. 그게 전부다.
+#    (파서·키생성·검증이 전부 이 dict 를 참조한다)
+#
+#  SQL ORDER BY 를 쓰지 않는 이유:
+#    · score/rank_no/volume 이 nullable 인데 DB 별 NULL 정렬 위치가 갈린다.
+#      NULL 은 asc/desc 어느 쪽이든 **항상 후순위** 여야 한다.
+#    · rate 는 '12.5%' 형태 varchar 라 애초에 SQL 정렬이 불가능하다.
+# ──────────────────────────────────────────────────────────────────
+def _num(v):
+    """숫자형 추출. 변환 불가/None 이면 None(→ 항상 후순위)."""
+    if v is None:
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
 
-    오름차순 sort 로 두 방향을 함께 표현하려고 score 만 부호를 뒤집는다.
-    score/rank_no 가 NULL 인 행은 어느 쪽이든 항상 후순위(+inf)로 밀린다.
+
+def _pct(v):
+    """'12.5%' · '-3.2%' · 12.5 → float. 변환 불가면 None."""
+    if v is None:
+        return None
+    if isinstance(v, (int, float, Decimal)):
+        return float(v)
+    s = str(v).strip().replace("%", "").replace(",", "")
+    if not s:
+        return None
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+# 필드명 → (값 추출기, 기본 정렬방향)
+#   기본방향: "그 필드로 정렬하라"고 했을 때 사람이 기대하는 쪽.
+#   score/volume/rate 는 클수록 상위(desc), rank_no 는 작을수록 상위(asc).
+_ORDER_FIELDS = {
+    "score":   (lambda r: _num(r.get("score")),   "desc"),
+    "volume":  (lambda r: _num(r.get("volume")),  "desc"),
+    "rate":    (lambda r: _pct(r.get("rate")),    "desc"),
+    "rank_no": (lambda r: _num(r.get("rank_no")), "asc"),
+    "close":   (lambda r: _num(r.get("close")),   "desc"),
+    # ── 추가 예시(컬럼만 SELECT 에 넣으면 즉시 동작) ──
+    # "per":   (lambda r: _num(r.get("per")),     "asc"),
+    # "roe":   (lambda r: _num(r.get("roe")),     "desc"),
+}
+
+# 스펙 미설정(NULL) 시 기본 = 기존 동작 그대로
+DEFAULT_BUY_ORDER = "score:desc,rank_no:asc"
+
+
+def parse_buy_order(spec: str | None) -> list[tuple[str, bool]]:
+    """스펙 문자열 → [(필드명, is_desc), ...]. 모르는 필드는 버린다.
+
+    유효한 항목이 하나도 안 남으면 DEFAULT_BUY_ORDER 로 되돌린다.
+    (유저가 오타를 내도 매수가 멈추면 안 되므로 예외를 던지지 않는다)
     """
-    score = row.get("score")
-    rank_no = row.get("rank_no")
-    score_key = -float(score) if score is not None else float("inf")
-    rank_key = float(rank_no) if rank_no is not None else float("inf")
-    return (score_key, rank_key)
+    steps: list[tuple[str, bool]] = []
+    for token in (spec or "").split(","):
+        token = token.strip()
+        if not token:
+            continue
+        field, _, direction = token.partition(":")
+        field = field.strip().lower()
+        entry = _ORDER_FIELDS.get(field)
+        if entry is None:
+            log.warning("[매수정렬] 알 수 없는 필드 무시: %r (허용: %s)",
+                        field, ", ".join(_ORDER_FIELDS))
+            continue
+        direction = (direction.strip().lower() or entry[1])
+        steps.append((field, direction == "desc"))
+
+    if not steps:
+        if spec:
+            log.warning("[매수정렬] 유효 항목 없음(%r) → 기본값 사용", spec)
+        return parse_buy_order(DEFAULT_BUY_ORDER) if spec else \
+            [(f, d == "desc") for f, d in
+             ((t.partition(":")[0], t.partition(":")[2])
+              for t in DEFAULT_BUY_ORDER.split(","))]
+    return steps
+
+
+def make_buy_order_key(spec: str | None):
+    """스펙에 맞는 sort key 함수를 만들어 반환.
+
+    각 키는 (is_null, value) 2-튜플이다.
+      · is_null 0/1 → NULL 행은 정렬 **방향과 무관하게** 항상 뒤로 간다.
+        (구현 초기의 float('inf') 방식은 desc 로 뒤집으면 NULL 이 맨 앞으로
+         올라오는 함정이 있어 이 방식으로 바꿨다)
+      · desc 는 값의 부호를 뒤집어 오름차순 sort 하나로 처리한다.
+    마지막에 stock_code 를 넣어 전 키 동률일 때도 순서가 흔들리지 않게 한다
+    (DB 가 행 순서를 보장하지 않으므로 없으면 실행마다 1순위가 바뀔 수 있다).
+    """
+    steps = parse_buy_order(spec)
+
+    def key(row):
+        out = []
+        for field, is_desc in steps:
+            v = _ORDER_FIELDS[field][0](row)
+            out.append((1, 0.0) if v is None else (0, -v if is_desc else v))
+        return (tuple(out), str(row.get("stock_code") or ""))
+
+    return key
+
+
+def describe_buy_order(spec: str | None) -> str:
+    """로그용 요약 — 실제 적용된 정렬을 남긴다(설정과 다를 수 있으므로)."""
+    return ",".join(f"{f}:{'desc' if d else 'asc'}" for f, d in parse_buy_order(spec))
 
 
 class Repository:
@@ -56,26 +161,29 @@ class Repository:
             row = s.execute(sql, {"min_ymd": min_ymd}).mappings().first()
         return row["ymd"] if row and row["ymd"] else None
 
-    def get_buy_targets(self, ymd: str) -> list[dict]:
-        """해당 ymd 추천 전체를 **score 내림차순**(최고점이 1순위)으로 정렬해 반환.
-        동률이면 rank_no 오름차순으로 tie-break.
+    def get_buy_targets(self, ymd: str, order_spec: str | None = None) -> list[dict]:
+        """해당 ymd 추천 전체를 order_spec 순서로 정렬해 반환.
 
-        SQL ORDER BY 대신 파이썬 정렬을 쓰는 이유: score/rank_no 가 nullable 이라
-        DB 별 NULL 정렬 위치가 갈리는데, NULL 은 방향과 무관하게 항상 후순위여야 한다.
-        (rate 는 '12.5%' 형태의 varchar 라 애초에 SQL 정렬 대상이 될 수 없다)
+        order_spec: user_options.s1_buy_order (예 "score:desc,volume:desc").
+                    None/빈값이면 DEFAULT_BUY_ORDER(= score:desc,rank_no:asc).
+                    문법·필드 상세는 파일 상단 _ORDER_FIELDS 주석 참고.
+
+        ※ 정렬 결과의 **1순위가 곧 매수 종목**이다(BuyExecutor 는 위에서부터
+          체결 가능한 첫 종목을 산다. 프리마켓 라운드는 아예 targets[0] 만 본다).
+          그래서 적용된 정렬을 로그로 남긴다.
 
         nxt_flag(master_stock): 'Y'=NXT 대상(통합 라우팅), 그 외=KRX 전용.
         """
         sql = text(
             "SELECT t.ymd, t.stock_code, t.stock_name, t.rate, t.close, "
-            "       t.score, t.rank_no, ms.nxt_flag "
+            "       t.volume, t.score, t.rank_no, ms.nxt_flag "
             "FROM trade_buy_target_stock t "
             "LEFT JOIN master_stock ms ON ms.stock_code = t.stock_code "
             "WHERE t.ymd = :ymd"
         )
         with get_session() as s:
             rows = [dict(r) for r in s.execute(sql, {"ymd": ymd}).mappings().all()]
-        rows.sort(key=_buy_target_order_key)
+        rows.sort(key=make_buy_order_key(order_spec))
         return rows
 
     # ── worker 전용 포지션 테이블(trade_worker_position) ─────────────

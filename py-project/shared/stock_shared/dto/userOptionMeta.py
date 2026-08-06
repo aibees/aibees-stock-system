@@ -137,6 +137,14 @@ class UserOptionMeta:
         self.s1_macd_signal_mode        = None
         self.s1_obv_signal_mode         = None
 
+        # ── worker 매수타겟 정렬 순서 (None이면 "score:desc,rank_no:asc") ──
+        # "필드[:방향],..." 형식. 앞 키 동률일 때만 다음 키로 tie-break.
+        #   예) "score:desc,volume:desc,rate:desc"
+        # 허용 필드는 trade_worker/repository.py 의 _ORDER_FIELDS 참조.
+        # ※ 전략 판정이 아니라 '후보 중 무엇을 먼저 살지'를 정한다.
+        #   BuyExecutor 는 이 순서의 첫 종목을 사므로 1순위 = 매수 종목.
+        self.s1_buy_order               = None
+
         # ── KospiStrategy2 파라미터 (None이면 전략 클래스 기본값 사용) ────────
         # HMA + MACD + OBV core AND + 체결강도 필터 전략
         self.s2_stop_loss_pct          = None

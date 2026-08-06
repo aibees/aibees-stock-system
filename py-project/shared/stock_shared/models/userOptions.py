@@ -57,6 +57,9 @@ class UserOptions(Base):
     s1_time_stop_grace = Column(Integer, nullable=True)
     s1_max_hold_bars_hard = Column(Integer, nullable=True)
     s1_obv_dead_min_bars = Column(Integer, nullable=True)
+    # worker 매수타겟 정렬 순서. "score:desc,volume:desc" 형식(다중 키 tie-break).
+    # NULL = 기본값(score:desc,rank_no:asc). 파싱은 repository._ORDER_FIELDS 참조.
+    s1_buy_order = Column(String(255), nullable=True)
 
     def to_dict(self):
         return {
@@ -106,4 +109,5 @@ class UserOptions(Base):
             "s1_time_stop_grace": self.s1_time_stop_grace,
             "s1_max_hold_bars_hard": self.s1_max_hold_bars_hard,
             "s1_obv_dead_min_bars": self.s1_obv_dead_min_bars,
+            "s1_buy_order": self.s1_buy_order,
         }

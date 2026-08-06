@@ -45,6 +45,8 @@ def extractor(x) -> UserOptionMeta:
     user_meta.s1_time_stop_grace        = x.get('s1_time_stop_grace')
     user_meta.s1_max_hold_bars_hard     = x.get('s1_max_hold_bars_hard')
     user_meta.s1_obv_dead_min_bars      = x.get('s1_obv_dead_min_bars')
+    # worker 매수타겟 정렬 순서 ("score:desc,volume:desc" 형식, None=기본값)
+    user_meta.s1_buy_order              = x.get('s1_buy_order')
     return user_meta
 
 

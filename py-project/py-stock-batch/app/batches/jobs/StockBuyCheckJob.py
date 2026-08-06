@@ -12,7 +12,7 @@ from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.kis.keyLoader import list_kis_user_ids
 from app.ext_services.kis.component.KisStockService import KisService
 from stock_shared.strategy.kospi1 import KospiStrategy1
-from dto.userOptionMeta import UserOptionMeta
+from stock_shared.dto.userOptionMeta import UserOptionMeta
 
 
 class StockBuyCheckJob(Job):
