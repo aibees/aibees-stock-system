@@ -20,10 +20,10 @@ COPY shared /shared
 
 COPY py-naver-stock-theme/pyproject.toml py-naver-stock-theme/poetry.lock /workdir/
 
-# poetry.lock 의 고정 버전 유지 + --no-root (Dockerfile 주석 참조)
+# poetry.lock 의 고정 버전 유지 (Dockerfile 주석 참조)
 RUN poetry lock --no-update \
  && poetry config virtualenvs.create false \
- && poetry install --no-interaction --no-ansi --no-root
+ && poetry install --no-interaction --no-ansi
 
 COPY py-naver-stock-theme/ /workdir/
 

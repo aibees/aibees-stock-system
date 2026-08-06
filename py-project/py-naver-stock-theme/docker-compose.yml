@@ -15,7 +15,6 @@ services:
         image: py-stock-web
         container_name: stock-web-flask-app
         working_dir: /workdir
-
         # build 를 명시해야 로컬에 이미지가 없을 때 compose 가 **직접 빌드**한다.
         #   없으면 compose 는 레지스트리에서 pull 을 시도하고,
         #   py-stock-web 은 로컬 전용 태그라 이렇게 끝난다:
@@ -41,32 +40,12 @@ services:
         environment:
             # 컨테이너 기본 TZ 는 UTC. 로그·스케줄 시각을 KST 로 맞춘다.
             - TZ=Asia/Seoul
-            # DB 접속정보는 app/config/db/database.py 가 DB_URL 을 우선 읽고,
-            # 없으면 코드의 기본값으로 떨어진다.
-            #
-            # ※ 반드시 값 없는 형태(`- DB_URL`)로 둘 것.
-            #   `DB_URL=${DB_URL:-}` 로 쓰면 호스트에 값이 없을 때 **빈 문자열**이
-            #   주입되고, os.getenv("DB_URL", 기본값) 은 빈 문자열을 그대로 반환해
-            #   기본값으로 떨어지지 않는다 → 접속 실패.
-            #   값 없는 형태는 호스트에 있을 때만 전달되고 없으면 아예 미설정이다.
-            - DB_URL
-
         # 로그 무제한 증가 방지. gunicorn access log 를 켰기 때문에 더 필요하다.
         logging:
             driver: json-file
             options:
                 max-size: "20m"
                 max-file: "5"
-
-        # 컨테이너는 살아있는데 gunicorn 이 죽은 상태를 구분한다.
-        # 인증 없이 200 이 나오는 엔드포인트가 없어 TCP 연결만 확인한다.
-        healthcheck:
-            test: ["CMD-SHELL", "python -c \"import socket,sys; s=socket.create_connection(('127.0.0.1',5556),3); s.close()\" || exit 1"]
-            interval: 30s
-            timeout: 5s
-            retries: 3
-            start_period: 40s
-
         networks:
             aibees:
                 ipv4_address: 172.21.1.4

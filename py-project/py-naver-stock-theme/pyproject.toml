@@ -4,14 +4,9 @@ version = "0.1.0"
 description = ""
 readme = "README.md"
 authors = ["aibees <aibees1129@naver.com>"]
-# 배포 가능한 라이브러리가 아니라 애플리케이션이다.
-# 이게 없으면 poetry install 이 root 패키지(n_theme) 를 찾다 실패한다
-# ("No file/folder found for package n-theme" — 현재는 경고, 다음 버전부터 에러).
-package-mode = false
 
 [tool.poetry.dependencies]
 stock-shared = { path = "../shared", develop = true }
-beautifulsoup4 = "^4.13.4"
 sqlalchemy = "^2.0.41"
 pymysql = "^1.1.1"
 requests = "^2.32.3"
@@ -27,7 +22,6 @@ gunicorn = "^23.0.0"
 gevent = "^24.11.1"
 xmltodict = "^0.14.2"
 elasticsearch = "^9.0.2"
-yfinance = "^0.2.65"
 simplejson = "^3.20.2"
 # JWT 액세스 토큰 발급·검증에 사용하는 표준 라이브러리
 # HS256 서명, exp claim 자동 처리 등을 제공함
@@ -39,7 +33,6 @@ pandas-stubs = "~=2.3.3"
 mcp = "^1.9.0"
 uvicorn = {extras = ["standard"], version = "^0.34.0"}
 scipy = "^1.18.0"
-ccxt = "^4.4.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
