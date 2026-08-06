@@ -46,9 +46,27 @@
                     </div>
                 </section>
 
+                <!-- ── 정렬 옵션 ── -->
+                <section v-if="!isLoading && resultData.length > 0" class="sort-bar">
+                    <span class="sort-label">정렬</span>
+                    <div class="sort-chips">
+                        <button v-for="o in SORT_OPTIONS" :key="o.key" type="button"
+                            :class="['sort-chip', { on: sortKey === o.key }]"
+                            @click="setSortKey(o.key)">
+                            {{ o.label }}
+                        </button>
+                    </div>
+                    <button type="button" class="sort-dir" @click="toggleSortDir"
+                        :title="sortDir === 'desc' ? '내림차순' : '오름차순'">
+                        <span class="dir-arrow">{{ sortDir === 'desc' ? '↓' : '↑' }}</span>
+                        {{ sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel }}
+                    </button>
+                    <span class="sort-count">{{ sortedData.length }}종목</span>
+                </section>
+
                 <section class="buy-target">
-                <div v-if="!isLoading && resultData.length > 0" class="signal-grid">
-                    <div v-for="(item, index) in resultData" :key="index" class="signal-card"
+                <div v-if="!isLoading && sortedData.length > 0" class="signal-grid">
+                    <div v-for="(item, index) in sortedData" :key="item.stock_code ?? index" class="signal-card"
                         :class="{ 'super-signal': calculateSignalScore(item) >= 6 }">
 
                         <div v-if="item.rank_no" class="rank-badge">
@@ -269,6 +287,55 @@ const getStockMainData = async () => {
 const handleDateChange = () => getStockMainData();
 const openDatePicker = () => dateInput.value?.showPicker();
 
+/* ══════════════ 매수타겟 정렬 ══════════════
+ * 조회는 하루치 전체를 한 번에 받아오므로 클라이언트에서 정렬한다(재조회 없음).
+ *
+ * 규칙은 worker(trade_worker/repository.py _ORDER_FIELDS)와 맞춘다:
+ *   · 필드별 기본 방향 — rank_no 는 작을수록 상위(asc), score/volume 은 클수록 상위(desc)
+ *   · 값이 없는(null) 종목은 정렬 방향과 무관하게 항상 뒤
+ *   · 전부 동점이면 stock_code 로 최종 결정 (매 조회마다 순서가 흔들리지 않도록)
+ */
+const SORT_OPTIONS = [
+    { key: 'rank_no', label: '추천순위', dir: 'asc', ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
+    { key: 'score',   label: '점수',     dir: 'desc', ascLabel: '낮은 점수 먼저', descLabel: '높은 점수 먼저' },
+    { key: 'volume',  label: '거래량',   dir: 'desc', ascLabel: '적은 순',        descLabel: '많은 순' },
+];
+
+const sortKey = ref('rank_no');
+const sortDir = ref('asc');
+
+const currentSort = computed(
+    () => SORT_OPTIONS.find(o => o.key === sortKey.value) ?? SORT_OPTIONS[0]);
+
+// 기준을 바꾸면 그 필드의 기본 방향으로 되돌린다.
+// (거래량을 고르고 '적은 순'이 남아 있으면 의도와 반대 결과가 나온다)
+const setSortKey = (key) => {
+    if (sortKey.value === key) return;
+    sortKey.value = key;
+    sortDir.value = SORT_OPTIONS.find(o => o.key === key)?.dir ?? 'desc';
+};
+const toggleSortDir = () => { sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc'; };
+
+const sortNum = (v) => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isNaN(n) ? null : n;
+};
+
+const sortedData = computed(() => {
+    const key = sortKey.value;
+    const desc = sortDir.value === 'desc';
+    return [...resultData.value].sort((a, b) => {
+        const va = sortNum(a[key]);
+        const vb = sortNum(b[key]);
+        if (va === null && vb === null) return 0;
+        if (va === null) return 1;      // null 은 방향 무관 항상 뒤
+        if (vb === null) return -1;
+        if (va !== vb) return desc ? vb - va : va - vb;
+        return String(a.stock_code ?? '').localeCompare(String(b.stock_code ?? ''));
+    });
+});
+
 /* ── 매도신호 탭 ── */
 const sellData = ref([]);
 const isSellLoading = ref(false);
@@ -348,6 +415,88 @@ $amber:   #e67700;
     background: $gray-50;
     color: $gray-900;
     font-family: 'Pretendard', -apple-system, sans-serif;
+}
+
+/* ── 매수타겟 정렬 바 ── */
+.sort-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    background: $white;
+    border: 1px solid $gray-100;
+    border-radius: 12px;
+
+    .sort-label {
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: $gray-400;
+        white-space: nowrap;
+    }
+
+    .sort-chips {
+        display: flex;
+        gap: 4px;
+    }
+
+    .sort-chip {
+        padding: 5px 12px;
+        border: 1px solid $gray-200;
+        border-radius: 999px;
+        background: $white;
+        color: $gray-500;
+        font-size: 0.76rem;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: border-color .15s, background .15s, color .15s;
+
+        &:hover { border-color: $blue; color: $blue; }
+
+        &.on {
+            border-color: $blue;
+            background: #e7f0fd;
+            color: $blue;
+        }
+    }
+
+    .sort-dir {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 11px;
+        border: 1px solid $gray-200;
+        border-radius: 999px;
+        background: $gray-50;
+        color: $gray-700;
+        font-size: 0.74rem;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+
+        &:hover { border-color: $blue; color: $blue; }
+
+        .dir-arrow {
+            font-size: 0.85rem;
+            line-height: 1;
+            color: $blue;
+        }
+    }
+
+    .sort-count {
+        margin-left: auto;
+        font-size: 0.72rem;
+        color: $gray-400;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 560px) {
+    .sort-bar {
+        .sort-count { margin-left: 0; width: 100%; }
+    }
 }
 
 .contents {
