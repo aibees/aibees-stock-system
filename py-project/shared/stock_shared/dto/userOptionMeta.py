@@ -117,7 +117,8 @@ class UserOptionMeta:
         self.s1_k_trail_atr           = None
         self.s1_trail_floor_pct       = None
         self.s1_trail_drawdown_pct    = None   # 고점 대비 단순 -x% 라인 (0.05=-5%). None=미사용
-        self.s1_trail_dual            = None   # 1=ATR/drawdown 이중화(먼저 닿는 쪽) 0=drawdown 단독
+        self.s1_trail_giveback_pct    = None   # 평가이익 중 x% 반납 시 청산 (0.38=38%). None=미사용
+        self.s1_trail_dual            = None   # 1=ATR 라인까지 포함해 먼저 닿는 쪽 0=ATR 제외
         self.s1_time_stop_extend      = None
         self.s1_time_stop_band        = None
         self.s1_time_stop_grace       = None

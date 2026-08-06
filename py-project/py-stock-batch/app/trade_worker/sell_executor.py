@@ -197,7 +197,7 @@ class SellExecutor:
 
             # ATR 은 daily 평가가 남긴 last_atr 우선, 없으면 진입 시점 ATR.
             atr = float(pos.get("last_atr") or pos.get("entry_atr") or 0)
-            line, src = s._trail_line_of(p, atr)
+            line, src = s._trail_line_of(entry, p, atr)
             pos["trail_line"] = round(line, 2)
 
         self._log_peak(symbol, p, pos.get("trail_line"), src)

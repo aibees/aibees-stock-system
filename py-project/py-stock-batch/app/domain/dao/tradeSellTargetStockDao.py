@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlalchemy import select, update, and_
 from sqlalchemy.dialects.mysql import insert
 
-from app.domain.model.tradeSellTargetStock import TradeSellTargetStock
+from stock_shared.models.tradeSellTargetStock import TradeSellTargetStock
 
 
 class TradeSellTargetStockDao:

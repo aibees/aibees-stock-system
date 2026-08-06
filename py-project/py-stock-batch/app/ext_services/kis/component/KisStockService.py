@@ -4,7 +4,6 @@ from scipy.signal import argrelextrema
 import  pytz,  matplotlib
 
 from app.common.constants.Literal import Literal
-from app.domain.dao.userTestDao import UserTestDao
 
 matplotlib.use('Agg')
 from stock_shared.dao.userMasterDao import UserMasterDao
@@ -21,7 +20,6 @@ class KisService:
     def __init__(self):
         self.__name__ = 'UpbitService'
         self.userMasterDaoImpl = UserMasterDao()
-        self.userTestDaoImpl = UserTestDao()
 
     def compute_indicator_df(self, data: pd.DataFrame, user_info: UserOptionMeta) -> pd.DataFrame:
 

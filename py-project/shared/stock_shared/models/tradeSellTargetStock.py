@@ -1,7 +1,14 @@
+"""
+trade_sell_target_stock — 매도 체크 결과(배치 출력) 모델.
+
+py-stock-batch/app/domain/model 에 있던 것을 shared 로 이관.
+(같은 metadata 를 쓰는 공용 Base 아래로 모으고, 두 프로젝트에서 재사용 가능하게 함)
+"""
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.dialects.mysql import DECIMAL
-from app.domain.model.base import Base
+
+from stock_shared.base import Base
 
 
 class TradeSellTargetStock(Base):

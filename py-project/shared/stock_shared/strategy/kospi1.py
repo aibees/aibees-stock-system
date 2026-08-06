@@ -54,10 +54,18 @@ class KospiStrategy1(StockStrategy):
         # None 이면 기존 ATR 방식(고점 - k_trail_atr*ATR)만 쓴다.
         # 활성 조건은 ATR 라인과 동일하게 trail_activate_pct 게이트를 따른다.
         self.trail_drawdown_pct = None
-        # 이중화 스위치 (trail_drawdown_pct 설정 시에만 의미).
-        #   True  : ATR 라인 + drawdown 라인 **둘 다 감시**. 고점에서 내려올 때
-        #           먼저 닿는 쪽(=더 높은 값)에서 매도. → max(두 라인)
-        #   False : drawdown 라인 단독 사용. "고점 -x%"를 문자 그대로 지킴.
+        # 이익반납(giveback) 라인. 고점까지 벌어둔 **평가이익 중 x% 를 반납**하면 청산.
+        #   giveback 라인 = 진입가 + (1 - pct) * (고점 - 진입가)
+        #                 = 고점 - pct * (고점 - 진입가)
+        # 예) 0.38 · 진입 10,000 · 고점 12,000
+        #     → 이익 2,000 중 38%(760) 반납 시점 = 11,240 에서 매도
+        # drawdown 라인과 달리 **진입가 아래로 내려가지 않아** 번 이익을 지킨다.
+        # 고점이 진입가 이하면(이익 없음) 이 라인은 쓰지 않는다.
+        self.trail_giveback_pct = None
+        # 이중화 스위치 (drawdown/giveback 설정 시에만 의미).
+        #   True  : 설정된 라인들을 **모두 감시**. 고점에서 내려올 때
+        #           먼저 닿는 쪽(=가장 높은 값)에서 매도. → max(라인들)
+        #   False : ATR 라인을 빼고 drawdown/giveback 만 사용.
         self.trail_dual = True
 
         # ── #4 동적 타임스탑 ────────────────────────────────────────────────
@@ -125,6 +133,7 @@ class KospiStrategy1(StockStrategy):
             'k_trail_atr':            _f(user_info.s1_k_trail_atr),
             'trail_floor_pct':        _f(user_info.s1_trail_floor_pct),
             'trail_drawdown_pct':     _f(user_info.s1_trail_drawdown_pct),
+            'trail_giveback_pct':     _f(user_info.s1_trail_giveback_pct),
             'trail_dual':             _bool(user_info.s1_trail_dual),
             'time_stop_extend':       _bool(user_info.s1_time_stop_extend),
             'time_stop_band':         _f(user_info.s1_time_stop_band),
@@ -159,22 +168,23 @@ class KospiStrategy1(StockStrategy):
 
         return None
 
-    def _trail_line_of(self, peak: float, atr: float):
+    def _trail_line_of(self, entry: float, peak: float, atr: float):
         """트레일링 기준선 계산. 반환 (trail_line, 근거태그).
 
-        두 종류의 라인:
+        세 종류의 라인:
           · ATR 라인      = 고점 - k_trail_atr * ATR
                             (ATR 미산출 시 고점 * (1 - trail_floor_pct))
-          · drawdown 라인 = 고점 * (1 - trail_drawdown_pct)   [설정 시에만]
+          · drawdown 라인 = 고점 * (1 - trail_drawdown_pct)          [설정 시]
+          · giveback 라인 = 고점 - trail_giveback_pct * (고점 - 진입가) [설정 시]
 
         조합 규칙:
-          trail_drawdown_pct 미설정      → ATR 라인 단독
-          설정 + trail_dual=True (기본)  → **max(두 라인)**.
+          drawdown/giveback 모두 미설정 → ATR 라인 단독 (기존 동작)
+          trail_dual=True  (기본)       → 설정된 라인 + ATR 라인 중 **최댓값**.
               고점에서 내려오는 중이므로 값이 큰 라인에 먼저 닿는다.
-              = 둘 중 먼저 도달하는 쪽에서 매도(이중 안전장치).
-          설정 + trail_dual=False        → drawdown 라인 단독
+              = 여러 라인 중 먼저 도달하는 쪽에서 매도.
+          trail_dual=False              → ATR 라인 제외, 설정된 라인들의 최댓값.
 
-        반환 태그로 어느 라인이 채택됐는지 알 수 있다('atr'|'floor'|'drawdown').
+        반환 태그: 'atr' | 'floor' | 'drawdown' | 'giveback'
 
         ※ 활성 여부(trail_activate_pct 게이트)는 호출부에서 판정한다.
           이 메서드는 라인 값만 산출한다.
@@ -184,18 +194,20 @@ class KospiStrategy1(StockStrategy):
         else:
             atr_line, atr_src = peak * (1 - self.trail_floor_pct), 'floor'
 
-        dd = self.trail_drawdown_pct
-        if not dd:
+        cands = []
+        if self.trail_drawdown_pct:
+            cands.append((peak * (1 - self.trail_drawdown_pct), 'drawdown'))
+        if self.trail_giveback_pct and entry and peak > entry:
+            # 이익이 난 상태에서만 의미. 반납분 = pct * (고점 - 진입가)
+            cands.append((peak - self.trail_giveback_pct * (peak - entry), 'giveback'))
+
+        if not cands:
             return atr_line, atr_src
+        if self.trail_dual:
+            cands.append((atr_line, atr_src))
 
-        dd_line = peak * (1 - dd)
-        if not self.trail_dual:
-            return dd_line, 'drawdown'
-
-        # 이중화: 고점에서 하락 시 더 높은 라인에 먼저 닿는다
-        if dd_line >= atr_line:
-            return dd_line, 'drawdown'
-        return atr_line, atr_src
+        # 고점에서 하락 시 가장 높은 라인에 먼저 닿는다
+        return max(cands, key=lambda x: x[0])
 
     # ──────────────────────────────────────────────────────────────────
     # 매도 판별 (전량 매도 정책 / 분할 없음)
@@ -226,7 +238,7 @@ class KospiStrategy1(StockStrategy):
         peak = user_info.peak_high or close
         atr = float(coin_info.atr) if (coin_info.atr and float(coin_info.atr) > 0) \
               else float(user_info.entry_atr or 0)
-        trail_line, trail_src = self._trail_line_of(peak, atr)
+        trail_line, trail_src = self._trail_line_of(entry, peak, atr)
         peak_gain = (peak - entry) / entry if entry > 0 else 0.0
         trail_on = self.use_trailing and peak_gain >= self.trail_activate_pct
         trail_valid = trail_on and (close <= trail_line)

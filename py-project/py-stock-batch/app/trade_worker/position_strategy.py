@@ -136,5 +136,5 @@ class SellStrategy:
         peak_gain = (peak - entry) / entry
         if not getattr(s, "use_trailing", True) or peak_gain < getattr(s, "trail_activate_pct", 0.08):
             return None
-        line, _src = s._trail_line_of(peak, atr)
+        line, _src = s._trail_line_of(entry, peak, atr)
         return line

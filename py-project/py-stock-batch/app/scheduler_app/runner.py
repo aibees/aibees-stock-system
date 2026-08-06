@@ -1,69 +1,35 @@
-import importlib
-import threading
-from concurrent.futures import ProcessPoolExecutor
-
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.executors.pool import ProcessPoolExecutor as APProcessPoolExecutor
 from pytz import timezone
 
 from app.config.contextManager import get_session
+from app.scheduler_app.job_runner import MP_CONTEXT, _execute_job, run_job_once  # noqa: F401
 from stock_shared.dao.batchJobMasterDao import BatchJobMasterDao
 
-
 # ──────────────────────────────────────────────────────────────
-#  module-level wrapper — ProcessPoolExecutor가 pickle하는 대상
+#  주의 — 이 모듈은 맨 아래에서 `scheduleManage = StockScheduler()` 를
+#  실행한다. 즉 **import 만 해도 DB 붙고 스케줄러가 선다.**
 #
-#  클래스 메서드(bound method)를 직접 등록하면 인스턴스 전체를
-#  pickle해야 하는데, KisEngine(PyKis 세션)·ThreadPoolExecutor
-#  등 직렬화 불가 객체가 포함되어 PicklingError가 발생한다.
-#
-#  module-level 함수는 "모듈 경로 + 함수명" 만으로 직렬화되므로
-#  내부 상태를 전혀 pickle하지 않아 문제가 없다.
-#
-#  또한 자식 프로세스 진입 직후 engine.dispose()를 호출하여
-#  fork로 복사된 부모 프로세스의 커넥션 풀을 폐기한다.
-#  (dispose() 없이 사용하면 부모-자식이 같은 소켓 FD를 공유해
-#   쿼리 결과 오염 또는 SSL 오류가 발생할 수 있다.)
+#  그래서 자식 프로세스가 실행할 함수(_execute_job)를 여기 두면 안 된다.
+#  자식은 그 함수를 되살리려고 이 모듈을 재import 하고, 그 순간
+#  스케줄러를 통째로 다시 세우기 때문이다. → job_runner.py 로 분리했다.
+#  (run_job_once / _execute_job 은 기존 import 경로 호환을 위해 re-export)
 # ──────────────────────────────────────────────────────────────
-def _execute_job(module_name: str, class_name: str, **kwargs):
-    from app.config.database import dbConn
-    dbConn.engine.dispose()
-
-    jobModule = importlib.import_module(module_name)
-    jobClass  = getattr(jobModule, class_name)
-    jobClass().process(**kwargs)
-
-
-# ──────────────────────────────────────────────────────────────
-#  수동 실행(/once) 전용 ProcessPoolExecutor.
-#
-#  기존엔 job 을 gunicorn worker 프로세스 안 daemon Thread 로 돌렸는데,
-#  batch 의 CPU-bound 구간이 GIL 을 오래 잡으면 worker 의 heartbeat 가
-#  끊겨 gunicorn arbiter 가 WORKER TIMEOUT 으로 worker 를 죽였다
-#  (그러면 job Thread 도 daemon 이라 같이 죽음).
-#  → 스케줄러 자동실행과 동일하게 '별도 프로세스'에서 실행해
-#    web worker 를 블로킹하지 않는다. _execute_job 은 pickle 안전.
-# ──────────────────────────────────────────────────────────────
-_manual_executor = None
-_manual_lock = threading.Lock()
-
-
-def run_job_once(module_name: str, class_name: str, **kwargs):
-    """수동(/once) batch 실행을 web worker 밖 별도 프로세스로 submit(비블로킹).
-    반환: concurrent.futures.Future (호출측은 대기하지 않음)."""
-    global _manual_executor
-    with _manual_lock:
-        if _manual_executor is None:
-            _manual_executor = ProcessPoolExecutor(max_workers=2)
-    return _manual_executor.submit(_execute_job, module_name, class_name, **kwargs)
 
 
 class StockScheduler:
     def __init__(self):
         self.batchJobMasterDaoImpl = BatchJobMasterDao()
         self.scheduler = BackgroundScheduler(
+            # dict 설정({'type':'processpool'})으로는 mp_context 를 못 넘긴다.
+            # 수동실행(/once) 풀과 동일한 spawn 컨텍스트를 쓰도록 객체로 준다.
+            # → 자동/수동 두 경로의 프로세스 생성 방식을 하나로 통일.
             executors={
-                'default': {'type': 'processpool', 'max_workers': 4}
+                'default': APProcessPoolExecutor(
+                    max_workers=4,
+                    pool_kwargs={'mp_context': MP_CONTEXT},
+                )
             },
             job_defaults={
                 'max_instances': 1,       # 같은 Job 중복 실행 방지
