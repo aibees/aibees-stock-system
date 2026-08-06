@@ -33,6 +33,7 @@ pandas-stubs = "~=2.3.3"
 mcp = "^1.9.0"
 uvicorn = {extras = ["standard"], version = "^0.34.0"}
 scipy = "^1.18.0"
+yfinance = "^1.5.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
