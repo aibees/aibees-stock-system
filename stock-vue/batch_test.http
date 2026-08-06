@@ -1,7 +1,7 @@
 
-POST https://stock.aibeesworld.com/batches/api/v1/jobs/once/STOCK_BUY_CHECK_JOB HTTP/1.1
+POST http://localhost:5557/batches/api/v1/jobs/once/STOCK_BUY_CHECK_JOB HTTP/1.1
 Content-Type: application/json; charset=UTF-8
 
 {
-    "end_date": "2026-04-01"
+    
 }
