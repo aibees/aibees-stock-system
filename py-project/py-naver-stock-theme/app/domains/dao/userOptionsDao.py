@@ -214,12 +214,23 @@ class UserOptionsDao(BaseDao):
             's1_k_trail_atr':          _f(uo.s1_k_trail_atr),
             's1_trail_floor_pct':      _f(uo.s1_trail_floor_pct),
             's1_trail_drawdown_pct':   _f(uo.s1_trail_drawdown_pct),
+            's1_trail_giveback_pct':   _f(uo.s1_trail_giveback_pct),
             's1_trail_dual':           uo.s1_trail_dual,
             's1_time_stop_extend':     uo.s1_time_stop_extend,
             's1_time_stop_band':       _f(uo.s1_time_stop_band),
             's1_time_stop_grace':      uo.s1_time_stop_grace,
             's1_max_hold_bars_hard':   uo.s1_max_hold_bars_hard,
             's1_obv_dead_min_bars':    uo.s1_obv_dead_min_bars,
+            # 매수 필터 on/off · core 신호 mode (관리자 전용 편집)
+            's1_enable_macd_filter':     uo.s1_enable_macd_filter,
+            's1_enable_rsi_filter':      uo.s1_enable_rsi_filter,
+            's1_enable_bb_upper_filter': uo.s1_enable_bb_upper_filter,
+            's1_enable_vol_avg_filter':  uo.s1_enable_vol_avg_filter,
+            's1_enable_regime_gate':     uo.s1_enable_regime_gate,
+            's1_macd_signal_mode':       uo.s1_macd_signal_mode,
+            's1_obv_signal_mode':        uo.s1_obv_signal_mode,
+            # worker 매수타겟 정렬 (유저별 개인화)
+            's1_buy_order':              uo.s1_buy_order,
         }
 
     # ----------------------------------------------------------------
@@ -235,9 +246,19 @@ class UserOptionsDao(BaseDao):
             's1_surge_relax_mult', 's1_downtrend_surge_bypass', 's1_surge_bypass_mult',
             's1_use_trailing', 's1_trail_activate_pct',
             's1_k_trail_atr', 's1_trail_floor_pct',
-            's1_trail_drawdown_pct', 's1_trail_dual', 's1_time_stop_extend',
+            's1_trail_drawdown_pct', 's1_trail_giveback_pct',
+            's1_trail_dual', 's1_time_stop_extend',
             's1_time_stop_band', 's1_time_stop_grace', 's1_max_hold_bars_hard',
             's1_obv_dead_min_bars',
+            # 매수 필터 on/off · core 신호 mode
+            #   라우터(_S1_ADMIN_ONLY_COLS)에서 관리자 여부를 먼저 막는다.
+            #   여기 화이트리스트는 '존재하는 컬럼인가'만 본다.
+            's1_enable_macd_filter', 's1_enable_rsi_filter',
+            's1_enable_bb_upper_filter', 's1_enable_vol_avg_filter',
+            's1_enable_regime_gate',
+            's1_macd_signal_mode', 's1_obv_signal_mode',
+            # worker 매수타겟 정렬 (개인화)
+            's1_buy_order',
         }
         values = {k: v for k, v in fields.items() if k in S1_ALLOWED}
         if not values:

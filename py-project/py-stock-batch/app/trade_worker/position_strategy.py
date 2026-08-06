@@ -26,6 +26,19 @@ def _f(v, default=0.0):
         return default
 
 
+def _s1_fingerprint(meta) -> tuple:
+    """user_meta 의 s1_* 값들을 비교 가능한 튜플로. 설정 변경 감지용.
+
+    user_options 에 updated_at 이 없어서 타임스탬프 비교를 못 한다.
+    행 1건을 읽어 값 자체를 비교하는 편이 스키마 변경보다 싸고 정확하다
+    (되돌리기·재저장으로 타임스탬프만 바뀐 경우를 오탐하지도 않는다).
+    """
+    return tuple(
+        (k, str(getattr(meta, k, None)))
+        for k in sorted(k for k in vars(meta) if k.startswith("s1_"))
+    )
+
+
 class SellStrategy:
     def __init__(self, engine, user_id: int, lookback_days: int = 250):
         self.engine = engine                    # KisEngine (get_daily_ohlcv)
@@ -38,6 +51,78 @@ class SellStrategy:
         # user_options 의 s1_* 로 전략 기본값을 덮어쓴다. 이 호출이 빠지면
         # 화면에서 조정한 손절/익절/트레일링 값이 worker 에 전혀 반영되지 않는다.
         self.strategy.configure(self.user_meta)
+        self._fingerprint = _s1_fingerprint(self.user_meta)
+
+    # ── 장중 설정 재적용 ─────────────────────────────────────────────
+    def reload_if_changed(self) -> list[tuple[str, object, object]]:
+        """user_options 를 다시 읽어 s1_* 이 바뀌었으면 전략을 재구성한다.
+
+        반환: [(속성명, 이전값, 새값), ...] — 변경 없으면 빈 리스트.
+
+        ※ 기존 KospiStrategy1 인스턴스에 configure() 를 다시 호출하면 안 된다.
+          configure 는 값이 None 이면 setattr 을 건너뛰므로, 유저가 필드를
+          비워서(NULL) '기본값으로 되돌린' 변경이 반영되지 않고 옛 override 가
+          그대로 남는다. 그래서 **새 인스턴스**를 만들어 갈아끼운다.
+          SellExecutor/BuyExecutor 는 self.strategy.strategy 를 매번 조회하므로
+          교체 즉시 새 파라미터를 쓴다.
+        """
+        with get_session() as s:
+            new_meta = UserService().get_user_options(s, self.user_id)
+
+        new_fp = _s1_fingerprint(new_meta)
+        if new_fp == self._fingerprint:
+            return []
+
+        old_strategy = self.strategy
+        fresh = KospiStrategy1()
+        fresh.configure(new_meta)
+
+        # 실제로 달라진 전략 속성만 추린다(로그·알림용).
+        changes = []
+        for attr in vars(fresh):
+            old_v, new_v = getattr(old_strategy, attr, None), getattr(fresh, attr)
+            if old_v != new_v:
+                changes.append((attr, old_v, new_v))
+
+        self.user_meta = new_meta
+        self.strategy = fresh
+        self._fingerprint = new_fp
+        return changes
+
+    # ── 보유 포지션의 라인 재계산 (KIS API 미사용) ─────────────────────
+    def recalc_lines(self, pos: dict) -> dict | None:
+        """현재 파라미터로 stop/target/trail 을 다시 계산한다.
+
+        일봉 지표(OBV 데드크로스·타임스탑·추세국면)는 손대지 않는다.
+        그건 evaluate() 영역이고 KIS 조회가 필요하며, 애초에 실시간 판정 대상이
+        아니다(sell_executor 문서 참고). 여기서는 **실시간 감시가 쓰는 3개 라인**만
+        메모리 값(entry_price / peak_high / last_atr)으로 다시 만든다.
+        → 외부 호출 0회라 장중에 몇 번을 불러도 부담이 없다.
+
+        반환: DB/메모리에 반영할 state dict. 계산 불가면 None.
+        """
+        entry = _f(pos.get("entry_price"))
+        if entry <= 0:
+            return None
+
+        s = self.strategy
+        state = {
+            "stop_price": round(entry * (1 - s.stop_loss_pct), 2),
+            "target_price": round(entry * (1 + s.take_profit_pct), 2),
+        }
+
+        peak = _f(pos.get("peak_high") or entry)
+        atr = _f(pos.get("last_atr") or pos.get("entry_atr"))
+        peak_gain = (peak - entry) / entry
+
+        # 활성화 게이트 미달이거나 트레일링 off → 라인 제거(None).
+        # 트레일링을 껐는데 옛 라인이 남아 매도되는 사고를 막는다.
+        if not getattr(s, "use_trailing", True) or peak_gain < getattr(s, "trail_activate_pct", 0.08):
+            state["trail_line"] = None
+        else:
+            line, _src = s._trail_line_of(entry, peak, atr)
+            state["trail_line"] = round(line, 2)
+        return state
 
     # ── 일봉 지표 계산 (공통) ────────────────────────────────────────
     def _indicators(self, code: str):

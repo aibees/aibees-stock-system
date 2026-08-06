@@ -336,6 +336,32 @@ def main():
     else:
         log.info("계좌 주기 갱신 비활성 (WALLET_POLL_SEC=%d)", cfg.wallet_poll_sec)
 
+    # ── 설정(user_options s1_*) 변경 감지 ──────────────────────────────
+    #  worker 는 데몬이라 부팅 시 configure() 한 파라미터가 그대로 굳는다.
+    #  이 폴링이 없으면 화면에서 매도 조건을 바꿔도 재기동 전까지 반영되지 않는다.
+    #  단일 행 SELECT 1건이라 60초 주기면 부하는 사실상 0.
+    #  KIS 조회는 하지 않는다(라인은 메모리 값으로 재계산) → 장중에 돌아도 안전.
+    def _poll_settings():
+        now_kst = datetime.now(_KST)
+        if now_kst.weekday() >= 5:
+            return
+        if not (_POLL_START_HOUR <= now_kst.hour < _POLL_END_HOUR):
+            return
+        if not _is_trading_day_cached(now_kst):
+            return
+        try:
+            sell.apply_settings_change()
+        except Exception as e:  # noqa: BLE001
+            log.warning("[poll] 설정 반영 실패: %s", e)
+
+    if cfg.settings_poll_sec > 0:
+        scheduler.add_job(_poll_settings, IntervalTrigger(seconds=cfg.settings_poll_sec),
+                          id="settings_poll", max_instances=1, coalesce=True)
+        log.info("설정 변경 감지 등록: %d초마다", cfg.settings_poll_sec)
+    else:
+        log.info("설정 변경 감지 비활성 (SETTINGS_POLL_SEC=%d) → 변경은 재기동 후 반영",
+                 cfg.settings_poll_sec)
+
     scheduler.start()
     for j in scheduler.get_jobs():
         log.info("스케줄러 job=%s · trigger=%s · 다음 실행=%s",

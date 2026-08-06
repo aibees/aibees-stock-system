@@ -4,6 +4,10 @@ router_strategy.py — 매매전략 셋업 및 백테스트
 엔드포인트 (url_prefix = /api/v1/strategy):
     GET   /options              전략 파라미터 조회 (s1_* 컬럼)
     PATCH /options              전략 파라미터 수정 (변경분만, flat key-value)
+    GET   /param-guide          파라미터 조정 화면 메타(master_strategy_param)
+    POST  /param-guide          메타 등록   (관리자)
+    PATCH /param-guide/<key>    메타 수정   (관리자)
+    DELETE/param-guide/<key>    메타 삭제   (관리자)
     POST  /backtest             단일 종목 백테스트 (구 버전 — StockModService 기반)
     POST  /backtest/ingest      KIS 지표 계산 + trade_candle_data UPSERT
     POST  /backtest/run         단일 종목 KisBacktester 백테스트
@@ -26,6 +30,7 @@ from flask import Blueprint, g, request
 from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
 from app.domains.dao.userOptionsDao import UserOptionsDao
+from app.domains.dao.masterStrategyParamDao import MasterStrategyParamDao
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.ext_services.kis.KisEngine import KisEngine
 from app.flask_app.routers.router_oauth import require_auth
@@ -33,6 +38,7 @@ from app.flask_app.utils.apiResponse import ApiResponse
 from stock_shared.strategy.backtester import KisBacktester
 from app.services.kis.KisStockService import KisStockService
 from app.services.strategy.backtestService import BacktestService
+from app.services.strategy.strategyParamGuideService import StrategyParamGuideService
 
 logging.basicConfig(level=logging.ERROR)
 
@@ -44,6 +50,11 @@ backtestSvc        = BacktestService()
 kisStockSvc        = KisStockService()
 kisBacktester      = KisBacktester()
 kisEngine          = KisEngine(virtual=False)
+paramGuideSvc      = StrategyParamGuideService()
+paramGuideDao      = MasterStrategyParamDao()
+
+# 관리자 user_id — 파라미터 메타(master_strategy_param) 편집 권한
+ADMIN_USER_ID = 1
 
 # KIS 지표 적재에 필요한 UserOptionMeta 기본값
 _DEFAULT_USER_INFO_FOR_INGEST = UserOptionMeta()
@@ -94,13 +105,85 @@ _S1_COLS: dict[str, str] = {
     's1_k_trail_atr':          'decimal',
     's1_trail_floor_pct':      'decimal',
     's1_trail_drawdown_pct':   'decimal',
+    's1_trail_giveback_pct':   'decimal',
     's1_trail_dual':           'tinyint',
     's1_time_stop_extend':     'tinyint',
     's1_time_stop_band':       'decimal',
     's1_time_stop_grace':      'int',
     's1_max_hold_bars_hard':   'int',
     's1_obv_dead_min_bars':    'int',
+    # ── 매수 필터 on/off · core 진입신호 mode ──
+    's1_enable_macd_filter':     'tinyint',
+    's1_enable_rsi_filter':      'tinyint',
+    's1_enable_bb_upper_filter': 'tinyint',
+    's1_enable_vol_avg_filter':  'tinyint',
+    's1_enable_regime_gate':     'tinyint',
+    's1_macd_signal_mode':       'signal_mode',
+    's1_obv_signal_mode':        'signal_mode',
+    # ── worker 매수타겟 정렬 (개인화) ──
+    's1_buy_order':              'buy_order',
 }
+
+# core 진입신호 mode 허용값
+_SIGNAL_MODES = ('off', 'golden', 'slope')
+
+# ─────────────────────────────────────────────────────────────────────
+# 권한 분리 — 어디서 소비되는 값인가로 갈린다
+#
+#  [관리자 전용] 매수 전략 파라미터
+#     KospiStrategy1.get_action_in_watch 가 쓰고, 이를 호출하는
+#     StockBuyCheckJob 은 get_user_options(session) 를 user_id 없이 부른다(=user_id 1).
+#     산출물 trade_buy_target_stock 은 **전 유저 공용 추천 테이블**이다.
+#     → 일반 유저가 바꿔도 자기 화면엔 반영되지 않고(공용 테이블이라),
+#       관리자가 바꾸면 전원에게 영향이 간다. 개인화가 성립하지 않는 값들.
+#
+#  [개인화] 그 외 (매도 파라미터 전체 + s1_buy_order)
+#     worker(SellStrategy / BuyExecutor)가 user_id 별로 읽어 쓴다. 서로 간섭 없음.
+# ─────────────────────────────────────────────────────────────────────
+_S1_ADMIN_ONLY_COLS = frozenset({
+    's1_rsi_overbought', 's1_rsi_ideal_low', 's1_rsi_ideal_high',
+    's1_vol_ma_window', 's1_vol_ma_mult',
+    's1_regime_window', 's1_regime_threshold',
+    's1_strict_need_macd_up', 's1_loose_need_vol_surge', 's1_surge_relax_mult',
+    's1_downtrend_surge_bypass', 's1_surge_bypass_mult',
+    's1_enable_macd_filter', 's1_enable_rsi_filter', 's1_enable_bb_upper_filter',
+    's1_enable_vol_avg_filter', 's1_enable_regime_gate',
+    's1_macd_signal_mode', 's1_obv_signal_mode',
+})
+
+# s1_buy_order 허용 필드 — trade_worker/repository.py _ORDER_FIELDS 와 동일해야 한다.
+# (worker 는 모르는 필드를 조용히 무시하지만, 저장 시점에 걸러야 사용자가 오타를 안다)
+_BUY_ORDER_FIELDS = ('score', 'volume', 'rate', 'rank_no', 'close')
+_BUY_ORDER_DIRS = ('asc', 'desc')
+
+
+def _validate_buy_order(spec: str):
+    """s1_buy_order 문법 검증. 반환 (정규화된 spec, 에러메시지|None).
+
+    worker 는 오타를 무시하고 기본값으로 돌지만, 그러면 사용자는 저장이 됐는데
+    왜 안 먹는지 알 수 없다. 저장 단계에서 막아 그 혼란을 없앤다.
+    """
+    parts = []
+    seen = set()
+    for token in spec.split(','):
+        token = token.strip()
+        if not token:
+            continue
+        field, _, direction = token.partition(':')
+        field = field.strip().lower()
+        direction = direction.strip().lower()
+        if field not in _BUY_ORDER_FIELDS:
+            return None, f'정렬 필드가 올바르지 않습니다: {field} (허용: {", ".join(_BUY_ORDER_FIELDS)})'
+        if direction and direction not in _BUY_ORDER_DIRS:
+            return None, f'정렬 방향은 asc 또는 desc 여야 합니다: {field}:{direction}'
+        if field in seen:
+            return None, f'정렬 필드가 중복되었습니다: {field}'
+        seen.add(field)
+        parts.append(f'{field}:{direction}' if direction else field)
+
+    if not parts:
+        return None, '정렬 항목이 비어 있습니다. 기본값으로 두려면 null 을 보내세요.'
+    return ','.join(parts), None
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -118,11 +201,12 @@ def _error(code: str, message: str, status: int = 400):
     )
 
 
-def _validate_s1_body(body: dict):
+def _validate_s1_body(body: dict, is_admin: bool = False):
     """
     PATCH body 검증.
-    - 알 수 없는 key → 400 INVALID_FIELD
-    - 타입 불일치   → 400 INVALID_FIELD
+    - 알 수 없는 key       → 400 INVALID_FIELD
+    - 타입 불일치          → 400 INVALID_FIELD
+    - 관리자 전용 key      → 403 FORBIDDEN (is_admin=False 일 때)
     반환: (정제된 dict, None) 또는 (None, error_response)
     """
     clean: dict = {}
@@ -130,6 +214,14 @@ def _validate_s1_body(body: dict):
         col_type = _S1_COLS.get(k)
         if col_type is None:
             return None, _error('INVALID_FIELD', f'허용되지 않는 필드입니다: {k}')
+
+        # 공용 매수타겟에 영향을 주는 값은 관리자만 바꿀 수 있다.
+        if k in _S1_ADMIN_ONLY_COLS and not is_admin:
+            return None, _error(
+                'FORBIDDEN',
+                f'{k} 는 전체 매수타겟 생성에 적용되는 값이라 관리자만 변경할 수 있습니다.',
+                status=403,
+            )
 
         if v is None:
             clean[k] = None
@@ -149,6 +241,21 @@ def _validate_s1_body(body: dict):
             if not isinstance(v, (int, float)) or isinstance(v, bool):
                 return None, _error('INVALID_FIELD', f'{k} 는 숫자여야 합니다.')
             clean[k] = float(v)
+
+        elif col_type == 'signal_mode':
+            if v not in _SIGNAL_MODES:
+                return None, _error(
+                    'INVALID_FIELD',
+                    f'{k} 는 {" / ".join(_SIGNAL_MODES)} 중 하나여야 합니다.')
+            clean[k] = str(v)
+
+        elif col_type == 'buy_order':
+            if not isinstance(v, str):
+                return None, _error('INVALID_FIELD', f'{k} 는 문자열이어야 합니다.')
+            normalized, err_msg = _validate_buy_order(v)
+            if err_msg:
+                return None, _error('INVALID_FIELD', err_msg)
+            clean[k] = normalized
 
         elif col_type == 'varchar':
             clean[k] = str(v)
@@ -199,9 +306,23 @@ def _validate_backtest_body(body: dict):
 @strategy_bp.route('/options', methods=['GET'])
 @require_auth
 def get_strategy_options():
+    """s1_* 전체를 반환하되, 편집 권한 메타를 함께 내려준다.
+
+    화면(BuySetting.vue)은 admin_only 목록으로 필드를 read-only 처리한다.
+    값 자체는 비관리자도 볼 수 있다 — 어떤 조건으로 타겟이 뽑혔는지는
+    알아야 정렬 기준을 정할 수 있기 때문.
+    """
     try:
-        data = userOptionsDaoImpl.select_s1_options(g.db, g.current_user_id)
-        return ApiResponse.success(data)
+        data = userOptionsDaoImpl.select_s1_options(g.db, g.current_user_id) or {}
+        is_admin = (g.current_user_id == ADMIN_USER_ID)
+        return ApiResponse.success({
+            **data,
+            '_meta': {
+                'is_admin': is_admin,
+                'admin_only_fields': sorted(_S1_ADMIN_ONLY_COLS),
+                'buy_order_fields': list(_BUY_ORDER_FIELDS),
+            },
+        })
     except Exception as e:
         logging.exception(e)
         return ApiResponse.error(str(e))
@@ -218,7 +339,7 @@ def patch_strategy_options():
     if not body:
         return ApiResponse.error('변경할 항목이 없습니다.', status=400)
 
-    clean, err = _validate_s1_body(body)
+    clean, err = _validate_s1_body(body, is_admin=(g.current_user_id == ADMIN_USER_ID))
     if err:
         return err
 
@@ -226,6 +347,116 @@ def patch_strategy_options():
         userOptionsDaoImpl.upsert_s1_options(g.db, g.current_user_id, clean)
         g.db.commit()
         return ApiResponse.success({'updated': True})
+    except Exception as e:
+        g.db.rollback()
+        logging.exception(e)
+        return ApiResponse.error(str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 2-1. 파라미터 조정 화면 메타 조회
+#      GET /api/v1/strategy/param-guide?strategy_code=S1
+#
+#      Vue(TradeSetting.vue)가 이 응답만으로 카드/필드를 렌더링한다.
+#      화면에 하드코딩된 GROUPS 상수를 대체하는 엔드포인트.
+# ═══════════════════════════════════════════════════════════════════
+@strategy_bp.route('/param-guide', methods=['GET'])
+@require_auth
+def get_param_guide():
+    strategy_code = request.args.get('strategy_code', 'S1')
+    # 관리자는 enabled_flag='N' 항목까지 볼 수 있다(메타 관리용).
+    include_disabled = (
+        g.current_user_id == ADMIN_USER_ID
+        and request.args.get('include_disabled') == 'Y'
+    )
+    try:
+        data = paramGuideSvc.get_guide(g.db, strategy_code, include_disabled)
+        return ApiResponse.success(data)
+    except Exception as e:
+        logging.exception(e)
+        return ApiResponse.error(str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 2-2. 메타 등록 (관리자)
+#      POST /api/v1/strategy/param-guide
+# ═══════════════════════════════════════════════════════════════════
+@strategy_bp.route('/param-guide', methods=['POST'])
+@require_auth
+def post_param_guide():
+    if g.current_user_id != ADMIN_USER_ID:
+        return _error('FORBIDDEN', '관리자만 수정할 수 있습니다.', status=403)
+
+    body = request.get_json(silent=True) or {}
+    body.setdefault('strategy_code', 'S1')
+
+    err_msg = paramGuideSvc.validate(body, for_insert=True)
+    if err_msg:
+        return _error('INVALID_FIELD', err_msg)
+
+    try:
+        exists = paramGuideDao.select_one(g.db, body['strategy_code'], body['param_key'])
+        if exists is not None:
+            return _error('DUPLICATE', f"이미 존재하는 param_key 입니다: {body['param_key']}", status=409)
+
+        paramGuideDao.insert_param(g.db, body)
+        g.db.commit()
+        return ApiResponse.success({'created': True, 'param_key': body['param_key']})
+    except Exception as e:
+        g.db.rollback()
+        logging.exception(e)
+        return ApiResponse.error(str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 2-3. 메타 수정 (관리자) — 넘어온 컬럼만
+#      PATCH /api/v1/strategy/param-guide/<param_key>?strategy_code=S1
+# ═══════════════════════════════════════════════════════════════════
+@strategy_bp.route('/param-guide/<param_key>', methods=['PATCH'])
+@require_auth
+def patch_param_guide(param_key):
+    if g.current_user_id != ADMIN_USER_ID:
+        return _error('FORBIDDEN', '관리자만 수정할 수 있습니다.', status=403)
+
+    body = request.get_json(silent=True) or {}
+    if not body:
+        return _error('INVALID_FIELD', '변경할 항목이 없습니다.')
+
+    strategy_code = request.args.get('strategy_code', 'S1')
+
+    err_msg = paramGuideSvc.validate(body, for_insert=False)
+    if err_msg:
+        return _error('INVALID_FIELD', err_msg)
+
+    try:
+        ok = paramGuideDao.update_param(g.db, strategy_code, param_key, body)
+        if not ok:
+            return _error('NOT_FOUND', f'대상을 찾을 수 없습니다: {param_key}', status=404)
+        g.db.commit()
+        return ApiResponse.success({'updated': True, 'param_key': param_key})
+    except Exception as e:
+        g.db.rollback()
+        logging.exception(e)
+        return ApiResponse.error(str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 2-4. 메타 삭제 (관리자)
+#      DELETE /api/v1/strategy/param-guide/<param_key>?strategy_code=S1
+# ═══════════════════════════════════════════════════════════════════
+@strategy_bp.route('/param-guide/<param_key>', methods=['DELETE'])
+@require_auth
+def delete_param_guide(param_key):
+    if g.current_user_id != ADMIN_USER_ID:
+        return _error('FORBIDDEN', '관리자만 삭제할 수 있습니다.', status=403)
+
+    strategy_code = request.args.get('strategy_code', 'S1')
+    try:
+        cnt = paramGuideDao.delete_param(g.db, strategy_code, param_key)
+        if not cnt:
+            return _error('NOT_FOUND', f'대상을 찾을 수 없습니다: {param_key}', status=404)
+        g.db.commit()
+        return ApiResponse.success({'deleted': True, 'param_key': param_key})
     except Exception as e:
         g.db.rollback()
         logging.exception(e)

@@ -92,7 +92,7 @@
         <!-- ── 레이어 팝업 ── -->
         <Teleport to="body">
             <Transition name="fade">
-                <div v-if="popup.visible" class="popup-overlay" @click.self="closePopup">
+                <div v-if="popup.visible" class="popup-overlay">
                     <div class="popup-panel" v-draggable>
 
                         <div class="popup-header">

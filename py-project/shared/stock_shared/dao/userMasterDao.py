@@ -38,6 +38,7 @@ class UserMasterDao(BaseDao):
             )
         )
         results = session.execute(stmt).all()
+        print(results)
         if not results:
             return []
 

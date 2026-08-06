@@ -166,6 +166,67 @@ class SellExecutor:
         self.wlog.info("[매도] %s 라인 돌파(%s) 감지했으나 %s → 주문 보류",
                        symbol, reason, sess.name)
 
+    # ── 장중 설정 변경 반영 ──────────────────────────────────────────
+    def apply_settings_change(self) -> bool:
+        """user_options 가 바뀌었으면 전략을 갈아끼우고 라인을 즉시 재계산한다.
+
+        worker 는 장시간 살아있는 데몬이라 부팅 때 configure() 한 값이 그대로 굳는다.
+        이 메서드가 없으면 화면에서 손절/익절/트레일링을 바꿔도 **다음 재기동까지**
+        반영되지 않는다.
+
+        재계산 범위는 실시간 감시가 쓰는 stop/target/trail 3개 라인뿐이다.
+        일봉 신호(OBV 데드크로스·타임스탑)는 다음 개장 루틴(refresh_positions)이
+        맡는다 — 장중엔 당일 봉이 미완성이라 판정 자체가 성립하지 않는다.
+
+        ⚠ 손절선을 조이면(예 5%→3%) 이미 그 아래인 종목은 **다음 틱에 즉시 매도**된다.
+          의도된 동작이지만 사고 여지가 있어 변경 내역과 라인을 모두 로그로 남기고
+          알림도 보낸다.
+        """
+        if not self.strategy:
+            return False
+        try:
+            changes = self.strategy.reload_if_changed()
+        except Exception as e:  # noqa: BLE001
+            self.wlog.warn("[설정] user_options 조회 실패: %s", e)
+            return False
+        if not changes:
+            return False
+
+        summary = ", ".join(f"{a}: {o}→{n}" for a, o, n in changes[:8])
+        if len(changes) > 8:
+            summary += f" 외 {len(changes) - 8}건"
+        self.wlog.info("[설정] 변경 감지 → 전략 재적용 (%s)", summary)
+
+        with self._lock:
+            targets = list(self.positions.items())
+
+        applied = 0
+        for code, pos in targets:
+            state = self.strategy.recalc_lines(pos)
+            if not state:
+                continue
+            try:
+                self.repo.update_position_state(self.cfg.user_id, code, state)
+            except Exception as e:  # noqa: BLE001
+                self.wlog.warn("[설정] %s 라인 저장 실패: %s", code, e)
+                continue
+            with self._lock:
+                cur = self.positions.get(code)
+                if cur is not None:
+                    cur.update(state)
+            applied += 1
+            self.wlog.info("[설정] %s 라인 재계산 stop=%s target=%s trail=%s",
+                           code, state.get("stop_price"), state.get("target_price"),
+                           state.get("trail_line"))
+
+        if self.notifier and applied:
+            try:
+                self.notifier.send("[설정 변경] 매도 전략 재적용",
+                                   f"{applied}종목 라인 갱신\n{summary}")
+            except Exception:  # noqa: BLE001
+                pass
+        return True
+
     # ── 실시간 고점 추적 ─────────────────────────────────────────────
     def _advance_peak(self, symbol: str, pos: dict, price: Decimal):
         """소켓 체결가로 peak_high 를 갱신하고 트레일 라인을 재계산한다.

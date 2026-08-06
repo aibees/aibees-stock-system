@@ -54,6 +54,8 @@ class WorkerConfig:
     buy_fill_wait_retries: int
     buy_fill_wait_sec: int
     wallet_poll_sec: int
+    # user_options(s1_*) 변경 감지 주기(초). 0 이면 비활성 → 재기동해야 반영된다.
+    settings_poll_sec: int
 
     @property
     def mode(self) -> str:
@@ -91,4 +93,5 @@ def load() -> WorkerConfig:
         buy_fill_wait_retries=int(os.getenv("BUY_FILL_WAIT_RETRIES", "5")),
         buy_fill_wait_sec=int(os.getenv("BUY_FILL_WAIT_SEC", "10")),
         wallet_poll_sec=int(os.getenv("WALLET_POLL_SEC", "30")),
+        settings_poll_sec=int(os.getenv("SETTINGS_POLL_SEC", "60")),
     )

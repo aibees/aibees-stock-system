@@ -196,11 +196,6 @@
                             <span class="pl-value">{{ fmtWon(lines.target) }}</span>
                             <span class="pl-sub">진입가 +{{ pctText('s1_take_profit_pct') }}</span>
                         </li>
-                        <li :class="{ muted: !isOn('s1_use_trailing') }">
-                            <span class="pl-label">트레일링 trail_line</span>
-                            <span class="pl-value">{{ isOn('s1_use_trailing') ? fmtWon(lines.trail) : '미사용' }}</span>
-                            <span class="pl-sub">{{ lines.trailBasisText }}</span>
-                        </li>
                     </ul>
                     <p class="pv-note">
                         고점(peak)은 활성화 수익 {{ pctText('s1_trail_activate_pct') }} 도달 시점을 가정했습니다.
@@ -269,8 +264,14 @@ const GROUPS = [
         desc: '일정% 손절 또는 OBV 데드크로스(세력 청산 신호). <br/>가장 먼저 평가되는 최우선 조건입니다.',
         fields: [
             {
-                k: 's1_stop_loss_pct', label: '손실', unit: '%', type: 'pct', def: 0.05,
-                min: 2, max: 15, step: 0.5,
+                k: 's1_stop_loss_pct', 
+                label: '손실', 
+                unit: '%', 
+                type: 'pct', 
+                def: 0.05,
+                min: 2, 
+                max: 15, 
+                step: 0.5,
                 hint: '진입가 대비 −N% 하회 시 전량 손절합니다.',
             },
             {
@@ -292,39 +293,56 @@ const GROUPS = [
         ],
     },
     {
-        id: 'C', priority: 3, title: '트레일링 스탑 (Chandelier)',
-        desc: '매수 시점부터 실시간 체결가로 고점을 추적하고, 그 고점에서 설정폭만큼 하락하면 청산합니다. 마스터 토글을 끄면 하위 항목이 비활성화됩니다.',
+        id: 'C', priority: 3, title: '트레일링 스탑',
+        desc: '매수 시점부터 실시간 체결가로 고점을 추적하고, 그 고점에서 설정폭만큼 하락하면 청산합니다. <br/>비활성화하면 손절/익절 뿐입니다.',
         master: 's1_use_trailing',
         fields: [
             {
-                k: 's1_trail_activate_pct', label: '활성화 수익', unit: '%', type: 'pct', def: 0.08,
-                min: 0, max: 50, step: 1,
-                hint: '고점 수익이 이 값 이상일 때만 트레일링이 켜집니다.',
+                k: 's1_trail_activate_pct', 
+                label: '활성화 기준', 
+                unit: '%', 
+                type: 'pct', 
+                def: 0.08,
+                min: 0, 
+                max: 50, 
+                step: 1,
+                hint: '매입가 기준 해당 설정 % 이상일 때만 트레일링이 켜집니다.',
             },
             {
-                k: 's1_k_trail_atr', label: 'ATR 배수 (k)', unit: '배', type: 'float', def: 3.0,
-                min: 1, max: 6, step: 0.5,
-                hint: '작을수록 타이트해서 빨리 매도합니다. 종목별 튜닝 포인트.',
+                k: 's1_k_trail_atr', 
+                label: 'ATR 배수 (k)', 
+                unit: '배', 
+                type: 'float', 
+                def: 3.0,
+                min: 1, 
+                max: 6, 
+                step: 0.5,
+                hint: 'ATR 변동폭 계산하여 설정 배수만큼 빠졌을 때 ',
             },
             {
-                k: 's1_trail_floor_pct', label: 'ATR 미산출 대체', unit: '%', type: 'pct', def: 0.10,
-                min: 3, max: 30, step: 1,
-                hint: 'ATR을 구하지 못할 때만 쓰는 fallback (고점 −N%).',
-            },
-            {
-                k: 's1_trail_drawdown_pct', label: '고점 대비 하락폭', unit: '%', type: 'pct',
-                def: null, nullLabel: '미사용', nullSlider: 5,
-                min: 1, max: 30, step: 0.5,
+                k: 's1_trail_drawdown_pct', 
+                label: '고점 대비 하락', 
+                unit: '%', 
+                type: 'pct',
+                def: 0.04, 
+                nullLabel: '미사용', 
+                nullSlider: 5,
+                min: 1, 
+                max: 30, 
+                step: 0.5,
                 hint: '고점에서 이 비율만큼 빠지면 청산합니다. 비우면(미사용) ATR 라인만 씁니다.',
             },
             {
-                k: 's1_trail_dual', label: 'ATR 라인과 이중 감시', type: 'bool', def: 1,
+                k: 's1_trail_dual', 
+                label: 'ATR 라인과 이중 감시', 
+                type: 'bool', 
+                def: 1,
                 hint: 'ON = ATR 라인과 하락폭 라인 중 먼저 닿는 쪽에서 매도. OFF = 하락폭 라인 단독.',
             },
         ],
     },
     {
-        id: 'D', priority: 4, title: '동적 타임스탑 (Time Stop)',
+        id: 'D', priority: 4, title: '동적 타임스탑',
         desc: '보유 봉수 한도에 도달하면 평가를 시작합니다. 추세가 살아있으면 매도를 보류할 수 있습니다.',
         fields: [
             {
@@ -583,10 +601,11 @@ const lines = computed(() => {
     if (atr && atr > 0) {
         atrLine = peak - rate('s1_k_trail_atr') * atr;
         atrText = `ATR 라인 = 고점 ${fmtWon(peak)} − ${rate('s1_k_trail_atr')}×ATR(${atr})`;
-    } else {
-        atrLine = peak * (1 - rate('s1_trail_floor_pct'));
-        atrText = `ATR 미입력 → 대체 라인 = 고점 ${fmtWon(peak)} −${(rate('s1_trail_floor_pct') * 100).toFixed(2)}%`;
-    }
+    } 
+    // else {
+    //     atrLine = peak * (1 - rate('s1_trail_floor_pct'));
+    //     atrText = `ATR 미입력 → 대체 라인 = 고점 ${fmtWon(peak)} −${(rate('s1_trail_floor_pct') * 100).toFixed(2)}%`;
+    // }
 
     const dd = rate('s1_trail_drawdown_pct');
     if (dd === null) {

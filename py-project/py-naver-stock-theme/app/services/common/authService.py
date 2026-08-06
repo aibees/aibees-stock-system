@@ -74,6 +74,7 @@ class AuthService:
             'type': 'EMAIL',
             'email': user_email
         }
+        print(param)
         user_data = self.userMasterDaoImpl.select_user_authinfo(session, param)
 
         if len(user_data) != 1:
