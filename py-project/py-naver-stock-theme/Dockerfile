@@ -39,6 +39,12 @@ RUN poetry lock --no-update \
  && poetry config virtualenvs.create false \
  && poetry install --no-interaction --no-ansi --no-root
 
+# CMD 와 **동일한 형태**로 실행 가능한지 빌드 단계에서 확인한다.
+# 이게 없으면 진입점이 어긋났을 때 컨테이너가 기동하는 순간에야 터진다
+#   (exec: "gunicorn": executable file not found in $PATH)
+# 빌드에서 걸리면 돌던 서비스는 그대로 유지된다.
+RUN poetry run gunicorn --version
+
 COPY py-naver-stock-theme/ /workdir/
 
 EXPOSE 5556
@@ -48,15 +54,22 @@ EXPOSE 5556
 #   실전 인증)과 create_mcp_app() 을 함께 끌고 와 worker 부팅이 실패했다.
 #   상세는 app/flask_app/wsgi.py 주석 참조.
 #
-# virtualenvs.create false 라 패키지가 시스템 파이썬에 깔린다 → gunicorn 이 PATH 에
-# 있으므로 'poetry run' 래핑이 필요 없다. 벗기면 PID 1 이 gunicorn 이 되어
-# SIGTERM 이 곧바로 전달된다(= graceful shutdown / 빠른 재기동).
+# ⚠ 'poetry run' 을 벗기지 말 것.
+#   위 RUN 에서 `poetry lock` 이 `poetry config virtualenvs.create false` **보다 먼저**
+#   실행되는데, 그 시점에 poetry 가 프로젝트 venv 를 만들어버린다
+#   (/root/.cache/pypoetry/virtualenvs/n-theme-*-py3.12).
+#   이어지는 poetry install 은 그 venv 에 설치하므로 시스템 PATH 에는 gunicorn 이 없다.
+#   맨 gunicorn 으로 바꾸면 컨테이너 기동 시 이렇게 죽는다:
+#     exec: "gunicorn": executable file not found in $PATH
+#   (순서를 바꾸거나 POETRY_VIRTUALENVS_CREATE 로 우회할 수도 있지만, 베이스 이미지의
+#    PEP 668 정책에 따라 시스템 설치가 거부될 수 있어 검증된 이 형태를 유지한다.
+#    PID 1 이 poetry 가 되는 문제는 compose 의 init: true 로 처리한다)
 #
 # --access-logfile - : 요청 로그를 stdout 으로. 없으면 docker logs 에 접근 기록이
 #   전혀 안 남아 "배포는 됐는데 요청이 들어오는지" 조차 확인할 수 없다.
 # --worker-tmp-dir /dev/shm : gunicorn heartbeat 파일이 느린 overlayfs 에 생기면
 #   worker 가 오탐으로 죽는 알려진 이슈를 피한다.
-CMD ["gunicorn", \
+CMD ["poetry", "run", "gunicorn", \
      "-k", "gevent", \
      "-w", "4", \
      "--timeout", "180", \
