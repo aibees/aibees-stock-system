@@ -1,5 +1,50 @@
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
+from enum import Enum
+from uuid import UUID
+
 from flask import Response
 import simplejson as json
+
+
+def _json_default(o):
+    """simplejson 이 모르는 타입의 직렬화 규칙.
+
+    모델 to_dict() 가 DateTime 컬럼을 그대로 반환하는 곳이 많아
+    (masterStock.created_date 등 8개 모델) 값이 NULL 이 아닌 행이 결과에
+    섞이는 순간 "Object of type datetime is not JSON serializable" 로 죽었다.
+    값이 있냐 없냐에 따라 되다 안 되다 해서 원인 파악이 오래 걸린다.
+
+    모델마다 isoformat() 을 붙이는 대신 **응답 계층 한 곳**에서 처리한다.
+      · 새 모델이 늘어도 자동으로 커버된다(빠뜨릴 여지가 없다)
+      · to_dict() 는 파이썬 타입 그대로 유지 → 배치·worker 등
+        API 밖에서 datetime 을 기대하는 호출부가 깨지지 않는다
+
+    ※ Decimal 은 여기서 다루지 않는다. dumps(use_decimal=True) 가
+      숫자 리터럴로(문자열 아님) 처리하므로 그쪽이 정확하다.
+    """
+    if isinstance(o, (datetime, date, time)):
+        return o.isoformat()
+    if isinstance(o, timedelta):
+        return o.total_seconds()
+    if isinstance(o, Decimal):          # use_decimal=False 로 호출된 경우 대비
+        return float(o)
+    if isinstance(o, Enum):
+        return o.value
+    if isinstance(o, UUID):
+        return str(o)
+    if isinstance(o, (bytes, bytearray)):
+        return o.decode("utf-8", errors="replace")
+    if isinstance(o, set):
+        return list(o)
+    raise TypeError(f"JSON 직렬화 불가 타입: {type(o).__name__}")
+
+
+def _dumps(body, **kw):
+    """응답 본문 직렬화 단일 진입점."""
+    kw.setdefault("ensure_ascii", False)
+    kw.setdefault("default", _json_default)
+    return json.dumps(body, **kw)
 
 
 class ApiResponse:
@@ -22,7 +67,7 @@ class ApiResponse:
         if extra:
             response_body.update(extra)
         return Response(
-            json.dumps(response_body, ensure_ascii=False, use_decimal=True),
+            _dumps(response_body, use_decimal=True),
             status=200,
             content_type='application/json; charset=utf-8'
         )
@@ -45,7 +90,7 @@ class ApiResponse:
             }
         }
         return Response(
-            json.dumps(response_body, ensure_ascii=False),
+            _dumps(response_body),
             status=status,
             content_type='application/json; charset=utf-8'
         )
@@ -80,7 +125,7 @@ class ApiResponse:
             }
         }
         return Response(
-            json.dumps(response_body, ensure_ascii=False),
+            _dumps(response_body),
             status=200,
             content_type='application/json; charset=utf-8'
         )

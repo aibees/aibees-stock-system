@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 
-from sqlalchemy import and_, select, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.dialects.mysql import insert
 
 from stock_shared.dao.baseDao import BaseDao
@@ -51,9 +51,26 @@ class TradeBuyTargetStockDao(BaseDao):
     # ------------------------------------------------------------------
     # select
     # ------------------------------------------------------------------
+    def select_latest_ymd(self, session) -> str | None:
+        """매수타겟이 존재하는 가장 최근 ymd. 데이터가 없으면 None."""
+        return session.execute(
+            select(func.max(TradeBuyTargetStock.ymd))
+        ).scalar()
+
     def select_trade_buy_target_daily(self, session, data: dict):
-        """일자별 매수타겟 조회 (rank_no 순)."""
-        ymd = data.get(_YMD, datetime.today().strftime(_ISO_DATE_FORMAT))
+        """일자별 매수타겟 조회 (rank_no 순).
+
+        ymd 미지정(None/빈값)이면 **가장 최근 영업일자**를 자동으로 찾아 쓴다.
+
+        ※ 예전엔 `data.get(_YMD, 오늘)` 이었는데, 라우터가
+          `request.args.get('ymd')` 를 그대로 넘기는 탓에 파라미터가 없으면
+          '키는 있고 값이 None' 이 된다. dict.get 은 이때 기본값을 쓰지 않고
+          None 을 반환하므로 `WHERE ymd IS NULL` 이 되어 항상 빈 배열이었다.
+          (기본값이 오늘이어도 배치 전이면 어차피 빈 배열이라 무용지물)
+        """
+        ymd = data.get(_YMD) or self.select_latest_ymd(session)
+        if not ymd:
+            return []
 
         stmt = (
             select(TradeBuyTargetStock)

@@ -13,7 +13,7 @@
                     </p>
                 </div>
                 <div class="head-right">
-                    <button class="btn-refresh" @click="fetchOptions" :disabled="isLoading">
+                    <button class="btn-refresh" @click="reloadAll" :disabled="isLoading">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M23 4v6h-6" /><path d="M1 20v-6h6" />
@@ -109,8 +109,20 @@
                     <!-- 정렬 미리보기 -->
                     <div class="order-preview">
                         <div class="op-head">
-                            <span class="op-title">정렬 예시</span>
-                            <span class="op-note">예시 후보 5종목에 현재 설정을 적용한 결과입니다. <b>맨 위 종목부터 매수됩니다.</b></span>
+                            <span class="op-title">
+                                정렬 예시
+                                <span v-if="!isFallback && targetYmd" class="op-ymd">{{ fmtYmd(targetYmd) }} 기준</span>
+                                <span v-else-if="isTargetLoading" class="op-ymd">불러오는 중…</span>
+                                <span v-else class="op-ymd warn">샘플 데이터</span>
+                            </span>
+                            <span v-if="!isFallback" class="op-note">
+                                실제 매수타겟 <b>{{ previewSource.length }}종목</b>에 현재 설정을 적용한 결과입니다
+                                (상위 {{ Math.min(PREVIEW_LIMIT, previewSource.length) }}건 표시).
+                                <b>맨 위 종목부터 매수됩니다.</b>
+                            </span>
+                            <span v-else class="op-note">
+                                매수타겟을 불러오지 못해 샘플로 표시합니다. <b>맨 위 종목부터 매수됩니다.</b>
+                            </span>
                         </div>
                         <table class="op-table">
                             <thead>
@@ -381,13 +393,49 @@ const resetOrderToDefault = () => { orderRows.value = specToRows(DEFAULT_ORDER_S
  *   · desc 는 부호를 뒤집어 오름차순 비교
  *   · 전 키 동점이면 stock_code 로 최종 결정
  */
-const SAMPLE_ROWS = [
+/* 최근 매수타겟을 그대로 미리보기에 쓴다.
+ * 가상의 예시로는 "내 설정이면 오늘 뭘 사는가"를 알 수 없어 실효가 없었다.
+ * ymd 없이 호출하면 서버가 가장 최근 영업일자를 찾아 반환한다.
+ * 조회 실패/데이터 없음이면 아래 FALLBACK_ROWS 로 떨어져 화면이 비지 않게 한다. */
+const FALLBACK_ROWS = [
     { stock_code: '005070', stock_name: '코스모신소재', score: 90, volume: 512000, rate: '12.5%', rank_no: 1 },
     { stock_code: '066430', stock_name: '와이오엠', score: 90, volume: 9120000, rate: '-3.2%', rank_no: 2 },
     { stock_code: '015760', stock_name: '한국전력', score: 80, volume: 1030000, rate: '5.0%', rank_no: 3 },
     { stock_code: '109070', stock_name: '컨버즈', score: null, volume: 24500000, rate: '29.9%', rank_no: null },
     { stock_code: '048910', stock_name: '대원미디어', score: 80, volume: null, rate: null, rank_no: 4 },
 ];
+
+const targetRows = ref([]);      // 실제 매수타겟 (비어 있으면 fallback 사용)
+const targetYmd = ref('');
+const isTargetLoading = ref(false);
+
+// 표에는 상위 몇 건만 보여준다. 정렬은 **전체**로 하고 자르는 건 마지막이다.
+// (먼저 자르고 정렬하면 1위가 잘려나가 완전히 틀린 결과가 나온다)
+const PREVIEW_LIMIT = 6;
+
+const previewSource = computed(
+    () => (targetRows.value.length ? targetRows.value : FALLBACK_ROWS));
+const isFallback = computed(() => targetRows.value.length === 0);
+
+const fetchBuyTargets = async () => {
+    isTargetLoading.value = true;
+    try {
+        // ymd 미지정 → 서버가 최신 영업일자로 조회
+        const { data } = await aibeesApi.get('/api/v1/stocks/buy-target');
+        const rows = data.data ?? [];
+        targetRows.value = rows;
+        targetYmd.value = rows[0]?.ymd ?? '';
+    } catch (e) {
+        console.error('[BuySetting] 매수타겟 조회 실패', e);
+        targetRows.value = [];
+    } finally {
+        isTargetLoading.value = false;
+    }
+};
+
+const fmtYmd = (v) => (v && v.length === 8
+    ? `${v.slice(0, 4)}.${v.slice(4, 6)}.${v.slice(6, 8)}`
+    : v || '');
 
 const numOf = (v) => {
     if (v === null || v === undefined) return null;
@@ -410,7 +458,7 @@ const FIELD_VALUE = {
 const sortedSample = computed(() => {
     const steps = orderRows.value.filter(r => r.on);
     const active = steps.length ? steps : specToRows(DEFAULT_ORDER_SPEC).filter(r => r.on);
-    return [...SAMPLE_ROWS].sort((a, b) => {
+    const sorted = [...previewSource.value].sort((a, b) => {
         for (const s of active) {
             const va = FIELD_VALUE[s.field](a);
             const vb = FIELD_VALUE[s.field](b);
@@ -420,8 +468,9 @@ const sortedSample = computed(() => {
             if (vb === null) return -1;
             if (va !== vb) return s.dir === 'desc' ? vb - va : va - vb;
         }
-        return String(a.stock_code).localeCompare(String(b.stock_code));
+        return String(a.stock_code ?? '').localeCompare(String(b.stock_code ?? ''));
     });
+    return sorted.slice(0, PREVIEW_LIMIT);   // 정렬 후 자른다
 });
 
 const pctClass = (rate) => {
@@ -629,7 +678,12 @@ const fetchOptions = async () => {
         isLoading.value = false;
     }
 };
-onMounted(fetchOptions);
+const reloadAll = () => {
+    fetchOptions();
+    fetchBuyTargets();
+};
+
+onMounted(reloadAll);   // 두 조회는 독립 — 타겟 조회가 실패해도 설정 화면은 뜬다
 
 /* ═══════════════ 컨트롤 헬퍼 ═══════════════ */
 const isOn = (k) => Number(form[k]) === 1;
@@ -1051,6 +1105,19 @@ const save = async () => {
 }
 
 .op-head { padding: 10px 12px; background: #f8f9fb; text-align: left; }
+
+.op-ymd {
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #e7f0fd;
+    color: #1971c2;
+    font-size: 0.68rem;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+.op-ymd.warn { background: #fff8e1; color: #a06800; }
 
 .op-title {
     display: block;

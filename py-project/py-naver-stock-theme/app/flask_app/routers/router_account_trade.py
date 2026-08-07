@@ -58,8 +58,12 @@ def _row(d: dict) -> dict:
 
 
 def _json(body: dict, status: int = 200) -> Response:
+    # 직렬화는 ApiResponse._dumps 로 통일 (datetime 등 공통 default 적용).
+    # 위 _serialize 가 대부분 미리 변환하지만, 거기 안 걸린 중첩 구조가
+    # 남아 있어도 여기서 안전하게 처리된다.
+    from app.flask_app.utils.apiResponse import _dumps
     return Response(
-        json.dumps(body, ensure_ascii=False),
+        _dumps(body),
         status=status,
         content_type='application/json; charset=utf-8',
     )

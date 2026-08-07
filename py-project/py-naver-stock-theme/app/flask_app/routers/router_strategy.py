@@ -190,12 +190,15 @@ def _validate_buy_order(spec: str):
 # 유효성 검증
 # ─────────────────────────────────────────────────────────────────────
 def _error(code: str, message: str, status: int = 400):
-    """code 포함 에러 응답."""
+    """code 포함 에러 응답.
+
+    직렬화는 ApiResponse._dumps 를 쓴다(datetime 등 공통 default 적용).
+    여기서 json.dumps 를 직접 부르면 응답 계층의 직렬화 규칙을 우회하게 된다.
+    """
     from flask import Response
-    import simplejson as json
+    from app.flask_app.utils.apiResponse import _dumps
     return Response(
-        json.dumps({'success': False, 'error': {'code': code, 'message': message}},
-                   ensure_ascii=False),
+        _dumps({'success': False, 'error': {'code': code, 'message': message}}),
         status=status,
         content_type='application/json; charset=utf-8',
     )
