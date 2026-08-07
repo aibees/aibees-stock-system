@@ -36,6 +36,9 @@ from app.ext_services.kis.KisEngine import KisEngine
 from app.flask_app.routers.router_oauth import require_auth
 from app.flask_app.utils.apiResponse import ApiResponse
 from stock_shared.strategy.backtester import KisBacktester
+from stock_shared.strategy.buy_order import DEFAULT_BUY_ORDER, describe_buy_order
+from stock_shared.strategy.buy_target_sim import BuyTargetSimulator
+from stock_shared.strategy.kospi1 import KospiStrategy1
 from app.services.kis.KisStockService import KisStockService
 from app.services.strategy.backtestService import BacktestService
 from app.services.strategy.strategyParamGuideService import StrategyParamGuideService
@@ -462,6 +465,132 @@ def delete_param_guide(param_key):
         return ApiResponse.success({'deleted': True, 'param_key': param_key})
     except Exception as e:
         g.db.rollback()
+        logging.exception(e)
+        return ApiResponse.error(str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 2-5. worker 가 실제로 사용하는 설정만 요약
+#      GET /api/v1/strategy/worker-config
+#
+#      user_options 의 s1_* 는 소비처가 둘로 갈린다:
+#        · worker(SellStrategy/BuyExecutor) — 개인화, 내 매매에 직접 영향
+#        · 매수타겟 배치(StockBuyCheckJob)  — 전 유저 공용 추천 생성
+#      이 API 는 **앞쪽만** 내려준다. 시뮬레이션 화면이 "내 worker 가 지금
+#      이렇게 동작한다"를 보여주는 용도라, 공용 파라미터가 섞이면 오해를 준다.
+# ═══════════════════════════════════════════════════════════════════
+
+# (키, 라벨, 표시타입, 전략 기본값)  — 기본값은 KospiStrategy1.__init__ 과 일치
+_WORKER_SELL_FIELDS = [
+    ('s1_stop_loss_pct',      '손절',              'pct',  0.05),
+    ('s1_take_profit_pct',    '익절',              'pct',  0.30),
+    ('s1_obv_dead_min_bars',  'OBV 데드크로스 무시', 'bars', 5),
+    ('s1_use_trailing',       '트레일링 사용',      'bool', 1),
+    ('s1_trail_activate_pct', '트레일링 활성화',    'pct',  0.08),
+    ('s1_k_trail_atr',        'ATR 배수(k)',       'num',  3.0),
+    ('s1_trail_drawdown_pct', '고점 대비 하락',     'pct',  None),
+    ('s1_trail_giveback_pct', '이익 반납',          'pct',  None),
+    ('s1_trail_dual',         'ATR 이중감시',       'bool', 1),
+    ('s1_max_hold_bars',      '보유 한도',          'bars', 12),
+    ('s1_time_stop_extend',   '추세생존 시 연장',    'bool', 1),
+    ('s1_time_stop_band',     '정체 판정 밴드',      'pct',  0.02),
+    ('s1_time_stop_grace',    '신고가 grace',       'bars', 3),
+    ('s1_max_hold_bars_hard', '절대 보유 한도',      'bars', 20),
+]
+
+
+@strategy_bp.route('/worker-config', methods=['GET'])
+@require_auth
+def get_worker_config():
+    try:
+        opts = userOptionsDaoImpl.select_s1_options(g.db, g.current_user_id) or {}
+
+        sell = []
+        for key, label, vtype, default in _WORKER_SELL_FIELDS:
+            v = opts.get(key)
+            sell.append({
+                'key': key, 'label': label, 'type': vtype,
+                'value': v, 'default': default,
+                'is_default': v is None,          # NULL = 전략 클래스 기본값 사용
+            })
+
+        spec = opts.get('s1_buy_order')
+        return ApiResponse.success({
+            'buy': {
+                'key': 's1_buy_order',
+                'label': '매수 후보 우선순위',
+                'value': spec,
+                'applied': describe_buy_order(spec),   # 실제 적용되는 정렬(오타 보정 후)
+                'is_default': not spec,
+                'default': DEFAULT_BUY_ORDER,
+            },
+            'sell': sell,
+        })
+    except Exception as e:
+        logging.exception(e)
+        return ApiResponse.error(str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 2-6. 매수추천 기반 실전 시뮬레이션
+#      POST /api/v1/strategy/sim/buy-target
+#
+#      body(전부 선택):
+#        start_date "2026-04-01" / end_date "2026-08-07"
+#        init_cash 1000000 / fee_rate 0.0011
+#        entry_price "next_open"|"close" / skip_gapup true|false
+#
+#      매도 판정은 **저장된 내 s1_* 설정**을 그대로 쓴다(화면에서 조정 불가).
+#      종목 선택은 s1_buy_order — worker BuyExecutor 와 동일한 정렬.
+# ═══════════════════════════════════════════════════════════════════
+@strategy_bp.route('/sim/buy-target', methods=['POST'])
+@require_auth
+def post_sim_buy_target():
+    body = request.get_json(silent=True) or {}
+
+    start_date = body.get('start_date')
+    end_date = body.get('end_date')
+    if not start_date:
+        return _error('INVALID_FIELD', 'start_date 가 필요합니다.')
+    for label, v in (('start_date', start_date), ('end_date', end_date)):
+        if v:
+            try:
+                datetime.strptime(v, '%Y-%m-%d')
+            except ValueError:
+                return _error('INVALID_FIELD', f'{label} 형식은 YYYY-MM-DD 이어야 합니다.')
+    if end_date and end_date < start_date:
+        return _error('INVALID_RANGE', 'start_date 는 end_date 보다 앞이어야 합니다.')
+
+    entry_price = body.get('entry_price', 'next_open')
+    if entry_price not in ('next_open', 'close'):
+        return _error('INVALID_FIELD', "entry_price 는 'next_open' 또는 'close' 여야 합니다.")
+
+    try:
+        init_cash = int(body.get('init_cash', 1_000_000))
+        fee_rate = float(body.get('fee_rate', 0.0011))
+    except (TypeError, ValueError):
+        return _error('INVALID_FIELD', 'init_cash / fee_rate 가 숫자가 아닙니다.')
+    if init_cash <= 0:
+        return _error('INVALID_FIELD', 'init_cash 는 0보다 커야 합니다.')
+
+    try:
+        # 저장된 s1_* → UserOptionMeta (매도 판정 파라미터)
+        ui = _build_base_user_info(g.db, g.current_user_id)
+        strategy = KospiStrategy1()
+        strategy.configure(ui)
+
+        opts = userOptionsDaoImpl.select_s1_options(g.db, g.current_user_id) or {}
+
+        sim = BuyTargetSimulator(g.db, ui, strategy=strategy)
+        result = sim.run(
+            start=start_date, end=end_date,
+            init_cash=init_cash, fee_rate=fee_rate,
+            entry_price=entry_price,
+            skip_gapup=bool(body.get('skip_gapup', False)),
+            buy_order=opts.get('s1_buy_order'),
+        )
+        return ApiResponse.success(result)
+    except Exception as e:
         logging.exception(e)
         return ApiResponse.error(str(e))
 
