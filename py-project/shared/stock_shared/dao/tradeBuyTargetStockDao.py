@@ -51,6 +51,27 @@ class TradeBuyTargetStockDao(BaseDao):
     # ------------------------------------------------------------------
     # select
     # ------------------------------------------------------------------
+    def select_target_codes_since(self, session, from_ymd: str) -> list:
+        """from_ymd(포함) 이후 매수추천에 한 번이라도 등장한 종목 목록(중복 제거).
+
+        반환: [{'stock_code':…, 'stock_name':…, 'first_ymd':…, 'target_cnt':…}, …]
+              추천이 잦았던 순 → 최근 등장 순으로 정렬.
+        캔들 백필 배치가 적재 대상을 뽑을 때 쓴다.
+        """
+        stmt = (
+            select(
+                TradeBuyTargetStock.stock_code,
+                func.max(TradeBuyTargetStock.stock_name).label("stock_name"),
+                func.min(TradeBuyTargetStock.ymd).label("first_ymd"),
+                func.max(TradeBuyTargetStock.ymd).label("last_ymd"),
+                func.count().label("target_cnt"),
+            )
+            .where(TradeBuyTargetStock.ymd >= from_ymd)
+            .group_by(TradeBuyTargetStock.stock_code)
+            .order_by(func.count().desc(), func.max(TradeBuyTargetStock.ymd).desc())
+        )
+        return [dict(r) for r in session.execute(stmt).mappings().all()]
+
     def select_latest_ymd(self, session) -> str | None:
         """매수타겟이 존재하는 가장 최근 ymd. 데이터가 없으면 None."""
         return session.execute(

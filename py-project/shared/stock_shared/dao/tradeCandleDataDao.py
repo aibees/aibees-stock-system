@@ -11,6 +11,29 @@ logging.basicConfig(level=logging.ERROR)
 
 _PK = ("coin", "datetime")
 
+# compute_indicator_df 결과에서 trade_candle_data 로 적재하는 컬럼.
+# upsert_candle_data_kis 의 values 키와 동일하게 유지할 것.
+_KIS_COLS = (
+    "open", "high", "low", "close", "volume",
+    "ema20", "ema60", "ema120",
+    "bb_mid", "bb_mid_breakout", "bb_lower", "bb_lower_chk",
+    "bb_upper", "bb_upper_chk", "bb_width", "bb_width_avg", "recent_high",
+    "macd", "macd_s", "macd_lower_mean", "macd_upper_mean",
+    "macd_recent_min", "macd_recent_max", "macd_g_cross_n", "macd_d_cross_n",
+    "obv", "obv_signal", "obv_g_cross_n", "obv_d_cross_n",
+    "rsi", "atr", "vol_surge_n",
+)
+
+
+def _clean(v):
+    """NaN/NaT → None. pandas 값이 그대로 넘어가면 MySQL 이 거부한다."""
+    if v is None:
+        return None
+    # float('nan') 은 자기 자신과 다르다. numpy.float64 도 동일하게 걸린다.
+    if isinstance(v, float) and v != v:
+        return None
+    return v
+
 
 class TradeCandleDataDao(BaseDao):
     model = TradeCandleData
@@ -155,6 +178,47 @@ class TradeCandleDataDao(BaseDao):
             **{k: stmt.inserted[k] for k in values if k not in _PK}
         )
         session.execute(stmt)
+
+    def upsert_candle_data_kis_bulk(self, session, coin: str, records: list,
+                                    chunk_size: int = 500) -> int:
+        """compute_indicator_df 결과(records)를 한 종목분 통째로 UPSERT.
+
+        records = df.to_dict(orient='records') 를 그대로 받는다.
+
+        행마다 upsert_candle_data_kis 를 부르면 250봉 × 종목수 만큼 execute 가
+        발생한다(213종목이면 5만회). 여기서는 multi-row
+        INSERT ... ON DUPLICATE KEY UPDATE 로 묶어 쿼리 수를 1/chunk_size 로 줄인다.
+
+        PK(coin, datetime) 기준이라 재실행해도 중복이 쌓이지 않고 최신값으로 덮인다.
+
+        chunk_size: 한 쿼리에 넣을 행 수. max_allowed_packet 을 넘지 않도록 분할한다.
+        반환: 적재 시도한 행 수.
+        """
+        if not records:
+            return 0
+
+        rows = []
+        for r in records:
+            dt = r.get("datetime")
+            if not dt:
+                continue                      # PK 없는 행은 버린다
+            row = {"coin": coin, "datetime": str(dt)[:19]}
+            for c in _KIS_COLS:
+                row[c] = _clean(r.get(c))
+            rows.append(row)
+
+        if not rows:
+            return 0
+
+        for i in range(0, len(rows), chunk_size):
+            batch = rows[i:i + chunk_size]
+            stmt = mysql_insert(TradeCandleData).values(batch)
+            stmt = stmt.on_duplicate_key_update(
+                **{k: stmt.inserted[k] for k in batch[0] if k not in _PK}
+            )
+            session.execute(stmt)
+
+        return len(rows)
 
     def update_candle_regime(self, session, candle_data: UserCoinInfo) -> None:
         """regime 컬럼만 갱신."""
