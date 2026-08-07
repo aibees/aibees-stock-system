@@ -39,6 +39,7 @@ from stock_shared.strategy.backtester import KisBacktester
 from stock_shared.strategy.buy_order import DEFAULT_BUY_ORDER, describe_buy_order
 from stock_shared.strategy.buy_target_sim import BuyTargetSimulator
 from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.reco_performance import RecoPerformanceAnalyzer
 from app.services.kis.KisStockService import KisStockService
 from app.services.strategy.backtestService import BacktestService
 from app.services.strategy.strategyParamGuideService import StrategyParamGuideService
@@ -588,6 +589,55 @@ def post_sim_buy_target():
             entry_price=entry_price,
             skip_gapup=bool(body.get('skip_gapup', False)),
             buy_order=opts.get('s1_buy_order'),
+        )
+        return ApiResponse.success(result)
+    except Exception as e:
+        logging.exception(e)
+        return ApiResponse.error(str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 2-7. 매수추천 이후 성과 (추천 건별)
+#      GET /api/v1/strategy/reco-performance
+#
+#      query(전부 선택):
+#        from_ymd 20260601 / to_ymd 20260806
+#        days 60            from_ymd 미지정 시 최근 N일
+#        horizon 20         추천일 이후 관측할 거래일 수 (0=끝까지)
+#        zigzag 5           변곡점 임계 % (0=계산 안 함)
+#
+#      같은 종목이 여러 번 추천됐으면 **추천일마다 별도 행**으로 나온다.
+# ═══════════════════════════════════════════════════════════════════
+@strategy_bp.route('/reco-performance', methods=['GET'])
+@require_auth
+def get_reco_performance():
+    args = request.args
+
+    from_ymd = args.get('from_ymd')
+    to_ymd = args.get('to_ymd')
+    if not from_ymd:
+        try:
+            days = int(args.get('days', 60))
+        except ValueError:
+            return _error('INVALID_FIELD', 'days 는 정수여야 합니다.')
+        from_ymd = (datetime.today() - timedelta(days=days)).strftime('%Y%m%d')
+
+    for label, v in (('from_ymd', from_ymd), ('to_ymd', to_ymd)):
+        if v and (len(v) != 8 or not v.isdigit()):
+            return _error('INVALID_FIELD', f'{label} 형식은 YYYYMMDD 이어야 합니다.')
+
+    try:
+        horizon = int(args.get('horizon', 0))
+        zigzag_pct = float(args.get('zigzag', 5))
+    except ValueError:
+        return _error('INVALID_FIELD', 'horizon / zigzag 가 숫자가 아닙니다.')
+    if horizon < 0 or zigzag_pct < 0:
+        return _error('INVALID_FIELD', 'horizon / zigzag 는 0 이상이어야 합니다.')
+
+    try:
+        result = RecoPerformanceAnalyzer(g.db).run(
+            from_ymd=from_ymd, to_ymd=to_ymd,
+            horizon_days=horizon, zigzag_pct=zigzag_pct,
         )
         return ApiResponse.success(result)
     except Exception as e:
