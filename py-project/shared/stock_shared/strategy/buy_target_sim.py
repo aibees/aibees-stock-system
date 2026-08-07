@@ -20,6 +20,8 @@ app/test/sim_buy_target.py 를 화면(API)에서 쓸 수 있게 옮긴 것.
   후보 종목 캔들이 trade_candle_data 에 있어야 한다
   (TradeCandleBackfillJob 이 매일 21:00 에 적재).
 """
+from decimal import Decimal
+
 from sqlalchemy import text
 
 from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
@@ -85,10 +87,29 @@ class BuyTargetSimulator:
             by_day[ymd].sort(key=key)
         return by_day
 
+    @staticmethod
+    def _to_float_row(r: dict) -> dict:
+        """캔들 1행의 Decimal 값을 float 으로 정규화.
+
+        trade_candle_data 는 DECIMAL(18,8) 컬럼이고 TradeCandleData.to_dict() 가
+        Decimal 을 그대로 반환한다. 그대로 두면 전략 내부에서
+            (peak - entry) / entry
+        같은 연산이 Decimal 과 float 을 섞어
+            unsupported operand type(s) for -: 'decimal.Decimal' and 'float'
+        로 터진다. 포지션 상태(ui.peak_high 등)는 float 인데 캔들은 Decimal 이라
+        max(float, Decimal) 이 Decimal 을 돌려주는 순간 오염이 시작된다.
+
+        개별 사용처마다 float() 을 씌우면 반드시 한 군데를 빠뜨린다.
+        캔들이 들어오는 이 입구 한 곳에서 정규화한다.
+        (Decimal 만 변환하므로 datetime·macd_g_cross_n 같은 문자열은 그대로 유지)
+        """
+        return {k: (float(v) if isinstance(v, Decimal) else v) for k, v in r.items()}
+
     def _candles(self, code: str):
         """(rows_list, {date: (idx, row)}) 캐시 로드."""
         if code not in self._candle_cache:
-            rows = self.dao.select_candle_data(self.session, {'coin_code': code})
+            raw = self.dao.select_candle_data(self.session, {'coin_code': code})
+            rows = [self._to_float_row(r) for r in raw]
             by_date = {r['datetime'][:10]: (i, r) for i, r in enumerate(rows)}
             self._candle_cache[code] = (rows, by_date)
         return self._candle_cache[code]

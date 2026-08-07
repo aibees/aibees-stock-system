@@ -19,10 +19,7 @@
             <section class="card cfg-card">
                 <header class="card-head">
                     <h3>내 worker 설정</h3>
-                    <div class="ch-right">
-                        <span class="hint-text">이 값으로 시뮬을 돌립니다</span>
-                        <button type="button" class="btn-link" @click="goSetting">설정 변경</button>
-                    </div>
+                    <span class="hint-text">이 값으로 시뮬을 돌립니다</span>
                 </header>
 
                 <div v-if="cfgLoading" class="skeleton-box"></div>
@@ -30,7 +27,10 @@
                 <template v-else>
                     <!-- 매수 -->
                     <div class="cfg-group">
-                        <span class="cfg-group-title">매수 — 후보 우선순위</span>
+                        <span class="cfg-group-title">
+                            매수 — 후보 우선순위
+                            <button type="button" class="btn-link" @click="goBuySetting">변경</button>
+                        </span>
                         <div class="order-chips">
                             <template v-for="(s, i) in appliedOrder" :key="s.field">
                                 <span class="ord-chip">
@@ -50,7 +50,10 @@
 
                     <!-- 매도 -->
                     <div class="cfg-group">
-                        <span class="cfg-group-title">매도 — 청산 조건</span>
+                        <span class="cfg-group-title">
+                            매도 — 청산 조건
+                            <button type="button" class="btn-link" @click="goSellSetting">변경</button>
+                        </span>
                         <div class="cfg-grid">
                             <div v-for="f in cfg.sell" :key="f.key"
                                 :class="['cfg-item', { off: isOff(f) }]">
@@ -277,7 +280,11 @@ const fmtCfg = (f) => {
     return String(v);
 };
 
-const goSetting = () => router.push({ path: '/trade/sell-setting' });
+// master_menu 의 menu_path 기준 경로 (menu_parents=Trade + menu_path)
+//   TradeBuySetting  → trade-buy-setting
+//   TradeSetting     → trade-sell-setting
+const goBuySetting = () => router.push({ path: '/trade/trade-buy-setting' });
+const goSellSetting = () => router.push({ path: '/trade/trade-sell-setting' });
 
 /* ═══════════ 2. 시뮬 실행 ═══════════ */
 const iso = (d) => d.toISOString().slice(0, 10);
@@ -434,7 +441,7 @@ const pnlClass = (v) => (Number(v) > 0 ? 'up' : Number(v) < 0 ? 'down' : '');
 .cfg-group:first-of-type { border-top: none; padding-top: 4px; }
 
 .cfg-group-title {
-    display: block; margin-bottom: 9px;
+    display: flex; align-items: center; gap: 9px; margin-bottom: 9px;
     font-size: 0.78rem; font-weight: 700; color: #495057;
 }
 
