@@ -3,4 +3,4 @@
 .pr_token
 .claude/settings.local.json
 
-*.sql
+**/*.sql

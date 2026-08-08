@@ -1,5 +1,6 @@
 # ---- Build Stage ----
-FROM node:20-alpine AS builder
+# @capacitor/cli 8.x는 node >=22 필요 (yarn install이 엔진 불일치 시 하드 실패함)
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 COPY . .
