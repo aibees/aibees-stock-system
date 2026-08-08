@@ -53,6 +53,8 @@ class UserOptions(Base):
     s1_trail_drawdown_pct = Column(DECIMAL(6, 4), nullable=True)
     s1_trail_giveback_pct = Column(DECIMAL(6, 4), nullable=True)
     s1_trail_dual = Column(TINYINT(1), nullable=True)
+    s1_trail_fib_use = Column(TINYINT(1), nullable=True)
+    s1_trail_fib_level = Column(DECIMAL(5, 3), nullable=True)
     s1_time_stop_extend = Column(TINYINT(1), nullable=True)
     s1_time_stop_band = Column(DECIMAL(6, 4), nullable=True)
     s1_time_stop_grace = Column(Integer, nullable=True)
@@ -122,6 +124,8 @@ class UserOptions(Base):
             "s1_trail_drawdown_pct": self.s1_trail_drawdown_pct,
             "s1_trail_giveback_pct": self.s1_trail_giveback_pct,
             "s1_trail_dual": self.s1_trail_dual,
+            "s1_trail_fib_use": self.s1_trail_fib_use,
+            "s1_trail_fib_level": self.s1_trail_fib_level,
             "s1_time_stop_extend": self.s1_time_stop_extend,
             "s1_time_stop_band": self.s1_time_stop_band,
             "s1_time_stop_grace": self.s1_time_stop_grace,

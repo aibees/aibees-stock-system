@@ -135,19 +135,44 @@ class UserCoinInfo:
         return {k: _to_plain(v) for k, v in self.__dict__.items()}
 
 
+    @staticmethod
+    def _coerce(default: Any, val: Any) -> Any:
+        """default(= __init__ 기본값)의 타입에 맞춰 val 을 정규화한다.
+
+        DB(trade_candle_data 등)에서 온 값은 SQLAlchemy DECIMAL 컬럼이라
+        decimal.Decimal 로 넘어오고, 라이브 경로(pandas)는 float 로 넘어온다.
+        이 둘이 전략 코드(kospi1/kospi2.py) 안에서 섞여 연산되면
+        "unsupported operand type(s) for -: 'decimal.Decimal' and 'float'" 로
+        터진다. 여기서 한 번에 float 로 통일해서 호출부 어디서든 안전하게 만든다.
+        문자열 플래그(macd_g_cross_n 등)나 dict(entry_gate) 는 그대로 둔다.
+        """
+        if val is None:
+            return default
+        if isinstance(default, bool):
+            return val
+        if isinstance(default, (int, float)):
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                return default
+        return val
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'UserCoinInfo':
         """
         TradeCandleData.to_dict()의 결과(dict)를 받아
         UserCoinInfo 인스턴스를 생성하고 데이터를 매핑합니다.
+
+        숫자 필드(open/close/macd/atr/rsi ... )는 원본이 Decimal 이든 float 든
+        항상 float 로 정규화해서 저장한다(위 _coerce 참고). 문자열/플래그 필드는 그대로.
         """
         instance = cls()
 
-        # 1. 필드명이 일치하는 항목들 자동 매핑
+        # 1. 필드명이 일치하는 항목들 자동 매핑 (+ 타입 정규화)
         # __init__에 정의된 self.__dict__의 키들을 기준으로 data에서 값을 가져옴
-        for key in instance.__dict__.keys():
+        for key, default in list(instance.__dict__.items()):
             if key in data:
-                setattr(instance, key, data[key])
+                setattr(instance, key, cls._coerce(default, data[key]))
 
         # 2. 필드명이 다르거나 별도 처리가 필요한 항목들 수동 매핑
         # TradeCandleData의 'coin' -> UserCoinInfo의 'coin_code'
@@ -156,7 +181,7 @@ class UserCoinInfo:
 
         # TradeCandleData의 'score_total' -> UserCoinInfo의 'score'
         if 'score_total' in data:
-            instance.score = data.get('score_total', 0.0)
+            instance.score = cls._coerce(instance.score, data.get('score_total', 0.0))
 
         # 3. 추가적인 기본값 설정이나 로직이 필요한 경우
         # 예: status나 enabled_flag 등은 DB 데이터에 없으므로 기본값 유지 혹은 별도 로직

@@ -119,6 +119,8 @@ class UserOptionMeta:
         self.s1_trail_drawdown_pct    = None   # 고점 대비 단순 -x% 라인 (0.05=-5%). None=미사용
         self.s1_trail_giveback_pct    = None   # 평가이익 중 x% 반납 시 청산 (0.38=38%). None=미사용
         self.s1_trail_dual            = None   # 1=ATR 라인까지 포함해 먼저 닿는 쪽 0=ATR 제외
+        self.s1_trail_fib_use         = None   # 피보나치 되돌림 트레일 사용 여부 (1/0)
+        self.s1_trail_fib_level       = None   # 되돌림 비율: 0.382 | 0.5 | 0.618
         self.s1_time_stop_extend      = None
         self.s1_time_stop_band        = None
         self.s1_time_stop_grace       = None

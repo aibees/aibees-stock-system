@@ -105,12 +105,51 @@ class StockService:
         except (ValueError, TypeError):
             return None
 
+    # ── 대조군 분석 반영 (2026-08-08, WIN 34건 vs CONTROL 470건 비교) ──────────
+    # 근거: 매수추천_성공패턴_대조군분석.xlsx.
+    #  · macd_cross='G'(신선한 골든크로스) 비율은 WIN 44.1% < CONTROL 65.3% — 오히려 역상관.
+    #    → 스코어 기준을 raw 골든크로스에서 'macd_slope_up'(기울기 상승)으로 바꾸고 비중을 낮춘다.
+    #  · is_vol_limit='Y' 는 WIN 34건 전원(100%) 충족 → 비중 상향.
+    #  · ATR/종가(atr_ratio, 변동성): WIN 평균 11.8% vs CONTROL 8.9% — 가장 유의한 차이 → 신규 가점.
+    #  · 고점 대비 눌림(dip_from_high): WIN -19.3% vs CONTROL -12.1% → 신규 가점(깊이 눌릴수록 유리).
+    _ATR_RATIO_LO, _ATR_RATIO_HI = 0.05, 0.12          # kospi1.atr_ratio_min ~ atr_ratio_full_score 와 동일 구간
+    _DIP_LO_PCT, _DIP_HI_PCT = 0.03, 0.15              # kospi1.dip_from_high_min_pct ~ full_pct 와 동일 구간
+
     def _tech_score(self, ind: dict) -> float:
-        # 신선한 MACD 골든(1.0) vs 갭축소 통과(0.4) / BB중심선 돌파 / 거래량 ≥ 사용자 기준
-        macd = 1.0 if ind.get('macd_cross') == 'G' else 0.4
-        bb   = 1.0 if ind.get('is_bb_mid_breakout') == 'Y' else 0.0
-        vl   = 1.0 if ind.get('is_vol_limit') == 'Y' else 0.0
-        return 0.5 * macd + 0.25 * bb + 0.25 * vl
+        # MACD: 'macd_slope_up'(기울기 상승) 우선 사용. 구버전/DB 재구성 등으로 이 키가
+        # 없는 indicator dict 가 들어오면 raw 골든크로스로 폴백한다.
+        macd_slope_up = ind.get('macd_slope_up')
+        if macd_slope_up is None:
+            macd_slope_up = 'Y' if ind.get('macd_cross') == 'G' else 'N'
+        macd = 1.0 if macd_slope_up == 'Y' else 0.4
+
+        bb = 1.0 if ind.get('is_bb_mid_breakout') == 'Y' else 0.0
+        vl = 1.0 if ind.get('is_vol_limit') == 'Y' else 0.0
+
+        atr_ratio = self._to_float(ind.get('atr_ratio'))
+        if atr_ratio is None:
+            atr = 0.0
+        elif atr_ratio <= self._ATR_RATIO_LO:
+            atr = 0.0
+        elif atr_ratio >= self._ATR_RATIO_HI:
+            atr = 1.0
+        else:
+            atr = (atr_ratio - self._ATR_RATIO_LO) / (self._ATR_RATIO_HI - self._ATR_RATIO_LO)
+
+        dip = self._to_float(ind.get('dip_from_high'))  # 0 이하(음수), 예: -0.193
+        if dip is None:
+            dip_score = 0.0
+        else:
+            d = abs(dip)
+            if d <= self._DIP_LO_PCT:
+                dip_score = 0.0
+            elif d >= self._DIP_HI_PCT:
+                dip_score = 1.0
+            else:
+                dip_score = (d - self._DIP_LO_PCT) / (self._DIP_HI_PCT - self._DIP_LO_PCT)
+
+        # 가중치: macd 0.30 · bb중심선돌파 0.15 · 거래량하한 0.20 · 변동성(ATR) 0.20 · 눌림목 0.15
+        return 0.30 * macd + 0.15 * bb + 0.20 * vl + 0.20 * atr + 0.15 * dip_score
 
     def _fund_score(self, fin: dict) -> float:
         eps = self._to_float(fin.get('eps'))

@@ -333,11 +333,30 @@ const GROUPS = [
                 hint: '고점에서 이 비율만큼 빠지면 청산합니다. 비우면(미사용) ATR 라인만 씁니다.',
             },
             {
-                k: 's1_trail_dual', 
-                label: 'ATR 라인과 이중 감시', 
-                type: 'bool', 
+                k: 's1_trail_dual',
+                label: 'ATR 라인과 이중 감시',
+                type: 'bool',
                 def: 1,
                 hint: 'ON = ATR 라인과 하락폭 라인 중 먼저 닿는 쪽에서 매도. OFF = 하락폭 라인 단독.',
+            },
+            {
+                k: 's1_trail_fib_use',
+                label: '피보나치 되돌림 허용',
+                type: 'bool',
+                def: 0,
+                hint: '고점에서 진입가까지 상승폭 중 아래 비율만큼 되돌려도 청산하지 않고 버팁니다.',
+            },
+            {
+                k: 's1_trail_fib_level',
+                label: '되돌림 비율',
+                type: 'enum',
+                def: '0.382',
+                options: [
+                    { v: '0.382', label: '38.2%' },
+                    { v: '0.5',   label: '50%' },
+                    { v: '0.618', label: '61.8%' },
+                ],
+                hint: '값이 클수록 더 크게 밀려도 버팁니다(익절 기회 ↑, 반납 손익 ↑).',
             },
         ],
     },
@@ -406,6 +425,9 @@ const DISABLE_RULES = {
     s1_trail_drawdown_pct: 's1_use_trailing',
     // 이중감시 스위치는 하락폭이 실제로 설정됐을 때만 의미가 있다
     s1_trail_dual: () => !isOn('s1_use_trailing') || isBlank('s1_trail_drawdown_pct'),
+    s1_trail_fib_use: 's1_use_trailing',
+    // 되돌림 비율 선택은 트레일링 + 피보나치 사용 둘 다 켜졌을 때만 의미가 있다
+    s1_trail_fib_level: () => !isOn('s1_use_trailing') || !isOn('s1_trail_fib_use'),
     s1_time_stop_band: 's1_time_stop_extend',
     s1_time_stop_grace: 's1_time_stop_extend',
 };

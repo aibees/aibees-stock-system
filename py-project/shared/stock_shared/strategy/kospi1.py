@@ -68,6 +68,15 @@ class KospiStrategy1(StockStrategy):
         #   False : ATR 라인을 빼고 drawdown/giveback 만 사용.
         self.trail_dual = True
 
+        # 피보나치 되돌림 허용 라인. 고점에서 진입가까지의 상승폭 중
+        # 되돌림 비율(38.2%/50%/61.8%)만큼 내려와도 매도하지 않고 버틴다.
+        #   fib 라인 = 고점 - trail_fib_level * (고점 - 진입가)
+        # giveback 라인과 계산식은 동일하되, 자유 입력이 아닌 3개 프리셋 중
+        # 선택하는 전용 옵션으로 화면에 노출한다(사용자 요청: 되돌림 스탑 별도 토글).
+        # 고점이 진입가 이하면(이익 없음) 이 라인은 쓰지 않는다.
+        self.trail_fib_use   = False   # 사용 여부 (기본 미사용)
+        self.trail_fib_level = 0.382   # 0.382 | 0.5 | 0.618
+
         # ── #4 동적 타임스탑 ────────────────────────────────────────────────
         # 보유한도(max_hold_bars) 도달해도 (1) 의미있는 수익 + (2) 추세유지(20일선 위)
         # + (3) 최근 grace봉 내 신고가 갱신(추세가 살아있음) 이면 매도를 보류하고
@@ -90,6 +99,28 @@ class KospiStrategy1(StockStrategy):
         self.enable_bb_upper_filter  = True  # BB 상단 추격 금지
         self.enable_vol_avg_filter   = True  # 20일 평균 거래량 이상
         self.enable_regime_gate      = True  # 적응형 추세국면 게이트
+
+        # ── 대조군 분석 반영 (2026-08-08, WIN 34건 vs CONTROL 470건 비교) ──────
+        # trade_buy_target_stock 전체 504건 중 30%+ 도달 34건과 나머지를 비교한
+        # 결과를 게이트/스코어에 반영한다. (근거: 매수추천_성공패턴_대조군분석.xlsx)
+        #
+        # 1) 변동성(ATR/종가): WIN 평균 11.8% vs CONTROL 평균 8.9% — 가장 유의한 차이.
+        #    너무 잔잔한 종목(저변동성)은 대박 확률이 낮다 → 하한 게이트 + 스코어 가점.
+        self.enable_atr_filter     = True   # atr_pct(ATR/종가) 하한 게이트 on/off
+        self.atr_ratio_min         = 0.05   # 이 미만이면 진입 차단(CONTROL 평균 8.9%보다 낮게 설정, 과도한 컷 방지)
+        self.atr_ratio_full_score  = 0.12   # 스코어 만점 기준(WIN 평균 11.8% 부근)
+
+        # 2) 고점 대비 눌림(dip_from_high): WIN -19.3% vs CONTROL -12.1%.
+        #    신고가 갱신 직후보다 눌림목 재진입이 유리 → 스코어 가점만(게이트는 아님,
+        #    너무 깊은 눌림은 추세이탈일 수 있어 하드 필터로 쓰지 않는다).
+        self.dip_from_high_min_pct  = 0.03   # 고점대비 -3% 미만(거의 신고가)이면 0점
+        self.dip_from_high_full_pct = 0.15   # 고점대비 -15% 이상이면 만점
+
+        # 3) is_vol_limit(당일 거래량 > user_options.vol_limit): WIN 34건 전원(100%) 충족,
+        #    CONTROL 88.7% → 사실상 필요조건. 배치 단계(StockBuyCheckJob)에서 이미
+        #    같은 기준으로 종목을 거르지만, 전략 계층에도 명시적 게이트를 둬서
+        #    (백테스터 등 사전 스킵을 거치지 않는 경로에서도) 안전하게 강제한다.
+        self.enable_vol_limit_filter = True
 
         # ── core 진입 신호 mode (MACD/OBV Optional) ─────────────────────
         # 각각 'off'(사용안함) / 'golden'(골든크로스 여부) / 'slope'(기울기 상승여부).
@@ -135,6 +166,8 @@ class KospiStrategy1(StockStrategy):
             'trail_drawdown_pct':     _f(user_info.s1_trail_drawdown_pct),
             'trail_giveback_pct':     _f(user_info.s1_trail_giveback_pct),
             'trail_dual':             _bool(user_info.s1_trail_dual),
+            'trail_fib_use':          _bool(user_info.s1_trail_fib_use),
+            'trail_fib_level':        _f(user_info.s1_trail_fib_level),
             'time_stop_extend':       _bool(user_info.s1_time_stop_extend),
             'time_stop_band':         _f(user_info.s1_time_stop_band),
             'time_stop_grace':        _f(user_info.s1_time_stop_grace, int),
@@ -176,15 +209,16 @@ class KospiStrategy1(StockStrategy):
                             (ATR 미산출 시 고점 * (1 - trail_floor_pct))
           · drawdown 라인 = 고점 * (1 - trail_drawdown_pct)          [설정 시]
           · giveback 라인 = 고점 - trail_giveback_pct * (고점 - 진입가) [설정 시]
+          · fib 라인      = 고점 - trail_fib_level * (고점 - 진입가)   [trail_fib_use=True 시]
 
         조합 규칙:
-          drawdown/giveback 모두 미설정 → ATR 라인 단독 (기존 동작)
+          drawdown/giveback/fib 모두 미설정 → ATR 라인 단독 (기존 동작)
           trail_dual=True  (기본)       → 설정된 라인 + ATR 라인 중 **최댓값**.
               고점에서 내려오는 중이므로 값이 큰 라인에 먼저 닿는다.
               = 여러 라인 중 먼저 도달하는 쪽에서 매도.
           trail_dual=False              → ATR 라인 제외, 설정된 라인들의 최댓값.
 
-        반환 태그: 'atr' | 'floor' | 'drawdown' | 'giveback'
+        반환 태그: 'atr' | 'floor' | 'drawdown' | 'giveback' | 'fib'
 
         ※ 활성 여부(trail_activate_pct 게이트)는 호출부에서 판정한다.
           이 메서드는 라인 값만 산출한다.
@@ -200,6 +234,9 @@ class KospiStrategy1(StockStrategy):
         if self.trail_giveback_pct and entry and peak > entry:
             # 이익이 난 상태에서만 의미. 반납분 = pct * (고점 - 진입가)
             cands.append((peak - self.trail_giveback_pct * (peak - entry), 'giveback'))
+        if self.trail_fib_use and self.trail_fib_level and entry and peak > entry:
+            # 피보나치 되돌림 라인. giveback과 계산식은 같고 프리셋 비율만 다르다.
+            cands.append((peak - self.trail_fib_level * (peak - entry), 'fib'))
 
         if not cands:
             return atr_line, atr_src
@@ -380,6 +417,16 @@ class KospiStrategy1(StockStrategy):
         # 평균 거래량 기준 — 20일 평균 대비 이상이어야 진입 (종목 편차에 강함)
         is_vol_above_avg   = (coin_info.vol_avg <= 0) or \
                              (coin_info.volume >= coin_info.vol_avg * self.vol_ma_mult)
+
+        # ── 대조군 분석(2026-08-08) 반영 지표 ────────────────────────────
+        is_vol_limit  = coin_info.volume > user_info.vol_limit        # 당일 거래량 > 사용자 하한(필수조건에 가까움)
+        # atr_pct 필드는 라이브(compute_indicator_df)에만 채워지고 trade_candle_data
+        # DB 컬럼엔 없어(백테스터/DB 재생 경로에서 0으로 빠짐) atr/close 로 직접 계산한다.
+        atr_ratio     = (float(coin_info.atr or 0.0) / float(coin_info.close)) if coin_info.close else 0.0
+        is_atr_ok     = atr_ratio >= self.atr_ratio_min
+        recent_high   = float(coin_info.recent_high or 0.0)
+        # DB(trade_candle_data) 경로에선 close 가 Decimal 로 온다(라이브는 float) — 혼합연산 방지 위해 float 캐스팅.
+        dip_from_high = ((float(coin_info.close) - recent_high) / recent_high) if recent_high > 0 else 0.0  # <=0. 눌림목 깊이
         # 음권 골든크로스 허용 조건: macd > macd_s(이미 골든크로스 상태) + 기울기 양수(전봉 대비 상승)
         is_macd_rising_fast = (coin_info.macd > coin_info.macd_s) and \
                               (coin_info.macd > prev_info.macd)
@@ -443,7 +490,7 @@ class KospiStrategy1(StockStrategy):
                 'is_under_bb_upper':    'Y' if is_under_bb_upper     else 'N',
                 'is_vol_surge':         'Y' if is_vol_surge          else 'N',
                 # 저장(DAO)용 지표 — 리팩터링 때 누락됐던 키 복구
-                'is_vol_limit':         'Y' if coin_info.volume > user_info.vol_limit else 'N',  # 오늘 거래량 > user_options.vol_limit
+                'is_vol_limit':         'Y' if is_vol_limit          else 'N',  # 오늘 거래량 > user_options.vol_limit
                 'is_over_on_mid':       'Y' if above_ema20           else 'N',  # 종가 > ema20(20일선 위)
                 'is_bb_mid_breakout':   'Y' if (coin_info.bb_mid_breakout or 0) > 0 else 'N',    # bb_mid 돌파
                 'is_rsi_ideal':         'Y' if is_rsi_ideal          else 'N',
@@ -453,6 +500,10 @@ class KospiStrategy1(StockStrategy):
                 'macd_slope':           round(float(coin_info.macd) - float(prev_info.macd), 4),
                 'macd_gap':             round(curr_macd_gap, 4),
                 'macd_gap_delta':       round(curr_macd_gap - prev_macd_gap, 4),
+                # ── 대조군 분석(2026-08-08) 반영 지표 ─────────────────────
+                'atr_ratio':            round(atr_ratio, 4),                    # ATR/종가(변동성)
+                'is_atr_ok':            'Y' if is_atr_ok             else 'N',
+                'dip_from_high':        round(dip_from_high, 4),                # 고점 대비 눌림 깊이(<=0)
             }
             if extra:
                 indicator.update(extra)
@@ -486,6 +537,12 @@ class KospiStrategy1(StockStrategy):
         if self.enable_bb_upper_filter and not is_under_bb_upper:
             return _build_result(Action.HOLD)
         if self.enable_vol_avg_filter and not is_vol_above_avg:
+            return _build_result(Action.HOLD)
+
+        # ── [대조군 분석 반영 게이트] ATR 변동성 하한 / 거래량 하한(필수조건 승격) ──
+        if self.enable_atr_filter and not is_atr_ok:
+            return _build_result(Action.HOLD)
+        if self.enable_vol_limit_filter and not is_vol_limit:
             return _build_result(Action.HOLD)
 
         # ── [추세국면 게이트] 구 is_uptrend 단일 게이트 대체 ──────────────────

@@ -46,6 +46,8 @@ def extractor(x) -> UserOptionMeta:
     user_meta.s1_max_hold_bars_hard     = x.get('s1_max_hold_bars_hard')
     user_meta.s1_obv_dead_min_bars      = x.get('s1_obv_dead_min_bars')
     user_meta.s1_trail_giveback_pct     = x.get('s1_trail_giveback_pct')
+    user_meta.s1_trail_fib_use          = x.get('s1_trail_fib_use')
+    user_meta.s1_trail_fib_level        = x.get('s1_trail_fib_level')
     # 매수 필터 on/off · core 신호 mode
     #   ※ 여태 이 매핑이 없어서 configure() 가 항상 None 을 받았고,
     #     결과적으로 전략 클래스 기본값만 쓰였다(유저 설정이 먹지 않던 원인).

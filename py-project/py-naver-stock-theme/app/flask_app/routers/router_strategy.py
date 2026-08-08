@@ -111,6 +111,8 @@ _S1_COLS: dict[str, str] = {
     's1_trail_drawdown_pct':   'decimal',
     's1_trail_giveback_pct':   'decimal',
     's1_trail_dual':           'tinyint',
+    's1_trail_fib_use':        'tinyint',
+    's1_trail_fib_level':      'fib_level',
     's1_time_stop_extend':     'tinyint',
     's1_time_stop_band':       'decimal',
     's1_time_stop_grace':      'int',
@@ -130,6 +132,9 @@ _S1_COLS: dict[str, str] = {
 
 # core 진입신호 mode 허용값
 _SIGNAL_MODES = ('off', 'golden', 'slope')
+
+# 피보나치 되돌림 트레일 허용 비율 (자유 입력 아님, 3개 프리셋만 허용)
+_FIB_LEVELS = (0.382, 0.5, 0.618)
 
 # ─────────────────────────────────────────────────────────────────────
 # 권한 분리 — 어디서 소비되는 값인가로 갈린다
@@ -248,6 +253,17 @@ def _validate_s1_body(body: dict, is_admin: bool = False):
             if not isinstance(v, (int, float)) or isinstance(v, bool):
                 return None, _error('INVALID_FIELD', f'{k} 는 숫자여야 합니다.')
             clean[k] = float(v)
+
+        elif col_type == 'fib_level':
+            try:
+                fv = float(v)
+            except (TypeError, ValueError):
+                return None, _error('INVALID_FIELD', f'{k} 는 숫자여야 합니다.')
+            if not any(abs(fv - lvl) < 1e-6 for lvl in _FIB_LEVELS):
+                return None, _error(
+                    'INVALID_FIELD',
+                    f'{k} 는 {" / ".join(str(l) for l in _FIB_LEVELS)} 중 하나여야 합니다.')
+            clean[k] = fv
 
         elif col_type == 'signal_mode':
             if v not in _SIGNAL_MODES:
@@ -492,6 +508,8 @@ _WORKER_SELL_FIELDS = [
     ('s1_trail_drawdown_pct', '고점 대비 하락',     'pct',  None),
     ('s1_trail_giveback_pct', '이익 반납',          'pct',  None),
     ('s1_trail_dual',         'ATR 이중감시',       'bool', 1),
+    ('s1_trail_fib_use',      '피보나치 되돌림 사용', 'bool', 0),
+    ('s1_trail_fib_level',    '되돌림 비율',        'num',  0.382),
     ('s1_max_hold_bars',      '보유 한도',          'bars', 12),
     ('s1_time_stop_extend',   '추세생존 시 연장',    'bool', 1),
     ('s1_time_stop_band',     '정체 판정 밴드',      'pct',  0.02),

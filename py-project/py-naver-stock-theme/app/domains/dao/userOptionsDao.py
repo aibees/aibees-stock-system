@@ -216,6 +216,8 @@ class UserOptionsDao(BaseDao):
             's1_trail_drawdown_pct':   _f(uo.s1_trail_drawdown_pct),
             's1_trail_giveback_pct':   _f(uo.s1_trail_giveback_pct),
             's1_trail_dual':           uo.s1_trail_dual,
+            's1_trail_fib_use':        uo.s1_trail_fib_use,
+            's1_trail_fib_level':      _f(uo.s1_trail_fib_level),
             's1_time_stop_extend':     uo.s1_time_stop_extend,
             's1_time_stop_band':       _f(uo.s1_time_stop_band),
             's1_time_stop_grace':      uo.s1_time_stop_grace,
@@ -247,7 +249,8 @@ class UserOptionsDao(BaseDao):
             's1_use_trailing', 's1_trail_activate_pct',
             's1_k_trail_atr', 's1_trail_floor_pct',
             's1_trail_drawdown_pct', 's1_trail_giveback_pct',
-            's1_trail_dual', 's1_time_stop_extend',
+            's1_trail_dual', 's1_trail_fib_use', 's1_trail_fib_level',
+            's1_time_stop_extend',
             's1_time_stop_band', 's1_time_stop_grace', 's1_max_hold_bars_hard',
             's1_obv_dead_min_bars',
             # 매수 필터 on/off · core 신호 mode
