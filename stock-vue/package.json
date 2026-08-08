@@ -9,6 +9,9 @@
     "preview": "vite preview --port 7077"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
     "@fortawesome/fontawesome-svg-core": "^6.2.1",
     "@fortawesome/free-solid-svg-icons": "^6.2.1",
     "@fortawesome/vue-fontawesome": "^3.0.3",
@@ -44,6 +47,7 @@
     "vuex-persistedstate": "^4.1.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
     "@vitejs/plugin-vue": "^5.0.0",
     "tree-cli": "^0.6.7",
     "unplugin-auto-import": "^19.3.0",
