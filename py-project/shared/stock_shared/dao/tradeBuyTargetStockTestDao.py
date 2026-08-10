@@ -1,5 +1,6 @@
 import logging
 
+from sqlalchemy import select
 from sqlalchemy.dialects.mysql import insert
 
 from stock_shared.dao.baseDao import BaseDao
@@ -45,6 +46,16 @@ class TradeBuyTargetStockTestDao(BaseDao):
 
     def __init__(self):
         self.__name__ = "TradeBuyTargetStockTestDao"
+
+    def select_recent_codes(self, session, from_ymd: str, to_ymd: str) -> set:
+        """[from_ymd, to_ymd](양쪽 포함) 구간에 테스트 매수추천에 등장한 종목코드 집합.
+        운영 DAO의 동명 메서드와 동일한 용도(재추천 페널티 랭킹)."""
+        stmt = (
+            select(TradeBuyTargetStockTest.stock_code)
+            .where(TradeBuyTargetStockTest.ymd >= from_ymd, TradeBuyTargetStockTest.ymd <= to_ymd)
+            .distinct()
+        )
+        return {r[0] for r in session.execute(stmt).all()}
 
     def delete_by_ymd(self, session, ymd: str) -> int:
         """해당 일자 전체 삭제(재실행 시 중복 방지)."""

@@ -126,12 +126,16 @@ _S1_COLS: dict[str, str] = {
     's1_enable_regime_gate':     'tinyint',
     's1_macd_signal_mode':       'signal_mode',
     's1_obv_signal_mode':        'signal_mode',
+    's1_ma20_signal_mode':       'ma20_signal_mode',
     # ── worker 매수타겟 정렬 (개인화) ──
     's1_buy_order':              'buy_order',
 }
 
 # core 진입신호 mode 허용값
 _SIGNAL_MODES = ('off', 'golden', 'slope')
+
+# MA20 기울기 게이트 허용값 — 자기 자신과의 골든크로스 개념이 없어 macd/obv와 별도 세트
+_MA20_SIGNAL_MODES = ('off', 'slope')
 
 # 피보나치 되돌림 트레일 허용 비율 (자유 입력 아님, 3개 프리셋만 허용)
 _FIB_LEVELS = (0.382, 0.5, 0.618)
@@ -157,7 +161,7 @@ _S1_ADMIN_ONLY_COLS = frozenset({
     's1_downtrend_surge_bypass', 's1_surge_bypass_mult',
     's1_enable_macd_filter', 's1_enable_rsi_filter', 's1_enable_bb_upper_filter',
     's1_enable_vol_avg_filter', 's1_enable_regime_gate',
-    's1_macd_signal_mode', 's1_obv_signal_mode',
+    's1_macd_signal_mode', 's1_obv_signal_mode', 's1_ma20_signal_mode',
 })
 
 # s1_buy_order 허용 필드 — trade_worker/repository.py _ORDER_FIELDS 와 동일해야 한다.
@@ -270,6 +274,13 @@ def _validate_s1_body(body: dict, is_admin: bool = False):
                 return None, _error(
                     'INVALID_FIELD',
                     f'{k} 는 {" / ".join(_SIGNAL_MODES)} 중 하나여야 합니다.')
+            clean[k] = str(v)
+
+        elif col_type == 'ma20_signal_mode':
+            if v not in _MA20_SIGNAL_MODES:
+                return None, _error(
+                    'INVALID_FIELD',
+                    f'{k} 는 {" / ".join(_MA20_SIGNAL_MODES)} 중 하나여야 합니다.')
             clean[k] = str(v)
 
         elif col_type == 'buy_order':

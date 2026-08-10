@@ -231,6 +231,7 @@ class UserOptionsDao(BaseDao):
             's1_enable_regime_gate':     uo.s1_enable_regime_gate,
             's1_macd_signal_mode':       uo.s1_macd_signal_mode,
             's1_obv_signal_mode':        uo.s1_obv_signal_mode,
+            's1_ma20_signal_mode':       uo.s1_ma20_signal_mode,
             # worker 매수타겟 정렬 (유저별 개인화)
             's1_buy_order':              uo.s1_buy_order,
         }
@@ -259,7 +260,7 @@ class UserOptionsDao(BaseDao):
             's1_enable_macd_filter', 's1_enable_rsi_filter',
             's1_enable_bb_upper_filter', 's1_enable_vol_avg_filter',
             's1_enable_regime_gate',
-            's1_macd_signal_mode', 's1_obv_signal_mode',
+            's1_macd_signal_mode', 's1_obv_signal_mode', 's1_ma20_signal_mode',
             # worker 매수타겟 정렬 (개인화)
             's1_buy_order',
         }

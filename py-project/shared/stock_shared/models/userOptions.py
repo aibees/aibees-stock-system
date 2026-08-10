@@ -74,6 +74,8 @@ class UserOptions(Base):
     # core 진입 신호 mode: 'off' | 'golden' | 'slope' (NULL = 전략 기본값)
     s1_macd_signal_mode = Column(String(10), nullable=True)
     s1_obv_signal_mode = Column(String(10), nullable=True)
+    # MA20(ema20) 기울기 게이트: 'off' | 'slope' (NULL = 전략 기본값 'off')
+    s1_ma20_signal_mode = Column(String(10), nullable=True)
 
     # worker 매수타겟 정렬 순서. "score:desc,volume:desc" 형식(다중 키 tie-break).
     # NULL = 기본값(score:desc,rank_no:asc). 파싱은 repository._ORDER_FIELDS 참조.
@@ -138,5 +140,6 @@ class UserOptions(Base):
             "s1_enable_regime_gate": self.s1_enable_regime_gate,
             "s1_macd_signal_mode": self.s1_macd_signal_mode,
             "s1_obv_signal_mode": self.s1_obv_signal_mode,
+            "s1_ma20_signal_mode": self.s1_ma20_signal_mode,
             "s1_buy_order": self.s1_buy_order,
         }

@@ -206,13 +206,20 @@ class StockService:
         except (ValueError, TypeError, AttributeError):
             return float('inf')
 
-    def assign_ranks(self, result_list: list) -> list:
+    def assign_ranks(self, result_list: list, recent_codes: set = None) -> list:
         """result_list 각 항목에 score/rank_no 주입 후 반환.
         rank_no = **과열최저(rate 오름차순)** 기준 (worker get_buy_targets 와 동일 기준).
-        동률(rate 같음)이면 score 내림차순으로 타이브레이크. score 는 참고용으로 계속 계산."""
+        동률(rate 같음)이면 score 내림차순으로 타이브레이크. score 는 참고용으로 계속 계산.
+
+        recent_codes: 최근 N일 내 이미 매수추천에 등장했던 종목코드 집합(선택, 2026-08-08 추가).
+          주어지면 '재추천 페널티' — 신규 등장 종목보다 항상 후순위로 밀린다(제외는 아님,
+          그날 신규 후보가 없으면 재추천 종목도 여전히 rank1이 될 수 있음).
+          같은 종목을 며칠 연속 rank1으로 반복 매수하는 걸 줄이려는 목적.
+          get_recent_target_codes() 로 구해서 넘긴다."""
         import math
         if not result_list:
             return result_list
+        recent_codes = recent_codes or set()
 
         # 유동성: 거래대금(close*volume) log 정규화
         turns = []
@@ -232,11 +239,30 @@ class StockService:
             score = 100.0 * (0.5 * tech + 0.3 * fund + 0.2 * liq)
             r['score'] = round(score, 2)
 
-        # 과열최저(rate 오름차순) → rank_no. 동률이면 score 내림차순.
-        ranked = sorted(result_list, key=lambda x: (self._parse_rate(x), -x.get('score', 0.0)))
+        # 재추천 페널티(0=신규, 1=최근 N일 내 재등장) → 과열최저(rate 오름차순) → rank_no.
+        # 동률이면 score 내림차순.
+        ranked = sorted(
+            result_list,
+            key=lambda x: (
+                1 if x.get('stock_code') in recent_codes else 0,
+                self._parse_rate(x),
+                -x.get('score', 0.0),
+            ),
+        )
         for idx, r in enumerate(ranked, start=1):
             r['rank_no'] = idx
         return ranked
+
+    def get_recent_target_codes(self, session, ymd: str, days: int) -> set:
+        """ymd 기준 최근 days일(캘린더) 이내 매수추천에 등장했던 종목코드 집합.
+        assign_ranks() 의 recent_codes(재추천 페널티) 인자로 넘긴다."""
+        from datetime import datetime, timedelta
+        dt = datetime.strptime(ymd, '%Y%m%d')
+        from_ymd = (dt - timedelta(days=days)).strftime('%Y%m%d')
+        to_ymd = (dt - timedelta(days=1)).strftime('%Y%m%d')
+        if to_ymd < from_ymd:
+            return set()
+        return self.tradeBuyTargetStockDaoImpl.select_recent_codes(session, from_ymd, to_ymd)
 
     # ──────────────────────────────────────────────────────────────────
     # stock_sell_request (Vue 입력 테이블) 관련 메서드

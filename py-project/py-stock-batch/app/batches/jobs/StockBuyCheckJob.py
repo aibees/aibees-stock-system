@@ -15,6 +15,13 @@ from stock_shared.strategy.kospi1 import KospiStrategy1
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 
 
+# 최근 N일(캘린더) 내 매수추천에 등장했던 종목은 오늘 다시 조건을 만족해도
+# rank_no 산정에서 신규 종목보다 후순위로 밀린다(완전 제외 아님 — 그날 신규 후보가
+# 없으면 재등장 종목도 여전히 rank1이 될 수 있다). 같은 종목 연속 반복 매수 완화 목적.
+# (2026-08-08 추가. 값만 바꾸면 즉시 적용됨.)
+REPEAT_PENALTY_DAYS = 5
+
+
 class StockBuyCheckJob(Job):
     def __init__(self):
         super().__init__()
@@ -107,7 +114,13 @@ class StockBuyCheckJob(Job):
 
         # ── 메인 스레드: 후보 전체 모은 뒤 랭크 산정 → 한 번에 저장 ──
         if result_list:
-            result_list = self.stockServiceImpl.assign_ranks(result_list)
+            try:
+                recent_codes = self.stockServiceImpl.get_recent_target_codes(
+                    self.session, ymd, REPEAT_PENALTY_DAYS)
+            except Exception as e:
+                print(f"[run_batch] 최근 추천 이력 조회 실패(재추천 페널티 미적용): {e}", flush=True)
+                recent_codes = set()
+            result_list = self.stockServiceImpl.assign_ranks(result_list, recent_codes=recent_codes)
             try:
                 self.stockServiceImpl.save_buy_target_stocks_bulk(self.session, result_list)
                 self.session.commit()

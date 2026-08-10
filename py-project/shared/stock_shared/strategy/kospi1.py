@@ -132,6 +132,12 @@ class KospiStrategy1(StockStrategy):
         self.macd_signal_mode = 'slope'   # 'off' | 'golden' | 'slope'
         self.obv_signal_mode  = 'golden'   # 'off' | 'golden' | 'slope'
 
+        # ── MA20(ema20 필드, 실제론 20일 단순이평) 기울기 게이트 ────────────
+        # macd/obv와 달리 자기 자신과의 '골든크로스' 개념이 없어 off/slope 2가지뿐.
+        # 'off'   : 미사용(기존 동작과 동일 — 위치만 보고 기울기는 안 봄)
+        # 'slope' : 오늘 ema20 > 전봉 ema20 이어야 진입 허용(추가 게이트, core 신호와 별개 AND 조건)
+        self.ma20_signal_mode = 'off'   # 'off' | 'slope'
+
     def configure(self, user_info: UserOptionMeta) -> None:
         """user_options의 s1_* 값이 있으면 __init__ 기본값을 덮어씁니다."""
         def _f(val, cast=float):
@@ -182,6 +188,7 @@ class KospiStrategy1(StockStrategy):
             # core 진입 신호 mode
             'macd_signal_mode':       user_info.s1_macd_signal_mode if user_info.s1_macd_signal_mode else None,
             'obv_signal_mode':        user_info.s1_obv_signal_mode  if user_info.s1_obv_signal_mode  else None,
+            'ma20_signal_mode':       user_info.s1_ma20_signal_mode if user_info.s1_ma20_signal_mode else None,
         }
         for attr, val in overrides.items():
             if val is not None:
@@ -364,6 +371,8 @@ class KospiStrategy1(StockStrategy):
         is_obv_g  = coin_info.obv_g_cross_n  == 'G'
         macd_slope_up = float(coin_info.macd) > float(prev_info.macd)  # MACD 기울기 상승
         obv_slope_up  = float(coin_info.obv)  > float(prev_info.obv)   # OBV 기울기 상승
+        ma20_slope_up = bool(coin_info.ema20 and prev_info.ema20 and
+                              float(coin_info.ema20) > float(prev_info.ema20))  # MA20(ema20) 기울기 상승
 
         # MACD 갭 축소 조건: 갭이 좁혀지는 중(크로스 임박) & 기울기 양수 (macd_ok 필터/지표용)
         curr_macd_gap = float(coin_info.macd) - float(coin_info.macd_s)
@@ -476,6 +485,9 @@ class KospiStrategy1(StockStrategy):
                 'obv_sig':              'Y' if obv_sig               else 'N',
                 'macd_slope_up':        'Y' if macd_slope_up         else 'N',
                 'obv_slope_up':         'Y' if obv_slope_up          else 'N',
+                'ma20_mode':            self.ma20_signal_mode,
+                'ma20_slope_up':        'Y' if ma20_slope_up         else 'N',
+                'ma20_slope':           round(float(coin_info.ema20 or 0) - float(prev_info.ema20 or 0), 4),
                 'is_macd_signal':       'Y' if is_macd_signal        else 'N',
                 'is_macd_gap_closing':  'Y' if is_macd_gap_closing   else 'N',
                 'is_vol_above_avg':     'Y' if is_vol_above_avg      else 'N',
@@ -537,6 +549,10 @@ class KospiStrategy1(StockStrategy):
         if self.enable_bb_upper_filter and not is_under_bb_upper:
             return _build_result(Action.HOLD)
         if self.enable_vol_avg_filter and not is_vol_above_avg:
+            return _build_result(Action.HOLD)
+
+        # ── [MA20 기울기 게이트] 'slope' 모드일 때만 오늘 ema20 > 전봉 ema20 요구 ──
+        if self.ma20_signal_mode == 'slope' and not ma20_slope_up:
             return _build_result(Action.HOLD)
 
         # ── [대조군 분석 반영 게이트] ATR 변동성 하한 / 거래량 하한(필수조건 승격) ──

@@ -138,6 +138,7 @@ class UserOptionMeta:
         # 'off'(사용안함) / 'golden'(골든크로스 여부) / 'slope'(기울기 상승여부)
         self.s1_macd_signal_mode        = None
         self.s1_obv_signal_mode         = None
+        self.s1_ma20_signal_mode        = None
 
         # ── worker 매수타겟 정렬 순서 (None이면 "score:desc,rank_no:asc") ──
         # "필드[:방향],..." 형식. 앞 키 동률일 때만 다음 키로 tie-break.

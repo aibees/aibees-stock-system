@@ -72,6 +72,19 @@ class TradeBuyTargetStockDao(BaseDao):
         )
         return [dict(r) for r in session.execute(stmt).mappings().all()]
 
+    def select_recent_codes(self, session, from_ymd: str, to_ymd: str) -> set:
+        """[from_ymd, to_ymd](양쪽 포함) 구간에 매수추천에 등장한 종목코드 집합.
+
+        '최근 N일 내 재추천' 랭킹 페널티(assign_ranks recent_codes) 판정용.
+        제외가 아니라 순위 후순위 처리이므로 존재 여부(집합)만 있으면 된다.
+        """
+        stmt = (
+            select(TradeBuyTargetStock.stock_code)
+            .where(TradeBuyTargetStock.ymd >= from_ymd, TradeBuyTargetStock.ymd <= to_ymd)
+            .distinct()
+        )
+        return {r[0] for r in session.execute(stmt).all()}
+
     def select_latest_ymd(self, session) -> str | None:
         """매수타겟이 존재하는 가장 최근 ymd. 데이터가 없으면 None."""
         return session.execute(

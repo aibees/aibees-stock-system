@@ -488,6 +488,12 @@ const SIGNAL_MODE_OPTIONS = [
     { v: 'off', label: '사용 안 함' },
 ];
 
+/* MA20은 자기 자신과의 골든크로스 개념이 없어 off/slope 2가지만 존재 */
+const MA20_SIGNAL_MODE_OPTIONS = [
+    { v: 'slope', label: '기울기 상승 요구' },
+    { v: 'off', label: '사용 안 함' },
+];
+
 const STRATEGY_GROUPS = [
     {
         id: 'S', title: '진입 신호 (core)',
@@ -502,6 +508,11 @@ const STRATEGY_GROUPS = [
                 k: 's1_obv_signal_mode', label: 'OBV 신호', type: 'enum', def: 'golden',
                 options: SIGNAL_MODE_OPTIONS,
                 hint: '거래량 누적 지표. 골든크로스가 기본이며 세력 유입 확인용입니다.',
+            },
+            {
+                k: 's1_ma20_signal_mode', label: 'MA20 기울기', type: 'enum', def: 'off',
+                options: MA20_SIGNAL_MODE_OPTIONS,
+                hint: '켜면 20일선이 전봉보다 올라가는 중(기울기 상승)이어야 진입을 허용합니다. MACD/OBV 신호와 별개의 추가 AND 게이트입니다.',
             },
         ],
     },

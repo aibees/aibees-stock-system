@@ -58,6 +58,7 @@ def extractor(x) -> UserOptionMeta:
     user_meta.s1_enable_regime_gate     = x.get('s1_enable_regime_gate')
     user_meta.s1_macd_signal_mode       = x.get('s1_macd_signal_mode')
     user_meta.s1_obv_signal_mode        = x.get('s1_obv_signal_mode')
+    user_meta.s1_ma20_signal_mode       = x.get('s1_ma20_signal_mode')
     # worker 매수타겟 정렬 순서 ("score:desc,volume:desc" 형식, None=기본값)
     user_meta.s1_buy_order              = x.get('s1_buy_order')
     return user_meta
