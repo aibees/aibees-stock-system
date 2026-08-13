@@ -93,7 +93,7 @@ class TradeCandleBackfillJob(Job):
                   f'(기준일 {end_date} · 최근 {days}일)', flush=True)
 
         if not targets:
-            return {'status': 'success', 'batch_cnt': 0,
+            return {'status': 'SUCCESS', 'batch_cnt': 0,
                     'desc': f'{from_ymd} 이후 추천 종목이 없습니다.'}
 
         stock_option_meta: UserOptionMeta = self.userServiceImpl.get_user_options(self.session)
@@ -142,7 +142,7 @@ class TradeCandleBackfillJob(Job):
         print(f'[완료] {desc}', flush=True)
 
         return {
-            'status': 'success',
+            'status': 'SUCCESS',
             'batch_cnt': total_codes,
             'desc': desc,
         }

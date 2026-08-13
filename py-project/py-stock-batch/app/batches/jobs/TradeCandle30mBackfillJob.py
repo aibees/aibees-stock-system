@@ -99,7 +99,7 @@ class TradeCandle30mBackfillJob(Job):
 
         desc = f'mode={mode} · ' + ' / '.join(details)
         print(f'[완료] {desc}', flush=True)
-        return {'status': 'success', 'batch_cnt': total_rows, 'desc': desc}
+        return {'status': 'SUCCESS', 'batch_cnt': total_rows, 'desc': desc}
 
     # ------------------------------------------------------------------
     # backfill — 과거 N영업일

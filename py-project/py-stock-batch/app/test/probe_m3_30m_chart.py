@@ -49,20 +49,9 @@ def probe_day_chart(engine: KisEngine, code: str):
 #    tr_id: FHKST03010230, 1회 최대 120건 (해당 일자, 지정시각 이전 역순)
 # ──────────────────────────────────────────────────────────────
 def fetch_daily_minute(engine: KisEngine, code: str, ymd: str, hhmmss: str = "153000"):
-    resp = engine.kis.fetch(
-        "/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice",
-        api="FHKST03010230",
-        params={
-            "FID_COND_MRKT_DIV_CODE": "J",
-            "FID_INPUT_ISCD": code,
-            "FID_INPUT_DATE_1": ymd,
-            "FID_INPUT_HOUR_1": hhmmss,
-            "FID_PW_DATA_INCU_YN": "N",
-            "FID_FAKE_TICK_INCU_YN": "N",
-        },
-        domain="real",
-    )
-    return getattr(resp, "output2", None) or []
+    # KisEngine 에 구현된 것과 동일 경로를 쓴다.
+    # (kis.fetch() 는 KisDynamicDict 를 반환해 .get() 이 없다 → request().json())
+    return engine._fetch_day_minutes_page(code, ymd, hhmmss)
 
 
 def probe_raw_backfill(engine: KisEngine, code: str, max_days: int = 40):

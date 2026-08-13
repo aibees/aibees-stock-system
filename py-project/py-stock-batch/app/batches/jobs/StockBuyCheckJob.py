@@ -131,7 +131,7 @@ class StockBuyCheckJob(Job):
                 raise
 
         return_result = {
-            'status': 'success',
+            'status': 'SUCCESS',
             'batch_cnt': len(stock_list),
             'desc': '매수 기대기준에 충족하는 종목이 없습니다.' if len(result_list) == 0 else f'매수 기대기준에 충족하는 종목은 총 {len(result_list)}개 입니다.'
         }

@@ -10,14 +10,26 @@
                     <h2>배치 작업 설정</h2>
                     <p class="sub-text">등록된 배치 작업을 관리하고 단독 실행할 수 있습니다</p>
                 </div>
-                <button class="btn-add" @click="openAdd">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                    배치 추가
-                </button>
+                <div class="head-actions">
+                    <button class="btn-reload" @click="reloadScheduler" :disabled="isReloading">
+                        <svg :class="{ spinning: isReloading }" xmlns="http://www.w3.org/2000/svg" width="14"
+                            height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10" />
+                            <polyline points="1 20 1 14 7 14" />
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                        </svg>
+                        {{ isReloading ? '갱신 중…' : '스케줄러 새로고침' }}
+                    </button>
+                    <button class="btn-add" @click="openAdd">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        배치 추가
+                    </button>
+                </div>
             </section>
 
             <!-- ── 데스크탑 테이블 ── -->
@@ -270,6 +282,26 @@ onMounted(async () => {
     await fetchBatchList();
 });
 
+/* ── 스케줄러 새로고침 (배치 서버의 job 재등록) ── */
+const isReloading = ref(false);
+
+const reloadScheduler = async () => {
+    if (isReloading.value) return;
+    if (!confirm('배치 스케줄러를 새로고침하시겠습니까?\n(DB 설정 기준으로 등록된 Job이 다시 로드됩니다)')) return;
+
+    isReloading.value = true;
+    try {
+        const { data } = await batchApi.get('/api/v1/jobs/reload');
+        const jobs = data?.data ?? [];
+        alert(`스케줄러가 갱신되었습니다. (등록된 Job ${jobs.length}건)`);
+        await fetchBatchList();
+    } catch (e) {
+        alert(e?.response?.data?.message ?? '스케줄러 새로고침 중 오류가 발생했습니다.');
+    } finally {
+        isReloading.value = false;
+    }
+};
+
 /* ── 사용/미사용 토글 (PATCH) ── */
 const toggleEnabled = async (row) => {
     togglingId.value = row.job_id;
@@ -427,8 +459,63 @@ $green: #2f9e44;
     }
 }
 
+.head-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+
+    @media (max-width: 520px) {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+.btn-reload {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: $white;
+    color: $gray-700;
+    border: 1px solid $gray-200;
+    border-radius: 0.4rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: border-color .12s, color .12s;
+
+    &:hover:not(:disabled) {
+        border-color: $blue;
+        color: $blue;
+    }
+
+    &:disabled {
+        opacity: .55;
+        cursor: not-allowed;
+    }
+
+    .spinning {
+        animation: spin 0.9s linear infinite;
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .btn-add {
     display: inline-flex;
+    justify-content: center;
     align-items: center;
     gap: 6px;
     padding: 8px 16px;

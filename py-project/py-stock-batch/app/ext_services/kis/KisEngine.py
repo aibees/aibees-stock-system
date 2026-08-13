@@ -295,23 +295,40 @@ class KisEngine:
     def _fetch_day_minutes_page(self, code: str, ymd: str, hhmmss: str) -> list:
         """주식일별분봉조회 1페이지. hhmmss 이전 방향으로 최대 120건 반환.
 
-        pykis 에 미구현이라 self.kis.fetch() 로 원시 호출한다.
-        인증 토큰 / 도메인 / rate-limit 은 pykis 것을 그대로 탄다.
+        pykis 에 미구현인 TR 이라 원시 호출한다.
+        ※ self.kis.fetch() 가 아니라 self.kis.request() + .json() 을 쓴다.
+          fetch() 는 응답을 KisDynamicDict 로 감싸 돌려주는데, 그 객체엔 .get() 이
+          없어서 dict 로 다루는 순간 AttributeError 가 난다.
+          _fetch_daily_mkt 와 동일하게 raw dict 로 받아 처리한다.
         """
-        resp = self.kis.fetch(
-            "/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice",
-            api="FHKST03010230",
-            params={
-                "FID_COND_MRKT_DIV_CODE": "J",
-                "FID_INPUT_ISCD": code,
-                "FID_INPUT_DATE_1": ymd,
-                "FID_INPUT_HOUR_1": hhmmss,
-                "FID_PW_DATA_INCU_YN": "N",
-                "FID_FAKE_TICK_INCU_YN": "N",
-            },
-            domain="real",
-        )
-        return getattr(resp, "output2", None) or []
+        PATH = "/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice"
+        TR_ID = "FHKST03010230"
+
+        params = {
+            "FID_COND_MRKT_DIV_CODE": "J",
+            "FID_INPUT_ISCD": code,
+            "FID_INPUT_DATE_1": ymd,
+            "FID_INPUT_HOUR_1": hhmmss,
+            "FID_PW_DATA_INCU_YN": "N",
+            "FID_FAKE_TICK_INCU_YN": "N",
+        }
+        try:
+            resp = self.kis.request(
+                PATH, method="GET", params=params,
+                headers={"tr_id": TR_ID, "custtype": "P"},
+                appkey_location="header", auth=True,
+            )
+            j = resp.json()
+        except Exception as e:  # noqa: BLE001
+            print(f"[_fetch_day_minutes_page] {code} {ymd} {hhmmss} 요청 실패: {e}", flush=True)
+            return []
+
+        if j.get("rt_cd") != "0":
+            print(f"[_fetch_day_minutes_page] {code} {ymd} rt_cd={j.get('rt_cd')} "
+                  f"msg={j.get('msg1')}", flush=True)
+            return []
+
+        return [r for r in (j.get("output2") or []) if r.get("stck_cntg_hour")]
 
     def fetch_day_minutes(self, code: str, ymd: str) -> pd.DataFrame:
         """특정 일자(YYYYMMDD) 1분봉 전량.
@@ -330,7 +347,9 @@ class KisEngine:
 
             before = len(seen)
             for r in rows:
-                key = str(r.get("stck_bsop_date", ymd)) + str(r.get("stck_cntg_hour", ""))
+                # stck_bsop_date 가 비어 오는 응답이 있어 요청 일자로 보정한다.
+                bsop = str(r.get("stck_bsop_date") or ymd)
+                key = bsop + str(r.get("stck_cntg_hour") or "")
                 if len(key) == 14 and key not in seen:
                     seen[key] = r
             if len(seen) == before:

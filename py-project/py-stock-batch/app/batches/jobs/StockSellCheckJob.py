@@ -59,7 +59,7 @@ class StockSellCheckJob(Job):
 
         if not target_users:
             return {
-                'status':    'success',
+                'status':    'SUCCESS',
                 'batch_cnt': 0,
                 'desc':      '매도 알림 설정 유저가 없습니다. (user_options 테이블을 확인하세요)',
             }
@@ -216,7 +216,7 @@ class StockSellCheckJob(Job):
         print(f'\n[StockSellCheckJob] 완료 — {desc}', flush=True)
 
         return {
-            'status':    'success',
+            'status':    'SUCCESS',
             'batch_cnt': total_checked,
             'desc':      desc,
         }

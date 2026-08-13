@@ -14,7 +14,11 @@ class StockCodeMasterJob(Job):
         self.job_name = "StockCodeMasterJob"
         self.target = ['kospi', 'kosdaq']
         self.nxt_target = ['nxt_kospi', 'nxt_kosdaq']
-        self.static_path = os.path.join(os.path.dirname(__file__), '../../static/')
+        self.static_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', '..', 'static')
+        ) + os.sep
+        # 컨테이너/신규 환경에서 static 디렉터리가 없으면 다운로드가 FileNotFoundError 로 실패한다.
+        os.makedirs(self.static_path, exist_ok=True)
         self.mst_url = 'https://new.real.download.dws.co.kr/common/master/'
         self.stockServiceImpl = StockService()
 
@@ -41,7 +45,7 @@ class StockCodeMasterJob(Job):
             self.stockServiceImpl.update_stock_nxt_flag(self.session, nxt_list)
 
         return {
-            'status': 'success',
+            'status': 'SUCCESS',
             'desc': '종목코드 마스터 갱신 완료',
             'batch_cnt': suc_cnt
         }
@@ -51,6 +55,8 @@ class StockCodeMasterJob(Job):
     ZIP file download하고, unzip 하여 .mst 파일 get
     """
     def download_and_extract(self, zip_file):
+        # 인스턴스가 재사용되거나 디렉터리가 중간에 사라진 경우를 대비해 매번 보장
+        os.makedirs(self.static_path, exist_ok=True)
         dest = f'{self.static_path}{zip_file}'
 
         if os.path.exists(dest):
