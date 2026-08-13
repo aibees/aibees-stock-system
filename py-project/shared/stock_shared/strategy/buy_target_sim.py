@@ -11,7 +11,7 @@ app/test/sim_buy_target.py 를 화면(API)에서 쓸 수 있게 옮긴 것.
   · 동시 보유 1종목, 전량매수/전량매도.
   · 대기중: 당일(ymd) 추천이 있으면 정렬 1순위 종목을 매수.
             지나간 추천은 폐기 — 매일 그날 추천을 새로 본다.
-  · 보유중: 매일 KospiStrategy1.get_action_in_active 로 매도판단.
+  · 보유중: 매일 KospiStrategy0.get_action_in_active 로 매도판단.
             SELL 계열이면 당일 종가 매도. 진입일에도 1회 판정(bars_held=0).
   · 매도한 날은 재매수 안 함.
   · 체결가: 매수 = entry_price 옵션('close' | 'next_open'), 매도 = 당일 종가.
@@ -28,7 +28,7 @@ from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
 from stock_shared.strategy.backtester import KisBacktester
 from stock_shared.strategy.base import Action
 from stock_shared.strategy.buy_order import describe_buy_order, make_buy_order_key
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.kospi0 import KospiStrategy0
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 
 SELL_ACTIONS = {Action.SELL_PROFIT, Action.SELL_STOP_LOSS, Action.SELL_STOP_PROFIT,
@@ -50,7 +50,7 @@ class BuyTargetSimulator:
     def __init__(self, session, user_info, strategy=None):
         self.session = session
         self.ui = user_info
-        self.strategy = strategy or KospiStrategy1()
+        self.strategy = strategy or KospiStrategy0()
         self.dao = TradeCandleDataDao()
         self._candle_cache = {}
 

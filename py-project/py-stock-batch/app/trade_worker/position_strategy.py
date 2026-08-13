@@ -1,10 +1,10 @@
 """
-매도 판정 = KospiStrategy1 재사용 (docs_buy_target_sim_spec.md §4 와 동일 로직).
+매도 판정 = KospiStrategy0 재사용 (docs_buy_target_sim_spec.md §4 와 동일 로직).
 
 worker 전용 포지션(trade_worker_position)의 HOLDING 종목에 대해:
   - 일봉 OHLCV(KisEngine.get_daily_ohlcv) → 지표계산(KisService.compute_indicator_df)
   - 포지션 상태(entry_price/entry_atr/bars_held/peak/bars_since_peak) 주입
-  - KospiStrategy1.get_action_in_active 로 action + stop/target/trail 산출
+  - KospiStrategy0.get_action_in_active 로 action + stop/target/trail 산출
 을 수행한다. daily 배치(StockSellCheckJob)·trade_sell_target_stock 과 무관하게 자체 계산.
 """
 import logging
@@ -14,7 +14,7 @@ from app.batches.services.userService import UserService
 from app.config.contextManager import get_session
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.ext_services.kis.component.KisStockService import KisService
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.kospi0 import KospiStrategy0
 
 log = logging.getLogger("trade_worker.strategy")
 
@@ -45,7 +45,7 @@ class SellStrategy:
         self.user_id = user_id
         self.lookback = lookback_days
         self.kis_service = KisService()
-        self.strategy = KospiStrategy1()
+        self.strategy = KospiStrategy0()
         with get_session() as s:                # s1_* 파라미터 포함 유저 옵션
             self.user_meta = UserService().get_user_options(s, user_id)
         # user_options 의 s1_* 로 전략 기본값을 덮어쓴다. 이 호출이 빠지면
@@ -59,7 +59,7 @@ class SellStrategy:
 
         반환: [(속성명, 이전값, 새값), ...] — 변경 없으면 빈 리스트.
 
-        ※ 기존 KospiStrategy1 인스턴스에 configure() 를 다시 호출하면 안 된다.
+        ※ 기존 KospiStrategy0 인스턴스에 configure() 를 다시 호출하면 안 된다.
           configure 는 값이 None 이면 setattr 을 건너뛰므로, 유저가 필드를
           비워서(NULL) '기본값으로 되돌린' 변경이 반영되지 않고 옛 override 가
           그대로 남는다. 그래서 **새 인스턴스**를 만들어 갈아끼운다.
@@ -75,7 +75,7 @@ class SellStrategy:
 
         old_strategy = self.strategy
         old_meta = self.user_meta
-        fresh = KospiStrategy1()
+        fresh = KospiStrategy0()
         fresh.configure(new_meta)
 
         # 실제로 달라진 전략 속성만 추린다(로그·알림용).
@@ -86,7 +86,7 @@ class SellStrategy:
                 changes.append((attr, old_v, new_v))
 
         # 전략 객체에 없고 user_meta 에만 있는 값도 로그에 남긴다.
-        #   s1_buy_order 는 KospiStrategy1 속성이 아니라 BuyExecutor 가 직접 읽는다.
+        #   s1_buy_order 는 KospiStrategy0 속성이 아니라 BuyExecutor 가 직접 읽는다.
         #   위 루프만으로는 변경돼도 로그에 안 잡혀, 실제로 반영됐는지 사후 확인이
         #   불가능했다(매수 종목이 예상과 다를 때 원인 추적이 막힌다).
         for key in ("s1_buy_order",):
@@ -220,7 +220,7 @@ class SellStrategy:
         """트레일링 라인(활성 시). 실시간 감시용으로 항상 계산해 저장.
 
         고점 기준은 peak_high 단일(구 trail_basis 선택 제거).
-        라인 산출식은 전략(KospiStrategy1._trail_line_of)에 위임한다.
+        라인 산출식은 전략(KospiStrategy0._trail_line_of)에 위임한다.
         여기서 식을 복제하면 드로다운 캡 같은 변경이 실시간 감시에만 누락된다.
         ※ SellExecutor._advance_peak 이 장중에 같은 식으로 재계산한다.
         """

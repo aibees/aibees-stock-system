@@ -133,9 +133,14 @@ class BuyExecutor:
                 continue
 
             if premarket:
-                res = self.broker.wait_fill(self.broker.buy_limit_nxt(code, Decimal(qty), price))
+                order = self.broker.buy_limit_nxt(code, Decimal(qty), price)
             else:
-                res = self.broker.wait_fill(self.broker.buy_market(code, Decimal(qty), price, nxt=nxt))
+                order = self.broker.buy_market(code, Decimal(qty), price, nxt=nxt)
+
+            # 주문 즉시 추적 등록. 아직 armed=False 라 콜백은 나가지 않는다 —
+            # 아래 wait_fill 동기 처리와 이중 계상되지 않게 하기 위함(broker.OrderWatch 참조).
+            self.broker.register_watch(order, self._on_late_fill)
+            res = self.broker.wait_fill(order)
 
             # 미체결(PENDING)이면 즉시 취소하지 않고 설정 횟수만큼 추가 대기하며 재확인.
             # wait_fill 은 재호출해도 누적 체결(_fills)을 이어서 보므로 부분→전량 체결도 반영됨.
@@ -151,6 +156,7 @@ class BuyExecutor:
                 # 최종적으로도 미체결이면 취소 시도(유령 체결 방지) 후 중단
                 if res.status == "PENDING":
                     self.broker.cancel(res)
+                self.broker.unregister_watch(res.order_no)
                 self.wlog.warn("[매수] %s 미체결/거부 status=%s reason=%s → 중단",
                                code, res.status, res.reason)
                 return
@@ -181,6 +187,45 @@ class BuyExecutor:
             if self.notifier:
                 self.notifier.trade("BUY", name, code, res.filled_qty, fill_px, final_balance,
                                     note=f"{tag} score={tgt.get('score')} · {res.status}")
+
+            # 동기 처리 완료 → 추적 개시. 여기서부터 도착하는 체결분만 _on_late_fill 로 온다.
+            # 전량 체결이면 arm_watch 가 False 를 돌려주고 추적은 즉시 끝난다.
+            if self.broker.arm_watch(res):
+                self.wlog.info("[매수] %s 잔량 %s주 체결 대기(이벤트 추적)",
+                               code, res.qty - res.filled_qty)
             return
 
         self.wlog.info("[매수] 체결 가능한 후보 없음 (ymd=%s, 후보=%d)", ymd, len(targets))
+
+    # ── 동기 창 밖 체결(잔량) 반영 ───────────────────────────────────
+    def _on_late_fill(self, ev):
+        """지정가·부분체결로 남아있던 매수 잔량이 뒤늦게 체결됐을 때 소켓 스레드에서 호출된다.
+
+        ev.delta_qty 만 반영한다(ev.filled_qty 는 누적이라 그대로 쓰면 이중 계상).
+        전환 전에는 이 경로가 없어서 잔량 체결이 다음 부팅 대조 때까지 DB 에 안 잡혔다.
+        """
+        uid = self.cfg.user_id
+        if ev.rejected:
+            self.wlog.warn("[매수] %s 잔량 거부 order=%s reason=%s", ev.symbol, ev.order_no, ev.reason)
+            return
+        if ev.delta_qty <= 0:
+            return
+        try:
+            self.repo.add_position_qty(uid, ev.symbol, ev.delta_qty, ev.last_price)
+            # 평단가가 바뀌었으므로 손절/익절 라인을 다시 잡는다(안 하면 옛 진입가 기준으로 남는다).
+            if self.strategy:
+                try:
+                    lines = self.strategy.initial_lines(ev.symbol, float(ev.avg_price))
+                    self.repo.update_position_state(uid, ev.symbol, lines)
+                except Exception as e:  # noqa: BLE001
+                    self.wlog.warn("[매수] %s 잔량체결 후 라인 재계산 실패: %s", ev.symbol, e)
+            balance = reconcile_wallet(self.broker, self.repo, uid,
+                                       sync=self.cfg.sync_wallet_on_trade, tag="매수잔량")
+            self.repo.insert_trade_log(uid, ev.symbol, "BUY", ev.last_price, ev.delta_qty, balance,
+                                       note=f"late fill {ev.filled_qty}/{ev.order_qty}")
+            self.wlog.info("[매수] %s 잔량체결 +%s주 @%s (누적 %s/%s) 평단=%s%s",
+                           ev.symbol, ev.delta_qty, ev.last_price,
+                           ev.filled_qty, ev.order_qty, ev.avg_price,
+                           " · 전량완료" if ev.complete else "")
+        except Exception as e:  # noqa: BLE001
+            self.wlog.warn("[매수] %s 잔량체결 반영 실패: %s", ev.symbol, e)

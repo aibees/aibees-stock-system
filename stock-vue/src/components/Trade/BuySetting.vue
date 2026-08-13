@@ -25,6 +25,19 @@
                 </div>
             </section>
 
+            <!-- ── 모드 탭 ── -->
+            <nav class="mode-tab-nav">
+                <button v-for="m in MODE_TABS" :key="m.code" type="button"
+                    :class="['mode-tab-btn', { active: activeMode === m.code }]"
+                    @click="activeMode = m.code">
+                    <span class="mt-code">{{ m.code }}</span>
+                    <span class="mt-name">{{ m.name }}</span>
+                </button>
+            </nav>
+
+            <!-- ══════════ M0 : 현행 설정 ══════════ -->
+            <template v-if="activeMode === 'M0'">
+
             <!-- ── 범위 안내 ── -->
             <section class="scope-bar">
                 <div class="scope-row">
@@ -266,6 +279,14 @@
                     </button>
                 </div>
             </form>
+            </template>
+
+            <!-- ══════════ M1 ~ M3 : 준비중 ══════════ -->
+            <section v-else class="mode-empty">
+                <span class="me-code">{{ activeMode }}</span>
+                <h3>{{ currentModeName }}</h3>
+                <p>이 모드의 매수조건 설정은 아직 준비중입니다.</p>
+            </section>
         </div>
     </div>
 </template>
@@ -278,6 +299,20 @@ import { assUserSession } from '@/scripts/stores/user-stores';
 
 const title = ref('매수 설정');
 const userSession = assUserSession();
+
+/* ═══════════════════════════════════════════════════════════
+ * 운용 모드 탭 (M0 만 현행 설정, M1~M3 은 준비중)
+ * ═══════════════════════════════════════════════════════════ */
+const MODE_TABS = [
+    { code: 'M0', name: '추천 1순위' },
+    { code: 'M1', name: '단일 종목 고정' },
+    { code: 'M2', name: 'ETF 교대' },
+    { code: 'M3', name: '지정가 감시' },
+];
+const activeMode = ref('M0');
+const currentModeName = computed(
+    () => MODE_TABS.find(m => m.code === activeMode.value)?.name ?? ''
+);
 
 /* ═══════════════════════════════════════════════════════════
  * 권한
@@ -480,7 +515,7 @@ const pctClass = (rate) => {
 };
 
 /* ═══════════════════════════════════════════════════════════
- * 2. 후보 선정 조건 (관리자 전용) — KospiStrategy1.get_action_in_watch
+ * 2. 후보 선정 조건 (관리자 전용) — KospiStrategy0.get_action_in_watch
  * ═══════════════════════════════════════════════════════════ */
 const SIGNAL_MODE_OPTIONS = [
     { v: 'golden', label: '골든크로스' },
@@ -808,6 +843,86 @@ const save = async () => {
     margin: 0 auto;
     padding: 16px 14px 96px;
     box-sizing: border-box;
+}
+
+/* ── 모드 탭 ── */
+.mode-tab-nav {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid #e5e7eb;
+    margin: 0 0 16px;
+    overflow-x: auto;
+}
+
+.mode-tab-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 14px;
+    border: none;
+    background: none;
+    color: #9ca3af;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .12s, border-color .12s;
+}
+
+.mode-tab-btn .mt-code {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+}
+
+.mode-tab-btn .mt-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.mode-tab-btn:hover { color: #4b5563; }
+
+.mode-tab-btn.active {
+    color: #1f3a5f;
+    border-bottom-color: #1f3a5f;
+}
+
+/* ── 준비중 영역 ── */
+.mode-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 320px;
+    background: #fff;
+    border: 1px dashed #d6dbe1;
+    border-radius: 0.8rem;
+    color: #9ca3af;
+}
+
+.mode-empty .me-code {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #eef1f5;
+    color: #6b7280;
+}
+
+.mode-empty h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #4b5563;
+}
+
+.mode-empty p {
+    margin: 0;
+    font-size: 0.85rem;
 }
 
 /* ── 상단 ── */

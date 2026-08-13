@@ -59,6 +59,7 @@ class SellExecutor:
         self._untradable_log: dict[str, float] = {}  # 장외 라인돌파 로그 throttle 만료시각
         self._peak_dirty: set[str] = set()     # 장중 고점이 갱신돼 flush 대상인 종목
         self._peak_log: dict[str, float] = {}  # 고점 갱신 로그 throttle 만료시각
+        self._pending_reason: dict[str, str] = {}  # 잔여 주문 추적중인 종목의 매도 사유
         self._lock = threading.Lock()
 
     # ── 구독 시작 ────────────────────────────────────────────────────
@@ -232,11 +233,11 @@ class SellExecutor:
         """소켓 체결가로 peak_high 를 갱신하고 트레일 라인을 재계산한다.
 
         DB 쓰기는 하지 않는다(장 종료 시 flush_peaks 가 일괄 저장).
-        라인 산출식은 daily 평가와 동일하게 KospiStrategy1._trail_line_of 에 위임한다.
+        라인 산출식은 daily 평가와 동일하게 KospiStrategy0._trail_line_of 에 위임한다.
         """
         if not self.strategy:
             return
-        s = self.strategy.strategy          # KospiStrategy1
+        s = self.strategy.strategy          # KospiStrategy0
         if not getattr(s, "use_trailing", True):
             return
 
@@ -312,9 +313,9 @@ class SellExecutor:
             return "SELL_TRAIL"
         return None
 
-    # ── 일별 전략 평가 (KospiStrategy1 재사용) ───────────────────────
+    # ── 일별 전략 평가 (KospiStrategy0 재사용) ───────────────────────
     def refresh_positions(self):
-        """HOLDING 포지션마다 KospiStrategy1 로 라인/액션 재계산 → DB 갱신.
+        """HOLDING 포지션마다 KospiStrategy0 로 라인/액션 재계산 → DB 갱신.
         일봉 신호(OBV 데드크로스·타임스탑 등)로 SELL 판정되면 개장 시 즉시 매도.
         realtime stop/target/trail 라인도 이 값으로 갱신됨."""
         if not self.strategy:
@@ -430,14 +431,18 @@ class SellExecutor:
                 self.wlog.info("[매도] %s %s 지정가=%s (체결가=%s -%s%%)",
                                symbol, sess.name, order_px, price, self.cfg.sell_limit_slip_pct)
             try:
-                res = self.broker.wait_fill(
-                    self.broker.order_in_session("SELL", symbol, qty, order_px, sess))
+                order = self.broker.order_in_session("SELL", symbol, qty, order_px, sess)
             except Exception as e:  # noqa: BLE001  (KIS API 오류·수량초과·rate limit 등)
                 self._register_fail(symbol, f"주문 예외: {e}")
                 return
 
+            # 주문 즉시 추적 등록(아직 armed=False → 아래 동기 처리와 이중 계상 안 됨)
+            self.broker.register_watch(order, self._on_late_fill)
+            res = self.broker.wait_fill(order)
+
             # 체결 실패/미체결/거부 → 쿨다운(폭주 방지), 보유 유지
             if res.status == "REJECTED" or res.filled_qty <= 0:
+                self.broker.unregister_watch(res.order_no)
                 self._register_fail(symbol, f"status={res.status} reason={res.reason}")
                 return
 
@@ -445,31 +450,99 @@ class SellExecutor:
             proceeds = fill_px * res.filled_qty
             computed_balance = self.repo.get_wallet_balance(self.cfg.user_id) + proceeds
 
-            # 부분체결(PARTIAL)은 스켈레톤에서 청산 처리 — 잔여수량 관리는 TODO
-            self.repo.close_position(self.cfg.user_id, symbol, fill_px, res.filled_qty, reason)
-            self.positions.pop(symbol, None)
-            self._unsubscribe(symbol)   # 매도 완료 → 실시간 감시 비활성
+            # 부분체결이면 체결분만 차감하고 **보유·감시를 유지**한다.
+            # (이전에는 1주만 체결돼도 close_position + unsubscribe 로 전량 청산 처리해서
+            #  잔여 보유분이 감시에서 이탈했다. reduce_position 이 잔량을 돌려준다.)
+            remain = self.repo.reduce_position(self.cfg.user_id, symbol, fill_px,
+                                               res.filled_qty, reason)
             final_balance = reconcile_wallet(self.broker, self.repo, self.cfg.user_id,
                                              computed=computed_balance,
                                              sync=self.cfg.sync_wallet_on_trade, tag="매도")
             self.repo.insert_trade_log(self.cfg.user_id, symbol, "SELL", fill_px, res.filled_qty,
                                        final_balance, note=f"{reason}/{res.status}")
-            self._sold.add(symbol)
-            self._fail_count.pop(symbol, None)
-            self._cooldown.pop(symbol, None)
-            self.wlog.info("[매도] 완료 %s qty=%s @~%s 잔고=%s (%s/%s)",
-                           symbol, res.filled_qty, fill_px, final_balance, reason, res.status)
             if self.notifier:
                 self.notifier.trade("SELL", pos.get("stock_name") or "", symbol,
                                     res.filled_qty, fill_px, final_balance,
-                                    note=f"{reason} · {res.status}")
+                                    note=f"{reason} · {res.status}"
+                                         + (f" · 잔량 {remain}주" if remain > 0 else ""))
+
+            if remain > 0:
+                # 잔량 보유 → 감시 유지. _sold 로 막지 않는다(다음 라인 돌파에 다시 매도).
+                with self._lock:
+                    p = self.positions.get(symbol)
+                    if p is not None:
+                        p["hold_qty"] = remain
+                self.wlog.info("[매도] 부분체결 %s qty=%s @~%s 잔량=%s주 → 감시 유지 (%s/%s)",
+                               symbol, res.filled_qty, fill_px, remain, reason, res.status)
+            else:
+                self.positions.pop(symbol, None)
+                self._unsubscribe(symbol)   # 전량 청산 → 실시간 감시 비활성
+                self._sold.add(symbol)
+                self.wlog.info("[매도] 완료 %s qty=%s @~%s 잔고=%s (%s/%s)",
+                               symbol, res.filled_qty, fill_px, final_balance, reason, res.status)
+
+            self._fail_count.pop(symbol, None)
+            self._cooldown.pop(symbol, None)
+
+            # 동기 처리 완료 → 추적 개시. 미체결 잔여 **주문**이 있으면 늦은 체결이 콜백으로 온다.
+            if self.broker.arm_watch(res):
+                self._pending_reason[symbol] = reason
+                # 잔여 주문이 아직 살아있는데 다음 틱에서 또 팔면 '주문가능수량 초과'가 난다.
+                # (계좌 보유수량은 매도 주문을 걸어둬도 줄지 않지만 주문가능수량은 줄어든다)
+                # 쿨다운을 걸어 살아있는 주문이 체결될 시간을 준다.
+                self._cooldown[symbol] = time.time() + self.cfg.sell_retry_cooldown_sec
+                self.wlog.info("[매도] %s 미체결 주문 %s주 체결 대기(이벤트 추적) · %ds 재주문 보류",
+                               symbol, res.qty - res.filled_qty, self.cfg.sell_retry_cooldown_sec)
         except Exception as e:  # noqa: BLE001  (예상 밖 오류도 폭주 없이 쿨다운)
             self._register_fail(symbol, f"예외: {e}")
         finally:
             self._inflight.discard(symbol)
 
+    # ── 동기 창 밖 체결(잔여 매도주문) 반영 ──────────────────────────
+    def _on_late_fill(self, ev):
+        """매도 주문의 미체결 잔량이 뒤늦게 체결됐을 때 소켓 스레드에서 호출된다.
+
+        ev.delta_qty 만 차감한다(ev.filled_qty 는 누적이라 그대로 쓰면 이중 차감).
+        차감 결과 잔량이 0 이 되면 그때 비로소 포지션 종료 + 감시 해제한다.
+        """
+        uid = self.cfg.user_id
+        symbol = ev.symbol
+        if ev.rejected:
+            self.wlog.warn("[매도] %s 잔여주문 거부 order=%s reason=%s", symbol, ev.order_no, ev.reason)
+            self._pending_reason.pop(symbol, None)
+            return
+        if ev.delta_qty <= 0:
+            return
+        reason = self._pending_reason.get(symbol, "LATE_FILL")
+        try:
+            remain = self.repo.reduce_position(uid, symbol, ev.last_price, ev.delta_qty, reason)
+            balance = reconcile_wallet(self.broker, self.repo, uid,
+                                       sync=self.cfg.sync_wallet_on_trade, tag="매도잔량")
+            self.repo.insert_trade_log(uid, symbol, "SELL", ev.last_price, ev.delta_qty, balance,
+                                       note=f"{reason}/late {ev.filled_qty}/{ev.order_qty}")
+            if remain > 0:
+                with self._lock:
+                    p = self.positions.get(symbol)
+                    if p is not None:
+                        p["hold_qty"] = remain
+                self.wlog.info("[매도] %s 잔량체결 -%s주 @%s → 보유 %s주 유지",
+                               symbol, ev.delta_qty, ev.last_price, remain)
+            else:
+                with self._lock:
+                    self.positions.pop(symbol, None)
+                self._unsubscribe(symbol)
+                self._sold.add(symbol)
+                self._cooldown.pop(symbol, None)
+                self.wlog.info("[매도] %s 잔량체결로 전량 청산 완료 @%s 잔고=%s",
+                               symbol, ev.last_price, balance)
+            if ev.complete:
+                self._pending_reason.pop(symbol, None)
+        except Exception as e:  # noqa: BLE001
+            self.wlog.warn("[매도] %s 잔량체결 반영 실패: %s", symbol, e)
+
     def _on_execution(self, execution):
-        # 실시간 체결통보 수신(정밀 체결 로그용 훅). 스켈레톤에선 로깅만.
+        # 실시간 체결통보 원본 로깅 훅(모든 통보 — worker 주문/타채널 주문 구분 없이).
+        # 실제 포지션·잔고 반영은 broker 가 주문번호로 라우팅해 _on_late_fill 로 보낸다.
         try:
             self.wlog.info("[체결통보] %s executed_qty=%s price=%s",
                            getattr(execution, "symbol", "?"),

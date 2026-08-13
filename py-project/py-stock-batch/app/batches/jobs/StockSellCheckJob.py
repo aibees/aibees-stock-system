@@ -10,7 +10,7 @@ from stock_shared.vo.userCoinInfo import UserCoinInfo
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.kis.component.KisStockService import KisService
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.kospi0 import KospiStrategy0
 
 
 class StockSellCheckJob(Job):
@@ -21,7 +21,7 @@ class StockSellCheckJob(Job):
       1. 매도 알림 설정된 유저 전체 조회 (stock_sell_mail_flag='Y' OR stock_sell_tele_flag='Y')
       2. 유저별로:
          a. 해당 user_id의 enabled_flag='Y' 종목 조회
-         b. 각 종목 OHLCV + 지표 계산 → KospiStrategy1.get_action_in_active()
+         b. 각 종목 OHLCV + 지표 계산 → KospiStrategy0.get_action_in_active()
          c. 결과를 trade_sell_target_stock(user_id, stock_code 복합 PK)에 upsert
          d. SELL 시그널 종목은 유저 설정에 따라 email/telegram으로 알림 발송
 
@@ -38,7 +38,7 @@ class StockSellCheckJob(Job):
         self.userServiceImpl  = UserService()
         self.kis              = KisEngine()
         self.kisServiceImpl   = KisService()
-        self.strategy         = KospiStrategy1()
+        self.strategy         = KospiStrategy0()
 
     def get_name(self):
         return self.job_name

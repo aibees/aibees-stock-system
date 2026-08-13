@@ -112,8 +112,8 @@ class StockService:
     #  · is_vol_limit='Y' 는 WIN 34건 전원(100%) 충족 → 비중 상향.
     #  · ATR/종가(atr_ratio, 변동성): WIN 평균 11.8% vs CONTROL 8.9% — 가장 유의한 차이 → 신규 가점.
     #  · 고점 대비 눌림(dip_from_high): WIN -19.3% vs CONTROL -12.1% → 신규 가점(깊이 눌릴수록 유리).
-    _ATR_RATIO_LO, _ATR_RATIO_HI = 0.05, 0.12          # kospi1.atr_ratio_min ~ atr_ratio_full_score 와 동일 구간
-    _DIP_LO_PCT, _DIP_HI_PCT = 0.03, 0.15              # kospi1.dip_from_high_min_pct ~ full_pct 와 동일 구간
+    _ATR_RATIO_LO, _ATR_RATIO_HI = 0.05, 0.12          # kospi0.atr_ratio_min ~ atr_ratio_full_score 와 동일 구간
+    _DIP_LO_PCT, _DIP_HI_PCT = 0.03, 0.15              # kospi0.dip_from_high_min_pct ~ full_pct 와 동일 구간
 
     def _tech_score(self, ind: dict) -> float:
         # MACD: 'macd_slope_up'(기울기 상승) 우선 사용. 구버전/DB 재구성 등으로 이 키가

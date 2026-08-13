@@ -15,7 +15,7 @@ trade_candle_data(또는 동일 스키마의 dict 리스트)를 시간순으로 
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from stock_shared.strategy.base import Action
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.kospi0 import KospiStrategy0
 
 
 class KisBacktester:
@@ -25,7 +25,7 @@ class KisBacktester:
 
     def __init__(self, strategy=None, fee_rate: float = 0.0015):
         # fee_rate: 편도 수수료+세금 근사 (왕복은 2*fee_rate 차감). KOSPI 매도세 등 감안 기본 0.15%/편도
-        self.strategy = strategy or KospiStrategy1()
+        self.strategy = strategy or KospiStrategy0()
         self.fee_rate = fee_rate
 
     # ──────────────────────────────────────────────────────────────

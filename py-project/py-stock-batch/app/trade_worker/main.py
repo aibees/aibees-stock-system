@@ -17,6 +17,7 @@ trade_worker 진입점 (유저 1명당 1 프로세스, 상시 daemon).
 import logging
 import signal
 import threading
+import time
 from datetime import datetime
 from decimal import Decimal
 
@@ -190,7 +191,7 @@ def main():
     # 체결 알림: 텔레그램 우선, 실패 시 이메일 fallback
     notifier = Notifier(repo.get_user_notify(cfg.user_id), mode_tag=cfg.mode)
 
-    # 매도 전략(KospiStrategy1 재사용) — 라인/액션 자체 계산
+    # 매도 전략(KospiStrategy0 재사용) — 라인/액션 자체 계산
     strategy = SellStrategy(engine, cfg.user_id)
 
     buy = BuyExecutor(cfg, broker, repo, notifier, strategy=strategy)
@@ -203,8 +204,29 @@ def main():
     # 수동매수 보유종목은 흡수하지 않는다.
     _reconcile_positions(cfg, broker, repo)
 
-    # 체결통보 구독(주문번호별 체결 누적) — 로깅 훅은 매도엔진에 위임
-    broker.start_fill_tracking(on_event=sell._on_execution)
+    # ── 체결통보 구독 (이벤트 드리븐) ────────────────────────────────
+    #   worker 가 낸 주문 → broker 가 주문번호로 라우팅해 각 executor 의 _on_late_fill 로 보낸다.
+    #   worker 가 내지 않은 주문(HTS/MTS 등 타채널) → 아래 _on_external_fill 로 온다.
+    #     체결통보(H0STCNI0)는 계좌 단위 구독이라 사용자가 직접 낸 주문의 체결도 들어온다.
+    #     이걸 받아 즉시 계좌를 재조회하면 user_wallet·user_holdings 가 폴링 주기(수십 초)를
+    #     기다리지 않고 갱신된다.
+    #   ※ 통보는 연달아 오므로 throttle 이 없으면 체결 1건마다 KIS 조회가 폭주한다.
+    _EXT_SYNC_MIN_GAP = 2.0          # 외부체결 동기화 최소 간격(초)
+    _ext_sync_at = [0.0]             # 클로저에서 갱신하려고 리스트로 감쌈
+
+    def _on_external_fill(symbol, order_no, qty, price):
+        now = time.monotonic()
+        if now - _ext_sync_at[0] < _EXT_SYNC_MIN_GAP:
+            return
+        _ext_sync_at[0] = now
+        try:
+            reconcile_wallet(broker, repo, cfg.user_id, sync=True, tag="외부체결")
+            log.info("[외부체결] %s qty=%s price=%s order=%s → 계좌 즉시 동기화",
+                     symbol, qty, price, order_no)
+        except Exception as e:  # noqa: BLE001
+            log.warning("[외부체결] 계좌 동기화 실패 %s: %s", symbol, e)
+
+    broker.start_fill_tracking(on_event=sell._on_execution, on_unknown=_on_external_fill)
 
     # 매도: 실시간 시세 소켓 구독 시작
     sell.start()
@@ -233,7 +255,7 @@ def main():
             #    08:00:35 에야 설정이 로드돼 유저의 s1_buy_order 가 반영되지 않았다)
             sell.apply_settings_change()
             sell.reload_positions()      # HOLDING 포지션 재적재(감시 대상 갱신)
-            sell.refresh_positions()     # KospiStrategy1로 라인/액션 재계산 + SELL이면 즉시 매도
+            sell.refresh_positions()     # KospiStrategy0로 라인/액션 재계산 + SELL이면 즉시 매도
             buy.run()                    # 매수
             # 매수는 이 루틴의 마지막이라, 여기서 다시 적재하지 않으면 당일 산 종목이
             # sell 의 감시 대상(positions)·소켓 구독에 들어가지 않는다.
@@ -344,6 +366,11 @@ def main():
             reconcile_wallet(broker, repo, cfg.user_id, sync=True, tag="poll")
         except Exception as e:  # noqa: BLE001
             log.warning("[poll] 계좌 갱신 실패: %s", e)
+        # 끝내 체결도 취소도 되지 않은 주문 추적을 정리한다(메모리 누수 방지).
+        try:
+            broker.sweep_watches()
+        except Exception as e:  # noqa: BLE001
+            log.warning("[poll] 체결추적 정리 실패: %s", e)
 
     if cfg.wallet_poll_sec > 0:
         scheduler.add_job(_poll_wallet, IntervalTrigger(seconds=cfg.wallet_poll_sec),

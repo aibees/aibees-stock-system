@@ -18,7 +18,7 @@ def extractor(x) -> UserOptionMeta:
     user_meta.tele_chat_id         = x.get('tele_chat_id', '')
     user_meta.stock_sell_mail_flag = x.get('stock_sell_mail_flag', 'N')
     user_meta.stock_sell_tele_flag = x.get('stock_sell_tele_flag', 'N')
-    # KospiStrategy1 파라미터 (None이면 전략 기본값 유지)
+    # KospiStrategy0 파라미터 (None이면 전략 기본값 유지)
     user_meta.s1_stop_loss_pct          = x.get('s1_stop_loss_pct')
     user_meta.s1_take_profit_pct        = x.get('s1_take_profit_pct')
     user_meta.s1_max_hold_bars          = x.get('s1_max_hold_bars')

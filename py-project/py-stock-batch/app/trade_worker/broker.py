@@ -3,10 +3,24 @@ Broker — pykis(PyKis) 주문/시세/실시간 소켓 + 체결 확인 래퍼.
 
 실전투자 전용(모의투자 미지원).
 
-체결 확인 전략:
-  - 주력: **실시간 체결통보**(kis.on('execution'), H0STCNI0).
-    주문번호별로 체결수량/체결가를 누적한다(부분체결 대응).
-  - 보조: pending_orders() 폴링 fallback.
+체결 확인 전략 (2단 구조):
+
+  1) **동기 창** — wait_fill(). 주문 직후 정해진 시간 동안 체결을 확인한다.
+     주문을 낸 executor 가 "지금 당장" 판단해야 하는 것(포지션 등록/청산)을 여기서 처리한다.
+
+  2) **이벤트 드리븐** — register_watch() / arm_watch().
+     동기 창이 닫힌 뒤 도착하는 체결통보를 콜백으로 흘려보낸다.
+     지정가·부분체결처럼 창 안에 안 끝나는 주문의 잔량이 여기서 반영된다.
+     ※ 전환 전에는 창 밖 체결통보가 _fills 에 쌓이기만 하고 아무도 읽지 않아,
+       부분체결 잔량이 다음 부팅 대조 때까지 DB 와 어긋난 채로 남았다.
+
+  보조: pending_orders() 폴링 fallback (소켓 유실 대비, 그대로 유지).
+
+체결통보(H0STCNI0)는 **계좌 단위** 구독이라 worker 가 내지 않은 주문(HTS/MTS 등 타채널)의
+체결도 들어온다. 이는 on_unknown 콜백으로 분리해 계좌 스냅샷 갱신에 쓴다.
+
+동시성: 소켓 콜백은 별도 스레드에서 들어온다. _lock 은 누적/등록 상태 갱신만 감싸고,
+콜백 호출(DB·KIS 접근)은 **반드시 락 밖에서** 한다.
 """
 import logging
 import threading
@@ -19,7 +33,7 @@ from typing import Callable, Optional
 from pytz import timezone
 
 log = logging.getLogger("trade_worker.broker")
-_KST = timezone("Asia/Seoul")
+TIMEZONE_KST = timezone("Asia/Seoul")
 
 
 def _ono(order_number) -> Optional[str]:
@@ -58,6 +72,45 @@ class OrderResult:
     raw: object = None              # pykis KisOrder (취소용)
 
 
+@dataclass
+class FillEvent:
+    """동기 창이 닫힌 뒤 도착한 체결통보 1건. delta_qty 가 이번에 **새로** 체결된 수량이다.
+
+    executor 는 delta_qty 만 반영하면 된다. filled_qty(누적)로 반영하면 중복 계상된다.
+    """
+    order_no: str
+    symbol: str
+    side: str                       # 'BUY' | 'SELL'
+    delta_qty: Decimal              # 이번 통보로 새로 체결된 수량 (반영 대상)
+    filled_qty: Decimal             # 주문 개시 이후 누적 체결수량
+    order_qty: Decimal              # 원 주문 수량
+    avg_price: Decimal              # 누적 평균 체결가
+    last_price: Decimal             # 이번 체결가
+    complete: bool                  # filled_qty >= order_qty (전량 체결)
+    rejected: bool = False
+    reason: str = ""
+
+
+@dataclass
+class OrderWatch:
+    """이벤트 드리븐 추적 대상 주문.
+
+    armed=False 인 동안(=주문 직후 ~ executor 의 동기 처리 완료 전)에는 콜백하지 않는다.
+    wait_fill 루프와 소켓 콜백이 같은 체결분을 동시에 반영해 이중 계상되는 것을 막기 위한
+    유일한 장치다. executor 가 동기 처리를 끝내고 arm_watch() 를 부르면 그 시점의 체결수량이
+    reported_qty 기준선이 되고, 이후 증분만 콜백된다.
+    """
+    order_no: str
+    symbol: str
+    side: str
+    qty: Decimal                                  # 주문 수량
+    on_fill: Callable[["FillEvent"], None]
+    reported_qty: Decimal = field(default=Decimal(0))   # 콜백으로 이미 통지한 누적 수량
+    armed: bool = False
+    rejected_fired: bool = False
+    created_at: float = field(default_factory=time.time)
+
+
 class Broker:
     def __init__(self, kis):
         self.kis = kis
@@ -65,8 +118,12 @@ class Broker:
         # 거래소 라우팅은 주문마다 종목 nxt_flag 기준으로 결정한다(_order → SOR/KRX).
         # self.exchange 는 하위호환용 기본값(현재 주문 경로에선 미사용).
         self.exchange = "SOR"
-        # 주문번호 → 체결 누적 {exec_qty, amount(=Σqty*px), rejected, reason}
+        # 주문번호 → 체결 누적 {exec_qty, amount(=Σqty*px), rejected, reason, ts}
         self._fills: dict[str, dict] = {}
+        # 주문번호 → OrderWatch. worker 가 낸 주문만 등록된다.
+        self._watch: dict[str, OrderWatch] = {}
+        # worker 가 내지 않은 주문(HTS/MTS 등)의 체결 콜백
+        self._unknown_cb: Optional[Callable[[str, str, Decimal, Decimal], None]] = None
         self._lock = threading.Lock()
         self._exec_ticket = None
 
@@ -100,7 +157,7 @@ class Broker:
         """오늘(또는 지정일 YYYYMMDD)이 국내 개장일인지 KIS 국내휴장일조회로 확인.
         반환: True=개장일 / False=휴장일 / None=조회 실패(호출측 판단).
         (chk-holiday, TR CTCA0903R). output 각 행의 opnd_yn(개장일여부) 기준."""
-        bass = date or datetime.now(_KST).strftime("%Y%m%d")
+        bass = date or datetime.now(TIMEZONE_KST).strftime("%Y%m%d")
         rows = self._holiday_rows(bass)
         if rows is None:
             return None
@@ -113,7 +170,7 @@ class Broker:
         """base(YYYYMMDD, 기본 KST 오늘) 직전 영업일(개장일)을 KIS 휴장일조회로 동적 산출.
         base-lookback_days 부터 1회 조회해 opnd_yn=='Y' 이면서 base 이전인 날짜 중 최대.
         반환: 직전 개장일 YYYYMMDD / None(조회 실패). 15일이면 연휴(설·추석)도 커버."""
-        base = base or datetime.now(_KST).strftime("%Y%m%d")
+        base = base or datetime.now(TIMEZONE_KST).strftime("%Y%m%d")
         start = (datetime.strptime(base, "%Y%m%d") - timedelta(days=lookback_days)).strftime("%Y%m%d")
         rows = self._holiday_rows(start)
         if rows is None:
@@ -227,24 +284,103 @@ class Broker:
             return None
 
     # ── 체결통보 구독 (fill tracking) ────────────────────────────────
-    def start_fill_tracking(self, on_event: Optional[Callable[[object], None]] = None):
-        """실시간 체결통보 구독 시작. 주문번호별 체결 누적 + (선택) 외부 로깅 콜백."""
+    def start_fill_tracking(self, on_event: Optional[Callable[[object], None]] = None,
+                            on_unknown: Optional[Callable[[str, str, Decimal, Decimal], None]] = None):
+        """실시간 체결통보 구독 시작.
+
+        on_event   : 원본 통보 로깅 훅(모든 통보).
+        on_unknown : worker 가 내지 않은 주문(HTS/MTS 등 타채널)의 체결 콜백.
+                     (symbol, order_no, qty, price) 로 호출된다.
+                     계좌 스냅샷(user_wallet·user_holdings)을 즉시 갱신하는 데 쓴다.
+                     ※ 통보가 연달아 오므로 호출측에서 throttle 할 것.
+        """
+        self._unknown_cb = on_unknown
+
         def _cb(client, ev):
             try:
                 self._apply_execution(ev.response)
-                if on_event:
-                    on_event(ev.response)
             except Exception as e:  # noqa: BLE001
                 log.warning("체결통보 처리 실패: %s", e)
+            # 로깅 훅은 누적/디스패치 실패와 무관하게 항상 시도한다.
+            if on_event:
+                try:
+                    on_event(ev.response)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("체결통보 로깅 훅 실패: %s", e)
 
         try:
             # 체결통보는 account 객체의 on("execution", ...) 로 구독한다.
             # (PyKis 자체에는 on 이 없음)
             self._exec_ticket = self.kis.account().on("execution", _cb)
-            log.info("실시간 체결통보 구독 시작")
+            log.info("실시간 체결통보 구독 시작 (이벤트 드리븐)")
         except Exception as e:  # noqa: BLE001
             log.warning("체결통보 구독 실패(폴링 fallback 사용): %s", e)
 
+    # ── 주문 추적 등록/해제 ──────────────────────────────────────────
+    def register_watch(self, result: OrderResult, on_fill: Callable[[FillEvent], None]) -> None:
+        """주문 직후 호출. 이 주문의 체결통보를 추적 대상에 넣는다.
+
+        아직 armed=False 라 콜백은 나가지 않는다. wait_fill 로 동기 처리를 끝낸 뒤
+        arm_watch() 를 불러야 이후 증분이 콜백된다.
+        """
+        if not result.order_no:
+            return
+        with self._lock:
+            self._watch[result.order_no] = OrderWatch(
+                order_no=result.order_no, symbol=result.symbol, side=result.side,
+                qty=result.qty, on_fill=on_fill,
+            )
+
+    def arm_watch(self, result: OrderResult) -> bool:
+        """동기 처리 완료 선언. result.filled_qty 를 기준선으로 삼고 이후 증분만 콜백한다.
+
+        반환: True=추적 계속(잔량 있음) / False=추적 종료(전량 체결·거부·미등록).
+        """
+        if not result.order_no:
+            return False
+        with self._lock:
+            w = self._watch.get(result.order_no)
+            if w is None:
+                return False
+            w.reported_qty = result.filled_qty
+            w.armed = True
+            done = (result.filled_qty >= w.qty) or result.status == "REJECTED"
+            if done:
+                self._watch.pop(result.order_no, None)
+        if done:
+            return False
+        log.info("체결추적 시작 %s %s order=%s 잔량=%s",
+                 result.side, result.symbol, result.order_no, result.qty - result.filled_qty)
+        return True
+
+    def unregister_watch(self, order_no: Optional[str]) -> None:
+        """추적 종료(주문 취소·정리)."""
+        if not order_no:
+            return
+        with self._lock:
+            self._watch.pop(order_no, None)
+
+    def sweep_watches(self, max_age_sec: int = 21600) -> None:
+        """오래된 추적/누적을 정리한다(메모리 누수 방지). 기본 6시간.
+
+        정상 경로에서는 전량 체결·거부·취소 시 해제되지만, 끝내 체결도 취소도 되지 않은
+        주문이 남을 수 있다. 폴링 job 에서 주기적으로 부른다.
+        """
+        now = time.time()
+        stale = []
+        with self._lock:
+            for ono, w in list(self._watch.items()):
+                if now - w.created_at > max_age_sec:
+                    stale.append((ono, w.symbol, w.side, w.reported_qty, w.qty))
+                    self._watch.pop(ono, None)
+            for ono, f in list(self._fills.items()):
+                if ono not in self._watch and now - f.get("ts", now) > max_age_sec:
+                    self._fills.pop(ono, None)
+        for ono, sym, side, rq, q in stale:
+            log.warning("체결추적 만료 해제 %s %s order=%s (%s/%s) — 수동 확인 필요",
+                        side, sym, ono, rq, q)
+
+    # ── 체결통보 수신 → 누적 → 디스패치 ─────────────────────────────
     def _apply_execution(self, execution):
         order_no = _ono(getattr(execution, "order_number", None))
         if not order_no:
@@ -252,14 +388,64 @@ class Broker:
         eq = Decimal(str(getattr(execution, "executed_qty", 0) or 0))
         px = Decimal(str(getattr(execution, "price", 0) or 0))
         reason = getattr(execution, "rejected_reason", None)
+        symbol = str(getattr(execution, "symbol", "") or "")
+
+        watch, event, unknown = None, None, False
         with self._lock:
             f = self._fills.setdefault(order_no, {"exec_qty": Decimal(0), "amount": Decimal(0),
-                                                  "rejected": False, "reason": ""})
+                                                  "rejected": False, "reason": "", "ts": 0.0})
             f["exec_qty"] += eq
             f["amount"] += eq * px
+            f["ts"] = time.time()
             if reason:
                 f["rejected"] = True
                 f["reason"] = str(reason)
+
+            w = self._watch.get(order_no)
+            if w is None:
+                # worker 가 낸 주문이 아니다 = 타채널(HTS/MTS) 또는 이미 추적 종료된 주문.
+                unknown = True
+            elif w.armed:
+                event = self._build_event(w, f, px, symbol)
+                if event is not None and (event.complete or event.rejected):
+                    self._watch.pop(order_no, None)
+                watch = w
+
+        # ── 락 밖: 콜백은 DB/KIS 를 만지므로 절대 락 안에서 부르지 않는다 ──
+        if unknown:
+            if self._unknown_cb:
+                try:
+                    self._unknown_cb(symbol, order_no, eq, px)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("외부주문 체결 콜백 실패 %s: %s", order_no, e)
+            return
+        if event is not None and watch is not None:
+            try:
+                watch.on_fill(event)
+            except Exception as e:  # noqa: BLE001
+                log.warning("체결 콜백 실패 %s %s order=%s: %s",
+                            event.side, event.symbol, order_no, e)
+
+    def _build_event(self, w: OrderWatch, f: dict, last_px: Decimal, symbol: str):
+        """누적 상태에서 '아직 통지하지 않은 증분'을 뽑아 FillEvent 를 만든다. (락 안에서 호출)
+
+        증분이 없고 거부도 아니면 None — 같은 체결을 두 번 반영하지 않기 위함이다.
+        """
+        eq = f["exec_qty"]
+        rejected = bool(f["rejected"])
+        delta = eq - w.reported_qty
+        if delta <= 0 and not (rejected and not w.rejected_fired):
+            return None
+        w.reported_qty = eq
+        if rejected:
+            w.rejected_fired = True
+        avg = (f["amount"] / eq) if eq > 0 else Decimal(0)
+        return FillEvent(
+            order_no=w.order_no, symbol=w.symbol or symbol, side=w.side,
+            delta_qty=delta if delta > 0 else Decimal(0),
+            filled_qty=eq, order_qty=w.qty, avg_price=avg, last_price=last_px,
+            complete=(eq >= w.qty), rejected=rejected, reason=f["reason"],
+        )
 
     def _fill_snapshot(self, order_no: str):
         with self._lock:
@@ -280,7 +466,7 @@ class Broker:
     @staticmethod
     def market_session(nxt: bool, now: Optional[datetime] = None) -> "MarketSession":
         """(nxt_flag 기준) 지금 이 종목을 주문할 수 있는 세션. 불가면 tradable=False."""
-        now = now or datetime.now(_KST)
+        now = now or datetime.now(TIMEZONE_KST)
         if now.weekday() >= 5:
             return MarketSession(False, "", "", "주말")
         hm = now.hour * 60 + now.minute

@@ -38,7 +38,7 @@ from app.flask_app.utils.apiResponse import ApiResponse
 from stock_shared.strategy.backtester import KisBacktester
 from stock_shared.strategy.buy_order import DEFAULT_BUY_ORDER, describe_buy_order
 from stock_shared.strategy.buy_target_sim import BuyTargetSimulator
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.kospi0 import KospiStrategy0
 from stock_shared.strategy.reco_performance import RecoPerformanceAnalyzer
 from app.services.kis.KisStockService import KisStockService
 from app.services.strategy.backtestService import BacktestService
@@ -144,7 +144,7 @@ _FIB_LEVELS = (0.382, 0.5, 0.618)
 # 권한 분리 — 어디서 소비되는 값인가로 갈린다
 #
 #  [관리자 전용] 매수 전략 파라미터
-#     KospiStrategy1.get_action_in_watch 가 쓰고, 이를 호출하는
+#     KospiStrategy0.get_action_in_watch 가 쓰고, 이를 호출하는
 #     StockBuyCheckJob 은 get_user_options(session) 를 user_id 없이 부른다(=user_id 1).
 #     산출물 trade_buy_target_stock 은 **전 유저 공용 추천 테이블**이다.
 #     → 일반 유저가 바꿔도 자기 화면엔 반영되지 않고(공용 테이블이라),
@@ -508,7 +508,7 @@ def delete_param_guide(param_key):
 #      이렇게 동작한다"를 보여주는 용도라, 공용 파라미터가 섞이면 오해를 준다.
 # ═══════════════════════════════════════════════════════════════════
 
-# (키, 라벨, 표시타입, 전략 기본값)  — 기본값은 KospiStrategy1.__init__ 과 일치
+# (키, 라벨, 표시타입, 전략 기본값)  — 기본값은 KospiStrategy0.__init__ 과 일치
 _WORKER_SELL_FIELDS = [
     ('s1_stop_loss_pct',      '손절',              'pct',  0.05),
     ('s1_take_profit_pct',    '익절',              'pct',  0.30),
@@ -606,7 +606,7 @@ def post_sim_buy_target():
     try:
         # 저장된 s1_* → UserOptionMeta (매도 판정 파라미터)
         ui = _build_base_user_info(g.db, g.current_user_id)
-        strategy = KospiStrategy1()
+        strategy = KospiStrategy0()
         strategy.configure(ui)
 
         opts = userOptionsDaoImpl.select_s1_options(g.db, g.current_user_id) or {}

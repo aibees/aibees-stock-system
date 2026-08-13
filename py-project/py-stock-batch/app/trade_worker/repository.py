@@ -260,6 +260,85 @@ class Repository:
             s.execute(sql, {"qty": str(qty), "now": datetime.now(), "uid": user_id, "code": stock_code})
             s.commit()
 
+    def add_position_qty(self, user_id: int, stock_code: str, delta_qty: Decimal,
+                         fill_price: Decimal) -> None:
+        """매수 잔량이 뒤늦게 체결 → 보유수량 증분 + 평단가 재계산. HOLDING 만.
+
+        동기 창(wait_fill) 밖에서 도착한 체결통보를 반영하는 경로다.
+        평단가는 (기존평가금액 + 이번체결금액) / 총수량 으로 가중평균한다.
+        진입가가 바뀌면 손절/익절 라인의 기준도 바뀌므로, 호출측에서 라인 재계산이 필요하다.
+        """
+        sql = text(
+            """
+            UPDATE trade_worker_position
+            SET entry_price = (entry_price * qty + :px * :dqty) / (qty + :dqty),
+                qty = qty + :dqty,
+                updated_at = :now
+            WHERE user_id = :uid AND stock_code = :code AND status = 'HOLDING'
+              AND qty + :dqty > 0
+            """
+        )
+        with get_session() as s:
+            s.execute(sql, {"dqty": str(delta_qty), "px": str(fill_price),
+                            "now": datetime.now(), "uid": user_id, "code": stock_code})
+            s.commit()
+
+    def reduce_position(self, user_id: int, stock_code: str, exit_price: Decimal,
+                        filled_qty: Decimal, reason: str) -> Decimal:
+        """부분 매도 → 보유수량 차감. 남은 수량을 반환한다.
+
+        잔량이 0 이 되면 close_position 과 동일하게 SOLD 로 종료한다.
+        pnl 은 이번 체결분의 실현손익을 **누적 가산**한다(부분 매도가 여러 번 나뉘어도 합산).
+        entry_price 는 건드리지 않는다 — 매도는 평단가를 바꾸지 않는다.
+
+        반환: 차감 후 잔여수량. 포지션이 없으면 Decimal(0).
+        """
+        with get_session() as s:
+            row = s.execute(
+                text("SELECT qty FROM trade_worker_position "
+                     "WHERE user_id = :uid AND stock_code = :code AND status = 'HOLDING'"),
+                {"uid": user_id, "code": stock_code},
+            ).mappings().first()
+            if not row:
+                return Decimal(0)
+
+            now = datetime.now()
+            remain = Decimal(str(row["qty"] or 0)) - Decimal(str(filled_qty))
+            if remain <= 0:
+                # 전량 소진 → 종료. pnl 은 이번 체결분까지 누적해서 확정.
+                # qty 는 건드리지 않는다 — close_position 과 동일하게 두어 M0 동작을 보존한다
+                # (SOLD 행의 qty = 마지막 보유수량. 매수 총량은 trade_log 로 추적한다).
+                s.execute(
+                    text("""
+                        UPDATE trade_worker_position
+                        SET status = 'SOLD', exit_at = :now, exit_price = :xprice,
+                            exit_reason = :reason,
+                            pnl = COALESCE(pnl, 0) + (:xprice - entry_price) * :fqty,
+                            updated_at = :now
+                        WHERE user_id = :uid AND stock_code = :code AND status = 'HOLDING'
+                    """),
+                    {"now": now, "xprice": str(exit_price), "reason": (reason or "")[:45],
+                     "fqty": str(filled_qty), "uid": user_id, "code": stock_code},
+                )
+                s.commit()
+                return Decimal(0)
+
+            # 잔량 있음 → HOLDING 유지, 실현손익만 누적
+            s.execute(
+                text("""
+                    UPDATE trade_worker_position
+                    SET qty = :remain,
+                        pnl = COALESCE(pnl, 0) + (:xprice - entry_price) * :fqty,
+                        exit_price = :xprice, exit_reason = :reason, updated_at = :now
+                    WHERE user_id = :uid AND stock_code = :code AND status = 'HOLDING'
+                """),
+                {"remain": str(remain), "xprice": str(exit_price), "fqty": str(filled_qty),
+                 "reason": (reason or "")[:45], "now": now,
+                 "uid": user_id, "code": stock_code},
+            )
+            s.commit()
+            return remain
+
     def close_position(self, user_id: int, stock_code: str, exit_price: Decimal,
                        filled_qty: Decimal, reason: str) -> None:
         """매도 체결 → status=SOLD + 청산정보/실현손익 기록(이력으로 남김)."""

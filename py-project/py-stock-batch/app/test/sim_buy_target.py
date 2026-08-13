@@ -1,13 +1,17 @@
 """
-trade_buy_target_stock(매수추천 누적) 기반 실전 시뮬레이션. 매도판단 = KospiStrategy1.
+trade_buy_target_stock(매수추천 누적) 기반 실전 시뮬레이션. 매도판단 = KospiStrategy0.
 
 정책:
   - START_DATE 부터 하루씩 진행. 동시 보유 1종목, 전량매수/전량매도.
   - 대기(무포지션): 당일(ymd) 매수추천이 있으면 '1순위(rank_no)' 종목을 당일 종가에 매수.
                    추천 없으면 pass.
-  - 보유중: 매일 KospiStrategy1.get_action_in_active 로 매도판단. SELL 계열이면 당일 종가 매도.
+  - 보유중: 매일 KospiStrategy0.get_action_in_active 로 매도판단. SELL 계열이면 당일 종가 매도.
              진입일(체결일)에도 매도판단 수행(bars_held=0, peak 갱신 없이 1회).
-  - 매도한 날은 재매수 안 함. 다음날부터 다시 추천 1순위 탐색. 반복.
+  - 당일매도-재매수(2026-08-09 추가, 기본 ON — SAME_DAY_REBUY): 매도가 발생한 날은
+    그 즉시 같은 날 '오늘 추천' 스캔으로 넘어가 새 후보를 재매수 시도한다(실전
+    trade_worker 의 _open_routine 이 매도 직후 같은 루틴에서 매수를 실행하는 것과
+    동일 정책). 그날 매도가 없었으면(계속 보유) 당연히 스캔 안 함. 껐을 때(False)는
+    기존 동작대로 매도한 날은 그날 재매수를 안 하고 다음날부터 다시 탐색한다.
   - 체결가: 매수·매도 모두 '당일 종가'.
   - 포지션 상태(entry_price/entry_atr/peak/bars_held/bars_since_peak) 갱신 규칙은
     KisBacktester 와 동일.
@@ -30,6 +34,8 @@ trade_buy_target_stock(매수추천 누적) 기반 실전 시뮬레이션. 매�
     poetry run python -m app.test.sim_buy_target 2026-04-01 2026-07-22 --table prod  # 운영만(기존 동작)
     poetry run python -m app.test.sim_buy_target 2026-04-01 2026-07-22 --table test  # 테스트만
 """
+from datetime import datetime, timedelta
+
 from sqlalchemy import text
 
 from app.config.database import dbConn
@@ -37,7 +43,7 @@ from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.batches.services.userService import UserService
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.kospi0 import KospiStrategy0
 from stock_shared.strategy.backtester import KisBacktester
 from stock_shared.strategy.base import Action
 
@@ -59,12 +65,22 @@ PLOT_DIR   = '.'           # 이미지 저장 폴더
 ENTRY_PRICE = 'next_open'  # 'close'(추천일 종가) | 'next_open'(다음 거래일 시가, 현실적)
 # 갭업 추격 회피: next_open 일 때, 다음날 시가가 추천일 종가보다 높으면(급등 추격) 스킵.
 SKIP_GAPUP  = False
+# 당일매도-재매수: 매도가 발생한 날, 같은 날 새 후보를 바로 재탐색/재매수 시도할지.
+# 실전(trade_worker._open_routine)은 매도 직후 같은 루틴에서 매수를 실행하므로 기본 True.
+SAME_DAY_REBUY = True
 
 # ── 추천 소스 테이블 ─────────────────────────────────────────────
 TABLE_PROD  = 'trade_buy_target_stock'         # 운영(라이브 배치가 채움)
 TABLE_TEST  = 'trade_buy_target_stock_test'    # 오프라인 테스트(run_test_buy_check.py 가 채움)
 _ALLOWED_TABLES = (TABLE_PROD, TABLE_TEST)     # SQL에 직접 꽂으므로 화이트리스트로 방어
 _TABLE_LABEL = {TABLE_PROD: 'prod', TABLE_TEST: 'test'}
+
+# 재추천 페널티(2026-08-09 추가): 최근 N일(캘린더) 내 같은 테이블에 등장했던 종목은
+# 오늘 후보 중에서도 신규 종목보다 후순위로 밀린다(완전 제외 아님 — 그날 신규 후보가
+# 없으면 재등장 종목이 여전히 선택될 수 있음). StockBuyCheckJob.py/run_test_buy_check.py
+# 의 REPEAT_PENALTY_DAYS 와 동일 개념·동일 기본값 — 오프라인 시뮬에서도 운영과 같은
+# '개인화된' 조회 순서를 재현하기 위함. 값만 바꾸면 즉시 반영됨.
+REPEAT_PENALTY_DAYS = 5
 # ══════════════════════════════════════════════════════════════════
 
 session = dbConn.get_session()
@@ -110,8 +126,30 @@ def _parse_rate(s) -> float:
         return float('inf')
 
 
+def _recent_codes_index(occ: dict, ymd: str) -> set:
+    """ymd 기준 최근 REPEAT_PENALTY_DAYS일(캘린더, 전일까지) 이내 등장했던 종목코드 집합.
+    occ: stock_code -> 오름차순 정렬된 ymd(str) 리스트(해당 테이블 전체 등장 이력).
+    운영 StockService.get_recent_target_codes() 와 동일한 계산 방식."""
+    dt = datetime.strptime(ymd, '%Y%m%d')
+    from_ymd = (dt - timedelta(days=REPEAT_PENALTY_DAYS)).strftime('%Y%m%d')
+    to_ymd = (dt - timedelta(days=1)).strftime('%Y%m%d')
+    if to_ymd < from_ymd:
+        return set()
+    out = set()
+    for code, ymds in occ.items():
+        if any(from_ymd <= y <= to_ymd for y in ymds):
+            out.add(code)
+    return out
+
+
 def _reco_by_day(start: str, end: str = None, table: str = TABLE_PROD) -> dict:
-    """ymd -> [(stock_code, rate_str, action_type), ...] '과열 최저'(당일 등락률 오름차순) 순.
+    """ymd -> [(stock_code, rate_str, action_type), ...] 정렬 순서(2026-08-09 변경):
+      1순위: 재추천 페널티(최근 REPEAT_PENALTY_DAYS일 내 같은 테이블에 등장했던 종목은 후순위)
+      2순위: 과열 최저(당일 등락률 오름차순)
+    운영 배치(StockBuyCheckJob.py)/오프라인 테스트(run_test_buy_check.py)의
+    assign_ranks(recent_codes=...) 랭킹 로직을 이 시뮬레이션의 후보 선택 순서에도
+    동일하게 재현한다 — '오늘 추천 중 첫 번째'를 사는 이 스크립트의 선택 로직이
+    운영과 다른 순서를 보게 되면 시뮬레이션이 운영 동작을 충실히 반영하지 못하기 때문.
     table: TABLE_PROD(운영) | TABLE_TEST(오프라인 테스트) — 화이트리스트 검증 후 SQL에 사용."""
     assert table in _ALLOWED_TABLES, f"허용되지 않은 테이블: {table}"
     sql = f"SELECT ymd, stock_code, rate, action_type FROM {table} WHERE ymd >= :s"
@@ -120,10 +158,19 @@ def _reco_by_day(start: str, end: str = None, table: str = TABLE_PROD) -> dict:
         sql += " AND ymd <= :e"
         p['e'] = end.replace('-', '')
     tmp = {}
+    occ = {}  # stock_code -> [ymd, ...] (이 테이블 전체 등장 이력, 재추천 페널티 판정용)
     for ymd, code, rate, action_type in session.execute(text(sql), p).all():
         tmp.setdefault(ymd, []).append((_parse_rate(rate), code, rate, action_type))
-    return {ymd: [(c, r, a) for _, c, r, a in sorted(lst, key=lambda x: x[0])]
-            for ymd, lst in tmp.items()}
+        occ.setdefault(code, []).append(ymd)
+    for ymds in occ.values():
+        ymds.sort()
+
+    result = {}
+    for ymd, lst in tmp.items():
+        recent = _recent_codes_index(occ, ymd)
+        ranked = sorted(lst, key=lambda x: (1 if x[1] in recent else 0, x[0]))
+        result[ymd] = [(c, r, a) for _, c, r, a in ranked]
+    return result
 
 
 def _buy_reason(code: str, ymd: str, action_type: str, rate) -> str:
@@ -158,7 +205,7 @@ _SELL_ACTION_KR = {'SELL_PROFIT': '익절', 'SELL_STOP_LOSS': '손절', 'SELL_ST
 
 
 def _sell_reason(action, ctx: dict) -> str:
-    """매도 사유 상세. get_action_in_active 가 반환하는 sell_ctx(kospi1.py `_build_sell`)를
+    """매도 사유 상세. get_action_in_active 가 반환하는 sell_ctx(kospi0.py `_build_sell`)를
     사람이 읽을 수 있는 한 줄로 요약한다."""
     ctx = ctx or {}
     name = action.name if hasattr(action, 'name') else str(action)
@@ -215,12 +262,16 @@ def _candles(code: str):
 
 
 def _simulate(strategy, ui, days: list, reco: dict, names: dict,
-              fee_rate: float = FEE_RATE, skip_gapup: bool = SKIP_GAPUP) -> list:
+              fee_rate: float = FEE_RATE, skip_gapup: bool = SKIP_GAPUP,
+              same_day_rebuy: bool = SAME_DAY_REBUY) -> list:
     """매매 루프 순수함수 버전. 출력/그래프/표 없이 trades 리스트만 반환한다.
     run()과 grid-search(옵션 최적화) 양쪽에서 재사용하기 위해 분리했다.
-    strategy: 이미 원하는 매도 파라미터가 세팅된 KospiStrategy1 인스턴스.
+    strategy: 이미 원하는 매도 파라미터가 세팅된 KospiStrategy0 인스턴스.
     ui: UserOptionMeta (포지션 상태 스크래치패드로 재사용됨 — 호출부에서 재사용해도 무방,
-        _open_position 이 매번 관련 필드를 덮어쓰기 때문에 콜 간 오염되지 않는다)."""
+        _open_position 이 매번 관련 필드를 덮어쓰기 때문에 콜 간 오염되지 않는다).
+    same_day_rebuy: True(기본)면 그날 매도가 발생했을 때 같은 날 바로 새 후보를
+        재탐색/재매수 시도한다(실전 trade_worker 정책과 동일). False면 기존처럼
+        매도한 날은 재매수 안 하고 다음날부터 다시 탐색한다."""
     trades = []
     mode = 'FLAT'          # FLAT(대기) | PENDING(다음날 시가 체결 대기) | HOLD(보유)
     code = entry_price = entry_date = entry_reason = None
@@ -285,10 +336,16 @@ def _simulate(strategy, ui, days: list, reco: dict, names: dict,
     for di, d in enumerate(days):
         ymd = d.replace('-', '')
 
-        # ── 보유중: 매도판단 (매수/매도 같은 날 동시수행 안 함) ──────────
+        # ── 보유중: 매도판단 ──────────────────────────────────────────
         if mode == 'HOLD':
             _eval_sell(d, advance=True)
-            continue  # 매도했든 아니든 그날은 재매수 안 함
+            if mode == 'HOLD':
+                continue  # 안 팔렸으면(계속 보유) 오늘은 스캔 안 함
+            if not same_day_rebuy:
+                continue  # 팔렸지만 당일매도-재매수 비활성화 → 다음날부터 재탐색
+            # else: 오늘 매도됨 + 당일매도-재매수 활성화 → mode=='FLAT' 상태로
+            #       아래 PENDING/FLAT 블록까지 그대로 흘러들어가 같은 날 재탐색한다
+            #       (실전 trade_worker._open_routine: 매도 직후 같은 루틴에서 매수 실행).
 
         # ── 다음날 시가 체결 대기 (ENTRY_PRICE='next_open', 1일만 유효) ───
         if mode == 'PENDING':
@@ -353,12 +410,14 @@ def _simulate(strategy, ui, days: list, reco: dict, names: dict,
 
 def run(start: str = START_DATE, end: str = END_DATE,
         init_cash: int = INIT_CASH, fee_rate: float = FEE_RATE,
-        table: str = TABLE_PROD, skip_gapup: bool = SKIP_GAPUP) -> dict:
+        table: str = TABLE_PROD, skip_gapup: bool = SKIP_GAPUP,
+        same_day_rebuy: bool = SAME_DAY_REBUY) -> dict:
     """table=TABLE_PROD(운영, 기본) 또는 TABLE_TEST(오프라인 테스트 알고리즘).
     skip_gapup=True 면 ENTRY_PRICE='next_open'일 때 다음날 시가가 추천일 종가보다
-    위로 갭이면 그 종목은 진입을 포기하고 같은 날 다음 후보를 다시 찾는다."""
+    위로 갭이면 그 종목은 진입을 포기하고 같은 날 다음 후보를 다시 찾는다.
+    same_day_rebuy=True(기본)면 매도가 발생한 날 같은 날 바로 새 후보를 재탐색한다."""
     assert table in _ALLOWED_TABLES, f"허용되지 않은 테이블: {table}"
-    strategy = KospiStrategy1()
+    strategy = KospiStrategy0()
     ui = _user_info()
 
     days = _trading_days(start, end)
@@ -368,10 +427,12 @@ def run(start: str = START_DATE, end: str = END_DATE,
     reco = _reco_by_day(start, end, table=table)
     names = _name_map(table=table)
 
-    trades = _simulate(strategy, ui, days, reco, names, fee_rate=fee_rate, skip_gapup=skip_gapup)
+    trades = _simulate(strategy, ui, days, reco, names, fee_rate=fee_rate,
+                       skip_gapup=skip_gapup, same_day_rebuy=same_day_rebuy)
 
     label = _TABLE_LABEL[table]
-    _report(strategy, start, days, trades, init_cash, label=label, skip_gapup=skip_gapup)
+    _report(strategy, start, days, trades, init_cash, label=label, skip_gapup=skip_gapup,
+           same_day_rebuy=same_day_rebuy)
     base_tag = 'gapskip' if (ENTRY_PRICE == 'next_open' and skip_gapup) else 'nogapskip'
     tag = f'{base_tag}_{label}'
     if SAVE_PLOT and trades:
@@ -390,18 +451,23 @@ def run(start: str = START_DATE, end: str = END_DATE,
 
 def compare(start: str = START_DATE, end: str = END_DATE,
             init_cash: int = INIT_CASH, fee_rate: float = FEE_RATE,
-            skip_gapup: bool = SKIP_GAPUP) -> dict:
+            skip_gapup: bool = SKIP_GAPUP, same_day_rebuy: bool = SAME_DAY_REBUY) -> dict:
     """운영(trade_buy_target_stock) vs 오프라인 테스트(trade_buy_target_stock_test)를
-    동일 기간·동일 매도로직·동일 skip_gapup 설정으로 각각 시뮬레이션하고 나란히 비교한다."""
+    동일 기간·동일 매도로직·동일 skip_gapup/same_day_rebuy 설정으로 각각 시뮬레이션하고
+    나란히 비교한다."""
     print('=' * 70)
-    print(f'[1/2] 운영 테이블(trade_buy_target_stock) 시뮬레이션  (갭업매수금지={skip_gapup})')
+    print(f'[1/2] 운영 테이블(trade_buy_target_stock) 시뮬레이션  '
+          f'(갭업매수금지={skip_gapup}, 당일매도-재매수={same_day_rebuy})')
     print('=' * 70)
-    prod = run(start, end, init_cash, fee_rate, table=TABLE_PROD, skip_gapup=skip_gapup)
+    prod = run(start, end, init_cash, fee_rate, table=TABLE_PROD,
+              skip_gapup=skip_gapup, same_day_rebuy=same_day_rebuy)
 
     print('\n' + '=' * 70)
-    print(f'[2/2] 테스트 테이블(trade_buy_target_stock_test — 신규 알고리즘) 시뮬레이션  (갭업매수금지={skip_gapup})')
+    print(f'[2/2] 테스트 테이블(trade_buy_target_stock_test — 신규 알고리즘) 시뮬레이션  '
+          f'(갭업매수금지={skip_gapup}, 당일매도-재매수={same_day_rebuy})')
     print('=' * 70)
-    test = run(start, end, init_cash, fee_rate, table=TABLE_TEST, skip_gapup=skip_gapup)
+    test = run(start, end, init_cash, fee_rate, table=TABLE_TEST,
+              skip_gapup=skip_gapup, same_day_rebuy=same_day_rebuy)
 
     if not prod or not test:
         print('\n[비교 생략] 한쪽(또는 양쪽) 테이블에 해당 기간 추천/매매가 없습니다.')
@@ -645,12 +711,14 @@ def _table_image(trades, strategy, init_cash=INIT_CASH, out_dir=PLOT_DIR, tag=''
     return os.path.abspath(path)
 
 
-def _report(strategy, start, days, trades, init_cash, label: str = 'prod', skip_gapup: bool = SKIP_GAPUP):
+def _report(strategy, start, days, trades, init_cash, label: str = 'prod', skip_gapup: bool = SKIP_GAPUP,
+            same_day_rebuy: bool = SAME_DAY_REBUY):
     summary = KisBacktester(strategy=strategy)._summarize('SIM', trades)
-    print(f'===== buy_target 실전 시뮬 (KospiStrategy1 매도) — 추천소스: {label} =====')
+    print(f'===== buy_target 실전 시뮬 (KospiStrategy0 매도) — 추천소스: {label} =====')
     print(f'기간: {days[0]} ~ {days[-1]} ({len(days)}거래일) | 1포지션 전량매매')
     print(f'선택: 당일추천만·과열최저(rate↓) | 체결: 매수={ENTRY_PRICE}'
-          f'{"(갭업 매수금지)" if (ENTRY_PRICE=="next_open" and skip_gapup) else "(갭업 허용)" if ENTRY_PRICE=="next_open" else ""}, 매도=당일종가')
+          f'{"(갭업 매수금지)" if (ENTRY_PRICE=="next_open" and skip_gapup) else "(갭업 허용)" if ENTRY_PRICE=="next_open" else ""}, 매도=당일종가'
+          f' | 당일매도-재매수={"ON" if same_day_rebuy else "OFF"}')
     for k in ('trades', 'win_rate', 'total_return', 'avg_ret', 'avg_win', 'avg_loss',
               'profit_factor', 'mdd', 'avg_bars', 'exit_breakdown'):
         print(f'  {k:14}: {summary.get(k)}')
@@ -686,10 +754,14 @@ if __name__ == '__main__':
     ap.add_argument('--skip-gapup', action='store_true',
                      help="ENTRY_PRICE='next_open'일 때 다음날 시가가 추천일 종가보다 위로 갭이면 "
                           "그 종목은 매수하지 않는다(기본: 갭업도 추격 매수 허용).")
+    ap.add_argument('--no-same-day-rebuy', dest='same_day_rebuy', action='store_false',
+                     help="매도가 발생한 날 같은 날 재매수를 시도하지 않는다(기본: 실전 trade_worker "
+                          "정책과 동일하게 매도 직후 같은 날 새 후보를 재탐색/재매수).")
+    ap.set_defaults(same_day_rebuy=SAME_DAY_REBUY)
     args = ap.parse_args()
 
     if args.table == 'both':
-        compare(args.start, args.end, skip_gapup=args.skip_gapup)
+        compare(args.start, args.end, skip_gapup=args.skip_gapup, same_day_rebuy=args.same_day_rebuy)
     else:
         run(args.start, args.end, table=(TABLE_PROD if args.table == 'prod' else TABLE_TEST),
-            skip_gapup=args.skip_gapup)
+            skip_gapup=args.skip_gapup, same_day_rebuy=args.same_day_rebuy)
