@@ -1,15 +1,17 @@
 """
-kospi3.py — M3 (지정가 감시) 전략 골격.
+kospi3.py — M3 (KOSPI100 ETF ↔ 인버스 교대) 전략 골격.
 
-운용모드 M3: 사용자가 등록한 지정가 세트(user_limit_order)로만 매매한다.
-  · buy_price  이하 도달 → 매수
-  · sell_price 이상 도달 → 매도
-  · use_stop_loss='Y' 인 경우 stop_price 손절만 병행
-  · 상태흐름 : WAIT_BUY → BOUGHT → DONE / STOPPED (loop_flag='Y' 면 재감시)
+운용모드 M3: KOSPI 추세를 판단해 정방향 ETF / 인버스 ETF 를 교대 매매한다.
+  · 방향 판정 (trend_symbol 일봉 기준)
+        score = (close>MA20 ? +1:-1) + (MA5>MA20 ? +1:-1) + (MACD_hist>0 ? +1:-1)
+        score >=  threshold_long   → LONG    (정방향 ETF)
+        score <= -threshold_short  → SHORT   (인버스 ETF)
+        그 외                      → NEUTRAL (현금 대기)
+  · 같은 방향 연속 시 재진입하지 않고 보유 유지(핑퐁 방지)
+  · 보유 중 반대 신호 → SELL_REGIME_FLIP 청산 후 다음 tick 에서 반대편 진입
+  · flip_cooldown_bars 로 청산 직후 재진입 방지
 
-S1 매도 로직을 쓰지 않는 유일한 모드다.
-
-※ 현재는 인터페이스만 있는 스켈레톤이다. 로직 미구현.
+※ 기존 HMA/OBV/MACD 조합 전략은 제거되었다. 현재는 인터페이스만 있는 스켈레톤이다.
 """
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from stock_shared.dto.userOptionMeta import UserOptionMeta
@@ -17,20 +19,28 @@ from stock_shared.strategy.base import StockStrategy, Action
 
 
 class KospiStrategy3(StockStrategy):
-    """M3 : 지정가 감시 매매."""
+    """M3 : ETF 정방향/인버스 교대 매매."""
 
     MODE_CODE = 'M3'
 
     def __init__(self):
         super().__init__()
         # ── M3 전용 파라미터 (구현 시 채운다) ───────────────────────
-        self.use_stop_loss = False
-        self.loop_flag = False
+        self.ma_short = 5
+        self.ma_long = 20
+        self.threshold_long = 2
+        self.threshold_short = 2
+        self.flip_cooldown_bars = 0
 
     # ── 유저 설정 주입 ────────────────────────────────────────────
     def configure(self, user_info: UserOptionMeta) -> None:
-        """user_limit_order 값을 인스턴스 파라미터에 반영."""
+        """active_config(long_code/short_code/trend_symbol/임계값)를 반영."""
         raise NotImplementedError('KospiStrategy3.configure 미구현')
+
+    # ── 방향 판정 ─────────────────────────────────────────────────
+    def decide_direction(self, coin_info: UserCoinInfo) -> str:
+        """LONG / SHORT / NEUTRAL 반환."""
+        raise NotImplementedError('KospiStrategy3.decide_direction 미구현')
 
     # ── 매매 판정 ─────────────────────────────────────────────────
     def get_action(self, trade_data: list[dict], user_info: UserOptionMeta) -> Action:
@@ -42,10 +52,10 @@ class KospiStrategy3(StockStrategy):
 
     def get_action_in_watch(self, prev_info: UserCoinInfo, coin_info: UserCoinInfo,
                             user_info: UserOptionMeta) -> dict:
-        """WAIT_BUY — 현재가 <= buy_price 판정."""
+        """미보유 — 방향 판정 후 해당 ETF 매수 여부."""
         raise NotImplementedError('KospiStrategy3.get_action_in_watch 미구현')
 
     def get_action_in_active(self, prev_info: UserCoinInfo, coin_info: UserCoinInfo,
                              user_info: UserOptionMeta) -> dict:
-        """BOUGHT — 현재가 >= sell_price(또는 <= stop_price) 판정."""
+        """보유 — 매도 판정 + 반대 신호 시 강제 청산."""
         raise NotImplementedError('KospiStrategy3.get_action_in_active 미구현')

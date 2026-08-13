@@ -1,11 +1,11 @@
 """
-trade_buy_target_stock(매수추천 누적) 기반 실전 시뮬레이션. 매도판단 = KospiStrategy0.
+trade_buy_target_stock(매수추천 누적) 기반 실전 시뮬레이션. 매도판단 = KospiStrategy1.
 
 정책:
   - START_DATE 부터 하루씩 진행. 동시 보유 1종목, 전량매수/전량매도.
   - 대기(무포지션): 당일(ymd) 매수추천이 있으면 '1순위(rank_no)' 종목을 당일 종가에 매수.
                    추천 없으면 pass.
-  - 보유중: 매일 KospiStrategy0.get_action_in_active 로 매도판단. SELL 계열이면 당일 종가 매도.
+  - 보유중: 매일 KospiStrategy1.get_action_in_active 로 매도판단. SELL 계열이면 당일 종가 매도.
              진입일(체결일)에도 매도판단 수행(bars_held=0, peak 갱신 없이 1회).
   - 당일매도-재매수(2026-08-09 추가, 기본 ON — SAME_DAY_REBUY): 매도가 발생한 날은
     그 즉시 같은 날 '오늘 추천' 스캔으로 넘어가 새 후보를 재매수 시도한다(실전
@@ -43,7 +43,7 @@ from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.batches.services.userService import UserService
-from stock_shared.strategy.kospi0 import KospiStrategy0
+from stock_shared.strategy.kospi1 import KospiStrategy1
 from stock_shared.strategy.backtester import KisBacktester
 from stock_shared.strategy.base import Action
 
@@ -205,7 +205,7 @@ _SELL_ACTION_KR = {'SELL_PROFIT': '익절', 'SELL_STOP_LOSS': '손절', 'SELL_ST
 
 
 def _sell_reason(action, ctx: dict) -> str:
-    """매도 사유 상세. get_action_in_active 가 반환하는 sell_ctx(kospi0.py `_build_sell`)를
+    """매도 사유 상세. get_action_in_active 가 반환하는 sell_ctx(kospi1.py `_build_sell`)를
     사람이 읽을 수 있는 한 줄로 요약한다."""
     ctx = ctx or {}
     name = action.name if hasattr(action, 'name') else str(action)
@@ -266,7 +266,7 @@ def _simulate(strategy, ui, days: list, reco: dict, names: dict,
               same_day_rebuy: bool = SAME_DAY_REBUY) -> list:
     """매매 루프 순수함수 버전. 출력/그래프/표 없이 trades 리스트만 반환한다.
     run()과 grid-search(옵션 최적화) 양쪽에서 재사용하기 위해 분리했다.
-    strategy: 이미 원하는 매도 파라미터가 세팅된 KospiStrategy0 인스턴스.
+    strategy: 이미 원하는 매도 파라미터가 세팅된 KospiStrategy1 인스턴스.
     ui: UserOptionMeta (포지션 상태 스크래치패드로 재사용됨 — 호출부에서 재사용해도 무방,
         _open_position 이 매번 관련 필드를 덮어쓰기 때문에 콜 간 오염되지 않는다).
     same_day_rebuy: True(기본)면 그날 매도가 발생했을 때 같은 날 바로 새 후보를
@@ -417,7 +417,7 @@ def run(start: str = START_DATE, end: str = END_DATE,
     위로 갭이면 그 종목은 진입을 포기하고 같은 날 다음 후보를 다시 찾는다.
     same_day_rebuy=True(기본)면 매도가 발생한 날 같은 날 바로 새 후보를 재탐색한다."""
     assert table in _ALLOWED_TABLES, f"허용되지 않은 테이블: {table}"
-    strategy = KospiStrategy0()
+    strategy = KospiStrategy1()
     ui = _user_info()
 
     days = _trading_days(start, end)
@@ -714,7 +714,7 @@ def _table_image(trades, strategy, init_cash=INIT_CASH, out_dir=PLOT_DIR, tag=''
 def _report(strategy, start, days, trades, init_cash, label: str = 'prod', skip_gapup: bool = SKIP_GAPUP,
             same_day_rebuy: bool = SAME_DAY_REBUY):
     summary = KisBacktester(strategy=strategy)._summarize('SIM', trades)
-    print(f'===== buy_target 실전 시뮬 (KospiStrategy0 매도) — 추천소스: {label} =====')
+    print(f'===== buy_target 실전 시뮬 (KospiStrategy1 매도) — 추천소스: {label} =====')
     print(f'기간: {days[0]} ~ {days[-1]} ({len(days)}거래일) | 1포지션 전량매매')
     print(f'선택: 당일추천만·과열최저(rate↓) | 체결: 매수={ENTRY_PRICE}'
           f'{"(갭업 매수금지)" if (ENTRY_PRICE=="next_open" and skip_gapup) else "(갭업 허용)" if ENTRY_PRICE=="next_open" else ""}, 매도=당일종가'

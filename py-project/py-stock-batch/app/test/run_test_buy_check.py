@@ -1,5 +1,5 @@
 """
-새 매수추천 알고리즘(kospi0.py, 2026-08-08 대조군 분석 반영) 오프라인 재현 테스트.
+새 매수추천 알고리즘(kospi1.py, 2026-08-08 대조군 분석 반영) 오프라인 재현 테스트.
 
 라이브 KIS API를 호출하지 않고, 이미 DB(trade_candle_data)에 적재된 종목만 대상으로
 지정한 과거 날짜(또는 날짜 구간) 기준 매수 판정을 재현해 trade_buy_target_stock_test
@@ -42,7 +42,7 @@ from stock_shared.dao.tradeBuyTargetStockTestDao import TradeBuyTargetStockTestD
 from stock_shared.models.tradeBuyTargetStock import TradeBuyTargetStock
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from stock_shared.dto.userOptionMeta import UserOptionMeta
-from stock_shared.strategy.kospi0 import KospiStrategy0
+from stock_shared.strategy.kospi1 import KospiStrategy1
 
 MIN_ROWS_FOR_REGIME = 30   # 이보다 히스토리가 적으면 regime/vol_avg 신뢰도 낮음(경고만, 차단 안 함)
 # 최근 N일 내 재추천 종목 rank_no 페널티(제외 아님). StockBuyCheckJob.py의
@@ -92,7 +92,7 @@ def _latest_fin(session, stock_code: str, target_ymd: str) -> dict:
     return {'eps': row.eps, 'per': row.per, 'pbr': row.pbr, 'roe': row.roe, 'peg': row.peg}
 
 
-def _inject_vol_avg_and_regime(rows: list[dict], strategy: KospiStrategy0) -> None:
+def _inject_vol_avg_and_regime(rows: list[dict], strategy: KospiStrategy1) -> None:
     """DB candle 에는 vol_avg/downtrend_ratio 컬럼이 없으므로 즉석 계산해 주입한다.
     (backtester.py KisBacktester.run_one 과 동일 로직 — 라이브 경로는 compute_indicator_df 가 채움)"""
     w = getattr(strategy, 'vol_ma_window', 20)
@@ -144,7 +144,7 @@ def _run_one_date(session, target_ymd: str, universe: list[dict], user_info: Use
             skipped_no_data += 1
             continue  # 그 날짜에 데이터가 없거나(비영업일 등) 직전봉이 없음
 
-        strategy = KospiStrategy0()  # 종목별 독립 인스턴스(상태 공유 방지)
+        strategy = KospiStrategy1()  # 종목별 독립 인스턴스(상태 공유 방지)
         _inject_vol_avg_and_regime(rows, strategy)
         if len(rows) < MIN_ROWS_FOR_REGIME and verbose:
             print(f"  [주의] {stock_name}({stock_code}) 히스토리 {len(rows)}봉 — regime/vol_avg 신뢰도 낮음")

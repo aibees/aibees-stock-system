@@ -9,13 +9,15 @@ py-stock-batch(실전 worker·배치·시뮬)와 py-naver-stock-theme(웹 백테
   backtester  KisBacktester   (일봉 순회 백테스트 엔진)
 
 전략 ↔ 운용모드(user_trade_mode.active_mode) 매핑:
-  kospi0      KospiStrategy0  M0  추천 1순위    (EMA/ATR/OBV. 실전 worker 현행 전략)
-  kospi1      KospiStrategy1  M1  단일 종목 고정   ← 스켈레톤
-  kospi2      KospiStrategy2  M2  ETF 정/역 교대   ← 스켈레톤
-  kospi3      KospiStrategy3  M3  지정가 감시     ← 스켈레톤
+  kospi1      KospiStrategy1  M1  추천 1순위     (EMA/ATR/OBV. 실전 worker 현행 전략)
+  kospi2      KospiStrategy2  M2  단일 종목 고정   ← 스켈레톤
+  kospi3      KospiStrategy3  M3  ETF 정/역 교대   ← 스켈레톤
+  kospi4      KospiStrategy4  M4  지정가 감시     ← 스켈레톤
 
   · 네 클래스 모두 StockStrategy 를 직접 상속한다(상호 상속 없음).
-  · M1~M3 는 인터페이스만 있고 호출 시 NotImplementedError 를 던진다.
+  · M2~M4 는 인터페이스만 있고 호출 시 NotImplementedError 를 던진다.
+  · 모드 코드는 M1 부터 시작한다(구 M0~M3 체계에서 한 칸씩 이동).
+    클래스 번호 = 모드 번호 = 파일 번호 로 셋이 일치한다.
 
 규칙:
   · 이 패키지는 **순수 계산**만 한다. DB 세션·설정·외부 API 를 import 하지 않는다.
@@ -24,27 +26,27 @@ py-stock-batch(실전 worker·배치·시뮬)와 py-naver-stock-theme(웹 백테
   · 여기를 고치면 py-stock-worker 이미지 재빌드가 필요하고 실매매 판정이 즉시 바뀐다.
 """
 from stock_shared.strategy.base import StockStrategy, Action
-from stock_shared.strategy.kospi0 import KospiStrategy0
 from stock_shared.strategy.kospi1 import KospiStrategy1
 from stock_shared.strategy.kospi2 import KospiStrategy2
 from stock_shared.strategy.kospi3 import KospiStrategy3
+from stock_shared.strategy.kospi4 import KospiStrategy4
 from stock_shared.strategy.backtester import KisBacktester
 
 # 운용모드 코드 → 전략 클래스. worker mode router 가 이 맵으로 분기한다.
 STRATEGY_BY_MODE = {
-    'M0': KospiStrategy0,
     'M1': KospiStrategy1,
     'M2': KospiStrategy2,
     'M3': KospiStrategy3,
+    'M4': KospiStrategy4,
 }
 
 __all__ = [
     "StockStrategy",
     "Action",
-    "KospiStrategy0",
     "KospiStrategy1",
     "KospiStrategy2",
     "KospiStrategy3",
+    "KospiStrategy4",
     "STRATEGY_BY_MODE",
     "KisBacktester",
 ]

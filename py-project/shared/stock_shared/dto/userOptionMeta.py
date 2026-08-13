@@ -95,7 +95,7 @@ class UserOptionMeta:
 
         self.upper_check_history = False
 
-        # ── KospiStrategy0 파라미터 (None이면 전략 클래스 기본값 사용) ────────
+        # ── KospiStrategy1 파라미터 (None이면 전략 클래스 기본값 사용) ────────
         self.s1_stop_loss_pct         = None
         self.s1_take_profit_pct       = None
         self.s1_max_hold_bars         = None
@@ -127,7 +127,7 @@ class UserOptionMeta:
         self.s1_max_hold_bars_hard    = None
         self.s1_obv_dead_min_bars     = None
 
-        # ── KospiStrategy0 매수 필터 on/off 스위치 (None이면 기본값 True 사용) ──
+        # ── KospiStrategy1 매수 필터 on/off 스위치 (None이면 기본값 True 사용) ──
         self.s1_enable_macd_filter      = None
         self.s1_enable_rsi_filter       = None
         self.s1_enable_bb_upper_filter  = None

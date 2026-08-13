@@ -147,6 +147,35 @@ class Repository:
             row = s.execute(sql, {"uid": user_id}).mappings().first()
         return dict(row) if row else {}
 
+    # ── 운용모드 (user_trade_mode) ──────────────────────────────────
+    def get_trade_mode(self, user_id: int) -> dict:
+        """유저의 현재 운용모드 상태.
+
+        반환 키:
+          active_mode   현재 모드 코드 (없으면 None)
+          pending_mode  예약 모드 — 보유분 청산 후 승계될 모드
+          run_state     IDLE / ARMED / HOLDING / SWITCH_PENDING
+          enabled_flag  자동매매 ON/OFF (Y/N)
+
+        행이 없으면 전부 None/기본값. worker 는 모드를 못 읽어도 죽지 않고
+        호출측이 기본 모드로 떨어지도록 한다(부팅 실패보다 낫다).
+        """
+        sql = text(
+            "SELECT active_mode, pending_mode, run_state, enabled_flag "
+            "FROM user_trade_mode WHERE user_id = :uid"
+        )
+        try:
+            with get_session() as s:
+                row = s.execute(sql, {"uid": user_id}).mappings().first()
+        except Exception as e:  # noqa: BLE001  (테이블 미생성 등)
+            log.warning("운용모드 조회 실패 user_id=%s: %s", user_id, e)
+            return {"active_mode": None, "pending_mode": None,
+                    "run_state": None, "enabled_flag": None}
+        if not row:
+            return {"active_mode": None, "pending_mode": None,
+                    "run_state": None, "enabled_flag": None}
+        return dict(row)
+
     def get_wallet_balance(self, user_id: int) -> Decimal:
         sql = text("SELECT user_balance FROM user_wallet WHERE user_id = :uid")
         with get_session() as s:

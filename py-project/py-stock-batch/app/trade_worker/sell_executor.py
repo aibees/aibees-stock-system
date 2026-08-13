@@ -26,6 +26,7 @@
 """
 import threading
 import time
+from abc import ABC, abstractmethod
 from decimal import Decimal
 
 from app.trade_worker.broker import Broker
@@ -39,7 +40,7 @@ def _toDecimal(v):
     return Decimal(str(v)) if v is not None else None
 
 
-class SellExecutor:
+class BaseSellExecutor(ABC):
     def __init__(self, cfg: WorkerConfig, broker: Broker, repo: Repository, notifier=None, strategy=None):
         self.cfg = cfg
         self.broker = broker
@@ -147,7 +148,7 @@ class SellExecutor:
         cd = self._cooldown.get(symbol)
         if cd and time.time() < cd:
             return
-        reason = self._hit_line(pos, price)
+        reason = self.hit_line(pos, price)
         if not reason:
             return
         sess = self._session(pos)
@@ -196,6 +197,23 @@ class SellExecutor:
         summary = ", ".join(f"{a}: {o}→{n}" for a, o, n in changes[:8])
         if len(changes) > 8:
             summary += f" 외 {len(changes) - 8}건"
+
+        # 운용모드 전환은 파라미터 조정과 급이 다르다 — 매매 방식 자체가 바뀐다.
+        # 보유 종목이 없어 라인 재계산 대상이 0건이어도 반드시 알린다.
+        mode_change = next((c for c in changes if c[0].startswith("active_mode")), None)
+        if mode_change:
+            key, old_mode, new_mode = mode_change
+            failed = key.endswith("(전환실패)")
+            if failed:
+                self.wlog.warn("[설정] 운용모드 %s → %s 전환 실패(미구현) · 기존 전략 유지",
+                               old_mode, new_mode)
+                self._notify_mode_change(old_mode, new_mode, failed=True)
+                # 전략이 그대로라 라인을 다시 계산할 이유가 없다.
+                return False
+            self.wlog.info("[설정] 운용모드 전환 %s → %s · 전략=%s",
+                           old_mode, new_mode, type(self.strategy.strategy).__name__)
+            self._notify_mode_change(old_mode, new_mode, failed=False)
+
         self.wlog.info("[설정] 변경 감지 → 전략 재적용 (%s)", summary)
 
         with self._lock:
@@ -228,16 +246,35 @@ class SellExecutor:
                 pass
         return True
 
+    def _notify_mode_change(self, old_mode, new_mode, failed: bool):
+        """운용모드 전환 알림. 보유 종목이 0건이어도 반드시 보낸다 —
+        매매 방식 자체가 바뀌는 사건이라 사용자가 몰라서는 안 된다."""
+        if not self.notifier:
+            return
+        try:
+            if failed:
+                self.notifier.send(
+                    f"[운용모드 전환 실패] {old_mode} → {new_mode}",
+                    f"⚠️ 운용모드 <b>{new_mode}</b> 전략이 아직 구현되지 않아 전환하지 못했습니다.\n"
+                    f"기존 <b>{old_mode}</b> 전략으로 계속 운용합니다.")
+            else:
+                self.notifier.send(
+                    f"[운용모드 전환] {old_mode} → {new_mode}",
+                    f"운용모드가 <b>{old_mode}</b> → <b>{new_mode}</b> 로 전환됐습니다.\n"
+                    f"이후 매수/매도 판정은 새 모드 기준으로 동작합니다.")
+        except Exception:  # noqa: BLE001
+            pass
+
     # ── 실시간 고점 추적 ─────────────────────────────────────────────
     def _advance_peak(self, symbol: str, pos: dict, price: Decimal):
         """소켓 체결가로 peak_high 를 갱신하고 트레일 라인을 재계산한다.
 
         DB 쓰기는 하지 않는다(장 종료 시 flush_peaks 가 일괄 저장).
-        라인 산출식은 daily 평가와 동일하게 KospiStrategy0._trail_line_of 에 위임한다.
+        라인 산출식은 daily 평가와 동일하게 모드 전략의 _trail_line_of 에 위임한다.
         """
         if not self.strategy:
             return
-        s = self.strategy.strategy          # KospiStrategy0
+        s = self.strategy.strategy          # 운용모드로 결정된 전략 인스턴스
         if not getattr(s, "use_trailing", True):
             return
 
@@ -300,22 +337,26 @@ class SellExecutor:
         if saved:
             self.wlog.info("[매도] 고점 flush%s: %d종목 저장", f"({tag})" if tag else "", saved)
 
-    @staticmethod
-    def _hit_line(pos: dict, price: Decimal) -> str | None:
-        stop = _toDecimal(pos.get("stop_price"))
-        target = _toDecimal(pos.get("target_price"))
-        trail = _toDecimal(pos.get("trail_line"))
-        if stop and price <= stop:
-            return "SELL_STOP_LOSS"
-        if target and price >= target:
-            return "SELL_PROFIT"
-        if trail and price <= trail:
-            return "SELL_TRAIL"
-        return None
+    # ── 모드별 훅 ────────────────────────────────────────────────────
+    @abstractmethod
+    def hit_line(self, pos: dict, price: Decimal) -> str | None:
+        """이 틱에서 팔아야 하는가. 사유 문자열을 반환하면 매도, None 이면 보유 유지.
 
-    # ── 일별 전략 평가 (KospiStrategy0 재사용) ───────────────────────
+        **모드별로 갈리는 유일한 판정 지점**이다. 반환한 사유는 그대로
+        trade_worker_position.exit_reason 과 trade_log 에 적재된다.
+        """
+
+    def sell_qty(self, pos: dict, actual) -> Decimal:
+        """이번에 팔 수량. 기본은 보유 전량(DB 와 실계좌 중 작은 쪽).
+
+        비율 매도가 필요한 모드(M4)는 여기를 재정의한다.
+        """
+        db_qty = _toDecimal(pos.get("hold_qty")) or Decimal(0)
+        return db_qty if actual is None else min(db_qty, actual)
+
+    # ── 일별 전략 평가 (모드 전략) ───────────────────────
     def refresh_positions(self):
-        """HOLDING 포지션마다 KospiStrategy0 로 라인/액션 재계산 → DB 갱신.
+        """HOLDING 포지션마다 모드 전략으로 라인/액션 재계산 → DB 갱신.
         일봉 신호(OBV 데드크로스·타임스탑 등)로 SELL 판정되면 개장 시 즉시 매도.
         realtime stop/target/trail 라인도 이 값으로 갱신됨."""
         if not self.strategy:
@@ -398,7 +439,6 @@ class SellExecutor:
             self._inflight.add(symbol)
         try:
             # ── 실제 보유수량으로 매도량 보정(‘주문가능수량 초과’ 방지) ──
-            db_qty = _toDecimal(pos.get("hold_qty")) or Decimal(0)
             actual = self._actual_qty(symbol)
             if actual is not None and actual <= 0:
                 # 실제 보유 없음 = 이미 청산됨 → 포지션 종료(정리)
@@ -408,9 +448,10 @@ class SellExecutor:
                 self._unsubscribe(symbol)   # 보유 종료 → 실시간 감시 비활성
                 self.wlog.warn("[매도] %s 실제 보유 0 → 청산된 것으로 간주하고 정리", symbol)
                 return
-            qty = db_qty if actual is None else min(db_qty, actual)
+            qty = self.sell_qty(pos, actual)   # 모드별 수량 정책(기본 전량)
             if qty <= 0:
-                self.wlog.warn("[매도] %s 매도수량 0 (db=%s actual=%s) → skip", symbol, db_qty, actual)
+                self.wlog.warn("[매도] %s 매도수량 0 (hold=%s actual=%s) → skip",
+                               symbol, pos.get("hold_qty"), actual)
                 self._register_fail(symbol, "매도수량 0")
                 return
 

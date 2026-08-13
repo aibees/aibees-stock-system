@@ -2,7 +2,7 @@
 trade_buy_target_stock_test — 매수추천 알고리즘 오프라인 재현 테스트용 테이블.
 
 trade_buy_target_stock(운영 테이블)과 완전히 동일한 구조를 그대로 복제한 것으로,
-운영 데이터를 건드리지 않고 새 알고리즘(kospi0.py) 결과를 저장/비교하기 위해 쓴다.
+운영 데이터를 건드리지 않고 새 알고리즘(kospi1.py) 결과를 저장/비교하기 위해 쓴다.
 테이블 생성은 py-project/sql/trade_buy_target_stock_test.sql 참고.
 
 ※ 스키마 변경 시 tradeBuyTargetStock.py 와 함께 이 파일도 갱신할 것.

@@ -1,7 +1,7 @@
 # buy_target 실전 시뮬레이션 로직 스냅샷
 
 > 목적: `app/test/sim_buy_target.py` 의 현재 매수/매도 판정 로직을 **실전 매매 로직으로 이식**할 수 있도록 모든 분기조건을 기록한 스냅샷.
-> 기준 시점: 2026-07 / 매도판단 = `KospiStrategy1`.
+> 기준 시점: 2026-07 / 매도판단 = `KospiStrategy0`.
 > ⚠️ `sim_buy_target.py` 파일 상단 docstring 은 구버전(당일 종가·rank_no) 서술이 남아있음. **실제 동작은 본 문서 기준**(당일추천·과열최저·다음날 시가).
 
 ---
@@ -14,7 +14,7 @@
 | 캔들/지표 소스 | `trade_candle_data` (일봉 OHLCV + 지표) |
 | 거래일 유니버스 | `master_stock.stock_type = 'KOSPI'` 종목의 `trade_candle_data.datetime` |
 | 포지션 | 동시 **1종목**, **전량매수 / 전량매도** |
-| 매도 판정 | `KospiStrategy1.get_action_in_active()` |
+| 매도 판정 | `KospiStrategy0.get_action_in_active()` |
 | 매수 체결 | 추천일 **다음 거래일 시가**(`ENTRY_PRICE='next_open'`) |
 | 매도 체결(시뮬) | 신호 발생일 **당일 종가** |
 | 수수료 가정 | 편도 0.11% (왕복 0.22%) |
@@ -77,9 +77,9 @@
 
 ---
 
-## 4. 매도(청산) 분기조건 — `KospiStrategy1.get_action_in_active`
+## 4. 매도(청산) 분기조건 — `KospiStrategy0.get_action_in_active`
 
-보유 중 매일(진입일 포함) 판정. **우선순위 순서**대로 먼저 걸리는 것이 발동. (아래는 `KospiStrategy1` 기본값; `user_options.s1_*` 로 오버라이드 가능)
+보유 중 매일(진입일 포함) 판정. **우선순위 순서**대로 먼저 걸리는 것이 발동. (아래는 `KospiStrategy0` 기본값; `user_options.s1_*` 로 오버라이드 가능)
 
 전제 계산:
 - `entry` = `entry_price`(없으면 `avg_price`)
@@ -103,7 +103,7 @@
      - `over_hard` = `bars_held >= max_hold_bars_hard`(20)
 5. 위 어느 것도 아니면 **HOLD**(계속 보유)
 
-**매도 파라미터 기본값 (KospiStrategy1):**
+**매도 파라미터 기본값 (KospiStrategy0):**
 
 | 파라미터 | 기본값 |
 |---|---|
@@ -161,7 +161,7 @@ bars_held += 1
 4. 이미 보유 중이면 신규 매수 안 함(1포지션).
 
 ### 매도
-1. 보유 종목에 대해 매일 장 마감 지표(`compute_indicator_df`)로 `KospiStrategy1.get_action_in_active` 판정(§4).
+1. 보유 종목에 대해 매일 장 마감 지표(`compute_indicator_df`)로 `KospiStrategy0.get_action_in_active` 판정(§4).
 2. SELL 계열이면 전량 매도. **체결 시점은 정책 결정 필요**: 시뮬은 당일 종가 가정 → 실전은 (a) 당일 종가 동시호가, 또는 (b) 다음 거래일 시가 중 택1. 선택에 따라 성과가 달라지므로 명시 필요.
 3. 매도한 날은 재매수 안 함(다음 거래일부터 신규 추천 탐색).
 
@@ -208,7 +208,7 @@ INIT_CASH    = 1_000_000
 FEE_RATE     = 0.0011
 ENTRY_PRICE  = 'next_open'
 SKIP_GAPUP   = False
-매도판정      = KospiStrategy1 (기본 파라미터, user_options.s1_* 오버라이드 가능)
+매도판정      = KospiStrategy0 (기본 파라미터, user_options.s1_* 오버라이드 가능)
 선택기준      = 당일 추천, 과열최저(rate 오름차순), 캔들 존재 첫 종목
 ```
 ```

@@ -90,7 +90,7 @@ PK = `position_id`. `status` = `HOLDING`(보유중) / `SOLD`(청산). 필드 그
 | `bars_since_peak` | 신고가 후 경과 봉수 |
 | `last_check_ymd` | 마지막 일별 갱신일(중복증가 방지) |
 
-매도 라인·판정(KospiStrategy1 산출):
+매도 라인·판정(KospiStrategy0 산출):
 
 | 컬럼 | 의미 |
 |------|------|

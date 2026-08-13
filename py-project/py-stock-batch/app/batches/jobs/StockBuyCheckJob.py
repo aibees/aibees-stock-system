@@ -11,7 +11,7 @@ from app.common.utils.smtpUtils import emailUtils
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.kis.keyLoader import list_kis_user_ids
 from app.ext_services.kis.component.KisStockService import KisService
-from stock_shared.strategy.kospi0 import KospiStrategy0
+from stock_shared.strategy.kospi1 import KospiStrategy1
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 
 
@@ -38,8 +38,8 @@ class StockBuyCheckJob(Job):
     def _make_strategy(strategy_param: str):
         """전략 인스턴스 생성. 스레드별로 독립 인스턴스를 만들어 상태 공유를 피한다."""
         if strategy_param == 'KOSPI_2':
-            return KospiStrategy0()  # TODO : more strategy
-        return KospiStrategy0()
+            return KospiStrategy1()  # TODO : more strategy
+        return KospiStrategy1()
 
     @staticmethod
     def _split_even(items: list, n: int) -> list:

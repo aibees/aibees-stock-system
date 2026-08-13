@@ -29,11 +29,10 @@ from pytz import timezone
 from app.ext_services.kis.KisEngine import KisEngine
 from app.trade_worker import config
 from app.trade_worker.broker import Broker
-from app.trade_worker.buy_executor import BuyExecutor
+from app.trade_worker.modes.mode_1 import BuyExecutor1, SellExecutor1
 from app.trade_worker.notifier import Notifier
-from app.trade_worker.position_strategy import SellStrategy
+from app.trade_worker.position_strategy import SellStrategy, UnsupportedModeError
 from app.trade_worker.repository import Repository
-from app.trade_worker.sell_executor import SellExecutor
 from app.trade_worker.wallet_sync import reconcile_wallet
 
 _KST = timezone("Asia/Seoul")
@@ -134,6 +133,7 @@ def _boot_balance_check(cfg, broker, repo):
         except Exception:  # noqa: BLE001
             pass
 
+
 def _reconcile_positions(cfg, broker, repo):
     """부팅 시 **worker 가 직접 매수한 포지션**(trade_worker_position)만 계좌와 대조한다.
 
@@ -176,26 +176,49 @@ def _reconcile_positions(cfg, broker, repo):
 
 
 def main():
-
+    # 1. Config Load
     cfg = config.load()
-    log.info("trade_worker 시작 · user_id=%s · mode=%s · buy=%02d:%02d",
+    log.info("[main] trade_worker 시작 / user_id=%s / mode=%s / buy=%02d:%02d",
              cfg.user_id, cfg.mode, cfg.buy_hour, cfg.buy_minute)
 
-    # 자기 유저 KIS 세션 (KIS_USER_ID → keyLoader → DB key). 실전 전용.
+    # 2. USER KIS 세션 (KIS_USER_ID → keyLoader → DB key). 실전 전용.
     engine = KisEngine(user_id=cfg.user_id)
 
+    # 3. Create Broker Instance
     broker = Broker(engine.kis) # engine.kis = pyKis
 
+    # 4. Create Repository Instance
     repo = Repository()
 
-    # 체결 알림: 텔레그램 우선, 실패 시 이메일 fallback
+    # 5. Create Notifier / 텔레그램 우선, 실패 시 이메일 fallback
     notifier = Notifier(repo.get_user_notify(cfg.user_id), mode_tag=cfg.mode)
 
-    # 매도 전략(KospiStrategy0 재사용) — 라인/액션 자체 계산
-    strategy = SellStrategy(engine, cfg.user_id)
+    # 6. 매도 전략 — user_trade_mode.active_mode 로 전략 결정. 라인/액션 자체 계산
+    #    repo 를 넘겨야 SellStrategy 가 유저의 운용모드를 읽는다. 안 넘기면 DEFAULT_MODE 로 굳는다.
+    mode_row = repo.get_trade_mode(cfg.user_id)
+    log.info("[main] 운용모드 active=%s pending=%s run_state=%s enabled=%s",
+             mode_row.get("active_mode"), mode_row.get("pending_mode"),
+             mode_row.get("run_state"), mode_row.get("enabled_flag"))
+    try:
+        strategy = SellStrategy(engine, cfg.user_id, repo=repo)
+    except UnsupportedModeError as e:
+        # 미구현 모드로 설정된 채 기동됐다. 판정 없이 도는 것이 가장 위험하므로 아예 시작하지 않는다.
+        # (전략이 없으면 손절/익절 라인이 안 잡혀 보유분이 무방비로 방치된다)
+        log.error("[main] %s → worker 를 시작하지 않습니다. "
+                  "화면에서 구현된 모드로 되돌리거나 해당 전략을 구현하세요.", e)
+        try:
+            repo.insert_worker_log(cfg.user_id, "boot", "ERROR", f"미구현 모드로 기동 중단: {e}")
+            notifier.send(f"[worker 기동 중단] 운용모드 {e.mode} 미구현",
+                          f"⚠️ 운용모드 <b>{e.mode}</b> 의 전략이 구현되지 않아 worker 를 시작하지 못했습니다.\n"
+                          f"자동매매가 동작하지 않습니다. 화면에서 모드를 되돌려 주세요.")
+        except Exception:  # noqa: BLE001  (알림 실패로 종료 경로를 막지 않는다)
+            pass
+        return
 
-    buy = BuyExecutor(cfg, broker, repo, notifier, strategy=strategy)
-    sell = SellExecutor(cfg, broker, repo, notifier, strategy=strategy)
+    # 7. 모드별 executor. 현재는 M1 고정 —
+    #    다음 단계에서 RUNNER_BY_MODE[strategy.mode] 팩토리로 대체한다.
+    buy = BuyExecutor1(cfg, broker, repo, notifier, strategy=strategy)
+    sell = SellExecutor1(cfg, broker, repo, notifier, strategy=strategy)
 
     # 부팅 시 실제 계좌 예수금 확인 + DB user_wallet 대조/동기화 + 보유종목 표시
     _boot_balance_check(cfg, broker, repo)
@@ -255,7 +278,7 @@ def main():
             #    08:00:35 에야 설정이 로드돼 유저의 s1_buy_order 가 반영되지 않았다)
             sell.apply_settings_change()
             sell.reload_positions()      # HOLDING 포지션 재적재(감시 대상 갱신)
-            sell.refresh_positions()     # KospiStrategy0로 라인/액션 재계산 + SELL이면 즉시 매도
+            sell.refresh_positions()     # 모드 전략으로 라인/액션 재계산 + SELL이면 즉시 매도
             buy.run()                    # 매수
             # 매수는 이 루틴의 마지막이라, 여기서 다시 적재하지 않으면 당일 산 종목이
             # sell 의 감시 대상(positions)·소켓 구독에 들어가지 않는다.

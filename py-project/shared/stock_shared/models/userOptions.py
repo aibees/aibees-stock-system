@@ -62,7 +62,7 @@ class UserOptions(Base):
     s1_obv_dead_min_bars = Column(Integer, nullable=True)
 
     # ── 매수 필터 on/off 스위치 (NULL = 전략 기본값 True) ──────────────
-    # KospiStrategy0.get_action_in_watch 의 각 게이트를 개별로 끈다.
+    # KospiStrategy1.get_action_in_watch 의 각 게이트를 개별로 끈다.
     # ※ 매수타겟 생성(StockBuyCheckJob)은 user_id=1 옵션만 읽어 **공용 테이블**을
     #   만든다. 즉 이 값들은 사실상 전역 설정이라 화면에서도 관리자 전용이다.
     s1_enable_macd_filter = Column(TINYINT(1), nullable=True)

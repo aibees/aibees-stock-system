@@ -14,7 +14,7 @@ from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.batches.services.stockService import StockService
 from app.batches.services.userService import UserService
-from stock_shared.strategy.kospi0 import KospiStrategy0
+from stock_shared.strategy.kospi1 import KospiStrategy1
 from stock_shared.strategy.backtester import KisBacktester
 
 session = dbConn.get_session()
@@ -46,7 +46,7 @@ def run(coin_code: str, start_date: str = None, end_date: str = None, fee_rate: 
         print(f'데이터 없음: {coin_code}')
         return {}
 
-    bt = KisBacktester(strategy=KospiStrategy0(), fee_rate=fee_rate)
+    bt = KisBacktester(strategy=KospiStrategy1(), fee_rate=fee_rate)
     result = bt.run_one(coin_code, rows, _user_info())
 
     summary = {k: v for k, v in result.items() if k != 'trade_list'}
@@ -79,7 +79,7 @@ def run(coin_code: str, start_date: str = None, end_date: str = None, fee_rate: 
 
 
 def run_all(start_date: str = None, end_date: str = None, fee_rate: float = 0.0015) -> dict:
-    bt = KisBacktester(strategy=KospiStrategy0(), fee_rate=fee_rate)
+    bt = KisBacktester(strategy=KospiStrategy1(), fee_rate=fee_rate)
     user_info = _user_info()
     stock_list = stockServiceImpl.get_stock_master_list(session, 'batches')
 

@@ -1,6 +1,6 @@
 """
 trade_buy_target_stock_test(오프라인 테스트 알고리즘 추천) 데이터를 고정하고,
-KospiStrategy0 의 매도 옵션(손절/익절/트레일링/피보나치 되돌림/타임스탑)만
+KospiStrategy1 의 매도 옵션(손절/익절/트레일링/피보나치 되돌림/타임스탑)만
 grid search 로 바꿔가며 시뮬레이션 → Profit Factor 기준 최적 조합을 찾는다.
 
 전제:
@@ -19,7 +19,7 @@ import itertools
 import time
 
 from app.test import sim_buy_target as sbt
-from stock_shared.strategy.kospi0 import KospiStrategy0
+from stock_shared.strategy.kospi1 import KospiStrategy1
 from stock_shared.strategy.backtester import KisBacktester
 
 MIN_TRADES = 8  # 이보다 적으면 PF가 표본부족으로 왜곡되므로 순위 산정에서 제외
@@ -31,7 +31,7 @@ def _pf_key(pf):
 
 
 def build_grid(quick: bool = False):
-    """(라벨, kwargs dict) 튜플 리스트. kwargs 는 KospiStrategy0 인스턴스 속성명 기준."""
+    """(라벨, kwargs dict) 튜플 리스트. kwargs 는 KospiStrategy1 인스턴스 속성명 기준."""
     if quick:
         stop_loss_list = [0.05, 0.08]
         take_profit_list = [0.20, 0.30]
@@ -94,7 +94,7 @@ def run_grid(start: str, end: str, table: str = None, quick: bool = False, min_t
     results = []
     t0 = time.time()
     for i, (label, kwargs) in enumerate(combos, 1):
-        strategy = KospiStrategy0()
+        strategy = KospiStrategy1()
         for k, v in kwargs.items():
             setattr(strategy, k, v)
         trades = sbt._simulate(strategy, ui, days, reco, names,

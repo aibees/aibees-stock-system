@@ -268,3 +268,180 @@ class KisEngine:
             "volume": [_safe_int(r.get("acml_vol")) for r in recs],
         })
         return df
+
+    # ══════════════════════════════════════════════════════════════════
+    # 30분봉 (M3 전용)
+    #
+    #  왜 별도 구현인가 — pykis 로는 안 되는 두 가지:
+    #   1) pykis 의 국내 분봉(stock.chart(period=N)) 은 TR FHKST03010200,
+    #      즉 "주식당일분봉조회" 다. start/end 가 time 타입만 허용되어
+    #      **당일 세션만** 조회된다. 정규장 390분 → 30분봉 13개가 상한이다.
+    #      지표에 필요한 250봉(≈20영업일)은 원천적으로 불가능.
+    #   2) 게다가 period 인자는 집계가 아니라 샘플링이다.
+    #      day_chart.drop_after() 가 `if i % period != 0: continue` 로
+    #      1분봉을 30개마다 하나씩 골라낼 뿐이라, high/low/volume 이
+    #      30분 구간값이 아니라 그 1분값이다. 그대로 쓰면 지표가 전부 틀어진다.
+    #
+    #  → 과거분: TR FHKST03010230 (주식일별분봉조회) 로 일자별 1분봉을 긁고
+    #    → 당일분: pykis day_chart(period=1) 로 당일 1분봉 전량
+    #    양쪽 모두 **직접 30분 resample** 한다.
+    # ══════════════════════════════════════════════════════════════════
+
+    BAR_MIN = 30                    # 봉 크기(분)
+    MKT_OPEN = "090000"             # 정규장 시작
+    MKT_CLOSE = "153000"            # 정규장 종료 (15:20~15:30 종가 단일가 포함)
+    _MINUTE_PAGE = 120              # FHKST03010230 1회 최대 건수
+
+    def _fetch_day_minutes_page(self, code: str, ymd: str, hhmmss: str) -> list:
+        """주식일별분봉조회 1페이지. hhmmss 이전 방향으로 최대 120건 반환.
+
+        pykis 에 미구현이라 self.kis.fetch() 로 원시 호출한다.
+        인증 토큰 / 도메인 / rate-limit 은 pykis 것을 그대로 탄다.
+        """
+        resp = self.kis.fetch(
+            "/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice",
+            api="FHKST03010230",
+            params={
+                "FID_COND_MRKT_DIV_CODE": "J",
+                "FID_INPUT_ISCD": code,
+                "FID_INPUT_DATE_1": ymd,
+                "FID_INPUT_HOUR_1": hhmmss,
+                "FID_PW_DATA_INCU_YN": "N",
+                "FID_FAKE_TICK_INCU_YN": "N",
+            },
+            domain="real",
+        )
+        return getattr(resp, "output2", None) or []
+
+    def fetch_day_minutes(self, code: str, ymd: str) -> pd.DataFrame:
+        """특정 일자(YYYYMMDD) 1분봉 전량.
+
+        1회 120건 제한이라 마감시각부터 커서를 내리며 4~5회 호출한다.
+        반환: DatetimeIndex + [open, high, low, close, volume]. 없으면 빈 DF.
+        """
+        seen: dict[str, dict] = {}
+        cursor = self.MKT_CLOSE
+
+        # 390분 / 120 ≈ 3.25 → 4회면 충분하나 시간외/이상치 대비 6회 상한.
+        for _ in range(6):
+            rows = self._fetch_day_minutes_page(code, ymd, cursor)
+            if not rows:
+                break
+
+            before = len(seen)
+            for r in rows:
+                key = str(r.get("stck_bsop_date", ymd)) + str(r.get("stck_cntg_hour", ""))
+                if len(key) == 14 and key not in seen:
+                    seen[key] = r
+            if len(seen) == before:
+                break                       # 진전 없음 → 무한루프 방지
+
+            oldest = min(str(r.get("stck_cntg_hour", "")) for r in rows)
+            if not oldest or oldest <= self.MKT_OPEN:
+                break
+            cursor = (datetime.strptime(oldest, "%H%M%S")
+                      - timedelta(minutes=1)).strftime("%H%M%S")
+
+        return self._minute_rows_to_df(seen)
+
+    @staticmethod
+    def _minute_rows_to_df(seen: dict) -> pd.DataFrame:
+        """{YYYYMMDDHHMMSS: row} → 시간 오름차순 1분봉 DataFrame."""
+        if not seen:
+            return pd.DataFrame()
+        keys = sorted(seen)
+        recs = [seen[k] for k in keys]
+        return pd.DataFrame(
+            {
+                "open":   [_safe_int(r.get("stck_oprc")) for r in recs],
+                "high":   [_safe_int(r.get("stck_hgpr")) for r in recs],
+                "low":    [_safe_int(r.get("stck_lwpr")) for r in recs],
+                "close":  [_safe_int(r.get("stck_prpr")) for r in recs],
+                "volume": [_safe_int(r.get("cntg_vol")) for r in recs],
+            },
+            index=pd.DatetimeIndex(
+                [datetime.strptime(k, "%Y%m%d%H%M%S") for k in keys], name="dt"),
+        )
+
+    def fetch_today_minutes(self, code: str) -> pd.DataFrame:
+        """당일 1분봉 전량 (pykis day_chart, 1콜).
+
+        과거분 API 와 달리 페이지네이션이 pykis 내부에서 처리된다.
+        장중 30분마다 호출해 당일 봉을 통째로 덮어쓰는 용도.
+        """
+        chart = self.kis.stock(code).chart(period=1)
+        bars = getattr(chart, "bars", None) or []
+        if not bars:
+            return pd.DataFrame()
+        return pd.DataFrame(
+            {
+                "open":   [int(b.open) for b in bars],
+                "high":   [int(b.high) for b in bars],
+                "low":    [int(b.low) for b in bars],
+                "close":  [int(b.close) for b in bars],
+                "volume": [int(b.volume) for b in bars],
+            },
+            index=pd.DatetimeIndex(
+                [b.time.replace(tzinfo=None) for b in bars], name="dt"),
+        ).sort_index()
+
+    def resample_30m(self, df1m: pd.DataFrame, drop_partial: bool = True,
+                     now: datetime | None = None) -> pd.DataFrame:
+        """1분봉 → 30분봉 집계.
+
+        origin='start_day' + label/closed='left' → 봉 경계가 09:00 / 09:30 / ...
+        로 떨어진다. datetime 은 봉의 **시작 시각**.
+
+        drop_partial: 마지막 봉이 아직 진행 중이면 버린다.
+            M3 는 확정봉만으로 지표를 계산한다(repainting 방지).
+            판정 기준은 "봉 시작 + 30분 <= 현재시각".
+        """
+        if df1m is None or df1m.empty:
+            return pd.DataFrame()
+
+        out = (
+            df1m.resample(f"{self.BAR_MIN}min", origin="start_day",
+                          label="left", closed="left")
+            .agg({"open": "first", "high": "max", "low": "min",
+                  "close": "last", "volume": "sum"})
+            .dropna(subset=["open", "close"])
+        )
+
+        if drop_partial and not out.empty:
+            ref = now or datetime.now()
+            edge = timedelta(minutes=self.BAR_MIN)
+            # 마감(15:30) 이후의 봉은 이미 확정이므로 시각 비교만으로 충분하다.
+            out = out[out.index + edge <= ref]
+
+        return out
+
+    def get_30m_ohlcv(self, code: str, ymd: str, is_today: bool = False,
+                      drop_partial: bool = True) -> pd.DataFrame:
+        """일자 단위 30분봉. compute_indicator_df 입력 형식으로 반환.
+
+        Args:
+            ymd: 'YYYYMMDD'
+            is_today: True 면 당일 API(day_chart), False 면 과거 API(FHKST03010230)
+            drop_partial: 진행 중인 마지막 봉 제외 여부
+
+        반환: [datetime(str), open, high, low, close, volume] 오름차순.
+              데이터 없으면 빈 DataFrame.
+        """
+        df1m = self.fetch_today_minutes(code) if is_today else self.fetch_day_minutes(code, ymd)
+        # 과거 조회에서 다른 날짜 행이 섞여 들어오는 경우가 있어 방어적으로 자른다.
+        if not df1m.empty:
+            day = datetime.strptime(ymd, "%Y%m%d").date()
+            df1m = df1m[df1m.index.date == day]
+
+        df30 = self.resample_30m(df1m, drop_partial=drop_partial)
+        if df30.empty:
+            return pd.DataFrame()
+
+        return pd.DataFrame({
+            "datetime": [t.strftime("%Y-%m-%d %H:%M:%S") for t in df30.index],
+            "open":   df30["open"].astype(int).tolist(),
+            "high":   df30["high"].astype(int).tolist(),
+            "low":    df30["low"].astype(int).tolist(),
+            "close":  df30["close"].astype(int).tolist(),
+            "volume": df30["volume"].astype("int64").tolist(),
+        })

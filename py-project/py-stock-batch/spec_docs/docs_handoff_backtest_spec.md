@@ -140,7 +140,7 @@ CREATE TABLE trade_log (
 
 ### 1-3. `user_options` strategy 파라미터 (s1_*)
 
-`KospiStrategy1` 의 파라미터는 `user_options` 테이블의 `s1_*` 컬럼으로 override 가능하다. **NULL이면 전략 클래스 기본값 사용**. 마이그레이션 DDL은 `migrate_user_options_s1.sql` 참고. 핵심 컬럼:
+`KospiStrategy0` 의 파라미터는 `user_options` 테이블의 `s1_*` 컬럼으로 override 가능하다. **NULL이면 전략 클래스 기본값 사용**. 마이그레이션 DDL은 `migrate_user_options_s1.sql` 참고. 핵심 컬럼:
 
 | 컬럼 | 타입 | 기본값 | 의미 |
 |---|---|---|---|
@@ -286,7 +286,7 @@ avg_bars, exit_breakdown(청산사유별 카운트), trade_list[]
 
 ---
 
-## 4. Strategy: `KospiStrategy1` (핵심 — 정확히 재현)
+## 4. Strategy: `KospiStrategy0` (핵심 — 정확히 재현)
 
 `get_action_with_prev(position_type, prev_info, coin_info, user_info)`:
 - 호출 첫줄에서 `configure(user_info)` 실행 → `user_options.s1_*` 값으로 기본값 override.
@@ -397,7 +397,7 @@ SELL_PROFIT=11, SELL_STOP_LOSS=12, SELL_TRAIL=13, SELL_STOP_PROFIT=14, SELL_TIME
 | DAO(조회/upsert) | `app/domain/dao/tradeCandleDataDao.py` |
 | 지표 계산 | `app/ext_services/kis/component/KisStockService.py` |
 | 백테스트 엔진 | `shared/stock_shared/strategy/backtester.py` |
-| 전략 | `shared/stock_shared/strategy/kospi1.py`, `shared/stock_shared/strategy/base.py` |
+| 전략 | `shared/stock_shared/strategy/kospi0.py`, `shared/stock_shared/strategy/base.py` |
 | 적재 러너 | `app/test/test_5.py` |
 | 백테스트 러너 | `app/test/test_backtest.py` |
 | DTO | `app/domain/dto/userCoinInfo.py`, `app/domain/dto/userOptionMeta.py` |
