@@ -29,9 +29,31 @@
 
 수동 실행
     POST /api/v1/jobs/once/STOCK_CANDLE_30M_BACKFILL_JOB
-      {"mode": "backfill", "days": 30}          과거 30영업일 백필
-      {"mode": "today"}                          당일분만 갱신
-      {"stock_codes": ["237350"]}                종목 한정
+      {"mode": "backfill", "days": 30}              오늘부터 과거 30영업일
+      {"end_date": "2026-07-31", "days": 30}        지정일부터 과거 30영업일
+      {"ym": "202601"}                               2026년 1월 전체
+      {"mode": "today"}                              당일분만 갱신
+      {"stock_codes": ["237350"]}                    종목 한정
+
+구간 지정 파라미터 (택 1)
+    ym        'YYYYMM' / 'YYYY-MM'. 해당 **월 전체**의 평일을 수집한다.
+              days 는 무시된다(월 전체가 목표).
+              진행 중인 달이면 오늘까지만. 미래 달이면 대상 없음.
+              → 월 단위로 끊어 백필할 때. 로그·재실행 단위가 깔끔하다.
+
+    end_date  'YYYY-MM-DD' / 'YYYYMMDD'. 이 날(포함)부터 과거로 days 영업일.
+              미지정 시 오늘. ym 이 있으면 무시된다.
+              → 소급 한계에 걸려 임의 구간으로 쪼개 받을 때.
+
+    두 모드 모두 기준일이 오늘이 아니면 과거 API(FHKST03010230)로 조회한다.
+    (당일 API 는 오늘 세션만 반환하므로 과거 일자엔 의미가 없다)
+
+구간을 나눠 받아도 지표가 깨지지 않는 이유
+    _compute_and_save 가 저장 전에 DB 이력을 전부 끌어와 합친 뒤,
+    **연속된 시계열** 위에서 지표를 계산한다.
+    지표는 과거만 참조하므로, 뒤늦게 앞구간을 채우면 이미 저장된 뒷구간
+    지표도 함께 교정된다(수집분 시작 시각 이후 전 구간 재저장).
+    → ym 을 202601, 202602, ... 순서와 무관하게 돌려도 결과가 같다.
 """
 import time
 from datetime import date, datetime, timedelta
@@ -73,6 +95,12 @@ class TradeCandle30mBackfillJob(Job):
         mode = kwargs.get('mode', 'backfill')
         codes = kwargs.get('stock_codes') or self.M3_CODES
         days = int(kwargs.get('days', self.DEFAULT_DAYS))
+        end_date = self._parse_end_date(kwargs.get('end_date'))
+        ym = self._parse_ym(kwargs.get('ym'))
+
+        # 대상 일자 계획을 미리 확정한다. 종목마다 같은 구간을 돌아야
+        # 두 종목의 봉 구간이 어긋나지 않는다(M3 는 정·역 비교 매매).
+        plan_days, plan_target, plan_label = self._build_day_plan(days, end_date, ym)
 
         engine = KisEngine()
         kis_service = KisService()
@@ -86,7 +114,8 @@ class TradeCandle30mBackfillJob(Job):
                 if mode == 'today':
                     rows = self._run_today(engine, kis_service, meta, code)
                 else:
-                    rows = self._run_backfill(engine, kis_service, meta, code, days)
+                    rows = self._run_backfill(engine, kis_service, meta, code,
+                                              plan_days, plan_target, plan_label)
                 total_rows += rows
                 cnt = self.candle30mDaoImpl.count_by_coin(self.session, code)
                 flag = 'OK' if cnt >= self.TARGET_BARS else f'부족({cnt})'
@@ -97,40 +126,130 @@ class TradeCandle30mBackfillJob(Job):
                 print(f'[{code}] 실패: {type(e).__name__}: {e}', flush=True)
                 details.append(f'{code}:실패')
 
-        desc = f'mode={mode} · ' + ' / '.join(details)
+        head = (f'mode={mode} · ' if mode == 'today'
+                else f'mode={mode} · {plan_label} · ')
+        desc = head + ' / '.join(details)
         print(f'[완료] {desc}', flush=True)
         return {'status': 'SUCCESS', 'batch_cnt': total_rows, 'desc': desc}
 
     # ------------------------------------------------------------------
-    # backfill — 과거 N영업일
+    # 파라미터 해석
     # ------------------------------------------------------------------
-    def _run_backfill(self, engine: KisEngine, kis_service: KisService,
-                      meta: UserOptionMeta, code: str, days: int) -> int:
-        today = date.today()
-        frames = []
-        collected = checked = 0
-        d = today
+    @staticmethod
+    def _parse_end_date(v) -> date:
+        """end_date 파라미터 해석. 'YYYY-MM-DD' / 'YYYYMMDD' / None(=오늘)."""
+        if not v:
+            return date.today()
+        if isinstance(v, date):
+            return v
+        s = str(v).strip().replace('-', '')
+        try:
+            return datetime.strptime(s, '%Y%m%d').date()
+        except ValueError:
+            raise ValueError(f"end_date 형식 오류: {v!r} (YYYY-MM-DD 또는 YYYYMMDD)")
 
-        # 영업일 판정은 달력이 아니라 "데이터가 나오는가"로 한다.
-        # 공휴일 캘린더를 따로 들고 있지 않고, 휴장일은 빈 응답으로 구분된다.
-        # checked 상한은 무한루프 방지용(주말 제외 후 days*2).
-        while collected < days and checked < days * 3:
-            if d.weekday() < 5:                       # 주말은 호출조차 하지 않는다
-                ymd = d.strftime('%Y%m%d')
-                is_today = (d == today)
-                df = engine.get_30m_ohlcv(code, ymd, is_today=is_today,
-                                          drop_partial=True)
-                checked += 1
-                if not df.empty:
-                    frames.append(df)
-                    collected += 1
-                    print(f'  [{code}] {ymd}: 30m {len(df)}봉 '
-                          f'({collected}/{days}일)', flush=True)
-                time.sleep(self.SLEEP_SEC)
+    @staticmethod
+    def _parse_ym(v) -> tuple | None:
+        """ym 파라미터 해석. '202601' / '2026-01' → (2026, 1). None 이면 None."""
+        if not v:
+            return None
+        s = str(v).strip().replace('-', '')
+        if len(s) != 6 or not s.isdigit():
+            raise ValueError(f"ym 형식 오류: {v!r} (YYYYMM 또는 YYYY-MM)")
+        y, m = int(s[:4]), int(s[4:])
+        if not 1 <= m <= 12:
+            raise ValueError(f"ym 월 범위 오류: {v!r}")
+        return y, m
+
+    def _build_day_plan(self, days: int, end_date: date, ym: tuple | None):
+        """수집 대상 후보 일자를 **최신 → 과거** 순으로 확정한다.
+
+        반환: (후보일자 리스트, 목표 영업일 수 | None, 사람이 읽는 라벨)
+
+        목표 수가 None 이면 "후보 전량 수집"이다(ym 모드).
+        목표 수가 있으면 데이터가 나온 날만 세어 그 수를 채우면 중단한다
+        (공휴일 캘린더가 없어 휴장일은 빈 응답으로만 구분되기 때문).
+
+        주말은 후보에서 아예 제외한다 — 호출 자체가 낭비다.
+        """
+        today = date.today()
+
+        # ── ym 모드: 해당 월 전체 ──────────────────────────────────
+        if ym:
+            y, m = ym
+            first = date(y, m, 1)
+            # 다음 달 1일 - 1일 = 이번 달 말일 (12월 → 이듬해 1월로 넘어감)
+            nxt = date(y + 1, 1, 1) if m == 12 else date(y, m + 1, 1)
+            last = nxt - timedelta(days=1)
+
+            if first > today:
+                print(f'  [계획] {y}-{m:02d} 은 미래 월 → 대상 없음', flush=True)
+                return [], None, f'ym={y}{m:02d}(미래)'
+
+            # 진행 중인 달이면 오늘까지만
+            if last > today:
+                last = today
+
+            cands = []
+            d = last
+            while d >= first:
+                if d.weekday() < 5:
+                    cands.append(d)
+                d -= timedelta(days=1)
+
+            label = (f'ym={y}{m:02d}({first:%m/%d}~{last:%m/%d}, '
+                     f'평일 {len(cands)}일)')
+            print(f'  [계획] {label}', flush=True)
+            return cands, None, label
+
+        # ── end_date/days 모드: 기준일부터 과거로 ──────────────────
+        # 후보는 목표의 3배까지 넉넉히 뽑고, 실제 중단은 수집 성공 수로 판단한다.
+        cands = []
+        d = end_date
+        while len(cands) < days * 3:
+            if d.weekday() < 5:
+                cands.append(d)
             d -= timedelta(days=1)
 
+        label = f'end_date={end_date:%Y-%m-%d} · days={days}'
+        print(f'  [계획] {label}', flush=True)
+        return cands, days, label
+
+    # ------------------------------------------------------------------
+    # backfill — 계획된 일자들을 수집
+    # ------------------------------------------------------------------
+    def _run_backfill(self, engine: KisEngine, kis_service: KisService,
+                      meta: UserOptionMeta, code: str,
+                      plan_days: list, target: int | None, label: str) -> int:
+        if not plan_days:
+            print(f'  [{code}] 대상 일자 없음 → skip', flush=True)
+            return 0
+
+        today = date.today()
+        frames = []
+        collected = 0
+
+        print(f'  [{code}] 백필 시작: {label}', flush=True)
+
+        for d in plan_days:
+            if target is not None and collected >= target:
+                break
+
+            ymd = d.strftime('%Y%m%d')
+            # 당일 API 는 오늘 세션만 반환한다. 과거 일자는 전부 과거 API.
+            is_today = (d == today)
+            df = engine.get_30m_ohlcv(code, ymd, is_today=is_today,
+                                      drop_partial=True)
+            if not df.empty:
+                frames.append(df)
+                collected += 1
+                progress = f'{collected}/{target}일' if target else f'{collected}일'
+                print(f'  [{code}] {ymd}: 30m {len(df)}봉 ({progress})', flush=True)
+            time.sleep(self.SLEEP_SEC)
+
         if not frames:
-            print(f'  [{code}] 수집된 봉 없음 → skip', flush=True)
+            print(f'  [{code}] 수집된 봉 없음 → skip '
+                  f'({label}, {len(plan_days)}일 조회)', flush=True)
             return 0
 
         # frames 는 최신일부터 쌓였다. 시간 오름차순으로 정렬해야 지표가 맞는다.
@@ -139,9 +258,12 @@ class TradeCandle30mBackfillJob(Job):
                  .sort_values('datetime')
                  .reset_index(drop=True))
 
+        # 이 회차 수집분 기준 안내. 누적 충족 여부는 run_batch 가 DB 기준으로 찍는다.
         if len(ohlcv) < self.TARGET_BARS:
-            print(f'  [{code}] ⚠ {len(ohlcv)}봉 — 목표 {self.TARGET_BARS} 미달. '
-                  f'days 를 늘려 재실행 필요.', flush=True)
+            oldest = ohlcv['datetime'].iloc[0][:10]
+            print(f'  [{code}] 이번 회차 {len(ohlcv)}봉 ({collected}영업일). '
+                  f'누적이 {self.TARGET_BARS}봉 미만이면 {oldest} 이전 구간을 '
+                  f'추가 백필할 것 (ym 또는 end_date 로 지정).', flush=True)
 
         return self._compute_and_save(kis_service, meta, code, ohlcv)
 
@@ -192,9 +314,56 @@ class TradeCandle30mBackfillJob(Job):
     # ------------------------------------------------------------------
     def _compute_and_save(self, kis_service: KisService, meta: UserOptionMeta,
                           code: str, ohlcv: pd.DataFrame) -> int:
-        computed = kis_service.compute_indicator_df(ohlcv, user_info=meta)
+        """수집분을 DB 이력과 합쳐 지표를 계산하고 저장한다.
+
+        왜 DB 이력을 끌어오는가:
+            ym/end_date 로 구간을 나눠 백필하면, 회차마다 그 구간만 보고
+            지표가 계산된다. ema120·bb_width_avg 같은 장기 지표는 구간 앞머리가
+            전부 왜곡된다(직전 구간을 못 보므로).
+            → DB 에 이미 있는 봉을 전부 합쳐 **연속된 시계열** 위에서 계산한다.
+
+        저장 범위:
+            지표는 과거만 참조하므로, 이번에 새로 끼워 넣은 구간보다 **뒤쪽 봉들도**
+            값이 바뀐다(예: 1월을 나중에 채우면 이미 저장된 2월 지표가 교정된다).
+            그래서 '수집분 최소 datetime 이후 전 구간'을 다시 저장한다.
+        """
+        if ohlcv.empty:
+            return 0
+
+        first_dt = str(ohlcv['datetime'].min())
+
+        # DB 이력 (OHLCV 만 취한다. 지표는 여기서 다시 계산한다)
+        prior = self.candle30mDaoImpl.select_latest(self.session, code, limit=100000)
+        prior_rows = [
+            {'datetime': p['datetime'],
+             'open': float(p['open']), 'high': float(p['high']),
+             'low': float(p['low']), 'close': float(p['close']),
+             'volume': float(p['volume'])}
+            for p in prior
+        ]
+
+        if prior_rows:
+            merged = pd.concat([pd.DataFrame(prior_rows), ohlcv], ignore_index=True)
+        else:
+            merged = ohlcv.copy()
+
+        merged = (merged
+                  .drop_duplicates(subset=['datetime'], keep='last')  # 신규 수집분 우선
+                  .sort_values('datetime')
+                  .reset_index(drop=True))
+
+        computed = kis_service.compute_indicator_df(merged, user_info=meta)
         computed.fillna(0.0, inplace=True)
-        records = computed.to_dict(orient='records')
+
+        # 앞구간(워밍업)은 지표가 어차피 부정확하고 이미 저장돼 있으므로 건드리지 않는다.
+        records = [r for r in computed.to_dict(orient='records')
+                   if str(r.get('datetime', '')) >= first_dt]
+
+        if len(merged) > len(ohlcv):
+            print(f'  [{code}] DB 이력 {len(prior_rows)}봉 + 신규 {len(ohlcv)}봉 '
+                  f'→ {len(merged)}봉 위에서 지표 계산 · {len(records)}행 저장',
+                  flush=True)
+
         rows = self.candle30mDaoImpl.upsert_candle_bulk(self.session, code, records)
         self.session.commit()
         return rows
