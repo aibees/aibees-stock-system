@@ -290,7 +290,18 @@ class KisEngine:
     BAR_MIN = 30                    # 봉 크기(분)
     MKT_OPEN = "090000"             # 정규장 시작
     MKT_CLOSE = "153000"            # 정규장 종료 (15:20~15:30 종가 단일가 포함)
-    _MINUTE_PAGE = 120              # FHKST03010230 1회 최대 건수
+
+    # 정규장 09:00~15:29 = 390분. 하루 완전성 판정 기준.
+    EXPECTED_MINUTES = 390
+    # 이 비율 미만이면 '불완전한 날'로 보고 버린다.
+    #   왜 버리는가: 오전 구간이 잘린 채 저장되면 09:00~11:00 봉이 통째로 없는
+    #   날이 생기고, 그 상태로 지표를 계산하면 전 구간이 조용히 오염된다.
+    #   부분 데이터를 남기는 것보다 그날을 통째로 빼는 쪽이 안전하다.
+    MIN_MINUTE_RATIO = 0.90
+    # 페이지네이션 상한. 페이지 크기를 모르므로(30건인지 120건인지 응답마다 다름)
+    #   횟수를 고정하지 않고 '09:00 에 닿을 때까지' 돈다. 이건 무한루프 방지용 캡.
+    #   페이지가 30건이어도 390/30 = 13회면 되므로 20이면 충분하다.
+    _MAX_PAGES = 20
 
     def _fetch_day_minutes_page(self, code: str, ymd: str, hhmmss: str) -> list:
         """주식일별분봉조회 1페이지. hhmmss 이전 방향으로 최대 120건 반환.
@@ -330,36 +341,73 @@ class KisEngine:
 
         return [r for r in (j.get("output2") or []) if r.get("stck_cntg_hour")]
 
-    def fetch_day_minutes(self, code: str, ymd: str) -> pd.DataFrame:
+    @staticmethod
+    def _norm_hhmmss(v) -> str:
+        """체결시각을 HHMMSS 6자리로 정규화.
+
+        응답이 'HHMM'(4자리) 또는 앞자리 0이 빠진 'HMMSS'(5자리)로 오는 경우가
+        있다. 예전 구현은 길이 14 키만 받아들여서, 형식이 다르면 그날 데이터가
+        통째로 조용히 버려졌다.
+        """
+        s = str(v or "").strip()
+        if not s.isdigit():
+            return ""
+        if len(s) == 4:          # HHMM → HHMM00
+            s += "00"
+        return s.zfill(6) if len(s) <= 6 else s[:6]
+
+    def fetch_day_minutes(self, code: str, ymd: str, verbose: bool = False) -> pd.DataFrame:
         """특정 일자(YYYYMMDD) 1분봉 전량.
 
-        1회 120건 제한이라 마감시각부터 커서를 내리며 4~5회 호출한다.
+        마감시각(15:30)부터 커서를 내리며 09:00 에 닿을 때까지 반복 호출한다.
+
+        ※ 페이지 크기를 가정하지 않는다.
+          이전 구현은 '페이지당 120건'을 전제로 6회만 돌았는데, 실제 응답이
+          30건이면 6×30 = 180분밖에 못 받아 **오전 구간이 통째로 누락**됐다.
+          그 상태로 resample 하면 하루 13봉이어야 할 게 5~6봉만 생기고,
+          그날의 시가가 사라진 채 저장된다. → 종료 조건을 횟수가 아니라
+          '09:00 도달'로 바꾸고, 도달 실패 시 경고한다.
+
         반환: DatetimeIndex + [open, high, low, close, volume]. 없으면 빈 DF.
         """
         seen: dict[str, dict] = {}
         cursor = self.MKT_CLOSE
+        reached_open = False
+        pages = 0
 
-        # 390분 / 120 ≈ 3.25 → 4회면 충분하나 시간외/이상치 대비 6회 상한.
-        for _ in range(6):
+        for _ in range(self._MAX_PAGES):
             rows = self._fetch_day_minutes_page(code, ymd, cursor)
+            pages += 1
             if not rows:
                 break
 
             before = len(seen)
+            hours = []
             for r in rows:
+                hh = self._norm_hhmmss(r.get("stck_cntg_hour"))
+                if not hh:
+                    continue
+                hours.append(hh)
                 # stck_bsop_date 가 비어 오는 응답이 있어 요청 일자로 보정한다.
-                bsop = str(r.get("stck_bsop_date") or ymd)
-                key = bsop + str(r.get("stck_cntg_hour") or "")
+                bsop = str(r.get("stck_bsop_date") or ymd).strip() or ymd
+                key = bsop + hh
                 if len(key) == 14 and key not in seen:
                     seen[key] = r
-            if len(seen) == before:
+
+            if not hours or len(seen) == before:
                 break                       # 진전 없음 → 무한루프 방지
 
-            oldest = min(str(r.get("stck_cntg_hour", "")) for r in rows)
-            if not oldest or oldest <= self.MKT_OPEN:
+            oldest = min(hours)
+            if oldest <= self.MKT_OPEN:
+                reached_open = True
                 break
             cursor = (datetime.strptime(oldest, "%H%M%S")
                       - timedelta(minutes=1)).strftime("%H%M%S")
+
+        got = len(seen)
+        if verbose or got < self.EXPECTED_MINUTES * self.MIN_MINUTE_RATIO:
+            print(f"[fetch_day_minutes] {code} {ymd}: {got}분 수집 "
+                  f"({pages}페이지, 09:00도달={reached_open})", flush=True)
 
         return self._minute_rows_to_df(seen)
 
@@ -435,22 +483,56 @@ class KisEngine:
         return out
 
     def get_30m_ohlcv(self, code: str, ymd: str, is_today: bool = False,
-                      drop_partial: bool = True) -> pd.DataFrame:
+                      drop_partial: bool = True,
+                      require_complete: bool = True) -> pd.DataFrame:
         """일자 단위 30분봉. compute_indicator_df 입력 형식으로 반환.
 
         Args:
             ymd: 'YYYYMMDD'
             is_today: True 면 당일 API(day_chart), False 면 과거 API(FHKST03010230)
             drop_partial: 진행 중인 마지막 봉 제외 여부
+            require_complete: 1분봉이 EXPECTED_MINUTES 의 MIN_MINUTE_RATIO 에
+                못 미치면 그날을 통째로 버린다(빈 DF 반환).
+                장중(is_today) 은 아직 하루가 안 끝났으므로 자동 면제된다.
 
         반환: [datetime(str), open, high, low, close, volume] 오름차순.
-              데이터 없으면 빈 DataFrame.
+              데이터 없거나 불완전하면 빈 DataFrame.
         """
         df1m = self.fetch_today_minutes(code) if is_today else self.fetch_day_minutes(code, ymd)
-        # 과거 조회에서 다른 날짜 행이 섞여 들어오는 경우가 있어 방어적으로 자른다.
-        if not df1m.empty:
-            day = datetime.strptime(ymd, "%Y%m%d").date()
+        if df1m.empty:
+            return pd.DataFrame()
+
+        # ── 날짜 정합성 ────────────────────────────────────────────────
+        # 과거 조회 API 가 요청 날짜를 무시하고 다른 날 데이터를 주는 경우가 있다.
+        # 예전엔 이걸 조용히 필터링해 빈 DF 로 넘겼는데, 그러면 "휴장일" 과
+        # "API 가 엉뚱한 날을 줬다" 를 구분할 수 없다 → 명시적으로 경고한다.
+        day = datetime.strptime(ymd, "%Y%m%d").date()
+        other = df1m[df1m.index.date != day]
+        if len(other):
+            got_days = sorted({str(d) for d in other.index.date})
+            print(f"[get_30m_ohlcv] {code} {ymd}: 요청과 다른 날짜 {len(other)}행 "
+                  f"섞임 {got_days[:3]} → 제외", flush=True)
             df1m = df1m[df1m.index.date == day]
+        if df1m.empty:
+            print(f"[get_30m_ohlcv] {code} {ymd}: 요청 날짜 데이터가 0행 → skip",
+                  flush=True)
+            return pd.DataFrame()
+
+        # ── 완전성 게이트 ──────────────────────────────────────────────
+        # 오전이 잘린 하루를 저장하면 그날 시가가 사라지고 봉 수가 들쭉날쭉해진다.
+        # 그 상태로 지표를 계산하면 전 구간이 조용히 오염되므로, 애매하면 버린다.
+        if require_complete and not is_today:
+            need = self.EXPECTED_MINUTES * self.MIN_MINUTE_RATIO
+            if len(df1m) < need:
+                print(f"[get_30m_ohlcv] {code} {ymd}: 1분봉 {len(df1m)}/"
+                      f"{self.EXPECTED_MINUTES}분 (기준 {need:.0f}) → 불완전, 버림",
+                      flush=True)
+                return pd.DataFrame()
+            first_hm = df1m.index[0].strftime("%H:%M")
+            if first_hm != "09:00":
+                print(f"[get_30m_ohlcv] {code} {ymd}: 첫 1분봉이 {first_hm} "
+                      f"(09:00 아님) → 오전 누락, 버림", flush=True)
+                return pd.DataFrame()
 
         df30 = self.resample_30m(df1m, drop_partial=drop_partial)
         if df30.empty:

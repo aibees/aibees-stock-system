@@ -2,6 +2,7 @@ from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
 from app.domain.dao.tradeSellTargetStockDao import TradeSellTargetStockDao
 from stock_shared.dao.stockSellRequestDao import StockSellRequestDao
+from stock_shared.strategy import scoring
 
 
 class StockService:
@@ -93,17 +94,12 @@ class StockService:
     #  - result_list 의 각 dict 에 'score'(0~100), 'rank_no'(1=최상위) 를 주입
     #  - 순위는 그날 후보 전체를 비교하는 단면 연산이므로 배치 루프 종료 후 1회 수행
     # ──────────────────────────────────────────────────────────────────
+    # ※ 스코어 계산 본체는 stock_shared.strategy.scoring 으로 이동했다.
+    #   M3 교대매매 시뮬레이터가 같은 로직을 써야 하는데 shared → py-stock-batch
+    #   방향 import 가 불가능해서다. 아래 메서드들은 호환용 위임 래퍼다.
     @staticmethod
     def _to_float(v):
-        try:
-            if v is None:
-                return None
-            s = str(v).replace('%', '').replace(',', '').strip()
-            if s in ('', '-', 'N/A'):
-                return None
-            return float(s)
-        except (ValueError, TypeError):
-            return None
+        return scoring.to_float(v)
 
     # ── 대조군 분석 반영 (2026-08-08, WIN 34건 vs CONTROL 470건 비교) ──────────
     # 근거: 매수추천_성공패턴_대조군분석.xlsx.
@@ -112,89 +108,14 @@ class StockService:
     #  · is_vol_limit='Y' 는 WIN 34건 전원(100%) 충족 → 비중 상향.
     #  · ATR/종가(atr_ratio, 변동성): WIN 평균 11.8% vs CONTROL 8.9% — 가장 유의한 차이 → 신규 가점.
     #  · 고점 대비 눌림(dip_from_high): WIN -19.3% vs CONTROL -12.1% → 신규 가점(깊이 눌릴수록 유리).
-    _ATR_RATIO_LO, _ATR_RATIO_HI = 0.05, 0.12          # kospi1.atr_ratio_min ~ atr_ratio_full_score 와 동일 구간
-    _DIP_LO_PCT, _DIP_HI_PCT = 0.03, 0.15              # kospi1.dip_from_high_min_pct ~ full_pct 와 동일 구간
+    _ATR_RATIO_LO, _ATR_RATIO_HI = scoring.ATR_RATIO_LO, scoring.ATR_RATIO_HI
+    _DIP_LO_PCT, _DIP_HI_PCT = scoring.DIP_LO_PCT, scoring.DIP_HI_PCT
 
     def _tech_score(self, ind: dict) -> float:
-        # MACD: 'macd_slope_up'(기울기 상승) 우선 사용. 구버전/DB 재구성 등으로 이 키가
-        # 없는 indicator dict 가 들어오면 raw 골든크로스로 폴백한다.
-        macd_slope_up = ind.get('macd_slope_up')
-        if macd_slope_up is None:
-            macd_slope_up = 'Y' if ind.get('macd_cross') == 'G' else 'N'
-        macd = 1.0 if macd_slope_up == 'Y' else 0.4
-
-        bb = 1.0 if ind.get('is_bb_mid_breakout') == 'Y' else 0.0
-        vl = 1.0 if ind.get('is_vol_limit') == 'Y' else 0.0
-
-        atr_ratio = self._to_float(ind.get('atr_ratio'))
-        if atr_ratio is None:
-            atr = 0.0
-        elif atr_ratio <= self._ATR_RATIO_LO:
-            atr = 0.0
-        elif atr_ratio >= self._ATR_RATIO_HI:
-            atr = 1.0
-        else:
-            atr = (atr_ratio - self._ATR_RATIO_LO) / (self._ATR_RATIO_HI - self._ATR_RATIO_LO)
-
-        dip = self._to_float(ind.get('dip_from_high'))  # 0 이하(음수), 예: -0.193
-        if dip is None:
-            dip_score = 0.0
-        else:
-            d = abs(dip)
-            if d <= self._DIP_LO_PCT:
-                dip_score = 0.0
-            elif d >= self._DIP_HI_PCT:
-                dip_score = 1.0
-            else:
-                dip_score = (d - self._DIP_LO_PCT) / (self._DIP_HI_PCT - self._DIP_LO_PCT)
-
-        # 가중치: macd 0.30 · bb중심선돌파 0.15 · 거래량하한 0.20 · 변동성(ATR) 0.20 · 눌림목 0.15
-        return 0.30 * macd + 0.15 * bb + 0.20 * vl + 0.20 * atr + 0.15 * dip_score
+        return scoring.tech_score(ind)
 
     def _fund_score(self, fin: dict) -> float:
-        eps = self._to_float(fin.get('eps'))
-        per = self._to_float(fin.get('per'))
-        pbr = self._to_float(fin.get('pbr'))
-        roe = self._to_float(fin.get('roe'))
-        peg = self._to_float(fin.get('peg'))
-
-        prof = (eps is not None and eps > 0)
-        eps_s = 1.0 if prof else 0.0
-        # PER: 적자/None 0점, 0~10 우량, ~20 보통
-        if not prof or per is None:
-            per_s = 0.0
-        elif 0 < per <= 10:
-            per_s = 1.0
-        elif per <= 20:
-            per_s = 0.5
-        else:
-            per_s = 0.0
-        # PBR
-        if pbr is None:
-            pbr_s = 0.0
-        elif pbr <= 1.0:
-            pbr_s = 1.0
-        elif pbr <= 2.0:
-            pbr_s = 0.5
-        else:
-            pbr_s = 0.0
-        # ROE: 분수(0.14=14%) 가정, 혹시 %로 들어오면 보정
-        if roe is None:
-            roe_s = 0.0
-        else:
-            if abs(roe) > 1.5:
-                roe = roe / 100.0
-            roe_s = 1.0 if roe >= 0.12 else (0.5 if roe >= 0.05 else 0.0)
-        # PEG: 적자 0점, 0이하(데이터없음) 중립, 0~1 우량
-        if not prof:
-            peg_s = 0.0
-        elif peg is None or peg <= 0:
-            peg_s = 0.5
-        elif peg <= 1:
-            peg_s = 1.0
-        else:
-            peg_s = 0.5
-        return (eps_s + per_s + pbr_s + roe_s + peg_s) / 5.0
+        return scoring.fund_score(fin)
 
     @staticmethod
     def _parse_rate(r) -> float:
@@ -216,28 +137,23 @@ class StockService:
           그날 신규 후보가 없으면 재추천 종목도 여전히 rank1이 될 수 있음).
           같은 종목을 며칠 연속 rank1으로 반복 매수하는 걸 줄이려는 목적.
           get_recent_target_codes() 로 구해서 넘긴다."""
-        import math
         if not result_list:
             return result_list
         recent_codes = recent_codes or set()
 
-        # 유동성: 거래대금(close*volume) log 정규화
+        # 유동성: 거래대금(close*volume) log 정규화 (단면 연산)
         turns = []
         for r in result_list:
             t = r.get('todayStock', {})
             close = self._to_float(t.get('close')) or 0.0
             vol = self._to_float(t.get('volume')) or 0.0
             turns.append(max(close * vol, 1.0))  # log 안정화 위해 하한 1
-        logs = [math.log10(x) for x in turns]
-        lo, hi = min(logs), max(logs)
-        span = (hi - lo) if hi > lo else 0.0
+        liqs = scoring.normalize_liquidity(turns)
 
         for i, r in enumerate(result_list):
-            tech = self._tech_score(r.get('indicator', {}))
-            fund = self._fund_score(r.get('fin', {}))
-            liq = ((logs[i] - lo) / span) if span > 0 else 1.0  # 단일/동일 시 만점
-            score = 100.0 * (0.5 * tech + 0.3 * fund + 0.2 * liq)
-            r['score'] = round(score, 2)
+            tech = scoring.tech_score(r.get('indicator', {}))
+            fund = scoring.fund_score(r.get('fin', {}))
+            r['score'] = round(scoring.total_score(tech, fund, liqs[i]), 2)
 
         # 재추천 페널티(0=신규, 1=최근 N일 내 재등장) → 과열최저(rate 오름차순) → rank_no.
         # 동률이면 score 내림차순.

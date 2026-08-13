@@ -104,10 +104,17 @@ class KisBacktester:
         ui.bars_held = 0
 
     # ──────────────────────────────────────────────────────────────
-    def run_one(self, coin_code: str, rows: list[dict], base_user_info: UserOptionMeta) -> dict:
-        """단일 종목 백테스트. rows = datetime 오름차순 정렬된 candle dict 리스트"""
-        ui = self._new_user_info(base_user_info)
+    def enrich_rows(self, rows: list[dict]) -> list[dict]:
+        """DB candle 에 없는 파생 컬럼을 즉석 계산해 rows 에 주입한다(in-place).
 
+        trade_candle_data / trade_candle_30m 에는 vol_avg · downtrend_ratio ·
+        hma · chegyul_strength 컬럼이 없다. 라이브 경로는 compute_indicator_df 가
+        채우지만, DB 재생 경로(백테스트/시뮬레이션)는 여기서 직접 만들어야 한다.
+
+        run_one 이 호출하며, M3 교대 시뮬레이터처럼 run_one 을 안 쓰는 경로도
+        같은 전처리를 재사용할 수 있도록 분리해 뒀다.
+        rows 는 datetime 오름차순 정렬 전제.
+        """
         # DB candle 에는 vol_avg 컬럼이 없으므로 백테스트 시 즉석 계산해 주입
         # (라이브 경로는 compute_indicator_df 가 vol_avg 를 채움)
         w = getattr(self.strategy, 'vol_ma_window', 20)
@@ -154,6 +161,14 @@ class KisBacktester:
             lo = float(rows[i].get('low') or 0)
             cl = float(rows[i].get('close') or 0)
             rows[i]['chegyul_strength'] = ((cl - lo) / (hi - lo) * 200.0) if hi > lo else 100.0
+
+        return rows
+
+    # ──────────────────────────────────────────────────────────────
+    def run_one(self, coin_code: str, rows: list[dict], base_user_info: UserOptionMeta) -> dict:
+        """단일 종목 백테스트. rows = datetime 오름차순 정렬된 candle dict 리스트"""
+        ui = self._new_user_info(base_user_info)
+        self.enrich_rows(rows)
 
         trades = []
         in_pos = False
