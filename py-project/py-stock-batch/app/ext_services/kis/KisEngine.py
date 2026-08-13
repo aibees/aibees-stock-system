@@ -291,6 +291,15 @@ class KisEngine:
     MKT_OPEN = "090000"             # 정규장 시작
     MKT_CLOSE = "153000"            # 정규장 종료 (15:20~15:30 종가 단일가 포함)
 
+    # 30분봉 라벨 규약. 'end' | 'start'
+    #   'end'  : 09:00~09:30 구간 → '09:30' 봉. **HTS(영웅문/나무 등)와 동일**.
+    #            하루 13봉 = 09:30, 10:00, ... , 15:00, 15:30.
+    #   'start': 09:00~09:30 구간 → '09:00' 봉. pandas/퀀트 관례.
+    #            하루 13봉 = 09:00, 09:30, ... , 14:30, 15:00.
+    # HTS 차트와 눈으로 대조할 일이 많아 기본을 'end' 로 둔다.
+    # ⚠ 이 값을 바꾸면 저장되는 datetime 이 30분 밀린다 → 반드시 재백필할 것.
+    BAR_LABEL = 'end'
+
     # 정규장 09:00~15:29 = 390분. 하루 완전성 판정 기준.
     EXPECTED_MINUTES = 390
     # 이 비율 미만이면 '불완전한 날'로 보고 버린다.
@@ -466,19 +475,53 @@ class KisEngine:
         if df1m is None or df1m.empty:
             return pd.DataFrame()
 
+        # ── 세션 경계 정렬 ────────────────────────────────────────────
+        # 단순 resample 로는 종가단일가(15:20~15:30 → 15:30:00 분봉)를 놓친다.
+        #   pandas 버킷 [15:00, 15:30) 은 15:30:00 을 배제하고 별도 15:30 버킷
+        #   (1분짜리)으로 떨궈, 그날의 **진짜 종가가 정상 봉에 안 들어간다**.
+        #   → 마지막 슬롯만 오른쪽 닫힘 [15:00, 15:30] 으로 처리한다.
+        #
+        # 슬롯 = 09:00~09:30, 09:30~10:00, ... , 15:00~15:30 (13개).
+        idx = df1m.index
+        day_start = idx[0].normalize()
+        open_min = day_start + pd.Timedelta(self.MKT_OPEN[:2] + 'h')          # 09:00
+        close_min = day_start + pd.Timedelta(hours=int(self.MKT_CLOSE[:2]),
+                                             minutes=int(self.MKT_CLOSE[2:4]))  # 15:30
+
+        # 정규장 밖(시간외/장전)은 버린다. 섞이면 09:00 봉의 시가가 오염된다.
+        df1m = df1m[(idx >= open_min) & (idx <= close_min)]
+        if df1m.empty:
+            return pd.DataFrame()
+
+        # 각 1분봉이 속할 슬롯 시작시각. 15:30 정각은 마지막 슬롯(15:00)에 귀속.
+        elapsed = (df1m.index - open_min) // pd.Timedelta(minutes=self.BAR_MIN)
+        slot_no = elapsed.to_numpy().copy()
+        last_slot = ((close_min - open_min) // pd.Timedelta(minutes=self.BAR_MIN)) - 1
+        slot_no[slot_no > last_slot] = last_slot        # 15:30:00 → 15:00 슬롯
+        slot_start = open_min + pd.to_timedelta(slot_no * self.BAR_MIN, unit='m')
+
         out = (
-            df1m.resample(f"{self.BAR_MIN}min", origin="start_day",
-                          label="left", closed="left")
+            df1m.groupby(slot_start)
             .agg({"open": "first", "high": "max", "low": "min",
                   "close": "last", "volume": "sum"})
             .dropna(subset=["open", "close"])
+            .sort_index()
         )
+        out.index.name = 'dt'
 
+        # ── 미확정 봉 제거 ────────────────────────────────────────────
         if drop_partial and not out.empty:
             ref = now or datetime.now()
             edge = timedelta(minutes=self.BAR_MIN)
-            # 마감(15:30) 이후의 봉은 이미 확정이므로 시각 비교만으로 충분하다.
             out = out[out.index + edge <= ref]
+
+        # ── 라벨 규약 ─────────────────────────────────────────────────
+        # 여기까지는 '슬롯 시작시각' 기준이다. HTS(영웅문/나무 등)는 30분봉을
+        # **종료시각**으로 표시한다(09:00~09:30 구간 → '09:30' 봉).
+        # BAR_LABEL='end' 면 +30분 해서 HTS 와 눈으로 대조 가능하게 맞춘다.
+        if self.BAR_LABEL == 'end':
+            out.index = out.index + timedelta(minutes=self.BAR_MIN)
+            out.index.name = 'dt'
 
         return out
 
