@@ -10,7 +10,8 @@ trade_worker 진입점 (유저 1명당 1 프로세스, 상시 daemon).
       · NXT_BUY_TIME(기본 08:00) → NXT 프리마켓 지정가 선매수(1위가 NXT 대상일 때만).
       · BUY_TIME(기본 09:00)     → 개장 일봉정리 + KRX 정규장 시장가 매수.
   - 매도 엔진: 실시간 소켓 구독(stop/target/trail 라인 감시).
-  - 안전장치: DRY_RUN 기본 true (실주문 전 로그만).
+  - 실전투자 전용 — 뜨는 순간 실주문이 나간다. 예전엔 DRY_RUN 이 "최우선 안전장치"로
+    적혀 있었으나 실제로는 주문 경로에서 분기하지 않아 아무 효과가 없었다 → 완전 제거(2026-08-20).
 
 메인 py-stock-batch(gunicorn 웹앱)과 별개의 진입점이다.
 """
@@ -140,9 +141,11 @@ def _reconcile_positions(cfg, broker, repo):
       - 테이블 HOLDING인데 실제 미보유 → 외부청산으로 종료(SOLD)   ← 안전장치
       - 수량 불일치 → 실제 수량으로 갱신
 
-    ※ 수동매수(HTS·MTS 등 타채널) 보유종목은 **흡수하지 않는다**.
-      worker 는 자기가 산 것만 감시·매도한다. 계좌 실제 보유 전체는
-      user_holdings(wallet_sync) 에 미러링되며 그쪽이 조회용 정본이다.
+    ※ 이 함수 자체는 수동매수(HTS·MTS 등 타채널) 보유종목을 흡수하지 않는다 —
+      worker 자기 포지션(trade_worker_position) 대조 전용이다. 타채널 보유종목의
+      편입은 별도 경로다: wallet_sync.reconcile_wallet(sell_executor=sell) 이
+      WALLET_POLL_SEC 주기로 계좌 실보유(user_holdings) 를 대조해 편입한다
+      (2026-08-21, §11.4 대체 구현 — 편입되면 모드 자동매도 대상이 됨).
     """
     holdings = broker.account_holdings()
     if holdings is None:
@@ -178,8 +181,8 @@ def _reconcile_positions(cfg, broker, repo):
 def main():
     # 1. Config Load
     cfg = config.load()
-    log.info("[main] trade_worker 시작 / user_id=%s / mode=%s / buy=%02d:%02d",
-             cfg.user_id, cfg.mode, cfg.buy_hour, cfg.buy_minute)
+    log.info("[main] trade_worker 시작 / user_id=%s / buy=%02d:%02d",
+             cfg.user_id, cfg.buy_hour, cfg.buy_minute)
 
     # 2. USER KIS 세션 (KIS_USER_ID → keyLoader → DB key). 실전 전용.
     engine = KisEngine(user_id=cfg.user_id)
@@ -191,7 +194,7 @@ def main():
     repo = Repository()
 
     # 5. Create Notifier / 텔레그램 우선, 실패 시 이메일 fallback
-    notifier = Notifier(repo.get_user_notify(cfg.user_id), mode_tag=cfg.mode)
+    notifier = Notifier(repo.get_user_notify(cfg.user_id))
 
     # 6. 매도 전략 — user_trade_mode.active_mode 로 전략 결정. 라인/액션 자체 계산
     #    repo 를 넘겨야 SellStrategy 가 유저의 운용모드를 읽는다. 안 넘기면 DEFAULT_MODE 로 굳는다.
@@ -243,7 +246,9 @@ def main():
             return
         _ext_sync_at[0] = now
         try:
-            reconcile_wallet(broker, repo, cfg.user_id, sync=True, tag="외부체결")
+            # sell_executor=sell: 이 계좌에 방금 잡힌 체결이 worker 가 모르는(HTS/MTS)
+            # 신규 보유 종목이면 즉시 trade_worker_position 에 편입 + 실시간 감시 시작.
+            reconcile_wallet(broker, repo, cfg.user_id, sync=True, tag="외부체결", sell_executor=sell)
             log.info("[외부체결] %s qty=%s price=%s order=%s → 계좌 즉시 동기화",
                      symbol, qty, price, order_no)
         except Exception as e:  # noqa: BLE001
@@ -386,7 +391,10 @@ def main():
         if not _is_trading_day_cached(now_kst):                     # 휴장일
             return
         try:
-            reconcile_wallet(broker, repo, cfg.user_id, sync=True, tag="poll")
+            # sell_executor=sell: 계좌 실보유 중 worker 미추적 종목(HTS/MTS 등)을
+            # trade_worker_position 으로 편입한다 — 편입되면 모드 자동매도 대상이 됨
+            # (wallet_sync.py 모듈 docstring 참고).
+            reconcile_wallet(broker, repo, cfg.user_id, sync=True, tag="poll", sell_executor=sell)
         except Exception as e:  # noqa: BLE001
             log.warning("[poll] 계좌 갱신 실패: %s", e)
         # 끝내 체결도 취소도 되지 않은 주문 추적을 정리한다(메모리 누수 방지).

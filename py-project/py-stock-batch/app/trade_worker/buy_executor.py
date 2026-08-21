@@ -91,7 +91,7 @@ class BaseBuyExecutor(ABC):
         """premarket=False: 정규장 · 시장가 / True: NXT 프리마켓 · 지정가."""
         uid = self.cfg.user_id
         tag = "NXT프리마켓" if premarket else "정규장"
-        self.wlog.info("[매수] 시작 user_id=%s (%s · %s)", uid, self.cfg.mode, tag)
+        self.wlog.info("[매수] 시작 user_id=%s (%s)", uid, tag)
 
         if premarket and not self.supports_premarket():
             self.wlog.info("[매수] %s 는 프리마켓 라운드를 쓰지 않음 → skip", type(self).__name__)

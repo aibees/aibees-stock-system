@@ -23,11 +23,25 @@
   시간에 SOR 시장가가 나가 거부되고 연속 실패로 종목이 자동 비활성된다.
 
 체결 → sold 처리 · 잔고 증가 · trade_log.
+
+매도 수기등록(지정가, 모드 무관, sql/08_manual_sell_order_ddl.sql):
+  trade_worker_manual_sell 에 ARMED 행이 있는 종목은 위 두 판정 경로(on_price 의
+  hit_line, refresh_positions 의 strategy.evaluate) 를 **둘 다** 건너뛰고
+  sell_price 도달 여부만 본다 — 활성 운용모드가 M1/M2/M3 무엇이든 동일하다
+  (reload_manual_sells 참고). 사용자가 "이 종목은 자동 rule 대신 이 가격에
+  팔아달라"고 등록해두면 모드 전략보다 우선한다는 뜻. 판정 대상은 self.positions
+  (trade_worker_position HOLDING)에 있는 종목뿐이다 — worker 가 직접 산 게
+  아니어도(HTS/MTS 등 타채널 매수) wallet_sync.reconcile_wallet 이 주기적으로
+  (WALLET_POLL_SEC, 기본 30초) 계좌 실보유를 대조해 자동 편입하므로(2026-08-21,
+  §11.4 대체 구현) 등록 후 한 폴링 주기 안에는 감시가 시작된다. 다만 그 편입은
+  이 종목 하나만 지정가로 지키는 게 아니라 **활성 운용모드의 자동 손절/익절/
+  트레일링/타임스탑 대상으로도** 편입한다는 뜻이라, 수기등록 없이 그냥 보유만
+  하던 종목도 같이 편입되면 알고리즘이 임의로 팔 수 있다(wallet_sync.py 참고).
 """
 import threading
 import time
 from abc import ABC, abstractmethod
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 
 from app.trade_worker.broker import Broker
 from app.trade_worker.config import WorkerConfig
@@ -61,12 +75,60 @@ class BaseSellExecutor(ABC):
         self._peak_dirty: set[str] = set()     # 장중 고점이 갱신돼 flush 대상인 종목
         self._peak_log: dict[str, float] = {}  # 고점 갱신 로그 throttle 만료시각
         self._pending_reason: dict[str, str] = {}  # 잔여 주문 추적중인 종목의 매도 사유
+        self._manual_sells: dict[str, dict] = {}    # symbol -> 매도 수기등록(ARMED) row. 있으면 모드 rule 무시
         self._lock = threading.Lock()
 
     # ── 구독 시작 ────────────────────────────────────────────────────
     def start(self):
         # 체결통보 구독은 broker.start_fill_tracking() 이 담당(main). 여기선 시세만.
         self.reload_positions()
+        self.reload_manual_sells()
+
+    # ── 매도 수기등록(지정가, 모드 무관) 재적재 ─────────────────────────
+    def reload_manual_sells(self):
+        """trade_worker_manual_sell(ARMED) 재적재.
+
+        등록된 종목은 **현재 활성 운용모드가 무엇이든**(M1/M2/M3) 그 모드의
+        자동 매도 rule(hit_line/일봉 신호)을 보지 않고 여기 담긴 sell_price
+        도달 여부만으로 매도한다 — on_price/refresh_positions 에서 모드 판정보다
+        먼저(선제) 확인한다. apply_settings_change() 폴링 주기(기본 60초)에
+        같이 불려 화면에서 등록/취소한 내역을 반영한다.
+        """
+        try:
+            rows = self.repo.get_active_manual_sells(self.cfg.user_id)
+        except Exception as e:  # noqa: BLE001  (테이블 미생성 등 — worker 는 죽지 않는다)
+            self.wlog.warn("[매도] 수기등록 조회 실패: %s", e)
+            return
+        fresh = {r["stock_code"]: r for r in rows}
+        with self._lock:
+            added = fresh.keys() - self._manual_sells.keys()
+            removed = self._manual_sells.keys() - fresh.keys()
+            self._manual_sells = fresh
+        for code in added:
+            if code not in self.positions:
+                # 아직 trade_worker_position 에 없는 종목 — wallet_sync.reconcile_wallet
+                # 의 주기 편입(WALLET_POLL_SEC)이 이 종목을 계좌 실보유에서 찾아 넣어줄
+                # 때까지 일시적으로 감시 밖이다(영구 미구현이 아니라 다음 폴링까지의 지연).
+                self.wlog.warn("[매도] %s 수기등록됐지만 아직 worker 편입 전 → 다음 계좌 동기화 후 감시 시작",
+                               code)
+                continue
+            self.wlog.info("[매도] %s 수기등록 감지 @%s → 이후 자동 rule 대신 지정가만 감시",
+                           code, fresh[code].get("sell_price"))
+        for code in removed:
+            self.wlog.info("[매도] %s 수기등록 해제(취소/체결) → 자동 rule 로 복귀", code)
+
+    def _complete_manual_if_needed(self, symbol: str, reason: str, fill_px, filled_qty):
+        """MANUAL_SELL 로 전량 청산됐으면 trade_worker_manual_sell 을 DONE 으로 닫는다.
+        일부 수량만(qty_ratio<1) 팔렸어도 remain=0(이번 매도로 보유 전부 소진)이면
+        수기등록 자체는 완료로 본다 — 재등록 전까지 같은 종목을 다시 팔지 않는다."""
+        if reason != "MANUAL_SELL":
+            return
+        try:
+            self.repo.complete_manual_sell(self.cfg.user_id, symbol, fill_px, filled_qty)
+        except Exception as e:  # noqa: BLE001
+            self.wlog.warn("[매도] %s 수기등록 완료 처리 실패: %s", symbol, e)
+        with self._lock:
+            self._manual_sells.pop(symbol, None)
 
     """
     worker 보유(trade_worker_position HOLDING) 종목을 감시 대상으로 갱신.
@@ -148,16 +210,31 @@ class BaseSellExecutor(ABC):
         cd = self._cooldown.get(symbol)
         if cd and time.time() < cd:
             return
-        reason = self.hit_line(pos, price)
-        if not reason:
-            return
+
+        # ── 매도 수기등록 우선(선제) 확인 ──────────────────────────────
+        # 이 종목에 사용자가 지정가를 등록해뒀으면, 활성 운용모드가 무엇이든
+        # 그 모드의 hit_line(stop/target/trail)은 아예 보지 않는다.
+        manual = self._manual_sells.get(symbol)
+        if manual is not None:
+            if Decimal(str(price)) < Decimal(str(manual["sell_price"])):
+                return   # 아직 지정가 미도달 — 모드 rule 로 넘어가지 않고 계속 대기
+            reason = "MANUAL_SELL"
+        else:
+            reason = self.hit_line(pos, price)
+            if not reason:
+                return
+
         sess = self._session(pos)
         if not sess.tradable:
             # 주문 불가 시간대(예: NXT 08:50~09:00 휴식, 20:00 이후). 실패로 세지 않는다.
             self._warn_untradable(symbol, reason, sess)
             return
-        self.wlog.info("[매도] 라인 돌파 %s @%s (%s · %s)", symbol, price, reason, sess.name)
-        self._do_sell(symbol, pos, price, reason, sess)
+        if manual is not None:
+            self.wlog.info("[매도] 수기등록 지정가 도달 %s @%s (목표=%s · %s)",
+                           symbol, price, manual["sell_price"], sess.name)
+        else:
+            self.wlog.info("[매도] 라인 돌파 %s @%s (%s · %s)", symbol, price, reason, sess.name)
+        self._do_sell(symbol, pos, price, reason, sess, manual=manual)
 
     def _warn_untradable(self, symbol: str, reason: str, sess):
         """장외 라인돌파 로그 — 소켓 틱마다 찍히면 폭주하므로 종목당 60초 1회로 제한."""
@@ -184,6 +261,9 @@ class BaseSellExecutor(ABC):
           의도된 동작이지만 사고 여지가 있어 변경 내역과 라인을 모두 로그로 남기고
           알림도 보낸다.
         """
+        # 매도 수기등록은 전략(모드)과 무관하므로 strategy 유무와 상관없이 매번 재적재한다.
+        self.reload_manual_sells()
+
         if not self.strategy:
             return False
         try:
@@ -347,12 +427,22 @@ class BaseSellExecutor(ABC):
         """
 
     def sell_qty(self, pos: dict, actual) -> Decimal:
-        """이번에 팔 수량. 기본은 보유 전량(DB 와 실계좌 중 작은 쪽).
-
-        비율 매도가 필요한 모드(M4)는 여기를 재정의한다.
-        """
+        """이번에 팔 수량. 기본은 보유 전량(DB 와 실계좌 중 작은 쪽)."""
         db_qty = _toDecimal(pos.get("hold_qty")) or Decimal(0)
         return db_qty if actual is None else min(db_qty, actual)
+
+    def _resolve_sell_qty(self, pos: dict, actual, manual: dict | None) -> Decimal:
+        """매도 수기등록이 있으면 그 qty_ratio(보유수량 대비 비율)를 적용하고,
+        없으면 모드 기본 정책(sell_qty, 기본 전량)을 그대로 쓴다."""
+        if manual is None:
+            return self.sell_qty(pos, actual)
+        db_qty = _toDecimal(pos.get("hold_qty")) or Decimal(0)
+        base = db_qty if actual is None else min(db_qty, actual)
+        ratio = _toDecimal(manual.get("qty_ratio"))
+        if ratio is None or ratio <= 0:
+            ratio = Decimal("1")
+        qty = (base * ratio).quantize(Decimal("1"), rounding=ROUND_DOWN)
+        return qty
 
     # ── 일별 전략 평가 (모드 전략) ───────────────────────
     def refresh_positions(self):
@@ -363,6 +453,12 @@ class BaseSellExecutor(ABC):
             return
         for code, pos in list(self.positions.items()):
             if code in self._sold or code in self._disabled:
+                continue
+            if code in self._manual_sells:
+                # 매도 수기등록 종목 — 모드 전략의 일봉 신호(OBV 데드크로스·타임스탑 등)도
+                # 보지 않는다. 실시간 지정가 감시(on_price)만 이 종목을 판정한다.
+                self.wlog.info("[매도] %s 수기등록됨(@%s) → 모드 전략 평가 skip",
+                               code, self._manual_sells[code].get("sell_price"))
                 continue
             try:
                 result, state = self.strategy.evaluate(pos)
@@ -428,7 +524,8 @@ class BaseSellExecutor(ABC):
                 self.notifier.send("⚠ 매도 실패 경보", f"{symbol} 매도 {c}회 실패로 자동 비활성됨")
 
     # ── 매도 실행 ────────────────────────────────────────────────────
-    def _do_sell(self, symbol: str, pos: dict, price: Decimal, reason: str, sess=None):
+    def _do_sell(self, symbol: str, pos: dict, price: Decimal, reason: str, sess=None,
+                manual: dict | None = None):
         # 동시성 가드: 소켓 콜백이 여러 틱 동시 진입해도 종목당 1건만 진행.
         with self._lock:
             if symbol in self._sold or symbol in self._inflight or symbol in self._disabled:
@@ -448,7 +545,7 @@ class BaseSellExecutor(ABC):
                 self._unsubscribe(symbol)   # 보유 종료 → 실시간 감시 비활성
                 self.wlog.warn("[매도] %s 실제 보유 0 → 청산된 것으로 간주하고 정리", symbol)
                 return
-            qty = self.sell_qty(pos, actual)   # 모드별 수량 정책(기본 전량)
+            qty = self._resolve_sell_qty(pos, actual, manual)   # 수기등록 비율 or 모드 기본(전량)
             if qty <= 0:
                 self.wlog.warn("[매도] %s 매도수량 0 (hold=%s actual=%s) → skip",
                                symbol, pos.get("hold_qty"), actual)
@@ -519,6 +616,7 @@ class BaseSellExecutor(ABC):
                 self.positions.pop(symbol, None)
                 self._unsubscribe(symbol)   # 전량 청산 → 실시간 감시 비활성
                 self._sold.add(symbol)
+                self._complete_manual_if_needed(symbol, reason, fill_px, res.filled_qty)
                 self.wlog.info("[매도] 완료 %s qty=%s @~%s 잔고=%s (%s/%s)",
                                symbol, res.filled_qty, fill_px, final_balance, reason, res.status)
 
@@ -574,6 +672,7 @@ class BaseSellExecutor(ABC):
                 self._unsubscribe(symbol)
                 self._sold.add(symbol)
                 self._cooldown.pop(symbol, None)
+                self._complete_manual_if_needed(symbol, reason, ev.last_price, ev.delta_qty)
                 self.wlog.info("[매도] %s 잔량체결로 전량 청산 완료 @%s 잔고=%s",
                                symbol, ev.last_price, balance)
             if ev.complete:

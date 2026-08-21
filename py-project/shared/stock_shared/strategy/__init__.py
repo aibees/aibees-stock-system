@@ -12,12 +12,16 @@ py-stock-batch(실전 worker·배치·시뮬)와 py-naver-stock-theme(웹 백테
   kospi1      KospiStrategy1  M1  추천 1순위     (EMA/ATR/OBV. 실전 worker 현행 전략)
   kospi2      KospiStrategy2  M2  단일 종목 고정   ← 스켈레톤
   kospi3      KospiStrategy3  M3  ETF 정/역 교대   ← 스켈레톤
-  kospi4      KospiStrategy4  M4  지정가 감시     ← 스켈레톤
+  kospi4      KospiStrategy4  M4  지정가 감시     ← 스켈레톤. 운용모드로는 폐기(표기만, 코드는 유지)
 
   · 네 클래스 모두 StockStrategy 를 직접 상속한다(상호 상속 없음).
   · M2~M4 는 인터페이스만 있고 호출 시 NotImplementedError 를 던진다.
   · 모드 코드는 M1 부터 시작한다(구 M0~M3 체계에서 한 칸씩 이동).
     클래스 번호 = 모드 번호 = 파일 번호 로 셋이 일치한다.
+  · M4(지정가 감시)는 별도 운용모드로 더 이상 구현하지 않는다. 필요했던 건
+    모드 전환이 아니라 종목 단위 매도가 오버라이드였다 — 그 부분은
+    app/trade_worker/sell_executor.py 의 "매도 수기등록"(모드 무관)으로
+    옮겨 구현했다. 자세한 배경은 docs_worker_mode_runtime_spec.md §6·§11.
 
 규칙:
   · 이 패키지는 **순수 계산**만 한다. DB 세션·설정·외부 API 를 import 하지 않는다.

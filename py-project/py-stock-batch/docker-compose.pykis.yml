@@ -6,8 +6,10 @@
 #   - worker(아래)는 유저 1명당 1 프로세스로 상시 실행:
 #       매수 엔진(09:00 시장가) + 매도 엔진(실시간 소켓 라인 감시)
 #
-# 안전장치(기본값): DRY_RUN=true(로그만), KIS_VIRTUAL=true(모의).
+# 안전장치(기본값): KIS_VIRTUAL=true(모의).
 #   실주문 전환은 각 worker 의 env 를 명시적으로 바꿔야 한다.
+#   (구 DRY_RUN 플래그는 선언만 되고 주문 경로에서 실제로 분기하지 않아 안전장치로
+#    기능하지 못했다 — 2026-08-20 완전 제거. worker 기동 = 즉시 실주문이라고 가정할 것.)
 #
 # 실행 (메인 py-stock-batch 와 **별개 이미지**로 독립 배포):
 #   docker build -f Dockerfile.worker -t py-stock-worker .
@@ -35,7 +37,6 @@ services:
     environment:
       - KIS_USER_ID=1            # ← 컨테이너마다 이 값만 다름
       - KIS_VIRTUAL=false         # 모의 (실전 전환 시 false)
-      - DRY_RUN=false             # 로그만 (실주문 전환 시 false)
       - BUY_TIME=09:00           # KRX 정규장 시장가 매수
       - NXT_PREMARKET=true        # NXT 프리마켓 선매수 라운드
       - NXT_BUY_TIME=08:00        # 프리마켓 08:00~08:50 (지정가만 가능)
@@ -51,7 +52,6 @@ services:
     environment:
       - KIS_USER_ID=2
       - KIS_VIRTUAL=false
-      - DRY_RUN=false
       - BUY_TIME=09:00           # KRX 정규장 시장가 매수
       - NXT_PREMARKET=true        # NXT 프리마켓 선매수 라운드
       - NXT_BUY_TIME=08:00        # 프리마켓 08:00~08:50 (지정가만 가능)
@@ -67,7 +67,6 @@ services:
     environment:
       - KIS_USER_ID=3
       - KIS_VIRTUAL=false
-      - DRY_RUN=false
       - BUY_TIME=09:00           # KRX 정규장 시장가 매수
       - NXT_PREMARKET=true        # NXT 프리마켓 선매수 라운드
       - NXT_BUY_TIME=08:00        # 프리마켓 08:00~08:50 (지정가만 가능)

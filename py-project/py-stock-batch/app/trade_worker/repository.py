@@ -7,9 +7,13 @@ trade_worker DB 접근 계층 (메인 DAO 와 독립, raw SQL).
   - get_holding_positions / get_holding_one          : trade_worker_position status='HOLDING'
   - get_wallet_balance(user_id)                      : user_wallet
 쓰기:
-  - open_position / update_position_state / close_position : trade_worker_position
+  - open_position / open_position_if_absent / update_position_state / close_position : trade_worker_position
   - set_wallet_balance / set_wallet_snapshot / replace_holdings : user_wallet / user_holdings
   - insert_trade_log / insert_worker_log             : trade_log / trade_worker_log
+
+매도 수기등록(모드 무관, sql/08_manual_sell_order_ddl.sql):
+  - get_active_manual_sells / get_manual_sell / upsert_manual_sell /
+    cancel_manual_sell / complete_manual_sell         : trade_worker_manual_sell
 """
 import logging
 from datetime import datetime, timedelta
@@ -257,6 +261,55 @@ class Repository:
             })
             s.commit()
 
+    def open_position_if_absent(self, user_id: int, stock_code: str, stock_name: str,
+                                entry_price: Decimal, qty: Decimal,
+                                entry_atr: Decimal = Decimal(0),
+                                exclusive_flag: str = "Y") -> bool:
+        """이미 HOLDING 포지션이 있으면 아무것도 안 하고 False. 없으면 신규 등록 후 True.
+
+        wallet_sync.reconcile_wallet 이 **계좌 실보유(user_holdings) 중 worker 가
+        추적하지 않는 종목**(HTS/MTS 등 타채널 매수분 포함)을 흡수할 때 쓴다
+        (2026-08-21, §11.4 대체 구현). 존재 확인 + 삽입을 한 SQL(INSERT ... SELECT
+        ... WHERE NOT EXISTS)로 묶어 레이스를 줄이지만, user_id+stock_code+status
+        유니크 제약이 없어 완전한 원자성 보장은 아니다 — 편입은 폴링 주기(수십 초)
+        당 한 번뿐이라 실질 위험은 낮다. mode_note='EXTERNAL_ABSORBED' 로 worker 가
+        직접 산 게 아님을 남긴다.
+
+        exclusive_flag 기본값 'Y': 이 포지션은 BaseBuyExecutor.allow_buy() 의
+        "1포지션 원칙" 카운트에서 제외된다(get_holding_positions(exclude_exclusive=True)
+        가 걸러냄). 그렇지 않으면(기본값 없이 NULL) 계좌에 있던 종목이 편입되는
+        순간 worker 의 자기 자동매수(09:00 cron)가 그 종목이 팔릴 때까지 전부
+        멈춘다 — 흡수는 매도 감시 목적이지 매수 정지를 의도한 게 아니므로 기본
+        'Y' 로 매수 카운트에서 뺀다. 매도 감시(get_holding_positions 기본 False)는
+        exclusive_flag 와 무관하게 항상 전량을 보므로 이 값과 상관없이 그대로 걸린다.
+        """
+        sql = text(
+            """
+            INSERT INTO trade_worker_position
+                (user_id, stock_code, stock_name, entry_ymd, entry_at, entry_price, entry_atr,
+                 qty, bars_held, peak_close, peak_high, bars_since_peak,
+                 action_type, status, mode_note, exclusive_flag, created_at, updated_at)
+            SELECT :uid, :code, :name, :eymd, :now, :eprice, :eatr,
+                   :qty, 0, :eprice, :eprice, 0,
+                   'HOLD', 'HOLDING', 'EXTERNAL_ABSORBED', :exclusive, :now, :now
+            FROM DUAL
+            WHERE NOT EXISTS (
+                SELECT 1 FROM trade_worker_position
+                WHERE user_id = :uid AND stock_code = :code AND status = 'HOLDING'
+            )
+            """
+        )
+        now = datetime.now()
+        with get_session() as s:
+            result = s.execute(sql, {
+                "uid": user_id, "code": stock_code, "name": stock_name,
+                "eymd": now.strftime("%Y%m%d"), "now": now,
+                "eprice": str(entry_price), "eatr": str(entry_atr), "qty": str(qty),
+                "exclusive": exclusive_flag,
+            })
+            s.commit()
+            return (result.rowcount or 0) > 0
+
     def update_position_state(self, user_id: int, stock_code: str, state: dict) -> None:
         """일별 갱신: 추적값(peak/bars) + 매도라인(stop/target/trail) + action 갱신. HOLDING 만."""
         cols = {
@@ -384,6 +437,103 @@ class Repository:
                 "now": datetime.now(), "xprice": str(exit_price), "reason": (reason or "")[:45],
                 "fqty": str(filled_qty), "uid": user_id, "code": stock_code,
             })
+            s.commit()
+
+    # ── 매도 수기등록(지정가, 모드 무관) ──────────────────────────────
+    #   trade_worker_manual_sell. 등록되면 sell_executor 가 그 종목의 모드
+    #   자동 매도 rule(stop/target/trail·일봉 신호)을 보지 않고 sell_price
+    #   도달 여부만으로 매도한다(BaseSellExecutor 공통 코드, 모드 무관).
+    def get_active_manual_sells(self, user_id: int) -> list[dict]:
+        """감시중(ARMED) + 활성(enabled_flag='Y') 수기등록 전체.
+        sell_executor 가 주기적으로 재적재해 메모리(dict)로 들고 있는다."""
+        sql = text(
+            "SELECT user_id, stock_code, stock_name, sell_price, qty_ratio, "
+            "       state, enabled_flag, memo "
+            "  FROM trade_worker_manual_sell "
+            " WHERE user_id = :uid AND state = 'ARMED' AND enabled_flag = 'Y'"
+        )
+        with get_session() as s:
+            return [dict(r) for r in s.execute(sql, {"uid": user_id}).mappings().all()]
+
+    def get_manual_sell(self, user_id: int, stock_code: str) -> dict | None:
+        sql = text(
+            "SELECT * FROM trade_worker_manual_sell WHERE user_id = :uid AND stock_code = :code"
+        )
+        with get_session() as s:
+            row = s.execute(sql, {"uid": user_id, "code": stock_code}).mappings().first()
+        return dict(row) if row else None
+
+    def get_latest_manual_sell(self, user_id: int) -> dict | None:
+        """단일 슬롯 화면(LimitOrder.vue) 전용 — 종목코드 없이 "지금 등록된 것" 1건을
+        조회한다. get_active_manual_sells 와 달리 enabled_flag='Y' 로 거르지 않는다
+        (감시를 꺼둔(enabled_flag='N') 등록도 화면엔 계속 보여야 하므로 — "등록은
+        유지되지만 감시하지 않습니다" 문구 참고). state='ARMED' 인 것 중 가장 최근
+        갱신 1건. 여러 종목을 동시 등록하는 화면(M2/M3 전용)이 생기면 이 메서드
+        대신 get_active_manual_sells 를 그대로 쓰면 된다."""
+        sql = text(
+            "SELECT * FROM trade_worker_manual_sell "
+            " WHERE user_id = :uid AND state = 'ARMED' "
+            " ORDER BY updated_at DESC LIMIT 1"
+        )
+        with get_session() as s:
+            row = s.execute(sql, {"uid": user_id}).mappings().first()
+        return dict(row) if row else None
+
+    def upsert_manual_sell(self, user_id: int, stock_code: str, stock_name: str,
+                           sell_price: Decimal, qty_ratio: Decimal = Decimal("1"),
+                           memo: str | None = None, enabled_flag: str = "Y") -> None:
+        """등록/재등록. 이미 있으면(같은 유저+종목) 값만 갱신하고 ARMED 로 되돌린다
+        (예: DONE/CANCELLED 상태였던 종목을 다시 등록하는 경우).
+        enabled_flag='N' 으로 저장하면 등록 자체는 유지되지만 get_active_manual_sells
+        (worker 가 읽는 감시 대상)에서 빠진다 — "감시 사용" 토글의 실제 동작."""
+        now = datetime.now()
+        sql = text(
+            """
+            INSERT INTO trade_worker_manual_sell
+                (user_id, stock_code, stock_name, sell_price, qty_ratio,
+                 state, enabled_flag, memo, created_at, updated_at)
+            VALUES
+                (:uid, :code, :name, :price, :ratio,
+                 'ARMED', :flag, :memo, :now, :now)
+            ON DUPLICATE KEY UPDATE
+                stock_name = :name, sell_price = :price, qty_ratio = :ratio,
+                state = 'ARMED', enabled_flag = :flag, memo = :memo,
+                filled_price = NULL, filled_qty = NULL, filled_at = NULL,
+                updated_at = :now
+            """
+        )
+        with get_session() as s:
+            s.execute(sql, {
+                "uid": user_id, "code": stock_code, "name": stock_name or "",
+                "price": str(sell_price), "ratio": str(qty_ratio), "memo": memo,
+                "flag": (enabled_flag or "Y"), "now": now,
+            })
+            s.commit()
+
+    def cancel_manual_sell(self, user_id: int, stock_code: str) -> None:
+        """사용자 취소. 체결 이력을 남기기 위해 삭제 대신 상태만 바꾼다."""
+        sql = text(
+            "UPDATE trade_worker_manual_sell SET state = 'CANCELLED', updated_at = :now "
+            "WHERE user_id = :uid AND stock_code = :code AND state = 'ARMED'"
+        )
+        with get_session() as s:
+            s.execute(sql, {"now": datetime.now(), "uid": user_id, "code": stock_code})
+            s.commit()
+
+    def complete_manual_sell(self, user_id: int, stock_code: str,
+                             filled_price: Decimal, filled_qty: Decimal) -> None:
+        """수기등록 지정가 도달 → worker 가 대신 체결 완료. DONE 으로 종료."""
+        sql = text(
+            """
+            UPDATE trade_worker_manual_sell
+            SET state = 'DONE', filled_price = :price, filled_qty = :qty,
+                filled_at = :now, updated_at = :now
+            WHERE user_id = :uid AND stock_code = :code AND state = 'ARMED'
+            """
+        )
+        with get_session() as s:
+            s.execute(sql, {"price": str(filled_price), "qty": str(filled_qty),
+                            "now": datetime.now(), "uid": user_id, "code": stock_code})
             s.commit()
 
     def insert_worker_log(self, user_id: int, source: str, level: str, message: str) -> None:

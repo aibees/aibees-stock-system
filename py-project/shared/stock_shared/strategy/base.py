@@ -17,6 +17,7 @@ class Action(Enum):
     SELL_STOP_PROFIT = 14
     SELL_TRAIL = 13    # 트레일링 스탑 (추세 꺾임)
     SELL_TIME = 15     # 타임 스탑 (보유기간 초과, 정체)
+    SELL_TREND = 16    # 모멘텀 이탈 (지표가 방향 전환. M3)
 
 
 class StockStrategy(ABC):

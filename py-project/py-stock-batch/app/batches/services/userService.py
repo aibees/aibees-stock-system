@@ -1,6 +1,8 @@
+import logging
 
 
 from stock_shared.dao.userMasterDao import UserMasterDao
+from stock_shared.dao.userOptionM3Dao import UserOptionM3Dao
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 
 
@@ -71,7 +73,24 @@ class UserService:
 
     def get_user_options(self, session, user_id: int = 1) -> UserOptionMeta:
         result = self.userMasterDaoImpl.select_user_stock_options(session, {'user_id': user_id})
-        return extractor(result)
+        meta = extractor(result)
+        self._apply_mode_options(session, user_id, meta)
+        return meta
+
+    @staticmethod
+    def _apply_mode_options(session, user_id: int, meta: UserOptionMeta) -> None:
+        """모드별 옵션 테이블(user_option_m3 등)을 s3_* 로 메타에 얹는다.
+
+        user_options 는 전역 설정이고 모드별 파라미터는 별도 테이블에 있다.
+        행이 없으면(= 아직 설정 안 함) 아무것도 덮지 않는다 → 전략 클래스 기본값.
+        조회가 실패해도 worker 를 죽이지 않는다. 기본값으로 도는 편이 낫다.
+        """
+        try:
+            for k, v in UserOptionM3Dao().select_prefixed(session, user_id).items():
+                setattr(meta, k, v)
+        except Exception as e:  # noqa: BLE001
+            logging.warning('user_option_m3 조회 실패(user_id=%s) → 기본값 사용: %s',
+                            user_id, e)
 
     def get_all_sell_target_users(self, session) -> list[UserOptionMeta]:
         """매도 알림(email 또는 telegram) 설정된 유저 전체를 UserOptionMeta 리스트로 반환"""

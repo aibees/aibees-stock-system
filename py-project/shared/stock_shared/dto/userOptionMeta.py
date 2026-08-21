@@ -188,5 +188,30 @@ class UserOptionMeta:
         self.s2_use_hma_exit           = None
         self.s2_hma_exit_mode          = None
 
+        # ── KospiStrategy3 파라미터 (None이면 전략 클래스 기본값 사용) ────────
+        # M3: KODEX 코스피100 / 인버스를 **각각 독립적으로** 매매. 30분봉 기준.
+        #   진입 = MACD↑ · OBV↑ · MA20↑ · RSI<x  가 confirm_bars 봉 연속
+        #   청산 = 가격라인(손절/익절/트레일링) 또는 모멘텀이탈(MACD↓·OBV↓·RSI↓)
+        self.s3_long_code              = None   # 정방향 ETF (기본 237350)
+        self.s3_short_code             = None   # 인버스 ETF (기본 114800)
+        # 진입
+        self.s3_confirm_bars           = None   # 연속확인 봉수 (기본 3)
+        self.s3_rsi_overbought         = None   # 진입차단 RSI (기본 70)
+        self.s3_enable_macd_up         = None
+        self.s3_enable_obv_up          = None
+        self.s3_enable_ma20_up         = None
+        self.s3_enable_rsi_filter      = None
+        # 청산 — 모멘텀 이탈
+        self.s3_exit_on_reverse        = None   # 사용 여부 (기본 1)
+        self.s3_exit_macd_down         = None
+        self.s3_exit_obv_down          = None
+        self.s3_exit_rsi_down          = None
+        # 청산 — 가격 라인 (30분봉 스케일. 일봉용 -5% 는 거의 안 걸린다)
+        self.s3_stop_loss_pct          = None   # 기본 0.02 (-2%)
+        self.s3_take_profit_pct        = None   # 기본 미사용
+        self.s3_use_trailing           = None   # 기본 0
+        self.s3_trail_activate_pct     = None
+        self.s3_trail_drawdown_pct     = None
+
     def to_dict(self) -> Dict[str, Any]:
         return {k: _to_plain(v) for k, v in self.__dict__.items()}

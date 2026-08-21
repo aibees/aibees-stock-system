@@ -64,7 +64,6 @@ class OrderResult:
     qty: Decimal                    # 주문 수량
     price: Decimal                  # 참조가(주문 시점)
     order_no: Optional[str]
-    dry_run: bool
     filled_qty: Decimal = field(default=Decimal(0))
     avg_price: Decimal = field(default=Decimal(0))
     status: str = "PENDING"         # FILLED|PARTIAL|REJECTED|PENDING
@@ -529,7 +528,7 @@ class Broker:
                  order_no, sess.exchange, sess.name)
         return OrderResult(symbol, side, qty,
                            px if sess.limit_only else Decimal(ref_price),
-                           order_no, False, raw=order)
+                           order_no, raw=order)
 
     def buy_limit_nxt(self, symbol: str, qty: Decimal, limit_price: Decimal) -> OrderResult:
         """NXT 프리마켓(08:00~08:50) 전용 지정가 매수. order_in_session 의 얇은 래퍼."""
@@ -545,7 +544,7 @@ class Broker:
         order_no = _ono(getattr(order, "order_number", None) or order)
         log.info("[LIVE] %s 주문 접수 %s qty=%s order=%s exch=%s",
                  side, symbol, qty, order_no, exchange)
-        return OrderResult(symbol, side, qty, Decimal(ref_price), order_no, False, raw=order)
+        return OrderResult(symbol, side, qty, Decimal(ref_price), order_no, raw=order)
 
     def _order_rest(self, side: str, symbol: str, qty: Decimal, exchange: str,
                     ord_dvsn: str = "01", ord_unpr: Decimal | int = 0):

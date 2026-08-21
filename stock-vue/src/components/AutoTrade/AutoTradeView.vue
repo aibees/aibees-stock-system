@@ -21,7 +21,7 @@ const router = useRouter();
 
 const tabs = [
     { path: '/auto-trade/mode', label: '운용방식 설정' },
-    { path: '/auto-trade/limit-order', label: '지정가 예약' },
+    { path: '/auto-trade/limit-order', label: '매도 수기 등록' },
     { path: '/auto-trade/status', label: '운용 현황' },
 ];
 

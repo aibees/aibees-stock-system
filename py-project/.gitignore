@@ -1,0 +1,7 @@
+# SQL 마이그레이션 스크립트 — 버전관리 대상 아님
+# (py-stock-batch/.gitignore 의 **/*.sql 과 동일 정책. sql/ 은 py-stock-batch 밖
+#  py-project/ 바로 아래에 있어서 여기 별도로 추가해야 적용됨)
+sql/*.sql
+
+# spec 문서(작업 메모용) — 버전관리 대상 아님
+spec_docs/*.md

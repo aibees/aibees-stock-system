@@ -147,11 +147,15 @@
                     </p>
                 </div>
 
-                <!-- M3 : 지정가 -->
-                <div v-else-if="form.mode_code === 'M3'" class="config-link">
-                    <p>지정가 매수·매도 값은 <b>지정가 예약</b> 화면에서 등록합니다.</p>
-                    <button class="btn-link" @click="goLimitOrder">지정가 예약 화면으로 이동</button>
-                </div>
+            </section>
+
+            <!-- ── 매도 수기 등록 (모드 무관) ──
+                 위에서 어떤 방식을 고르든, 보유 종목 하나에 지정가를 걸어두면
+                 그 종목만은 이 방식의 자동 매도 판정 대신 지정가로 감시된다.
+                 구 'M4/지정가 감시' 모드는 폐기되고 이 기능만 모드 무관으로 남았다. -->
+            <section class="config-link">
+                <p>보유 종목에 <b>지정 매도가</b>를 걸어두면, 선택한 방식과 무관하게 그 종목만 지정가로 매도됩니다.</p>
+                <button class="btn-link" @click="goManualSell">매도 수기 등록 화면으로 이동</button>
             </section>
 
             <!-- ── 저장 ── -->
@@ -196,7 +200,7 @@ const DEFAULT_CONFIG = {
         long_code: '', long_name: '', short_code: '', short_name: '',
         ma_short: 5, ma_long: 20, threshold_long: 2, threshold_short: 2, flip_cooldown_bars: 0,
     }),
-    M3: () => ({}),
+    // 구 M3(지정가 감시)는 폐기 — 매도 수기 등록으로 대체(모드 무관, 위 config-link 참고).
 };
 
 const form = reactive({ mode_code: '', config: {} });
@@ -234,7 +238,6 @@ const configSummary = (code, cfg) => {
     const c = cfg ?? {};
     if (code === 'M1') return `고정 종목 ${display(c.stock_code, c.stock_name) || '-'}`;
     if (code === 'M2') return `${c.long_name || c.long_code || '-'} ↔ ${c.short_name || c.short_code || '-'}`;
-    if (code === 'M3') return '지정가 예약 화면의 등록값 사용';
     return '추천 1순위 자동매매';
 };
 
@@ -332,7 +335,7 @@ const togglePower = async () => {
     }
 };
 
-const goLimitOrder = () => router.push({ path: '/auto-trade/limit-order' });
+const goManualSell = () => router.push({ path: '/auto-trade/limit-order' });
 </script>
 
 <style scoped lang="scss">

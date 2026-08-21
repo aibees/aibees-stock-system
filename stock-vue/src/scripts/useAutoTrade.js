@@ -3,15 +3,30 @@
  *  - 화면 3종(ModeSetting / LimitOrder / RunStatus)에서 공유
  *
  * ⚠ USE_MOCK
- *  백엔드 API 구현 전까지 화면 확인용 mock 데이터를 사용한다.
- *  API 가 준비되면 아래 상수만 false 로 바꾸면 실제 서버 호출로 전환된다.
+ *  모드 설정/운용 상태/이력은 이 저장소 밖(ROOT 서버, VITE_SERVER_URL)이 구현할
+ *  예정이라 아직 mock 이다. API 가 준비되면 아래 상수만 false 로 바꾸면 된다.
+ *
+ * ⚠ 매도 수기등록(fetchManualSell/saveManualSell/removeManualSell)만은 예외다.
+ *  이 기능은 이 저장소(py-stock-batch, app/trade_worker)에 이미 완전히 구현돼
+ *  있어서 ROOT 서버를 기다릴 이유가 없다(2026-08-21) — USE_MOCK 값과 무관하게
+ *  항상 실제 서버(batchApi → py-stock-batch)를 호출한다.
  */
-import aibeesApi from './aibeesApi.js';
+import aibeesApi, { batchApi } from './aibeesApi.js';
+import { assUserSession } from './stores/user-stores.js';
 import * as mock from './autoTradeMock.js';
 
-export const USE_MOCK = true;   // TODO: 백엔드 연동 후 false
+export const USE_MOCK = true;   // TODO: 백엔드 연동 후 false (모드/상태/이력 전용)
 
 const BASE = '/api/v1/auto-trade';
+
+/* 매도 수기등록은 py-stock-batch(app/flask_app/router/router_auto_trade.py)가
+ * 직접 처리한다 — 이 앱 Flask 에는 JWT 인증 미들웨어가 없어(job_bp 포함 기존
+ * 라우트 전부 무인증) user_id 를 프런트가 세션에서 직접 실어보낸다. */
+const currentUserId = () => {
+    const { user } = assUserSession();
+    const uid = user?.loginInfo?.user_id;
+    return uid ? Number(uid) : null;
+};
 
 /* ── 모드 마스터 ── */
 export const fetchModes = async () => {
@@ -49,22 +64,30 @@ export const setPower = async (enabled) => {
     return data.data ?? {};
 };
 
-/* ── 지정가 예약 (M3) ── */
-export const fetchLimitOrder = async () => {
-    if (USE_MOCK) return mock.mockFetchLimitOrder();
-    const { data } = await aibeesApi.get(`${BASE}/limit-order`);
+/* ── 매도 수기등록 (모드 무관, 구 'M4/M3 지정가 감시' 폐기 후 대체)
+ *   보유 종목에 지정 매도가를 걸어두면, 활성 운용모드가 무엇이든 그 모드의
+ *   자동 매도 rule 대신 이 가격 도달 여부로 worker 가 대신 체결한다.
+ *   백엔드: app/trade_worker (trade_worker_manual_sell, sql/08_manual_sell_order_ddl.sql).
+ *   spec: py-stock-batch/spec_docs/docs_worker_mode_runtime_spec.md §11
+ */
+export const fetchManualSell = async () => {
+    const user_id = currentUserId();
+    if (!user_id) return null;   // 로그인 세션 없음 — 화면은 "미등록"으로 표시됨
+    const { data } = await batchApi.get(`${BASE}/manual-sell`, { params: { user_id } });
     return data.data ?? null;
 };
 
-export const saveLimitOrder = async (payload) => {
-    if (USE_MOCK) return mock.mockSaveLimitOrder(payload);
-    const { data } = await aibeesApi.put(`${BASE}/limit-order`, payload);
+export const saveManualSell = async (payload) => {
+    const user_id = currentUserId();
+    if (!user_id) throw new Error('로그인 세션이 없습니다.');
+    const { data } = await batchApi.post(`${BASE}/manual-sell`, { ...payload, user_id });
     return data.data ?? {};
 };
 
-export const removeLimitOrder = async () => {
-    if (USE_MOCK) return mock.mockRemoveLimitOrder();
-    await aibeesApi.delete(`${BASE}/limit-order`);
+export const removeManualSell = async () => {
+    const user_id = currentUserId();
+    if (!user_id) throw new Error('로그인 세션이 없습니다.');
+    await batchApi.post(`${BASE}/manual-sell/cancel`, { user_id });
 };
 
 /* ── 변경 이력 ── */
@@ -95,11 +118,10 @@ export const RUN_STATE_LABEL = {
     SWITCH_PENDING: '전환 예약됨',
 };
 
-export const ORDER_STATE_LABEL = {
-    WAIT_BUY: '매수가 감시 중',
-    BOUGHT: '매수 체결 · 매도가 감시 중',
+export const MANUAL_SELL_STATE_LABEL = {
+    ARMED: '지정가 감시 중',
     DONE: '매도 완료',
-    STOPPED: '손절 종료',
+    CANCELLED: '취소됨',
 };
 
 export const formatNumber = (v) =>

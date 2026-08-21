@@ -1,24 +1,25 @@
 <template>
     <div id="auto-trade-limit">
-        <Headers :prop_title="'지정가 예약'" />
+        <Headers :prop_title="'매도 수기 등록'" />
 
         <div class="contents">
 
             <section class="head-desc">
                 <div>
-                    <h2>지정가 예약</h2>
-                    <p class="sub-text">종목 1개에 매수가·매도가를 지정하면 worker 가 감시하다가 도달 시 자동 체결합니다.</p>
+                    <h2>매도 수기 등록</h2>
+                    <p class="sub-text">
+                        보유 종목에 지정 매도가를 등록하면, 지금 운용 방식이 무엇이든
+                        <b>그 종목만은 자동 매도 판정(손절·익절·트레일링) 대신 이 가격 도달 여부로</b>
+                        worker 가 대신 체결합니다. 매수는 관여하지 않습니다 — 매수는 항상 현재 운용 방식이 담당합니다.
+                    </p>
                 </div>
-                <span v-if="!isModeActive" class="mode-warn">
-                    현재 운용 방식이 <b>지정가 감시</b>가 아닙니다. 등록해도 감시되지 않습니다.
-                </span>
             </section>
 
-            <!-- ── 진행 상태 스텝 ── -->
+            <!-- ── 상태 ── -->
             <section class="steps" v-if="form.stock_code">
-                <div v-for="s in STEPS" :key="s.key" :class="['step', { done: stepIndex > s.idx, on: stepIndex === s.idx }]">
+                <div class="step" :class="{ on: record.state === 'ARMED', done: record.state === 'DONE' }">
                     <span class="dot"></span>
-                    <span class="label">{{ s.label }}</span>
+                    <span class="label">{{ stateLabel }}</span>
                 </div>
             </section>
 
@@ -27,58 +28,36 @@
                 <div class="form-grid">
 
                     <div class="form-field full">
-                        <label>감시 종목 <span class="req">*</span></label>
+                        <label>대상 종목 <span class="req">*</span></label>
                         <div class="stock-picker">
-                            <input readonly :value="stockDisplay" placeholder="종목을 선택하세요" />
-                            <button class="btn-pick" @click="picker = true" :disabled="isStockLocked">종목 선택</button>
+                            <input readonly :value="stockDisplay" placeholder="보유 중인 종목을 선택하세요" />
+                            <button class="btn-pick" @click="picker = true" :disabled="isLocked">종목 선택</button>
                         </div>
-                        <p v-if="isStockLocked" class="lock-hint">매수 체결 상태에서는 종목·매수가를 변경할 수 없습니다.</p>
-                    </div>
-
-                    <div class="form-field">
-                        <label>지정 매수가 <span class="req">*</span></label>
-                        <input type="number" v-model.number="form.buy_price" :disabled="isStockLocked" placeholder="0" />
+                        <p class="lock-hint">worker 가 직접 매수해 보유 중인 종목에만 적용됩니다. 미보유 종목은 등록해도 감시되지 않습니다.</p>
                     </div>
 
                     <div class="form-field">
                         <label>지정 매도가 <span class="req">*</span></label>
-                        <input type="number" v-model.number="form.sell_price" placeholder="0" />
+                        <input type="number" v-model.number="form.sell_price" :disabled="isLocked" placeholder="0" />
                     </div>
 
                     <div class="form-field">
-                        <label>매수 수량</label>
-                        <input type="number" v-model.number="form.qty" :disabled="isStockLocked"
-                            placeholder="비우면 예수금 전량" />
-                    </div>
-
-                    <div class="form-field">
-                        <label>목표 수익률</label>
-                        <div class="readonly-box" :class="{ minus: expectedRate < 0 }">
-                            {{ expectedRateText }}
+                        <label>매도 비율</label>
+                        <div class="inline">
+                            <input type="number" v-model.number="form.qty_ratio_pct" :disabled="isLocked" min="1" max="100" placeholder="100" />
+                            <span class="inline-text">% (보유수량 기준, 비우면 전량)</span>
                         </div>
                     </div>
 
                     <div class="form-field">
-                        <label>손절 병행</label>
+                        <label>감시 사용</label>
                         <div class="inline">
-                            <button :class="['toggle-btn', form.use_stop_loss === 'Y' ? 'active' : 'inactive']"
-                                @click="form.use_stop_loss = form.use_stop_loss === 'Y' ? 'N' : 'Y'">
-                                <span class="toggle-knob"></span>
-                            </button>
-                            <input type="number" v-model.number="form.stop_price" :disabled="form.use_stop_loss !== 'Y'"
-                                placeholder="손절가" />
-                        </div>
-                    </div>
-
-                    <div class="form-field">
-                        <label>매도 후 반복 감시</label>
-                        <div class="inline">
-                            <button :class="['toggle-btn', form.loop_flag === 'Y' ? 'active' : 'inactive']"
-                                @click="form.loop_flag = form.loop_flag === 'Y' ? 'N' : 'Y'">
+                            <button :class="['toggle-btn', form.enabled_flag === 'Y' ? 'active' : 'inactive']"
+                                @click="form.enabled_flag = form.enabled_flag === 'Y' ? 'N' : 'Y'">
                                 <span class="toggle-knob"></span>
                             </button>
                             <span class="inline-text">
-                                {{ form.loop_flag === 'Y' ? '매도 완료 후 다시 매수가를 감시합니다' : '1회 체결 후 종료' }}
+                                {{ form.enabled_flag === 'Y' ? '감시 중' : '꺼짐 — 등록은 유지되지만 감시하지 않습니다' }}
                             </span>
                         </div>
                     </div>
@@ -91,68 +70,60 @@
             </section>
 
             <!-- ── 체결 기록 ── -->
-            <section class="card" v-if="record.order_state && record.order_state !== 'WAIT_BUY'">
+            <section class="card" v-if="record.state && record.state !== 'ARMED'">
                 <h4>체결 기록</h4>
                 <ul class="record-list">
-                    <li><span>상태</span><b>{{ orderStateLabel }}</b></li>
-                    <li><span>매수 체결</span><b>{{ formatNumber(record.filled_buy_price) }} · {{
-                        formatDateTime(record.filled_buy_at) }}</b></li>
-                    <li><span>매도 체결</span><b>{{ formatNumber(record.filled_sell_price) }} · {{
-                        formatDateTime(record.filled_sell_at) }}</b></li>
-                    <li><span>반복 횟수</span><b>{{ record.loop_count ?? 0 }}회</b></li>
+                    <li><span>상태</span><b>{{ stateLabel }}</b></li>
+                    <li><span>매도 체결</span><b>{{ formatNumber(record.filled_price) }} · {{
+                        formatDateTime(record.filled_at) }}</b></li>
                 </ul>
             </section>
 
             <div class="action-bar">
-                <button class="btn-delete" @click="onDelete" :disabled="isBusy || !hasSaved">삭제</button>
+                <button class="btn-delete" @click="onDelete" :disabled="isBusy || !hasSaved">취소</button>
                 <button class="btn-save" @click="onSave" :disabled="isBusy">저장</button>
             </div>
         </div>
 
-        <StockPickerModal :visible="picker" title="감시 종목 선택" @pick="onPick" @close="picker = false" />
+        <StockPickerModal :visible="picker" title="대상 종목 선택" @pick="onPick" @close="picker = false" />
     </div>
 </template>
 
 <script setup>
 import StockPickerModal from './StockPickerModal.vue';
 import {
-    fetchLimitOrder, saveLimitOrder, removeLimitOrder, fetchState,
-    ORDER_STATE_LABEL, formatNumber, formatDateTime,
+    fetchManualSell, saveManualSell, removeManualSell,
+    MANUAL_SELL_STATE_LABEL, formatNumber, formatDateTime,
 } from '@scripts/useAutoTrade.js';
-
-const STEPS = [
-    { key: 'WAIT_BUY', idx: 0, label: '매수가 감시' },
-    { key: 'BOUGHT', idx: 1, label: '매수 체결' },
-    { key: 'DONE', idx: 2, label: '매도 완료' },
-];
 
 const isBusy = ref(false);
 const hasSaved = ref(false);
 const picker = ref(false);
-const isModeActive = ref(true);
 
 const defaultForm = () => ({
     stock_code: '', stock_name: '',
-    buy_price: null, sell_price: null, qty: null,
-    use_stop_loss: 'N', stop_price: null,
-    loop_flag: 'N', enabled_flag: 'Y', memo: '',
+    sell_price: null, qty_ratio_pct: 100,
+    enabled_flag: 'Y', memo: '',
 });
 const form = reactive(defaultForm());
-const record = reactive({ order_state: 'WAIT_BUY', filled_buy_price: null, filled_buy_at: null, filled_sell_price: null, filled_sell_at: null, loop_count: 0 });
+const record = reactive({ state: 'ARMED', filled_price: null, filled_at: null });
 
 const load = async () => {
-    const [row, st] = await Promise.all([fetchLimitOrder(), fetchState()]);
-    isModeActive.value = (st?.active_mode === 'M3');
+    const row = await fetchManualSell();
     if (row) {
         hasSaved.value = true;
-        Object.assign(form, { ...defaultForm(), ...row });
+        Object.assign(form, {
+            ...defaultForm(),
+            stock_code: row.stock_code, stock_name: row.stock_name,
+            sell_price: row.sell_price,
+            qty_ratio_pct: row.qty_ratio != null ? Math.round(Number(row.qty_ratio) * 100) : 100,
+            enabled_flag: row.enabled_flag ?? 'Y',
+            memo: row.memo ?? '',
+        });
         Object.assign(record, {
-            order_state: row.order_state ?? 'WAIT_BUY',
-            filled_buy_price: row.filled_buy_price,
-            filled_buy_at: row.filled_buy_at,
-            filled_sell_price: row.filled_sell_price,
-            filled_sell_at: row.filled_sell_at,
-            loop_count: row.loop_count ?? 0,
+            state: row.state ?? 'ARMED',
+            filled_price: row.filled_price,
+            filled_at: row.filled_at,
         });
     }
 };
@@ -161,18 +132,10 @@ onMounted(load);
 const stockDisplay = computed(() =>
     form.stock_code ? `${form.stock_name} (${form.stock_code})` : ''
 );
-const isStockLocked = computed(() => record.order_state === 'BOUGHT');
-const orderStateLabel = computed(() => ORDER_STATE_LABEL[record.order_state] ?? record.order_state);
-const stepIndex = computed(() => ({ WAIT_BUY: 0, BOUGHT: 1, DONE: 2, STOPPED: 2 })[record.order_state] ?? 0);
-
-const expectedRate = computed(() => {
-    const b = Number(form.buy_price), s = Number(form.sell_price);
-    if (!b || !s) return 0;
-    return ((s - b) / b) * 100;
-});
-const expectedRateText = computed(() =>
-    (!form.buy_price || !form.sell_price) ? '-' : `${expectedRate.value >= 0 ? '+' : ''}${expectedRate.value.toFixed(2)}%`
-);
+// 이미 체결(DONE)됐거나 취소(CANCELLED)된 건은 그대로 새로 등록해야 하므로
+// 종목 선택을 다시 열어준다 — 잠그는 건 감시(ARMED) 중일 때만.
+const isLocked = computed(() => false);
+const stateLabel = computed(() => MANUAL_SELL_STATE_LABEL[record.state] ?? record.state);
 
 const onPick = ({ stock_code, stock_name }) => {
     form.stock_code = stock_code;
@@ -182,14 +145,9 @@ const onPick = ({ stock_code, stock_name }) => {
 
 const validate = () => {
     if (!form.stock_code) return '종목을 선택해 주세요.';
-    if (!form.buy_price || Number(form.buy_price) <= 0) return '지정 매수가를 입력해 주세요.';
     if (!form.sell_price || Number(form.sell_price) <= 0) return '지정 매도가를 입력해 주세요.';
-    if (Number(form.buy_price) >= Number(form.sell_price)) return '매도가는 매수가보다 커야 합니다.';
-    if (form.use_stop_loss === 'Y') {
-        if (!form.stop_price || Number(form.stop_price) <= 0) return '손절가를 입력해 주세요.';
-        if (Number(form.stop_price) >= Number(form.buy_price)) return '손절가는 매수가보다 낮아야 합니다.';
-    }
-    if (form.qty !== null && form.qty !== '' && Number(form.qty) <= 0) return '수량은 1 이상이어야 합니다.';
+    const pct = form.qty_ratio_pct;
+    if (pct !== null && pct !== '' && (Number(pct) <= 0 || Number(pct) > 100)) return '매도 비율은 1~100 사이여야 합니다.';
     return null;
 };
 
@@ -198,19 +156,16 @@ const onSave = async () => {
     if (err) { alert(err); return; }
     isBusy.value = true;
     try {
-        await saveLimitOrder({
+        const pct = (form.qty_ratio_pct === null || form.qty_ratio_pct === '') ? 100 : Number(form.qty_ratio_pct);
+        await saveManualSell({
             stock_code: form.stock_code,
             stock_name: form.stock_name,
-            buy_price: Number(form.buy_price),
             sell_price: Number(form.sell_price),
-            qty: (form.qty === null || form.qty === '') ? null : Number(form.qty),
-            use_stop_loss: form.use_stop_loss,
-            stop_price: form.use_stop_loss === 'Y' ? Number(form.stop_price) : null,
-            loop_flag: form.loop_flag,
+            qty_ratio: pct / 100,
             enabled_flag: form.enabled_flag,
             memo: form.memo,
         });
-        alert('저장되었습니다.');
+        alert('저장되었습니다. 지금 운용 방식과 무관하게 이 종목은 지정가로만 감시됩니다.');
         await load();
     } finally {
         isBusy.value = false;
@@ -218,16 +173,12 @@ const onSave = async () => {
 };
 
 const onDelete = async () => {
-    if (record.order_state === 'BOUGHT') {
-        alert('매수 체결 상태에서는 삭제할 수 없습니다. 매도 완료 후 삭제해 주세요.');
-        return;
-    }
-    if (!confirm('지정가 예약을 삭제할까요?')) return;
+    if (!confirm('매도 수기 등록을 취소할까요? 이후 이 종목은 다시 활성 운용 방식의 자동 매도 rule을 따릅니다.')) return;
     isBusy.value = true;
     try {
-        await removeLimitOrder();
+        await removeManualSell();
         Object.assign(form, defaultForm());
-        Object.assign(record, { order_state: 'WAIT_BUY', filled_buy_price: null, filled_buy_at: null, filled_sell_price: null, filled_sell_at: null, loop_count: 0 });
+        Object.assign(record, { state: 'ARMED', filled_price: null, filled_at: null });
         hasSaved.value = false;
     } finally {
         isBusy.value = false;

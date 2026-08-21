@@ -25,11 +25,11 @@ const MODES = [
         mode_desc: 'KOSPI 지수 추세를 판단해 <b>정방향 ETF</b> 또는 <b>인버스 ETF</b> 한쪽만 보유합니다.<br/>반대 신호가 나오면 청산 후 반대편으로 전환합니다.',
         need_stock: 'N', need_pair: 'Y', need_price: 'N', sort_order: 3, enabled_flag: 'Y',
     },
-    {
-        mode_code: 'M3', mode_name: '지정가 감시 매매',
-        mode_desc: '종목·매수가·매도가를 직접 지정하면 worker 가 감시하다가 <b>도달 시 자동 체결</b>합니다.<br/>손절가 병행과 반복 감시를 옵션으로 켤 수 있습니다.',
-        need_stock: 'Y', need_pair: 'N', need_price: 'Y', sort_order: 4, enabled_flag: 'Y',
-    },
+    // 구 'M3 지정가 감시 매매'(설계 문서 기준 M4)는 폐기됐다.
+    // 매도가 도달 시 자동 체결하는 기능 자체는 없어지지 않았고, 모드 선택과
+    // 무관하게 '매도 수기 등록' 화면(LimitOrder.vue)으로 옮겨졌다 — 위 모드
+    // 중 무엇을 쓰든 보유 종목에 지정가를 걸어두면 그 종목만 자동 rule 대신
+    // 지정가로 감시된다. spec_docs/docs_worker_mode_runtime_spec.md §6·§11 참고.
 ];
 
 /* ── 운용 상태 (보유 중 시나리오로 시작) ── */
@@ -52,14 +52,17 @@ const db = {
             bars_held: 5, sell_reason: null,
         },
     },
-    limitOrder: {
+    // 매도 수기등록 — 보유 종목 1개에 지정 매도가를 걸어두면, 현재 활성 모드가
+    // 무엇이든 그 모드의 자동 매도 rule(손절/익절/트레일링) 대신 이 가격 도달
+    // 여부만으로 worker 가 대신 체결한다. 매수는 관여하지 않는다(기존 M4 처럼
+    // 매수가를 함께 지정하지 않음 — 매수는 항상 활성 모드가 담당).
+    // 백엔드 대응: app/trade_worker/repository.py get_active_manual_sells 등
+    // (trade_worker_manual_sell, sql/08_manual_sell_order_ddl.sql).
+    manualSell: {
         stock_code: '069500', stock_name: 'KODEX 200',
-        buy_price: 38500, sell_price: 41200, qty: 20,
-        use_stop_loss: 'Y', stop_price: 37000, loop_flag: 'Y',
-        order_state: 'WAIT_BUY',
-        filled_buy_price: null, filled_buy_at: null,
-        filled_sell_price: null, filled_sell_at: null,
-        loop_count: 0, enabled_flag: 'Y', memo: '조정 시 분할 진입용',
+        sell_price: 41200, qty_ratio: 1,
+        state: 'ARMED', enabled_flag: 'Y', memo: '목표가 도달 시 전량 매도',
+        filled_price: null, filled_qty: null, filled_at: null,
     },
     history: [
         { log_id: 3, action_type: 'APPLY_NOW', from_mode: null, to_mode: 'M0', reason: '최초 설정', actor: 'USER', created_at: '2026-08-01T10:12:00' },
@@ -139,16 +142,16 @@ export const mockSetPower = async (enabled) => {
     return { enabled_flag: s.enabled_flag, run_state: s.run_state };
 };
 
-export const mockFetchLimitOrder = async () => { await delay(); return clone(db.limitOrder); };
+export const mockFetchManualSell = async () => { await delay(); return clone(db.manualSell); };
 
-export const mockSaveLimitOrder = async (payload) => {
+export const mockSaveManualSell = async (payload) => {
     await delay();
-    db.limitOrder = { ...(db.limitOrder ?? {}), ...clone(payload) };
-    if (!db.limitOrder.order_state) db.limitOrder.order_state = 'WAIT_BUY';
-    return clone(db.limitOrder);
+    db.manualSell = { ...(db.manualSell ?? {}), ...clone(payload) };
+    if (!db.manualSell.state) db.manualSell.state = 'ARMED';
+    return clone(db.manualSell);
 };
 
-export const mockRemoveLimitOrder = async () => { await delay(); db.limitOrder = null; };
+export const mockRemoveManualSell = async () => { await delay(); db.manualSell = null; };
 
 export const mockFetchHistory = async (limit = 30) => { await delay(); return clone(db.history).slice(0, limit); };
 

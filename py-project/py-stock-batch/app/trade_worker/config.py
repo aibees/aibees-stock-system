@@ -3,10 +3,14 @@ trade_worker 설정 (환경변수 파싱).
 
 worker 는 유저 1명당 1 프로세스(상시 daemon)로 뜬다. KIS_USER_ID 만 다르게.
 
+※ 실전투자 전용이다 — 뜨면 즉시 실주문이 나간다. 예전에 있던 DRY_RUN 플래그는
+  선언만 되고 주문 경로 어디서도 실제로 분기하지 않아 안전장치로 기능하지 못했다
+  (docs_worker_mode_runtime_spec.md §10 참고). 그래서 아예 제거했다(2026-08-20).
+  테스트/검증은 실계좌가 아닌 별도 계정으로 할 것.
+
 | 변수 | 기본 | 설명 |
 |------|------|------|
 | KIS_USER_ID   | (필수) | 이 worker 가 담당할 유저 id (1/2/3) |
-| DRY_RUN       | true   | true 면 실제 주문 대신 로그만 남김 (최우선 안전장치) |
 | BUY_TIME      | 09:00  | 매수 엔진 실행 시각 (KRX 정규장 시작, 시장가) |
 | NXT_PREMARKET | true   | NXT 프리마켓 선매수 라운드 사용 여부 |
 | NXT_BUY_TIME  | 08:00  | NXT 프리마켓 매수 시각 (프리마켓 08:00~08:50) |
@@ -36,7 +40,6 @@ def _bool(v, default):
 @dataclass
 class WorkerConfig:
     user_id: int
-    dry_run: bool
     buy_hour: int
     buy_minute: int
     nxt_premarket: bool
@@ -57,10 +60,6 @@ class WorkerConfig:
     # user_options(s1_*) 변경 감지 주기(초). 0 이면 비활성 → 재기동해야 반영된다.
     settings_poll_sec: int
 
-    @property
-    def mode(self) -> str:
-        return "DRY_RUN(로그만)" if self.dry_run else "실전투자"
-
 
 def load() -> WorkerConfig:
     uid = os.getenv("KIS_USER_ID")
@@ -75,7 +74,6 @@ def load() -> WorkerConfig:
 
     return WorkerConfig(
         user_id=int(uid),
-        dry_run=_bool(os.getenv("DRY_RUN"), False),
         buy_hour=int(hh),
         buy_minute=int(mm),
         nxt_premarket=_bool(os.getenv("NXT_PREMARKET"), True),
