@@ -16,8 +16,12 @@ class FlaskApp:
         self.app = Flask(__name__)
         CORS(
             self.app
-           ,allow_headers=['Content-Type', 'maria-Authorization']
-           ,methods=['GET', 'POST', 'OPTIONS']     
+           # [수정] 'Authorization' 추가 — Capacitor 앱(WebView origin: https://localhost 등)에서
+           # 호출 시 aibeesApi/batchApi 가 Bearer 토큰을 Authorization 헤더로 보내는데,
+           # 이 목록에 없으면 브라우저/WebView의 CORS preflight 가 실제 요청을 막는다.
+           # 기존 배포(같은 origin, nginx 프록시)에서는 preflight 자체가 없어 드러나지 않았다.
+           ,allow_headers=['Content-Type', 'Authorization', 'maria-Authorization']
+           ,methods=['GET', 'POST', 'OPTIONS']
         )
         if config_obj:
             self.app.config.from_object(config_obj)

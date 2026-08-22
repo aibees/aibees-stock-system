@@ -28,6 +28,7 @@ x-worker-common: &worker-common
   volumes:
     - ./aes.key:/workdir/aes.key:ro     # 3대 공통 (KIS key 복호화), 이미지엔 안 굽음
     - ./smtp.key:/workdir/smtp.key:ro   # 이메일 fallback 발신 계정 (텔레그램 실패 시)
+    - ./firebase-service-account.json:/workdir/firebase-service-account.json:ro  # 체결 push(FCM), notifier.py
   restart: unless-stopped
 
 services:
@@ -44,6 +45,7 @@ services:
       - SELL_LIMIT_SLIP_PCT=1.0   # NXT 장외 매도 지정가 = 체결가 -1%
       - KIS_ALLOW_FILE_FALLBACK=false
       - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
+      - FCM_CREDENTIALS_PATH=/workdir/firebase-service-account.json
 #    networks: { aibees: { ipv4_address: 172.21.1.11 } }
 #
   kis-user2:
@@ -59,6 +61,7 @@ services:
       - SELL_LIMIT_SLIP_PCT=1.0   # NXT 장외 매도 지정가 = 체결가 -1%
       - KIS_ALLOW_FILE_FALLBACK=false
       - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
+      - FCM_CREDENTIALS_PATH=/workdir/firebase-service-account.json
 #    networks: { aibees: { ipv4_address: 172.21.1.12 } }
 
   kis-user3:
@@ -74,6 +77,7 @@ services:
       - SELL_LIMIT_SLIP_PCT=1.0   # NXT 장외 매도 지정가 = 체결가 -1%
       - KIS_ALLOW_FILE_FALLBACK=false
       - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
+      - FCM_CREDENTIALS_PATH=/workdir/firebase-service-account.json
 #    networks: { aibees: { ipv4_address: 172.21.1.13 } }
 
 #networks:

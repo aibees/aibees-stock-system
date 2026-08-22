@@ -84,8 +84,10 @@ worker 매도 로직(`KospiStrategy0`)의 유저별 튜닝 파라미터를 조�
 | `SELL_RETRY_COOLDOWN_SEC` | 매도 실패 재시도 쿨다운(초) | int | 60 | 10 ~ 600 | number |
 | `SELL_MAX_FAILS` | 연속 실패 자동 비활성 임계 | int | 5 | 1 ~ 20 | number |
 | `EXCHANGE` | 주문 라우팅 | enum | SOR | KRX/NXT/SOR | select |
-| `DRY_RUN` | 모의(로그만) | bool | false | on/off | toggle (강조/경고색) |
 | `lookback_days` | 지표 계산 조회 기간(일) | int | 250 | 60 ~ 500 | number |
+
+> 구 `DRY_RUN` 토글은 제거됨(2026-08-20) — 선언만 되고 실제로 주문 경로를 막지 않아 안전장치로
+> 기능하지 못했다. 실거래를 막으려면 `KIS_VIRTUAL`(모의) 사용.
 
 ---
 
@@ -158,6 +160,5 @@ PUT /api/users/{userId}/sell-params
 ## 5. 주의사항
 
 - 파라미터 변경은 **다음 daily 평가부터 라인 반영**(실시간 즉시 아님) — 저장 후 토스트로 안내.
-- `DRY_RUN` toggle은 실거래 스위치라 강조 + 확인 모달.
 - E 그룹(env)은 프로세스 재시작 필요할 수 있음 — 백엔드 확인.
 - 참고 문서: `docs_buy_target_sim_spec.md`(판정 규칙 근거), `docs_pykis_service_design.md`.

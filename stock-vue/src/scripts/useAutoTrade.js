@@ -6,10 +6,10 @@
  *  모드 설정/운용 상태/이력은 이 저장소 밖(ROOT 서버, VITE_SERVER_URL)이 구현할
  *  예정이라 아직 mock 이다. API 가 준비되면 아래 상수만 false 로 바꾸면 된다.
  *
- * ⚠ 매도 수기등록(fetchManualSell/saveManualSell/removeManualSell)만은 예외다.
- *  이 기능은 이 저장소(py-stock-batch, app/trade_worker)에 이미 완전히 구현돼
- *  있어서 ROOT 서버를 기다릴 이유가 없다(2026-08-21) — USE_MOCK 값과 무관하게
- *  항상 실제 서버(batchApi → py-stock-batch)를 호출한다.
+ * ⚠ 매도 수기등록(fetchHoldings/fetchManualSells/addManualSell/cancelManualSell)만은
+ *  예외다. 이 기능은 이 저장소(py-stock-batch, app/trade_worker)에 이미 완전히
+ *  구현돼 있어서 ROOT 서버를 기다릴 이유가 없다(2026-08-21) — USE_MOCK 값과
+ *  무관하게 항상 실제 서버(batchApi → py-stock-batch)를 호출한다.
  */
 import aibeesApi, { batchApi } from './aibeesApi.js';
 import { assUserSession } from './stores/user-stores.js';
@@ -67,27 +67,43 @@ export const setPower = async (enabled) => {
 /* ── 매도 수기등록 (모드 무관, 구 'M4/M3 지정가 감시' 폐기 후 대체)
  *   보유 종목에 지정 매도가를 걸어두면, 활성 운용모드가 무엇이든 그 모드의
  *   자동 매도 rule 대신 이 가격 도달 여부로 worker 가 대신 체결한다.
- *   백엔드: app/trade_worker (trade_worker_manual_sell, sql/08_manual_sell_order_ddl.sql).
+ *   백엔드: app/trade_worker (trade_worker_manual_sell, sql/08_manual_sell_order_ddl.sql
+ *   + 09_manual_sell_multi_ddl.sql).
  *   spec: py-stock-batch/spec_docs/docs_worker_mode_runtime_spec.md §11
+ *
+ *   2026-08-21 다건화: 종목당 1건(단일 슬롯)이던 제약을 풀어 종목당 여러 지정가
+ *   (사다리 매도)와 여러 종목 동시 등록을 허용했다. 그래서 조회는 이제 "지금
+ *   등록된 것 1건"이 아니라 유저의 등록 전체 목록(fetchManualSells)이고, 등록은
+ *   항상 새 티어 생성(addManualSell)이며, 취소는 특정 티어 하나만 id 로 지정한다
+ *   (cancelManualSell). 등록 가능 조건은 계좌 실보유(user_holdings)뿐이다 —
+ *   worker 가 직접 매수한 종목(trade_worker_position)으로 좁히지 않는다.
  */
-export const fetchManualSell = async () => {
+export const fetchHoldings = async () => {
     const user_id = currentUserId();
-    if (!user_id) return null;   // 로그인 세션 없음 — 화면은 "미등록"으로 표시됨
-    const { data } = await batchApi.get(`${BASE}/manual-sell`, { params: { user_id } });
-    return data.data ?? null;
+    if (!user_id) return [];   // 로그인 세션 없음 — 화면은 빈 목록으로 표시됨
+    const { data } = await batchApi.get(`${BASE}/holdings`, { params: { user_id } });
+    return data.data ?? [];
 };
 
-export const saveManualSell = async (payload) => {
+export const fetchManualSells = async () => {
+    const user_id = currentUserId();
+    if (!user_id) return [];   // 로그인 세션 없음 — 화면은 "미등록"으로 표시됨
+    const { data } = await batchApi.get(`${BASE}/manual-sell`, { params: { user_id } });
+    return data.data ?? [];
+};
+
+export const addManualSell = async (payload) => {
     const user_id = currentUserId();
     if (!user_id) throw new Error('로그인 세션이 없습니다.');
     const { data } = await batchApi.post(`${BASE}/manual-sell`, { ...payload, user_id });
     return data.data ?? {};
 };
 
-export const removeManualSell = async () => {
+export const cancelManualSell = async (manual_sell_id) => {
     const user_id = currentUserId();
     if (!user_id) throw new Error('로그인 세션이 없습니다.');
-    await batchApi.post(`${BASE}/manual-sell/cancel`, { user_id });
+    if (!manual_sell_id) throw new Error('취소할 등록 건을 찾을 수 없습니다.');
+    await batchApi.post(`${BASE}/manual-sell/cancel`, { user_id, manual_sell_id });
 };
 
 /* ── 변경 이력 ── */

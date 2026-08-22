@@ -10,17 +10,24 @@
 import logging
 
 from app.common.utils.telegramUtils import telegramUtils
+# [추가] 체결 push — worker 소유자(user_id) 1명에게만 보낸다(broadcast 아님).
+# get_session()은 job.py 가 쓰는 것과 같은 dbConn(app.config.database)을 감싼
+# contextmanager 라 커넥션 풀을 새로 만들지 않는다.
+from app.config.contextManager import get_session
+from app.batches.services.notifyService import notifyService
 
 log = logging.getLogger("trade_worker.notify")
 
 
 class Notifier:
-    def __init__(self, conf: dict | None, mode_tag: str = ""):
+    def __init__(self, conf: dict | None, mode_tag: str = "", user_id: int | None = None):
         conf = conf or {}
         self.bot = conf.get("tele_bot_id")
         self.chat = conf.get("tele_chat_id")
         self.email = conf.get("email")
         self.mode_tag = mode_tag
+        # [추가] push 발송 대상 — 이 worker 가 담당하는 유저 1명.
+        self.user_id = user_id
 
     def send(self, subject: str, text: str) -> str | None:
         """텔레그램 → 이메일 순서로 시도. 성공 채널명('telegram'|'email') 또는 None 반환."""
@@ -56,7 +63,9 @@ class Notifier:
         return None
 
     def trade(self, kind: str, name: str, code: str, qty, price, balance, note: str = "") -> str | None:
-        """체결 알림 포맷 후 전송. kind='BUY'|'SELL'."""
+        """체결 알림 포맷 후 전송. kind='BUY'|'SELL'.
+        텔레그램/이메일(send)과 별개로, worker 소유자에게 push 도 보낸다
+        (전체 broadcast 인 배치 시작/종료 push 와 달리 이건 user 스코프)."""
         icon = "🟢" if kind == "BUY" else "🔴"
         label = "매수" if kind == "BUY" else "매도"
         subject = f"[{label} 체결] {name}({code})"
@@ -64,4 +73,19 @@ class Notifier:
                 f"수량 {qty} @ {price}\n"
                 f"잔고 {balance}"
                 + (f"\n{note}" if note else ""))
-        return self.send(subject, text)
+        channel = self.send(subject, text)
+
+        # [추가] 체결 push — 실패해도 매매 흐름을 절대 막으면 안 되므로 통째로 감싼다.
+        # (notifyService.to_user 내부에서도 이미 예외를 삼키지만 이중 방어)
+        if self.user_id:
+            try:
+                push_body = f"{name}({code}) {qty}주 @{price} · 잔고 {balance}"
+                with get_session() as s:
+                    notifyService.to_user(
+                        s, self.user_id, f"{label} 체결", push_body,
+                        {"event": "TRADE", "kind": kind, "stock_code": code},
+                    )
+            except Exception as e:  # noqa: BLE001
+                log.warning("체결 push 실패: %s", e)
+
+        return channel

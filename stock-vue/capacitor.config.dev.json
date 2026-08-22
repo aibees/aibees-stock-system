@@ -1,0 +1,9 @@
+{
+  "appId": "com.aibeesworld.stock",
+  "appName": "Aibees Stock",
+  "webDir": "dist",
+  "server": {
+    "url": "http://localhost:19010",
+    "cleartext": true
+  }
+}

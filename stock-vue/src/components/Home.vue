@@ -240,7 +240,7 @@ import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores';
 
 const router = useRouter();
-const title = ref('전략 대시보드');
+const title = ref('SSAP');
 
 const userSession = assUserSession();
 const isLogin = ref(false);

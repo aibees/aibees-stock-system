@@ -13,8 +13,9 @@ import Lnb from './common/Lnb.vue';
 @use '@@/__variables.scss' as *;
 body {
   height: 100%;
-  background-color: #fff;
+  background-color: #1a1a1a;
   margin: 0;
+
 }
 #app {
   height: 100%;
@@ -24,5 +25,10 @@ body {
   text-align: center;
   color: #f7f7f7;
 
+  /* 상하좌우 노치 및 홈 바 영역 자동 대응 */
+  padding-top: env(safe-area-inset-top);
+  // padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 </style>

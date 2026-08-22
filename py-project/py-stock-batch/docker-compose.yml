@@ -12,6 +12,13 @@ services:
         working_dir: /workdir
         ports:
           - "5557:5557"
+        environment:
+            # 배치 시작/종료 broadcast push (job.py) 발송용 — FCM 서비스 계정 키 경로.
+            - FCM_CREDENTIALS_PATH=/workdir/firebase-service-account.json
+        volumes:
+            # 실제 키 파일은 aes.key/smtp.key 와 같은 위치(py-stock-batch/)에 두고
+            # git 에는 올리지 않는다(.gitignore 참고).
+            - ./firebase-service-account.json:/workdir/firebase-service-account.json:ro
         networks:
             aibees:
                 ipv4_address: 172.21.1.5

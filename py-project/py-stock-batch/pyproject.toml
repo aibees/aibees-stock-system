@@ -34,6 +34,7 @@ python-kis = "^2.1.6"
 finance-datareader = "^0.9.102"
 opendartreader = "^0.2.3"
 python-telegram-bot = "^22.8"
+firebase-admin = "^6.5.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -291,28 +291,33 @@ console.log(userSession.getRole);
     left: 0;
     width: 100%;
     height: 2.5rem;
-    background-color: #171717;
-    padding: calc(8px + env(safe-area-inset-bottom)) 0;
+    // [수정] 헤더와 통일 — 검정 배경 대신 앱 배경(흰색)에 상단 border로 구분.
+    // fixed 라서 스크롤되는 컨텐츠가 밑에서 올라올 수 있어 완전 투명은 피하고
+    // 불투명한 흰색으로 뒀음(헤더는 relative라 투명해도 안전, 여긴 다름).
+    background-color: #ffffff;
+    border-top: 1px solid #1c3d6e; // [수정] "매도신호 신청" 버튼과 동일한 $navy
+    // [수정] 상하 여백 축소: 8px → 4px
+    padding: 0.5rem 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
     z-index: 1000;
     font-size: 1.4rem;
-    color: #fff;
+    color: #1a1a1a; // [수정] white → 다크(흰 배경이라)
 
     @include mobile {
         display: none;
     }
 
     .left {
-        padding: 0.4rem 1.8rem;
+        // [수정] 상하 여백 축소: 0.4rem → 0.15rem
+        padding: 0.15rem 3rem;
     }
 
     .right {
         width: 1.8rem;
-        padding: 0.4rem 1.8rem;
+        // [수정] 상하 여백 축소: 0.4rem → 0.15rem
+        padding: 0.15rem 3rem;
         display: flex;
         justify-content: end;
         align-items: center;

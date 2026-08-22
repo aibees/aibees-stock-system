@@ -110,7 +110,6 @@
 import aibeesApi from '../scripts/aibeesApi.js'
 import * as StrUtils from '@/scripts/utils/stringUtils.js'
 import { assUserSession } from '../scripts/stores/user-stores';
-import { removeCookie } from '@/scripts/utils/cookieUtils';
 
 const userSession = assUserSession();
 const router = useRouter()
@@ -187,7 +186,7 @@ watch(rememberEmail, (val) => {
 })
 watch(autoLogin, (val) => {
     localStorage.setItem('autoLogin', val)
-    if (!val) removeCookie('userSession')
+    if (!val) localStorage.removeItem('userSession')
 })
 // ─────────────────────────────────────────────────────────────
 

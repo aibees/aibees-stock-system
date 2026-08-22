@@ -1,6 +1,7 @@
 """shared ORM models — DB(stock) 스키마 기준."""
 
 from stock_shared.models.batchJobMaster import BatchJobMaster
+from stock_shared.models.devicePushToken import DevicePushToken
 from stock_shared.models.masterStock import MasterStock
 from stock_shared.models.nStockBatchLog import NStockBatchLog
 from stock_shared.models.stockSellRequest import StockSellRequest
@@ -19,6 +20,7 @@ from stock_shared.models.userRole import UserRole
 
 __all__ = [
     "BatchJobMaster",
+    "DevicePushToken",
     "MasterStock",
     "NStockBatchLog",
     "StockSellRequest",

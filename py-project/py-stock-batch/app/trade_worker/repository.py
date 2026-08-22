@@ -11,9 +11,16 @@ trade_worker DB 접근 계층 (메인 DAO 와 독립, raw SQL).
   - set_wallet_balance / set_wallet_snapshot / replace_holdings : user_wallet / user_holdings
   - insert_trade_log / insert_worker_log             : trade_log / trade_worker_log
 
-매도 수기등록(모드 무관, sql/08_manual_sell_order_ddl.sql):
-  - get_active_manual_sells / get_manual_sell / upsert_manual_sell /
-    cancel_manual_sell / complete_manual_sell         : trade_worker_manual_sell
+매도 수기등록(모드 무관, sql/08_manual_sell_order_ddl.sql + 09_manual_sell_multi_ddl.sql):
+  - get_user_holdings(전체) / get_user_holding(단건)  : user_holdings 조회
+    (등록 가능 여부 판단 — worker 매수분(trade_worker_position) 여부와 무관하게
+    계좌 실보유만 있으면 등록할 수 있어야 하므로 이 테이블을 직접 본다.)
+  - get_active_manual_sells / get_manual_sells / get_manual_sell_by_id /
+    insert_manual_sell / cancel_manual_sell / complete_manual_sell
+                                                       : trade_worker_manual_sell
+    (2026-08-21 다건화: PK가 (user_id, stock_code) → surrogate id 로 바뀌어
+    종목당 여러 건(지정가 사다리) 동시 등록을 허용한다 — upsert_manual_sell/
+    get_manual_sell(단일)/get_latest_manual_sell 은 폐기.)
 """
 import logging
 from datetime import datetime, timedelta
@@ -185,6 +192,36 @@ class Repository:
         with get_session() as s:
             row = s.execute(sql, {"uid": user_id}).mappings().first()
         return Decimal(row["user_balance"]) if row and row["user_balance"] is not None else Decimal(0)
+
+    def get_user_holdings(self, user_id: int) -> list[dict]:
+        """계좌 실보유(user_holdings) 전체 목록 — 매도 수기등록 화면의 "종목 선택"이
+        여기서 고른다(전 종목 검색이 아니라 지금 보유 중인 종목만 노출). qty 내림차순
+        정렬은 의미가 없어 stock_code 순으로 반환한다."""
+        sql = text(
+            "SELECT stock_code, stock_name, qty, avg_price, cur_price, eval_amount, profit "
+            "  FROM user_holdings WHERE user_id = :uid ORDER BY stock_code ASC"
+        )
+        with get_session() as s:
+            return [dict(r) for r in s.execute(sql, {"uid": user_id}).mappings().all()]
+
+    def get_user_holding(self, user_id: int, stock_code: str) -> dict | None:
+        """계좌 실보유(user_holdings) 단건 조회.
+
+        매도 수기등록 "등록 가능 여부"는 worker 자기매수(trade_worker_position
+        HOLDING) 여부로 좁히지 않는다 — user_holdings 는 replace_holdings()가
+        실제 계좌 조회 결과로 주기 갱신하는 스냅샷이라, 여기 있으면 채널(worker
+        자동매수든 HTS/MTS 수동매수든)과 무관하게 "지금 보유 중"이라는 뜻이다.
+        등록 자체는 이 테이블만 보고 허용하고, 실시간 감시(구독) 편입은 여전히
+        wallet_sync.reconcile_wallet 의 주기 폴링(WALLET_POLL_SEC)에 맡긴다
+        (sell_executor.reload_manual_sells 참고 — 아직 trade_worker_position 에
+        없으면 다음 폴링까지 감시만 지연될 뿐, 등록 자체를 막지 않는다)."""
+        sql = text(
+            "SELECT stock_code, stock_name, qty, avg_price, cur_price "
+            "  FROM user_holdings WHERE user_id = :uid AND stock_code = :code"
+        )
+        with get_session() as s:
+            row = s.execute(sql, {"uid": user_id, "code": stock_code}).mappings().first()
+        return dict(row) if row else None
 
     # ── 쓰기 ────────────────────────────────────────────────────────
     def set_wallet_balance(self, user_id: int, balance: Decimal) -> None:
@@ -443,97 +480,110 @@ class Repository:
     #   trade_worker_manual_sell. 등록되면 sell_executor 가 그 종목의 모드
     #   자동 매도 rule(stop/target/trail·일봉 신호)을 보지 않고 sell_price
     #   도달 여부만으로 매도한다(BaseSellExecutor 공통 코드, 모드 무관).
+    #
+    #   2026-08-21 다건화(09_manual_sell_multi_ddl.sql): PK가 (user_id, stock_code)
+    #   에서 surrogate id 로 바뀌어 종목당 여러 건(지정가 사다리)과 여러 종목을
+    #   동시에 등록할 수 있다. upsert 방식(같은 유저+종목이면 값만 덮어씀)은
+    #   더 이상 맞지 않는다 — 매 등록이 새 행(insert_manual_sell)이고, 취소/완료는
+    #   전부 id 로 특정 행 하나만 골라 처리한다.
     def get_active_manual_sells(self, user_id: int) -> list[dict]:
-        """감시중(ARMED) + 활성(enabled_flag='Y') 수기등록 전체.
-        sell_executor 가 주기적으로 재적재해 메모리(dict)로 들고 있는다."""
+        """감시중(ARMED) + 활성(enabled_flag='Y') 수기등록 전체(종목당 여러 건 포함).
+        sell_executor 가 주기적으로 재적재해 종목코드별 리스트(가격 오름차순)로
+        메모리에 들고 있는다."""
         sql = text(
-            "SELECT user_id, stock_code, stock_name, sell_price, qty_ratio, "
-            "       state, enabled_flag, memo "
+            "SELECT id, user_id, stock_code, stock_name, sell_price, qty_ratio, "
+            "       base_qty, state, enabled_flag, memo "
             "  FROM trade_worker_manual_sell "
             " WHERE user_id = :uid AND state = 'ARMED' AND enabled_flag = 'Y'"
         )
         with get_session() as s:
             return [dict(r) for r in s.execute(sql, {"uid": user_id}).mappings().all()]
 
-    def get_manual_sell(self, user_id: int, stock_code: str) -> dict | None:
+    def get_manual_sells(self, user_id: int, stock_code: str | None = None) -> list[dict]:
+        """등록 화면(LimitOrder.vue) 전용 — 유저의 수기등록 전체(모든 상태 포함)를
+        종목코드 → 지정 매도가 오름차순으로 반환한다. stock_code 를 주면 그 종목만.
+        get_active_manual_sells 와 달리 enabled_flag/state 로 거르지 않는다 —
+        감시를 꺼둔(enabled_flag='N') 등록이나 이미 체결/취소된 이력도 화면엔
+        계속 보여야 하기 때문이다."""
+        sql_txt = (
+            "SELECT * FROM trade_worker_manual_sell WHERE user_id = :uid"
+            + (" AND stock_code = :code" if stock_code else "")
+            + " ORDER BY stock_code ASC, sell_price ASC"
+        )
+        params = {"uid": user_id}
+        if stock_code:
+            params["code"] = stock_code
+        with get_session() as s:
+            return [dict(r) for r in s.execute(text(sql_txt), params).mappings().all()]
+
+    def get_manual_sell_by_id(self, user_id: int, manual_sell_id: int) -> dict | None:
         sql = text(
-            "SELECT * FROM trade_worker_manual_sell WHERE user_id = :uid AND stock_code = :code"
+            "SELECT * FROM trade_worker_manual_sell WHERE user_id = :uid AND id = :id"
         )
         with get_session() as s:
-            row = s.execute(sql, {"uid": user_id, "code": stock_code}).mappings().first()
+            row = s.execute(sql, {"uid": user_id, "id": manual_sell_id}).mappings().first()
         return dict(row) if row else None
 
-    def get_latest_manual_sell(self, user_id: int) -> dict | None:
-        """단일 슬롯 화면(LimitOrder.vue) 전용 — 종목코드 없이 "지금 등록된 것" 1건을
-        조회한다. get_active_manual_sells 와 달리 enabled_flag='Y' 로 거르지 않는다
-        (감시를 꺼둔(enabled_flag='N') 등록도 화면엔 계속 보여야 하므로 — "등록은
-        유지되지만 감시하지 않습니다" 문구 참고). state='ARMED' 인 것 중 가장 최근
-        갱신 1건. 여러 종목을 동시 등록하는 화면(M2/M3 전용)이 생기면 이 메서드
-        대신 get_active_manual_sells 를 그대로 쓰면 된다."""
-        sql = text(
-            "SELECT * FROM trade_worker_manual_sell "
-            " WHERE user_id = :uid AND state = 'ARMED' "
-            " ORDER BY updated_at DESC LIMIT 1"
-        )
-        with get_session() as s:
-            row = s.execute(sql, {"uid": user_id}).mappings().first()
-        return dict(row) if row else None
-
-    def upsert_manual_sell(self, user_id: int, stock_code: str, stock_name: str,
+    def insert_manual_sell(self, user_id: int, stock_code: str, stock_name: str,
                            sell_price: Decimal, qty_ratio: Decimal = Decimal("1"),
-                           memo: str | None = None, enabled_flag: str = "Y") -> None:
-        """등록/재등록. 이미 있으면(같은 유저+종목) 값만 갱신하고 ARMED 로 되돌린다
-        (예: DONE/CANCELLED 상태였던 종목을 다시 등록하는 경우).
-        enabled_flag='N' 으로 저장하면 등록 자체는 유지되지만 get_active_manual_sells
-        (worker 가 읽는 감시 대상)에서 빠진다 — "감시 사용" 토글의 실제 동작."""
+                           memo: str | None = None, enabled_flag: str = "Y",
+                           base_qty: Decimal | None = None) -> int:
+        """신규 등록 — 항상 새 행을 만든다(종목당 여러 건 허용). 반환값은 새 id.
+
+        base_qty: 등록 시점 보유수량 스냅샷(user_holdings.qty 또는
+        trade_worker_position.hold_qty). 이 값을 넘기면 qty_ratio 는 매도 시점의
+        실보유가 아니라 **이 스냅샷 기준 절대수량**으로 고정된다 — 그래야 같은
+        종목에 여러 티어를 등록해도(예 30%/30%/40%) 먼저 체결된 티어 때문에
+        다음 티어의 비율 기준(잔여 보유수량)이 줄어드는 문제가 없다.
+        None 이면(호출측이 보유수량을 못 구한 경우) sell_executor 가 매도 시점
+        실보유 대비 비율로 폴백한다(구 단일슬롯 동작과 동일)."""
         now = datetime.now()
         sql = text(
             """
             INSERT INTO trade_worker_manual_sell
-                (user_id, stock_code, stock_name, sell_price, qty_ratio,
+                (user_id, stock_code, stock_name, sell_price, qty_ratio, base_qty,
                  state, enabled_flag, memo, created_at, updated_at)
             VALUES
-                (:uid, :code, :name, :price, :ratio,
+                (:uid, :code, :name, :price, :ratio, :base_qty,
                  'ARMED', :flag, :memo, :now, :now)
-            ON DUPLICATE KEY UPDATE
-                stock_name = :name, sell_price = :price, qty_ratio = :ratio,
-                state = 'ARMED', enabled_flag = :flag, memo = :memo,
-                filled_price = NULL, filled_qty = NULL, filled_at = NULL,
-                updated_at = :now
             """
         )
         with get_session() as s:
-            s.execute(sql, {
+            result = s.execute(sql, {
                 "uid": user_id, "code": stock_code, "name": stock_name or "",
-                "price": str(sell_price), "ratio": str(qty_ratio), "memo": memo,
-                "flag": (enabled_flag or "Y"), "now": now,
+                "price": str(sell_price), "ratio": str(qty_ratio),
+                "base_qty": str(base_qty) if base_qty is not None else None,
+                "memo": memo, "flag": (enabled_flag or "Y"), "now": now,
             })
             s.commit()
+            return result.lastrowid
 
-    def cancel_manual_sell(self, user_id: int, stock_code: str) -> None:
-        """사용자 취소. 체결 이력을 남기기 위해 삭제 대신 상태만 바꾼다."""
+    def cancel_manual_sell(self, user_id: int, manual_sell_id: int) -> None:
+        """사용자 취소. 체결 이력을 남기기 위해 삭제 대신 상태만 바꾼다.
+        id 로 특정 행 하나만 취소한다 — 같은 종목의 다른 티어는 건드리지 않는다."""
         sql = text(
             "UPDATE trade_worker_manual_sell SET state = 'CANCELLED', updated_at = :now "
-            "WHERE user_id = :uid AND stock_code = :code AND state = 'ARMED'"
+            "WHERE user_id = :uid AND id = :id AND state = 'ARMED'"
         )
         with get_session() as s:
-            s.execute(sql, {"now": datetime.now(), "uid": user_id, "code": stock_code})
+            s.execute(sql, {"now": datetime.now(), "uid": user_id, "id": manual_sell_id})
             s.commit()
 
-    def complete_manual_sell(self, user_id: int, stock_code: str,
+    def complete_manual_sell(self, user_id: int, manual_sell_id: int,
                              filled_price: Decimal, filled_qty: Decimal) -> None:
-        """수기등록 지정가 도달 → worker 가 대신 체결 완료. DONE 으로 종료."""
+        """수기등록 지정가 도달 → worker 가 대신 체결 완료. 해당 티어(id)만 DONE 으로
+        종료한다 — 같은 종목에 등록된 다른 티어는 계속 ARMED 로 남아 감시된다."""
         sql = text(
             """
             UPDATE trade_worker_manual_sell
             SET state = 'DONE', filled_price = :price, filled_qty = :qty,
                 filled_at = :now, updated_at = :now
-            WHERE user_id = :uid AND stock_code = :code AND state = 'ARMED'
+            WHERE user_id = :uid AND id = :id AND state = 'ARMED'
             """
         )
         with get_session() as s:
             s.execute(sql, {"price": str(filled_price), "qty": str(filled_qty),
-                            "now": datetime.now(), "uid": user_id, "code": stock_code})
+                            "now": datetime.now(), "uid": user_id, "id": manual_sell_id})
             s.commit()
 
     def insert_worker_log(self, user_id: int, source: str, level: str, message: str) -> None:

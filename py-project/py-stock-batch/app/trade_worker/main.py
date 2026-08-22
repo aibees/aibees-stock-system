@@ -193,8 +193,8 @@ def main():
     # 4. Create Repository Instance
     repo = Repository()
 
-    # 5. Create Notifier / 텔레그램 우선, 실패 시 이메일 fallback
-    notifier = Notifier(repo.get_user_notify(cfg.user_id))
+    # 5. Create Notifier / 텔레그램 우선, 실패 시 이메일 fallback + 체결 push(user 스코프)
+    notifier = Notifier(repo.get_user_notify(cfg.user_id), user_id=cfg.user_id)
 
     # 6. 매도 전략 — user_trade_mode.active_mode 로 전략 결정. 라인/액션 자체 계산
     #    repo 를 넘겨야 SellStrategy 가 유저의 운용모드를 읽는다. 안 넘기면 DEFAULT_MODE 로 굳는다.

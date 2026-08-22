@@ -6,12 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview --port 7077"
+    "preview": "vite preview --port 7077",
+    "cap:dev": "cp capacitor.config.dev.json capacitor.config.json && npx cap sync ios",
+    "cap:prod": "cp capacitor.config.prod.json capacitor.config.json && npx cap sync ios"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
+    "@capacitor/push-notifications": "^8.5.0",
     "@fortawesome/fontawesome-svg-core": "^6.2.1",
     "@fortawesome/free-solid-svg-icons": "^6.2.1",
     "@fortawesome/vue-fontawesome": "^3.0.3",

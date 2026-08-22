@@ -3,6 +3,10 @@ from abc import ABC, abstractmethod
 from app.common.utils.commUtils import *
 from app.config.database import dbConn
 from app.domain.dao.batchLogDao import BatchLogDao
+# [추가] 배치 시작/종료 push 알림 — notifyService 자체는 import 시점에 firebase_admin
+# 을 건드리지 않는다(pushUtils.py 의 lazy init). job_runner.py 의 "import 시점
+# side-effect 금지" 불변식과 충돌하지 않는다.
+from app.batches.services.notifyService import notifyService
 
 import logging
 logging.basicConfig(level=logging.ERROR)
@@ -32,6 +36,17 @@ class Job(ABC):
         self.batchLogDaoImpl.insert_batch_log(self.session, insert_param)
         self.session.commit()
 
+        # [추가] 배치 시작 push (broadcast). push 실패가 배치를 막지 않도록
+        # notifyService 내부에서 이미 예외를 삼키지만, 방어적으로 한 번 더 감싼다.
+        try:
+            notifyService.broadcast(
+                self.session, "배치 시작",
+                f"{self.job_name} 배치가 시작되었습니다.",
+                {"batch_seq": str(batch_seq), "batch_code": self.job_name, "event": "START"},
+            )
+        except Exception as e:  # noqa: BLE001
+            logging.exception(e)
+
         try:
             print(f'======= BATCH START :: {batch_seq} =======')
             batch_result = self.run_batch(**kwargs)
@@ -48,6 +63,18 @@ class Job(ABC):
 
             self.batchLogDaoImpl.update_batch_log(self.session, update_param)
             self.session.commit()
+
+            # [추가] 배치 정상 종료 push (broadcast)
+            try:
+                notifyService.broadcast(
+                    self.session, "배치 종료",
+                    f"{self.job_name} 배치가 종료되었습니다. ({update_param['status']})",
+                    {"batch_seq": str(batch_seq), "batch_code": self.job_name,
+                     "event": "END", "status": update_param['status']},
+                )
+            except Exception as push_e:  # noqa: BLE001
+                logging.exception(push_e)
+
             print('=======  JOB   END  =======')
         except Exception as e:
             print('=======  JOB  FAIL  =======')
@@ -66,6 +93,17 @@ class Job(ABC):
                 }
                 self.batchLogDaoImpl.update_batch_log(self.session, update_param)
                 self.session.commit()
+
+                # [추가] 배치 실패 종료 push (broadcast)
+                try:
+                    notifyService.broadcast(
+                        self.session, "배치 실패",
+                        f"{self.job_name} 배치가 실패했습니다: {error_msg}",
+                        {"batch_seq": str(batch_seq), "batch_code": self.job_name,
+                         "event": "END", "status": "FAIL"},
+                    )
+                except Exception as push_e:  # noqa: BLE001
+                    logging.exception(push_e)
             except Exception as log_e:
                 print('======= LOG UPDATE FAIL =======')
                 self.session.rollback()

@@ -3,4 +3,10 @@
 .pr_token
 .claude/settings.local.json
 
+# Firebase 서비스 계정 비공개 키 — 절대 커밋 금지
+firebase-service-account.json
+
 **/*.sql
+
+# spec 문서(작업 메모용) — 버전관리 대상 아님
+spec_docs/*.md

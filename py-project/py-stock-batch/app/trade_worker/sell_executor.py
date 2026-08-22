@@ -24,19 +24,32 @@
 
 체결 → sold 처리 · 잔고 증가 · trade_log.
 
-매도 수기등록(지정가, 모드 무관, sql/08_manual_sell_order_ddl.sql):
+매도 수기등록(지정가, 모드 무관, sql/08_manual_sell_order_ddl.sql +
+09_manual_sell_multi_ddl.sql):
   trade_worker_manual_sell 에 ARMED 행이 있는 종목은 위 두 판정 경로(on_price 의
   hit_line, refresh_positions 의 strategy.evaluate) 를 **둘 다** 건너뛰고
   sell_price 도달 여부만 본다 — 활성 운용모드가 M1/M2/M3 무엇이든 동일하다
   (reload_manual_sells 참고). 사용자가 "이 종목은 자동 rule 대신 이 가격에
-  팔아달라"고 등록해두면 모드 전략보다 우선한다는 뜻. 판정 대상은 self.positions
-  (trade_worker_position HOLDING)에 있는 종목뿐이다 — worker 가 직접 산 게
+  팔아달라"고 등록해두면 모드 전략보다 우선한다는 뜻. 등록 자체는 계좌 실보유
+  (user_holdings)만 있으면 worker 자기매수 여부와 무관하게 할 수 있다
+  (router_auto_trade.py 참고) — 다만 실시간 판정 대상은 self.positions
+  (trade_worker_position HOLDING)에 있는 종목뿐이다. worker 가 직접 산 게
   아니어도(HTS/MTS 등 타채널 매수) wallet_sync.reconcile_wallet 이 주기적으로
   (WALLET_POLL_SEC, 기본 30초) 계좌 실보유를 대조해 자동 편입하므로(2026-08-21,
   §11.4 대체 구현) 등록 후 한 폴링 주기 안에는 감시가 시작된다. 다만 그 편입은
   이 종목 하나만 지정가로 지키는 게 아니라 **활성 운용모드의 자동 손절/익절/
   트레일링/타임스탑 대상으로도** 편입한다는 뜻이라, 수기등록 없이 그냥 보유만
   하던 종목도 같이 편입되면 알고리즘이 임의로 팔 수 있다(wallet_sync.py 참고).
+
+  다건화(2026-08-21): 종목 하나에 지정가를 여러 개(사다리 매도 — 예 30%@50000·
+  30%@55000·40%@60000) 등록할 수 있고, 여러 종목에 동시 등록할 수도 있다.
+  _manual_sells 는 symbol → 티어 리스트(sell_price 오름차순)로 관리한다.
+  on_price 는 그 틱에서 가격이 도달한 티어 중 **가장 낮은 가격의 미체결 티어
+  1건**만 매도한다(가격이 여러 티어를 한 번에 건너뛰어도 다음 틱에서 마저
+  처리된다 — 틱당 1건으로 제한해 무한루프를 피한다). 각 티어의 매도수량은
+  등록 시점 보유수량 스냅샷(base_qty)에 그 티어의 qty_ratio 를 곱한 절대수량으로
+  고정된다(repository.insert_manual_sell 참고) — 그래야 먼저 체결된 티어 때문에
+  다음 티어의 비율 기준(실보유)이 줄어들어 의도한 수량보다 적게 팔리는 일이 없다.
 """
 import threading
 import time
@@ -74,8 +87,13 @@ class BaseSellExecutor(ABC):
         self._untradable_log: dict[str, float] = {}  # 장외 라인돌파 로그 throttle 만료시각
         self._peak_dirty: set[str] = set()     # 장중 고점이 갱신돼 flush 대상인 종목
         self._peak_log: dict[str, float] = {}  # 고점 갱신 로그 throttle 만료시각
-        self._pending_reason: dict[str, str] = {}  # 잔여 주문 추적중인 종목의 매도 사유
-        self._manual_sells: dict[str, dict] = {}    # symbol -> 매도 수기등록(ARMED) row. 있으면 모드 rule 무시
+        self._pending_reason: dict[str, str] = {}  # order_no -> 잔여 주문의 매도 사유
+        self._pending_manual_id: dict[str, int] = {}  # order_no -> 잔여 주문의 수기등록 티어 id
+        # ⚠ symbol 이 아니라 order_no 로 키를 잡는다 — 사다리 매도(종목당 여러 티어)에서는
+        # 한 종목에 티어 A 의 주문이 아직 지연체결 추적 중인 상태로 쿨다운이 풀려 티어 B 의
+        # 주문이 나갈 수 있다. symbol 키였다면 나중 주문이 먼저 것의 pending 정보를
+        # 덮어써 late-fill 이 엉뚱한 티어를 완료 처리하는 사고가 난다.
+        self._manual_sells: dict[str, list[dict]] = {}  # symbol -> 매도 수기등록(ARMED) 티어 리스트(가격 오름차순). 있으면 모드 rule 무시
         self._lock = threading.Lock()
 
     # ── 구독 시작 ────────────────────────────────────────────────────
@@ -93,13 +111,21 @@ class BaseSellExecutor(ABC):
         도달 여부만으로 매도한다 — on_price/refresh_positions 에서 모드 판정보다
         먼저(선제) 확인한다. apply_settings_change() 폴링 주기(기본 60초)에
         같이 불려 화면에서 등록/취소한 내역을 반영한다.
+
+        종목당 여러 티어(사다리 매도)를 지원하므로 symbol → 리스트로 묶고,
+        가격 오름차순으로 정렬해둔다 — on_price 가 "가장 낮은 미도달 티어"부터
+        순서대로 확인할 수 있게 하기 위함이다.
         """
         try:
             rows = self.repo.get_active_manual_sells(self.cfg.user_id)
         except Exception as e:  # noqa: BLE001  (테이블 미생성 등 — worker 는 죽지 않는다)
             self.wlog.warn("[매도] 수기등록 조회 실패: %s", e)
             return
-        fresh = {r["stock_code"]: r for r in rows}
+        fresh: dict[str, list[dict]] = {}
+        for r in rows:
+            fresh.setdefault(r["stock_code"], []).append(r)
+        for tiers in fresh.values():
+            tiers.sort(key=lambda t: Decimal(str(t["sell_price"])))
         with self._lock:
             added = fresh.keys() - self._manual_sells.keys()
             removed = self._manual_sells.keys() - fresh.keys()
@@ -112,23 +138,29 @@ class BaseSellExecutor(ABC):
                 self.wlog.warn("[매도] %s 수기등록됐지만 아직 worker 편입 전 → 다음 계좌 동기화 후 감시 시작",
                                code)
                 continue
-            self.wlog.info("[매도] %s 수기등록 감지 @%s → 이후 자동 rule 대신 지정가만 감시",
-                           code, fresh[code].get("sell_price"))
+            prices = ", ".join(str(t.get("sell_price")) for t in fresh[code])
+            self.wlog.info("[매도] %s 수기등록 감지 @[%s] → 이후 자동 rule 대신 지정가만 감시",
+                           code, prices)
         for code in removed:
             self.wlog.info("[매도] %s 수기등록 해제(취소/체결) → 자동 rule 로 복귀", code)
 
-    def _complete_manual_if_needed(self, symbol: str, reason: str, fill_px, filled_qty):
-        """MANUAL_SELL 로 전량 청산됐으면 trade_worker_manual_sell 을 DONE 으로 닫는다.
-        일부 수량만(qty_ratio<1) 팔렸어도 remain=0(이번 매도로 보유 전부 소진)이면
-        수기등록 자체는 완료로 본다 — 재등록 전까지 같은 종목을 다시 팔지 않는다."""
-        if reason != "MANUAL_SELL":
+    def _complete_manual_if_needed(self, symbol: str, reason: str, fill_px, filled_qty,
+                                   manual_id: int | None = None):
+        """MANUAL_SELL 로 체결됐으면 해당 티어(manual_id)만 trade_worker_manual_sell 을
+        DONE 으로 닫는다. 같은 종목에 등록된 다른 티어(사다리 매도)는 건드리지 않는다 —
+        그래서 전량 소진(remain=0) 여부와 무관하게 "이번에 체결된 티어"만 완료 처리한다."""
+        if reason != "MANUAL_SELL" or manual_id is None:
             return
         try:
-            self.repo.complete_manual_sell(self.cfg.user_id, symbol, fill_px, filled_qty)
+            self.repo.complete_manual_sell(self.cfg.user_id, manual_id, fill_px, filled_qty)
         except Exception as e:  # noqa: BLE001
-            self.wlog.warn("[매도] %s 수기등록 완료 처리 실패: %s", symbol, e)
+            self.wlog.warn("[매도] %s(id=%s) 수기등록 완료 처리 실패: %s", symbol, manual_id, e)
         with self._lock:
-            self._manual_sells.pop(symbol, None)
+            tiers = self._manual_sells.get(symbol)
+            if tiers is not None:
+                tiers[:] = [t for t in tiers if t.get("id") != manual_id]
+                if not tiers:
+                    self._manual_sells.pop(symbol, None)
 
     """
     worker 보유(trade_worker_position HOLDING) 종목을 감시 대상으로 갱신.
@@ -212,14 +244,20 @@ class BaseSellExecutor(ABC):
             return
 
         # ── 매도 수기등록 우선(선제) 확인 ──────────────────────────────
-        # 이 종목에 사용자가 지정가를 등록해뒀으면, 활성 운용모드가 무엇이든
-        # 그 모드의 hit_line(stop/target/trail)은 아예 보지 않는다.
-        manual = self._manual_sells.get(symbol)
-        if manual is not None:
-            if Decimal(str(price)) < Decimal(str(manual["sell_price"])):
+        # 이 종목에 사용자가 지정가를 등록해뒀으면(종목당 여러 티어 가능),
+        # 활성 운용모드가 무엇이든 그 모드의 hit_line(stop/target/trail)은
+        # 아예 보지 않는다. 티어가 하나라도 있으면 그중 **가장 낮은 가격의
+        # 미도달 티어**가 이 틱의 대상이다 — 도달했으면 그 티어 1건만 판다
+        # (틱당 1건. 가격이 여러 티어를 한 번에 건너뛰어도 다음 틱에서 마저 처리).
+        tiers = self._manual_sells.get(symbol)
+        if tiers:
+            tier = tiers[0]   # 가격 오름차순 정렬 → 첫 원소가 가장 낮은(=가장 먼저 도달할) 티어
+            if Decimal(str(price)) < Decimal(str(tier["sell_price"])):
                 return   # 아직 지정가 미도달 — 모드 rule 로 넘어가지 않고 계속 대기
+            manual = tier
             reason = "MANUAL_SELL"
         else:
+            manual = None
             reason = self.hit_line(pos, price)
             if not reason:
                 return
@@ -432,8 +470,18 @@ class BaseSellExecutor(ABC):
         return db_qty if actual is None else min(db_qty, actual)
 
     def _resolve_sell_qty(self, pos: dict, actual, manual: dict | None) -> Decimal:
-        """매도 수기등록이 있으면 그 qty_ratio(보유수량 대비 비율)를 적용하고,
-        없으면 모드 기본 정책(sell_qty, 기본 전량)을 그대로 쓴다."""
+        """매도 수기등록(티어)이 있으면 그 수량을 적용하고, 없으면 모드 기본
+        정책(sell_qty, 기본 전량)을 그대로 쓴다.
+
+        수량 산출은 두 가지 방식이 있다:
+          1) base_qty(등록 시점 보유수량 스냅샷)가 있으면 base_qty × qty_ratio 의
+             **절대수량**으로 고정한다 — 종목당 여러 티어(사다리 매도)를 등록해도
+             먼저 체결된 티어가 실보유를 줄여놔서 다음 티어의 비율 기준이 함께
+             줄어드는 문제가 없다(2026-08-21 다건화). 단 실제/DB 보유수량을
+             넘겨 팔 수는 없으니 그 값으로 상한을 씌운다.
+          2) base_qty 가 없는(구 단일슬롯 시절 등록된) 행은 매도 시점 실보유
+             대비 비율로 계산하는 기존 방식으로 폴백한다.
+        """
         if manual is None:
             return self.sell_qty(pos, actual)
         db_qty = _toDecimal(pos.get("hold_qty")) or Decimal(0)
@@ -441,7 +489,12 @@ class BaseSellExecutor(ABC):
         ratio = _toDecimal(manual.get("qty_ratio"))
         if ratio is None or ratio <= 0:
             ratio = Decimal("1")
-        qty = (base * ratio).quantize(Decimal("1"), rounding=ROUND_DOWN)
+        base_qty = _toDecimal(manual.get("base_qty"))
+        if base_qty is not None and base_qty > 0:
+            qty = (base_qty * ratio).quantize(Decimal("1"), rounding=ROUND_DOWN)
+            qty = min(qty, base)   # 실제/DB 보유수량 상한 — 초과 매도 방지
+        else:
+            qty = (base * ratio).quantize(Decimal("1"), rounding=ROUND_DOWN)
         return qty
 
     # ── 일별 전략 평가 (모드 전략) ───────────────────────
@@ -454,11 +507,12 @@ class BaseSellExecutor(ABC):
         for code, pos in list(self.positions.items()):
             if code in self._sold or code in self._disabled:
                 continue
-            if code in self._manual_sells:
-                # 매도 수기등록 종목 — 모드 전략의 일봉 신호(OBV 데드크로스·타임스탑 등)도
-                # 보지 않는다. 실시간 지정가 감시(on_price)만 이 종목을 판정한다.
-                self.wlog.info("[매도] %s 수기등록됨(@%s) → 모드 전략 평가 skip",
-                               code, self._manual_sells[code].get("sell_price"))
+            if self._manual_sells.get(code):
+                # 매도 수기등록 종목(티어 1개 이상) — 모드 전략의 일봉 신호(OBV
+                # 데드크로스·타임스탑 등)도 보지 않는다. 실시간 지정가 감시(on_price)만
+                # 이 종목을 판정한다.
+                prices = ", ".join(str(t.get("sell_price")) for t in self._manual_sells[code])
+                self.wlog.info("[매도] %s 수기등록됨(@[%s]) → 모드 전략 평가 skip", code, prices)
                 continue
             try:
                 result, state = self.strategy.evaluate(pos)
@@ -526,6 +580,8 @@ class BaseSellExecutor(ABC):
     # ── 매도 실행 ────────────────────────────────────────────────────
     def _do_sell(self, symbol: str, pos: dict, price: Decimal, reason: str, sess=None,
                 manual: dict | None = None):
+        # manual: MANUAL_SELL 이면 이번에 체결하는 **단일 티어**(trade_worker_manual_sell
+        # 행 1건, 종목당 여러 티어 중 하나) — id/sell_price/qty_ratio/base_qty 를 담고 있다.
         # 동시성 가드: 소켓 콜백이 여러 틱 동시 진입해도 종목당 1건만 진행.
         with self._lock:
             if symbol in self._sold or symbol in self._inflight or symbol in self._disabled:
@@ -604,6 +660,11 @@ class BaseSellExecutor(ABC):
                                     note=f"{reason} · {res.status}"
                                          + (f" · 잔량 {remain}주" if remain > 0 else ""))
 
+            # ⚠ remain(=이 종목 전체 보유수량)과 "이 주문(=이 티어)이 다 팔렸는가"는
+            # 다른 질문이다 — 사다리 매도에서는 다른 티어가 아직 보유분을 들고 있어
+            # remain>0 이어도 지금 이 주문 자체는 전량 체결됐을 수 있다. 포지션(종목)
+            # 정리는 remain 으로, 수기등록 **티어** 완료는 이 주문의 체결 완료 여부
+            # (armed=False, 아래 arm_watch 결과)로 따로 판단한다.
             if remain > 0:
                 # 잔량 보유 → 감시 유지. _sold 로 막지 않는다(다음 라인 돌파에 다시 매도).
                 with self._lock:
@@ -616,7 +677,6 @@ class BaseSellExecutor(ABC):
                 self.positions.pop(symbol, None)
                 self._unsubscribe(symbol)   # 전량 청산 → 실시간 감시 비활성
                 self._sold.add(symbol)
-                self._complete_manual_if_needed(symbol, reason, fill_px, res.filled_qty)
                 self.wlog.info("[매도] 완료 %s qty=%s @~%s 잔고=%s (%s/%s)",
                                symbol, res.filled_qty, fill_px, final_balance, reason, res.status)
 
@@ -624,14 +684,21 @@ class BaseSellExecutor(ABC):
             self._cooldown.pop(symbol, None)
 
             # 동기 처리 완료 → 추적 개시. 미체결 잔여 **주문**이 있으면 늦은 체결이 콜백으로 온다.
+            # arm_watch 가 False 를 반환하면 이 주문은 이미 동기 창 안에서 전량 체결됐다는
+            # 뜻 — 그 즉시 이 티어를 완료 처리한다(종목 전체 remain 과 무관).
             if self.broker.arm_watch(res):
-                self._pending_reason[symbol] = reason
+                self._pending_reason[res.order_no] = reason
+                if manual is not None:
+                    self._pending_manual_id[res.order_no] = manual.get("id")
                 # 잔여 주문이 아직 살아있는데 다음 틱에서 또 팔면 '주문가능수량 초과'가 난다.
                 # (계좌 보유수량은 매도 주문을 걸어둬도 줄지 않지만 주문가능수량은 줄어든다)
                 # 쿨다운을 걸어 살아있는 주문이 체결될 시간을 준다.
                 self._cooldown[symbol] = time.time() + self.cfg.sell_retry_cooldown_sec
                 self.wlog.info("[매도] %s 미체결 주문 %s주 체결 대기(이벤트 추적) · %ds 재주문 보류",
                                symbol, res.qty - res.filled_qty, self.cfg.sell_retry_cooldown_sec)
+            else:
+                self._complete_manual_if_needed(symbol, reason, fill_px, res.filled_qty,
+                                                manual_id=(manual or {}).get("id"))
         except Exception as e:  # noqa: BLE001  (예상 밖 오류도 폭주 없이 쿨다운)
             self._register_fail(symbol, f"예외: {e}")
         finally:
@@ -648,17 +715,22 @@ class BaseSellExecutor(ABC):
         symbol = ev.symbol
         if ev.rejected:
             self.wlog.warn("[매도] %s 잔여주문 거부 order=%s reason=%s", symbol, ev.order_no, ev.reason)
-            self._pending_reason.pop(symbol, None)
+            self._pending_reason.pop(ev.order_no, None)
+            self._pending_manual_id.pop(ev.order_no, None)
             return
         if ev.delta_qty <= 0:
             return
-        reason = self._pending_reason.get(symbol, "LATE_FILL")
+        reason = self._pending_reason.get(ev.order_no, "LATE_FILL")
+        manual_id = self._pending_manual_id.get(ev.order_no)
         try:
             remain = self.repo.reduce_position(uid, symbol, ev.last_price, ev.delta_qty, reason)
             balance = reconcile_wallet(self.broker, self.repo, uid,
                                        sync=self.cfg.sync_wallet_on_trade, tag="매도잔량")
             self.repo.insert_trade_log(uid, symbol, "SELL", ev.last_price, ev.delta_qty, balance,
                                        note=f"{reason}/late {ev.filled_qty}/{ev.order_qty}")
+            # remain(종목 전체 잔량)과 이 주문(티어)의 완료 여부(ev.complete)는 별개다 —
+            # 사다리 매도에서는 다른 티어의 보유분이 남아 remain>0 이어도 이 주문은
+            # 이번 통보로 전량 체결(ev.complete)됐을 수 있다.
             if remain > 0:
                 with self._lock:
                     p = self.positions.get(symbol)
@@ -672,11 +744,13 @@ class BaseSellExecutor(ABC):
                 self._unsubscribe(symbol)
                 self._sold.add(symbol)
                 self._cooldown.pop(symbol, None)
-                self._complete_manual_if_needed(symbol, reason, ev.last_price, ev.delta_qty)
                 self.wlog.info("[매도] %s 잔량체결로 전량 청산 완료 @%s 잔고=%s",
                                symbol, ev.last_price, balance)
             if ev.complete:
-                self._pending_reason.pop(symbol, None)
+                self._pending_reason.pop(ev.order_no, None)
+                self._pending_manual_id.pop(ev.order_no, None)
+                self._complete_manual_if_needed(symbol, reason, ev.last_price, ev.delta_qty,
+                                                manual_id=manual_id)
         except Exception as e:  # noqa: BLE001
             self.wlog.warn("[매도] %s 잔량체결 반영 실패: %s", symbol, e)
 

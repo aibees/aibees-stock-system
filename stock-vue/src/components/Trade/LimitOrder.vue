@@ -11,177 +11,211 @@
                         보유 종목에 지정 매도가를 등록하면, 지금 운용 방식이 무엇이든
                         <b>그 종목만은 자동 매도 판정(손절·익절·트레일링) 대신 이 가격 도달 여부로</b>
                         worker 가 대신 체결합니다. 매수는 관여하지 않습니다 — 매수는 항상 현재 운용 방식이 담당합니다.
+                        <br />
+                        종목당 지정가를 <b>여러 개</b>(예: 30%는 5만원, 30%는 5만5천원, 나머지는 6만원) 등록할 수 있고,
+                        <b>여러 종목</b>을 동시에 등록할 수도 있습니다.
                     </p>
                 </div>
             </section>
 
-            <!-- ── 상태 ── -->
-            <section class="steps" v-if="form.stock_code">
-                <div class="step" :class="{ on: record.state === 'ARMED', done: record.state === 'DONE' }">
-                    <span class="dot"></span>
-                    <span class="label">{{ stateLabel }}</span>
-                </div>
-            </section>
+            <p class="holding-note">
+                직접 매수한 종목(worker 자동매매)이 아니어도 <b>계좌에 보유 중(user_holdings)</b>이기만 하면
+                등록할 수 있습니다. 다만 worker 가 아직 이 종목을 감시 대상으로 편입하기 전이라면, 계좌 동기화
+                주기(기본 30초) 안에 감시가 시작됩니다 — 등록 직후 잠깐 "감시 대기"로 보일 수 있습니다.
+            </p>
 
-            <!-- ── 입력 폼 ── -->
+            <!-- ── 보유 종목 목록 ── -->
             <section class="card">
-                <div class="form-grid">
-
-                    <div class="form-field full">
-                        <label>대상 종목 <span class="req">*</span></label>
-                        <div class="stock-picker">
-                            <input readonly :value="stockDisplay" placeholder="보유 중인 종목을 선택하세요" />
-                            <button class="btn-pick" @click="picker = true" :disabled="isLocked">종목 선택</button>
-                        </div>
-                        <p class="lock-hint">worker 가 직접 매수해 보유 중인 종목에만 적용됩니다. 미보유 종목은 등록해도 감시되지 않습니다.</p>
-                    </div>
-
-                    <div class="form-field">
-                        <label>지정 매도가 <span class="req">*</span></label>
-                        <input type="number" v-model.number="form.sell_price" :disabled="isLocked" placeholder="0" />
-                    </div>
-
-                    <div class="form-field">
-                        <label>매도 비율</label>
-                        <div class="inline">
-                            <input type="number" v-model.number="form.qty_ratio_pct" :disabled="isLocked" min="1" max="100" placeholder="100" />
-                            <span class="inline-text">% (보유수량 기준, 비우면 전량)</span>
-                        </div>
-                    </div>
-
-                    <div class="form-field">
-                        <label>감시 사용</label>
-                        <div class="inline">
-                            <button :class="['toggle-btn', form.enabled_flag === 'Y' ? 'active' : 'inactive']"
-                                @click="form.enabled_flag = form.enabled_flag === 'Y' ? 'N' : 'Y'">
-                                <span class="toggle-knob"></span>
-                            </button>
-                            <span class="inline-text">
-                                {{ form.enabled_flag === 'Y' ? '감시 중' : '꺼짐 — 등록은 유지되지만 감시하지 않습니다' }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="form-field full">
-                        <label>메모</label>
-                        <input type="text" v-model="form.memo" maxlength="255" placeholder="선택 입력" />
-                    </div>
+                <div class="card-head">
+                    <h4>보유 종목</h4>
+                    <input class="filter-input" v-model="holdingFilter" placeholder="종목명 또는 코드로 찾기" />
                 </div>
-            </section>
 
-            <!-- ── 체결 기록 ── -->
-            <section class="card" v-if="record.state && record.state !== 'ARMED'">
-                <h4>체결 기록</h4>
-                <ul class="record-list">
-                    <li><span>상태</span><b>{{ stateLabel }}</b></li>
-                    <li><span>매도 체결</span><b>{{ formatNumber(record.filled_price) }} · {{
-                        formatDateTime(record.filled_at) }}</b></li>
+                <p v-if="loadingHoldings" class="empty-msg">불러오는 중...</p>
+                <p v-else-if="filteredHoldings.length === 0" class="empty-msg">
+                    {{ holdings.length === 0 ? '계좌에 보유 중인 종목이 없습니다.' : '검색 결과가 없습니다.' }}
+                </p>
+
+                <ul v-else class="holding-list">
+                    <li v-for="h in filteredHoldings" :key="h.stock_code" class="holding-row">
+                        <div class="holding-main" @click="toggleExpand(h.stock_code)">
+                            <div class="holding-id">
+                                <span class="code-chip">{{ h.stock_code }}</span>
+                                <span class="name">{{ h.stock_name }}</span>
+                            </div>
+                            <div class="holding-meta">
+                                <span>보유 {{ formatNumber(h.qty) }}주</span>
+                                <span>평단 {{ formatNumber(h.avg_price) }}</span>
+                                <span v-if="tiersOf(h.stock_code).armed.length" class="allocated"
+                                      :class="{ over: allocatedPct(h.stock_code) > 100 }">
+                                    등록 {{ allocatedPct(h.stock_code) }}%
+                                </span>
+                            </div>
+                            <span class="chevron" :class="{ open: expanded === h.stock_code }">▾</span>
+                        </div>
+
+                        <div class="holding-expand" v-if="expanded === h.stock_code">
+                            <!-- 이미 등록된 티어들 -->
+                            <ul class="tier-list" v-if="tiersOf(h.stock_code).all.length">
+                                <li v-for="t in tiersOf(h.stock_code).all" :key="t.id"
+                                    class="tier-row" :class="tierStateClass(t)">
+                                    <span class="tier-price">{{ formatNumber(t.sell_price) }}원</span>
+                                    <span class="tier-ratio">{{ pctOf(t.qty_ratio) }}%</span>
+                                    <span class="tier-state" :class="tierStateClass(t)">{{ stateLabel(t) }}</span>
+                                    <span class="tier-memo" v-if="t.memo">{{ t.memo }}</span>
+                                    <span class="tier-fill" v-if="t.state === 'DONE'">
+                                        체결 {{ formatNumber(t.filled_price) }} · {{ formatDateTime(t.filled_at) }}
+                                    </span>
+                                    <button v-if="t.state === 'ARMED'" class="btn-tier-cancel"
+                                            :disabled="busyId === t.id" @click.stop="onCancelTier(t)">취소</button>
+                                </li>
+                            </ul>
+                            <p v-else class="empty-msg small">등록된 지정가가 없습니다.</p>
+
+                            <!-- 신규 티어 추가 폼 -->
+                            <div class="tier-form">
+                                <div class="tier-form-row">
+                                    <label>지정 매도가</label>
+                                    <input type="number" v-model.number="form.sell_price" placeholder="0" />
+                                </div>
+                                <div class="tier-form-row">
+                                    <label>비율</label>
+                                    <div class="inline">
+                                        <input type="number" v-model.number="form.qty_ratio_pct" min="1" max="100" placeholder="100" />
+                                        <span class="inline-text">% (지금 보유수량 {{ formatNumber(h.qty) }}주 기준)</span>
+                                    </div>
+                                </div>
+                                <div class="tier-form-row">
+                                    <label>메모</label>
+                                    <input type="text" v-model="form.memo" maxlength="255" placeholder="선택 입력" />
+                                </div>
+                                <div class="tier-form-row">
+                                    <label>감시 사용</label>
+                                    <button :class="['toggle-btn', form.enabled_flag === 'Y' ? 'active' : 'inactive']"
+                                            @click="form.enabled_flag = form.enabled_flag === 'Y' ? 'N' : 'Y'">
+                                        <span class="toggle-knob"></span>
+                                    </button>
+                                </div>
+                                <button class="btn-add-tier" :disabled="isBusy" @click="onAdd(h)">
+                                    + 이 종목에 지정가 추가
+                                </button>
+                            </div>
+                        </div>
+                    </li>
                 </ul>
             </section>
-
-            <div class="action-bar">
-                <button class="btn-delete" @click="onDelete" :disabled="isBusy || !hasSaved">취소</button>
-                <button class="btn-save" @click="onSave" :disabled="isBusy">저장</button>
-            </div>
         </div>
-
-        <StockPickerModal :visible="picker" title="대상 종목 선택" @pick="onPick" @close="picker = false" />
     </div>
 </template>
 
 <script setup>
-import StockPickerModal from './StockPickerModal.vue';
 import {
-    fetchManualSell, saveManualSell, removeManualSell,
+    fetchHoldings, fetchManualSells, addManualSell, cancelManualSell,
     MANUAL_SELL_STATE_LABEL, formatNumber, formatDateTime,
 } from '@scripts/useAutoTrade.js';
 
+const holdings = ref([]);
+const manualSells = ref([]);   // 유저의 수기등록 전체(모든 종목·모든 상태)
+const loadingHoldings = ref(false);
 const isBusy = ref(false);
-const hasSaved = ref(false);
-const picker = ref(false);
+const busyId = ref(null);
+const holdingFilter = ref('');
+const expanded = ref(null);
 
-const defaultForm = () => ({
-    stock_code: '', stock_name: '',
-    sell_price: null, qty_ratio_pct: 100,
-    enabled_flag: 'Y', memo: '',
-});
+const defaultForm = () => ({ sell_price: null, qty_ratio_pct: 100, memo: '', enabled_flag: 'Y' });
 const form = reactive(defaultForm());
-const record = reactive({ state: 'ARMED', filled_price: null, filled_at: null });
 
 const load = async () => {
-    const row = await fetchManualSell();
-    if (row) {
-        hasSaved.value = true;
-        Object.assign(form, {
-            ...defaultForm(),
-            stock_code: row.stock_code, stock_name: row.stock_name,
-            sell_price: row.sell_price,
-            qty_ratio_pct: row.qty_ratio != null ? Math.round(Number(row.qty_ratio) * 100) : 100,
-            enabled_flag: row.enabled_flag ?? 'Y',
-            memo: row.memo ?? '',
-        });
-        Object.assign(record, {
-            state: row.state ?? 'ARMED',
-            filled_price: row.filled_price,
-            filled_at: row.filled_at,
-        });
+    loadingHoldings.value = true;
+    try {
+        const [h, m] = await Promise.all([fetchHoldings(), fetchManualSells()]);
+        holdings.value = h ?? [];
+        manualSells.value = m ?? [];
+    } finally {
+        loadingHoldings.value = false;
     }
 };
 onMounted(load);
 
-const stockDisplay = computed(() =>
-    form.stock_code ? `${form.stock_name} (${form.stock_code})` : ''
-);
-// 이미 체결(DONE)됐거나 취소(CANCELLED)된 건은 그대로 새로 등록해야 하므로
-// 종목 선택을 다시 열어준다 — 잠그는 건 감시(ARMED) 중일 때만.
-const isLocked = computed(() => false);
-const stateLabel = computed(() => MANUAL_SELL_STATE_LABEL[record.state] ?? record.state);
+const filteredHoldings = computed(() => {
+    const kw = holdingFilter.value.trim().toLowerCase();
+    if (!kw) return holdings.value;
+    return holdings.value.filter(h =>
+        (h.stock_name || '').toLowerCase().includes(kw) ||
+        (h.stock_code || '').toLowerCase().includes(kw));
+});
 
-const onPick = ({ stock_code, stock_name }) => {
-    form.stock_code = stock_code;
-    form.stock_name = stock_name;
-    picker.value = false;
+// 종목코드별 티어 그룹 — 화면 전체 목록에서 매번 필터링하지 않도록 캐시.
+const tiersByCode = computed(() => {
+    const map = {};
+    for (const t of manualSells.value) {
+        (map[t.stock_code] ??= []).push(t);
+    }
+    for (const list of Object.values(map)) {
+        list.sort((a, b) => Number(a.sell_price) - Number(b.sell_price));
+    }
+    return map;
+});
+
+const tiersOf = (code) => {
+    const all = tiersByCode.value[code] ?? [];
+    return { all, armed: all.filter(t => t.state === 'ARMED') };
 };
 
-const validate = () => {
-    if (!form.stock_code) return '종목을 선택해 주세요.';
-    if (!form.sell_price || Number(form.sell_price) <= 0) return '지정 매도가를 입력해 주세요.';
-    const pct = form.qty_ratio_pct;
-    if (pct !== null && pct !== '' && (Number(pct) <= 0 || Number(pct) > 100)) return '매도 비율은 1~100 사이여야 합니다.';
-    return null;
+const pctOf = (ratio) => Math.round(Number(ratio) * 100);
+
+const allocatedPct = (code) => {
+    const armed = tiersOf(code).armed;
+    return armed.reduce((sum, t) => sum + pctOf(t.qty_ratio), 0);
 };
 
-const onSave = async () => {
-    const err = validate();
-    if (err) { alert(err); return; }
+const stateLabel = (t) => MANUAL_SELL_STATE_LABEL[t.state] ?? t.state;
+const tierStateClass = (t) => ({
+    armed: t.state === 'ARMED', done: t.state === 'DONE', cancelled: t.state === 'CANCELLED',
+});
+
+const toggleExpand = (code) => {
+    expanded.value = expanded.value === code ? null : code;
+    Object.assign(form, defaultForm());
+};
+
+const onAdd = async (holding) => {
+    if (!form.sell_price || Number(form.sell_price) <= 0) { alert('지정 매도가를 입력해 주세요.'); return; }
+    const pct = (form.qty_ratio_pct === null || form.qty_ratio_pct === '') ? 100 : Number(form.qty_ratio_pct);
+    if (pct <= 0 || pct > 100) { alert('비율은 1~100 사이여야 합니다.'); return; }
+
+    const already = allocatedPct(holding.stock_code);
+    if (already + pct > 100 &&
+        !confirm(`이 종목에 이미 ${already}% 등록돼 있습니다. 이번 ${pct}%를 더하면 ${already + pct}%로 100%를 넘습니다. 계속할까요?`)) {
+        return;
+    }
+
     isBusy.value = true;
     try {
-        const pct = (form.qty_ratio_pct === null || form.qty_ratio_pct === '') ? 100 : Number(form.qty_ratio_pct);
-        await saveManualSell({
-            stock_code: form.stock_code,
-            stock_name: form.stock_name,
+        await addManualSell({
+            stock_code: holding.stock_code,
+            stock_name: holding.stock_name,
             sell_price: Number(form.sell_price),
             qty_ratio: pct / 100,
             enabled_flag: form.enabled_flag,
             memo: form.memo,
         });
-        alert('저장되었습니다. 지금 운용 방식과 무관하게 이 종목은 지정가로만 감시됩니다.');
+        Object.assign(form, defaultForm());
         await load();
+        alert('저장되었습니다. 지금 운용 방식과 무관하게 이 지정가로 감시됩니다.');
     } finally {
         isBusy.value = false;
     }
 };
 
-const onDelete = async () => {
-    if (!confirm('매도 수기 등록을 취소할까요? 이후 이 종목은 다시 활성 운용 방식의 자동 매도 rule을 따릅니다.')) return;
-    isBusy.value = true;
+const onCancelTier = async (tier) => {
+    if (!confirm(`${formatNumber(tier.sell_price)}원 지정가 등록을 취소할까요? 같은 종목의 다른 지정가는 그대로 유지됩니다.`)) return;
+    busyId.value = tier.id;
     try {
-        await removeManualSell();
-        Object.assign(form, defaultForm());
-        Object.assign(record, { state: 'ARMED', filled_price: null, filled_at: null });
-        hasSaved.value = false;
+        await cancelManualSell(tier.id);
+        await load();
     } finally {
-        isBusy.value = false;
+        busyId.value = null;
     }
 };
 </script>
@@ -214,11 +248,7 @@ $green: #2f9e44;
 }
 
 .head-desc {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    gap: 12px;
-    margin-bottom: 18px;
+    margin-bottom: 10px;
 
     h2 {
         margin: 0;
@@ -230,66 +260,19 @@ $green: #2f9e44;
         margin: 4px 0 0;
         font-size: .82rem;
         color: $gray-500;
-    }
-
-    .mode-warn {
-        font-size: .76rem;
-        color: $amber;
-        background: #fff8e1;
-        border: 1px solid #ffe08a;
-        border-radius: 8px;
-        padding: 7px 10px;
-    }
-
-    @media (max-width: 700px) {
-        flex-direction: column;
-        align-items: flex-start;
+        line-height: 1.5;
     }
 }
 
-/* ── 스텝 ── */
-.steps {
-    display: flex;
-    align-items: center;
-    gap: 26px;
-    background: $white;
-    border: 1px solid $gray-100;
-    border-radius: 12px;
-    padding: 14px 18px;
-    margin-bottom: 14px;
-
-    .step {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: .8rem;
-        color: $gray-400;
-
-        .dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: $gray-200;
-        }
-
-        &.on {
-            color: $blue;
-            font-weight: 700;
-
-            .dot {
-                background: $blue;
-                box-shadow: 0 0 0 4px rgba(25, 113, 194, .15);
-            }
-        }
-
-        &.done {
-            color: $green;
-
-            .dot {
-                background: $green;
-            }
-        }
-    }
+.holding-note {
+    margin: 0 0 16px;
+    font-size: .78rem;
+    color: $amber;
+    background: #fff8e1;
+    border: 1px solid #ffe08a;
+    border-radius: 8px;
+    padding: 9px 12px;
+    line-height: 1.5;
 }
 
 .card {
@@ -298,84 +281,244 @@ $green: #2f9e44;
     border-radius: 12px;
     padding: 18px;
     margin-bottom: 14px;
+}
+
+.card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
 
     h4 {
-        margin: 0 0 12px;
+        margin: 0;
         font-size: .9rem;
         font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .filter-input {
+        flex: 1;
+        max-width: 260px;
+        height: 34px;
+        border: 1px solid $gray-200;
+        border-radius: 8px;
+        padding: 0 10px;
+        font-size: .82rem;
     }
 }
 
-.form-grid {
+.empty-msg {
+    text-align: center;
+    color: $gray-500;
+    font-size: .84rem;
+    padding: 16px 0;
+
+    &.small {
+        padding: 8px 0;
+        font-size: .78rem;
+    }
+}
+
+.holding-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.holding-row {
+    border-bottom: 1px solid $gray-100;
+
+    &:last-child {
+        border-bottom: 0;
+    }
+}
+
+.holding-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 4px;
+    cursor: pointer;
+
+    &:hover {
+        background: $gray-50;
+    }
+}
+
+.holding-id {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 220px;
+
+    .code-chip {
+        font-family: monospace;
+        background: $gray-100;
+        border-radius: 6px;
+        padding: 2px 6px;
+        font-size: .76rem;
+    }
+
+    .name {
+        font-weight: 600;
+        font-size: .88rem;
+    }
+}
+
+.holding-meta {
+    display: flex;
+    gap: 14px;
+    flex: 1;
+    font-size: .8rem;
+    color: $gray-500;
+
+    .allocated {
+        color: $blue;
+        font-weight: 600;
+
+        &.over {
+            color: $red;
+        }
+    }
+}
+
+.chevron {
+    color: $gray-400;
+    transition: transform .15s;
+
+    &.open {
+        transform: rotate(180deg);
+    }
+}
+
+.holding-expand {
+    padding: 4px 4px 16px 4px;
+}
+
+.tier-list {
+    list-style: none;
+    margin: 0 0 10px;
+    padding: 0;
+}
+
+.tier-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: .82rem;
+    background: $gray-50;
+    margin-bottom: 6px;
+
+    &.done {
+        opacity: .7;
+    }
+
+    &.cancelled {
+        opacity: .45;
+        text-decoration: line-through;
+    }
+
+    .tier-price {
+        font-weight: 700;
+        min-width: 90px;
+    }
+
+    .tier-ratio {
+        color: $gray-500;
+        min-width: 48px;
+    }
+
+    .tier-state {
+        font-size: .74rem;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: $gray-200;
+        color: $gray-900;
+
+        &.armed {
+            background: rgba(25, 113, 194, .15);
+            color: $blue;
+        }
+
+        &.done {
+            background: rgba(47, 158, 68, .15);
+            color: $green;
+        }
+
+        &.cancelled {
+            background: $gray-100;
+            color: $gray-500;
+        }
+    }
+
+    .tier-memo {
+        color: $gray-500;
+        flex: 1;
+    }
+
+    .tier-fill {
+        color: $gray-500;
+        font-size: .76rem;
+    }
+}
+
+.btn-tier-cancel {
+    margin-left: auto;
+    border: 1px solid $red;
+    background: transparent;
+    color: $red;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: .76rem;
+    cursor: pointer;
+
+    &:disabled {
+        opacity: .5;
+        cursor: not-allowed;
+    }
+}
+
+.tier-form {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
+    gap: 10px;
+    background: $gray-50;
+    border: 1px dashed $gray-200;
+    border-radius: 10px;
+    padding: 14px;
 
     @media (max-width: 700px) {
         grid-template-columns: 1fr;
     }
-
-    .full {
-        grid-column: 1 / -1;
-    }
 }
 
-.form-field {
+.tier-form-row {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
 
     label {
-        font-size: .78rem;
+        font-size: .76rem;
         font-weight: 600;
         color: $gray-500;
     }
 
-    .req {
-        color: $red;
-    }
-
     input {
-        height: 38px;
+        height: 34px;
         border: 1px solid $gray-200;
         border-radius: 8px;
         padding: 0 10px;
-        font-size: .85rem;
+        font-size: .84rem;
         background: $white;
-
-        &:disabled {
-            background: $gray-50;
-            color: $gray-400;
-        }
-    }
-
-    .lock-hint {
-        margin: 0;
-        font-size: .74rem;
-        color: $amber;
-    }
-
-    .readonly-box {
-        height: 38px;
-        display: flex;
-        align-items: center;
-        padding: 0 10px;
-        border: 1px dashed $gray-200;
-        border-radius: 8px;
-        font-size: .88rem;
-        font-weight: 700;
-        color: $red;
-        background: $gray-50;
-
-        &.minus {
-            color: $blue;
-        }
     }
 
     .inline {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
 
         input {
             flex: 1;
@@ -383,42 +526,15 @@ $green: #2f9e44;
     }
 
     .inline-text {
-        font-size: .78rem;
+        font-size: .74rem;
         color: $gray-500;
-    }
-}
-
-.stock-picker {
-    display: flex;
-    gap: 8px;
-
-    input {
-        flex: 1;
-        background: $gray-50;
-    }
-
-    .btn-pick {
-        height: 38px;
-        padding: 0 14px;
-        border: 1px solid $blue;
-        color: $blue;
-        background: transparent;
-        border-radius: 8px;
-        font-size: .8rem;
-        font-weight: 600;
-        cursor: pointer;
         white-space: nowrap;
-
-        &:disabled {
-            opacity: .45;
-            cursor: not-allowed;
-        }
     }
 }
 
 .toggle-btn {
-    width: 46px;
-    height: 26px;
+    width: 44px;
+    height: 24px;
     border-radius: 999px;
     border: 0;
     position: relative;
@@ -437,8 +553,8 @@ $green: #2f9e44;
         position: absolute;
         top: 3px;
         left: 3px;
-        width: 20px;
-        height: 20px;
+        width: 18px;
+        height: 18px;
         border-radius: 50%;
         background: #fff;
         transition: transform .18s;
@@ -449,41 +565,14 @@ $green: #2f9e44;
     }
 }
 
-.record-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-
-    li {
-        display: flex;
-        justify-content: space-between;
-        padding: 9px 0;
-        border-bottom: 1px dashed $gray-100;
-        font-size: .82rem;
-
-        &:last-child {
-            border-bottom: 0;
-        }
-
-        span {
-            color: $gray-500;
-        }
-    }
-}
-
-.action-bar {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 8px;
-}
-
-.btn-save,
-.btn-delete {
-    height: 42px;
-    padding: 0 24px;
-    border-radius: 10px;
-    font-size: .88rem;
+.btn-add-tier {
+    grid-column: 1 / -1;
+    height: 40px;
+    border: 0;
+    border-radius: 8px;
+    background: $navy;
+    color: #fff;
+    font-size: .84rem;
     font-weight: 700;
     cursor: pointer;
 
@@ -491,17 +580,5 @@ $green: #2f9e44;
         opacity: .5;
         cursor: not-allowed;
     }
-}
-
-.btn-save {
-    border: 0;
-    background: $navy;
-    color: #fff;
-}
-
-.btn-delete {
-    border: 1px solid $red;
-    background: transparent;
-    color: $red;
 }
 </style>

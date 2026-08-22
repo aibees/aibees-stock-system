@@ -50,6 +50,12 @@ import { setRouterToApp } from './router'
 setRouterToApp().then(router => {
     app.use(router);
     app.mount('#app');
+
+    // ===== 푸시 알림(FCM) 등록 — 네이티브(iOS/Android) 앱에서만 동작 =====
+    import('./usePushNotifications').then(({ initPushNotifications }) => {
+        initPushNotifications();
+    });
+    // ====================================================================
 })
 // ===========================
 

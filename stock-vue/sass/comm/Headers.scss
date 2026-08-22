@@ -2,9 +2,18 @@
 
 .header {
     position: relative;
-    background-color: #2db400;
+    // [수정] 초록 배경 제거 — 앱 배경화면과 동일하게(투명) 두고
+    // 대신 밑줄(border-bottom)로 구분. 배경색을 특정 hex로 고정하지 않고
+    // transparent 로 둔 건, 이 헤더가 여러 페이지에서 공용으로 쓰이는데
+    // 페이지마다 실제 배경색이 살짝 달라도 항상 "그 페이지 배경과 동일"하게
+    // 저절로 맞춰지기 때문 — hex를 박아두면 나중에 페이지 배경이 바뀔 때
+    // 헤더만 따로 겉돌 수 있음.
+    background-color: transparent;
+    border-bottom: 2px solid #1c3d6e; // [수정] "매도신호 신청" 버튼과 동일한 $navy
     width: 100%;
     height: 50px;
+    // box-sizing: content-box;
+    // padding-top: env(safe-area-inset-top);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -15,7 +24,7 @@
 
         .title {
             font-size: 1rem;
-            color: white;
+            color: #1a1a1a; // [수정] white → 어두운 배경 아니라서 흰 글씨는 안 보임
             font-weight: bold;
             margin-left: 20px;
         }
@@ -28,7 +37,7 @@
             margin-right: 10px;
 
             .nav-item {
-                color: white;
+                color: #1a1a1a; // [수정] white → 다크
                 font-weight: 600;
                 cursor: pointer;
                 font-size: 15px;
@@ -58,6 +67,8 @@
         .group,
         .users {
             cursor: pointer;
+            color: #1a1a1a; // [추가] #app 전역 color(#f7f7f7, 거의 흰색)를 상속받아
+                            // 밝은 배경에서 안 보이던 문제 — 명시적으로 다크 지정
 
             div {
                 text-align: center;
@@ -74,20 +85,20 @@
                         display: inline-flex;
                         align-items: center;
                         gap: 6px;
-                        color: #fff;
+                        color: #1a1a1a; // [수정] white → 다크
                         font-weight: 400;
                         background: transparent;
                         border: 0;
                         outline: none;
                     }
-        
+
                     /* 화살표 */
                     .caret {
                         width: 0;
                         height: 0;
                         border-left: 5px solid transparent;
                         border-right: 5px solid transparent;
-                        border-top: 6px solid #fff;
+                        border-top: 6px solid #1a1a1a; // [수정] white → 다크
                         transition: transform .18s ease;
         
                         &.open {

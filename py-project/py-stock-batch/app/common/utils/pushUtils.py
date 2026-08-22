@@ -1,0 +1,93 @@
+"""
+FCM(Firebase Cloud Messaging) 푸시 발송 유틸 — telegramUtils.py 와 같은 위치/스타일.
+
+firebase_admin 초기화는 lazy + 1회다. 이유:
+  - 서비스 계정 키(JSON)는 배포 서버에만 있는 비밀 파일이라 저장소엔 없다.
+    FCM_CREDENTIALS_PATH 환경변수로 경로만 받는다(.env / docker-compose 참고).
+  - 이 모듈은 job.py 에서 배치 클래스마다 매번 import 되는데, 키 파일이 없는
+    로컬 개발/CI 환경에서 import 시점에 죽어버리면 그 자체로 배치 전체가
+    막힌다. 그래서 실제 send 호출 시점까지 초기화를 미루고, 그마저 실패하면
+    로그만 남기고 조용히 skip 한다 — push 실패가 배치 실행을 막아선 안 된다.
+"""
+import logging
+import os
+
+log = logging.getLogger("push.fcm")
+
+_app = None
+_init_failed = False
+
+
+def _get_app():
+    global _app, _init_failed
+    if _app is not None:
+        return _app
+    if _init_failed:
+        return None
+    try:
+        import firebase_admin
+        from firebase_admin import credentials
+
+        cred_path = os.getenv("FCM_CREDENTIALS_PATH")
+        if not cred_path or not os.path.exists(cred_path):
+            log.warning("FCM_CREDENTIALS_PATH 미설정/파일없음 → push 미발송")
+            _init_failed = True
+            return None
+
+        cred = credentials.Certificate(cred_path)
+        _app = firebase_admin.initialize_app(cred)
+        return _app
+    except Exception as e:  # noqa: BLE001
+        log.warning("firebase_admin 초기화 실패(push 미발송): %s", e)
+        _init_failed = True
+        return None
+
+
+class PushSender:
+    def send_to_tokens(self, tokens: list, title: str, body: str, data: dict | None = None) -> dict:
+        """토큰 목록에 개별 발송(send_each). 토큰 1개가 실패해도 나머지는 계속
+        발송되며, 만료/미등록 토큰은 invalid_tokens 로 반환한다(호출부가 원하면
+        DB 에서 비활성화하는 데 쓸 수 있음 — 지금은 로그만)."""
+        app = _get_app()
+        if app is None:
+            return {"result": "skip", "reason": "firebase not initialized"}
+        if not tokens:
+            return {"result": "skip", "reason": "no tokens"}
+
+        try:
+            from firebase_admin import messaging
+        except Exception as e:  # noqa: BLE001
+            log.warning("firebase_admin.messaging import 실패: %s", e)
+            return {"result": "fail", "msg": str(e)}
+
+        messages = [
+            messaging.Message(
+                notification=messaging.Notification(title=title, body=body),
+                data={str(k): str(v) for k, v in (data or {}).items()},
+                token=t,
+            )
+            for t in tokens
+        ]
+
+        try:
+            resp = messaging.send_each(messages, app=app)
+            invalid_tokens = [
+                tokens[i]
+                for i, r in enumerate(resp.responses)
+                if not r.success and getattr(getattr(r, "exception", None), "code", None)
+                in ("NOT_FOUND", "UNREGISTERED")
+            ]
+            result = {
+                "result": "success",
+                "success": resp.success_count,
+                "failure": resp.failure_count,
+                "invalid_tokens": invalid_tokens,
+            }
+            log.info("push 발송 완료: success=%s failure=%s", resp.success_count, resp.failure_count)
+            return result
+        except Exception as e:  # noqa: BLE001
+            log.warning("push 발송 실패: %s", e)
+            return {"result": "fail", "msg": str(e)}
+
+
+pushUtils = PushSender()

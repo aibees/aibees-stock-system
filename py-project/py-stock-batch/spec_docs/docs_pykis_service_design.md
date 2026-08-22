@@ -23,12 +23,14 @@
   과 대조하고, 다르면 실제값으로 동기화(`SYNC_WALLET_ON_BOOT`, 기본 true). 조회 실패 시 DB 값 유지.
   체결 직후에도 재동기화(`SYNC_WALLET_ON_TRADE`, 기본 true, `wallet_sync.reconcile_wallet`).
 - **체결 알림**: 매수/매도 체결 시 `notifier.Notifier` 가 **텔레그램 우선**(user_detail.tele_*), 실패/미설정 시
-  **이메일 fallback**(user_master.email, smtpUtils). 이메일은 `smtp.key` 마운트 필요(compose). DRY_RUN/모의도
+  **이메일 fallback**(user_master.email, smtpUtils). 이메일은 `smtp.key` 마운트 필요(compose). 모의 계좌도
   모드 태그 붙여 발송.
 - **worker 로그 DB 적재**: 매수/매도 executor 의 모든 로그는 `log.info` 대신 `worklog.WorkerLogger` 로
   `trade_worker_log` 테이블에 시간순 적재(user_id·source(buy/sell)·level·message·created_at). 콘솔에도 echo.
   스키마: `sql/20260730_create_trade_worker_log.sql`.
-- **안전장치**: `DRY_RUN=true`(로그만)·`KIS_VIRTUAL=true`(모의)가 기본. 실주문은 env 를 명시적으로 바꿔야 함.
+- **안전장치**: `KIS_VIRTUAL=true`(모의)가 기본. 실주문은 env 를 명시적으로 바꿔야 함.
+  (구 `DRY_RUN` 플래그는 선언만 되고 주문 경로에서 분기하지 않아 안전장치로 기능하지 못했다 →
+  2026-08-20 완전 제거. worker 기동 = 즉시 실주문이라고 가정할 것.)
 
 ### 신규/변경 파일
 
@@ -36,7 +38,7 @@
 |------|------|
 | `app/ext_services/kis/keyLoader.py` (신규) | `KIS_USER_ID`→`user_detail` 조회+AES 복호화, 없으면 `kis.key` 파일. DB 실패 시 fallback |
 | `app/ext_services/kis/KisEngine.py` | `user_id` 인자 추가 → keyLoader 위임. secret 로그출력 제거 |
-| `app/trade_worker/` (신규) | 데몬: `main.py`(진입점·cron·소켓), `config.py`, `broker.py`(pykis 주문/소켓+DRY_RUN), `repository.py`(DB), `buy_executor.py`, `sell_executor.py` |
+| `app/trade_worker/` (신규) | 데몬: `main.py`(진입점·cron·소켓), `config.py`, `broker.py`(pykis 주문/소켓), `repository.py`(DB), `buy_executor.py`, `sell_executor.py` |
 | `app/flask_app/wsgi.py` (신규) | 메인 진입점(스케줄러 ON). 기존 미정의 `app.main:flaskApp` 대체 |
 | `Dockerfile` | 메인 CMD 를 `app.flask_app.wsgi:app` 로 교정 |
 | `Dockerfile.worker` (신규) | **worker 전용 이미지 `py-stock-worker`**. 메인과 별개로 독립 빌드·배포. `COPY app` 만(시크릿 안 굽음), CMD=데몬 |
@@ -53,7 +55,7 @@
 → ③ `./build_worker.sh` (권장) — 또는 `py-project/` 에서
    `docker build -f py-stock-batch/Dockerfile.worker -t py-stock-worker .`
 → ④ `DB_URL=... docker compose -f py-stock-batch/docker-compose.pykis.yml up -d` (py-project/ 에서)
-→ ⑤ `docker logs -f kis-user1` 로 부팅 잔고 동기화·매수/매도 로그 확인(DRY_RUN) → ⑥ 모의(`KIS_VIRTUAL`)로 실주문 검증 → ⑦ 실전 전환.
+→ ⑤ `docker logs -f kis-user1` 로 부팅 잔고 동기화·매수/매도 로그 확인 → ⑥ 모의(`KIS_VIRTUAL`)로 실주문 검증 → ⑦ 실전 전환.
 
 > 메인 py-stock-batch(`Dockerfile`→`docker-compose.yml`)와 worker(`Dockerfile.worker`→`docker-compose.pykis.yml`)는 **완전히 별개 이미지·배포 파이프라인**이다.
 
