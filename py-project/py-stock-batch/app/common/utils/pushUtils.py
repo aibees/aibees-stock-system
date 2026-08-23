@@ -76,6 +76,25 @@ class PushSender:
 
         try:
             resp = messaging.send_each(messages, app=app)
+
+            # 실패 원인을 알아야 진단이 되므로(success/failure 카운트만으로는 이유를 알 수 없음)
+            # 실패한 응답마다 토큰 앞 12자 + 실제 예외 코드/메시지를 남긴다.
+            for i, r in enumerate(resp.responses):
+                if not r.success:
+                    exc = getattr(r, "exception", None)
+                    code = getattr(exc, "code", None)
+                    http_resp = getattr(exc, "http_response", None)
+                    body = None
+                    if http_resp is not None:
+                        try:
+                            body = http_resp.text
+                        except Exception:  # noqa: BLE001
+                            body = None
+                    log.warning(
+                        "push 개별 발송 실패: token=%s... code=%s msg=%s body=%s",
+                        tokens[i][:12], code, exc, body,
+                    )
+
             invalid_tokens = [
                 tokens[i]
                 for i, r in enumerate(resp.responses)
