@@ -31,28 +31,40 @@ class NotifyService:
     def broadcast(self, session, title: str, body: str, data: dict | None = None):
         try:
             tokens = _dao.select_broadcast_tokens(session)
-            self._send(tokens, title, body, data)
+            self._send(tokens, title, body, data, session=session)
         except Exception as e:  # noqa: BLE001
             log.warning("broadcast push 실패: %s", e)
 
     def to_user(self, session, user_id: int, title: str, body: str, data: dict | None = None):
         try:
             tokens = _dao.select_tokens_by_user(session, user_id)
-            self._send(tokens, title, body, data)
+            self._send(tokens, title, body, data, session=session)
         except Exception as e:  # noqa: BLE001
             log.warning("user(%s) push 실패: %s", user_id, e)
 
     def to_role(self, session, role: str, title: str, body: str, data: dict | None = None):
         try:
             tokens = _dao.select_tokens_by_role(session, role)
-            self._send(tokens, title, body, data)
+            self._send(tokens, title, body, data, session=session)
         except Exception as e:  # noqa: BLE001
             log.warning("role(%s) push 실패: %s", role, e)
 
-    def _send(self, tokens, title, body, data):
+    def _send(self, tokens, title, body, data, session=None):
         if not tokens:
             return
-        pushUtils.send_to_tokens(tokens, title, body, data)
+        result = pushUtils.send_to_tokens(tokens, title, body, data)
+
+        # 영구 실패(폐기/미등록/형식오류) 토큰은 DB에서 비활성화 — 안 하면 다음
+        # 발송 때마다 같은 토큰이 계속 실패로 걸려서 로그만 쌓이고 낭비된다.
+        invalid_tokens = (result or {}).get("invalid_tokens") or []
+        if invalid_tokens and session is not None:
+            for t in invalid_tokens:
+                try:
+                    _dao.deactivate_token(session, t)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("무효 토큰 비활성화 실패: token=%s... %s", t[:12], e)
+            log.info("무효 토큰 %d개 비활성화: %s", len(invalid_tokens),
+                      [t[:12] + "..." for t in invalid_tokens])
 
 
 notifyService = NotifyService()

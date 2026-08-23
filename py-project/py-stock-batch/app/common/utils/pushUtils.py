@@ -84,22 +84,28 @@ class PushSender:
                     exc = getattr(r, "exception", None)
                     code = getattr(exc, "code", None)
                     http_resp = getattr(exc, "http_response", None)
-                    body = None
+                    err_body = None
                     if http_resp is not None:
                         try:
-                            body = http_resp.text
+                            err_body = http_resp.text
                         except Exception:  # noqa: BLE001
-                            body = None
+                            err_body = None
                     log.warning(
                         "push 개별 발송 실패: token=%s... code=%s msg=%s body=%s",
-                        tokens[i][:12], code, exc, body,
+                        tokens[i][:12], code, exc, err_body,
                     )
 
+            # 영구적으로 다시 성공할 수 없는 토큰(폐기/미등록/형식오류)은 재시도해봐야
+            # 계속 실패하므로 호출부(NotifyService)가 DB에서 비활성화할 수 있게 반환한다.
+            # - NOT_FOUND/UNREGISTERED: 앱 삭제 등으로 APNs/FCM 쪽에서 폐기된 토큰
+            # - INVALID_ARGUMENT: 애초에 FCM 토큰 형식이 아닌 값(예: 과거 iOS에서
+            #   @capacitor/push-notifications 가 잘못 넘겼던 raw APNs hex token 잔재)
+            PERMANENT_FAILURE_CODES = ("NOT_FOUND", "UNREGISTERED", "INVALID_ARGUMENT")
             invalid_tokens = [
                 tokens[i]
                 for i, r in enumerate(resp.responses)
                 if not r.success and getattr(getattr(r, "exception", None), "code", None)
-                in ("NOT_FOUND", "UNREGISTERED")
+                in PERMANENT_FAILURE_CODES
             ]
             result = {
                 "result": "success",

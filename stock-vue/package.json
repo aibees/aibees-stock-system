@@ -11,10 +11,10 @@
     "cap:prod": "cp capacitor.config.prod.json capacitor.config.json && npx cap sync ios"
   },
   "dependencies": {
+    "@capacitor-firebase/messaging": "^8.4.0",
     "@capacitor/android": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
-    "@capacitor/push-notifications": "^8.1.2",
     "@capacitor/splash-screen": "^8.0.2",
     "@fortawesome/fontawesome-svg-core": "^6.2.1",
     "@fortawesome/free-solid-svg-icons": "^6.2.1",
