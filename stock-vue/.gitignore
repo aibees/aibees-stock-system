@@ -28,3 +28,6 @@ package-lock.json
 *.sln
 *.sw?
 .vscode
+# 환경별 .env — VITE_ENCRYPT_KEY 등 민감정보 포함
+.env.dev
+.env.prd

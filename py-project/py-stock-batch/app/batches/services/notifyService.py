@@ -20,6 +20,9 @@ from stock_shared.dao.devicePushTokenDao import DevicePushTokenDao
 from app.common.utils.pushUtils import pushUtils
 
 log = logging.getLogger("push.notify")
+# pushUtils.py 와 동일한 이유 — root 로거 레벨(ERROR)을 그대로 물려받아
+# warning 로그(발송 실패 사유)까지 씹히는 걸 막기 위해 명시적으로 올려둔다.
+log.setLevel(logging.INFO)
 
 _dao = DevicePushTokenDao()
 

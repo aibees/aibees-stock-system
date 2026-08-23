@@ -1,9 +1,22 @@
 {
-  "appId": "com.aibeesworld.stock",
+  "appId": "com.aibeesworld.stocks",
   "appName": "Aibees Stock",
   "webDir": "dist",
   "server": {
     "url": "http://localhost:19010",
     "cleartext": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "launchFadeOutDuration": 300,
+      "backgroundColor": "#1c3d6e",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    }
   }
 }

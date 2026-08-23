@@ -19,12 +19,21 @@ import { assUserSession } from './stores/user-stores';
 let initialized = false;
 
 export async function initPushNotifications() {
-    if (initialized) return;
-    if (!Capacitor.isNativePlatform()) return; // 웹 배포는 skip
+    console.log("[initPushNotifications] INIT : " + initialized);
+    if (initialized) {
+        return;
+    }
+    console.log("[initPushNotifications] isNativePlatform" + Capacitor.isNativePlatform())
+    if (!Capacitor.isNativePlatform()) {
+        return;
+    } // 웹 배포는 skip
+    
     initialized = true;
 
     try {
         let perm = await PushNotifications.checkPermissions();
+        console.log("[initPushNotifications] PERM : ");
+        console.log(perm);
         if (perm.receive === 'prompt') {
             perm = await PushNotifications.requestPermissions();
         }
@@ -33,14 +42,20 @@ export async function initPushNotifications() {
             return;
         }
 
+        console.log('[push] register() 호출');
         await PushNotifications.register();
+        console.log('[push] register() 반환 — 이후 registration/registrationError 이벤트 대기');
 
         PushNotifications.addListener('registration', (token) => {
+            // [디버깅] 이 로그가 안 뜨면 native 단(APNs)에서 콜백 자체가 안 온 것 —
+            // Push Notifications capability/entitlement, provisioning profile 쪽 문제.
+            console.log('[push] registration 이벤트 수신, token 길이=' + (token?.value?.length ?? 0)
+                + ', token 앞 12자=' + (token?.value?.slice(0, 12) ?? ''));
             registerTokenToServer(token.value);
         });
 
         PushNotifications.addListener('registrationError', (err) => {
-            console.error('[push] 토큰 등록 실패', err);
+            console.error('[push] 토큰 등록 실패(registrationError)', JSON.stringify(err));
         });
 
         // 포그라운드 수신 → toast. (백그라운드/종료 상태 수신은 OS 가 시스템
@@ -70,13 +85,19 @@ async function registerTokenToServer(deviceToken) {
             : null;
         const roles = userSession.getRole ?? [];
 
-        await batchApi.post('/api/v1/notify/register', {
+        console.log('[push] 서버 등록 요청 → /api/v1/notify/register platform=' + platform
+            + ' user_id=' + userId + ' baseURL=' + (batchApi.defaults?.baseURL ?? '(none)'));
+
+        const resp = await batchApi.post('/api/v1/notify/register', {
             device_token: deviceToken,
             platform,
             user_id: userId,
             roles,
         });
+
+        console.log('[push] 서버 등록 성공', JSON.stringify(resp.data));
     } catch (e) {
-        console.error('[push] 서버 등록 실패', e);
+        // [디버깅] 여기 안 뜨고 registration 로그만 있으면 → nginx 라우팅/CORS/네트워크 문제.
+        console.error('[push] 서버 등록 실패', e?.response?.status, e?.message, JSON.stringify(e?.response?.data ?? ''));
     }
 }

@@ -13,6 +13,11 @@ import logging
 import os
 
 log = logging.getLogger("push.fcm")
+# job.py/runner.py 가 앱 부팅 시 logging.basicConfig(level=logging.ERROR) 를 걸어버려서
+# (force=True 가 아니므로 root 레벨이 ERROR로 고정됨) 이 로거가 부모(root) 레벨을
+# 그대로 물려받아 info/warning 로그가 전부 조용히 씹힌다. push 발송 성공/실패 여부를
+# 로그로 확인할 수 있어야 하므로 이 로거만 명시적으로 INFO로 올려둔다.
+log.setLevel(logging.INFO)
 
 _app = None
 _init_failed = False

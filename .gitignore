@@ -19,3 +19,9 @@ npm-debug.log*
 # OS
 .DS_Store
 .env.lock
+
+# API/서명 키 — 절대 커밋 금지 (AES 암호화키, KIS/SMTP API 키, APNs 인증키, Firebase 설정 등)
+*.p8
+*.key
+GoogleService-Info.plist
+google-services.json

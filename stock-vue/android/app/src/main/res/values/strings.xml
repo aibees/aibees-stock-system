@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Aibees Stock</string>
     <string name="title_activity_main">Aibees Stock</string>
-    <string name="package_name">com.aibeesworld.stock</string>
-    <string name="custom_url_scheme">com.aibeesworld.stock</string>
+    <string name="package_name">com.aibeesworld.stocks</string>
+    <string name="custom_url_scheme">com.aibeesworld.stocks</string>
 </resources>
