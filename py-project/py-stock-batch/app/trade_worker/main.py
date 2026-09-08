@@ -181,8 +181,7 @@ def _reconcile_positions(cfg, broker, repo):
 def main():
     # 1. Config Load
     cfg = config.load()
-    log.info("[main] trade_worker 시작 / user_id=%s / buy=%02d:%02d",
-             cfg.user_id, cfg.buy_hour, cfg.buy_minute)
+    log.info("[main] trade_worker 시작 / user_id=%s / buy=%02d:%02d", cfg.user_id, cfg.buy_hour, cfg.buy_minute)
 
     # 2. USER KIS 세션 (KIS_USER_ID → keyLoader → DB key). 실전 전용.
     engine = KisEngine(user_id=cfg.user_id)
