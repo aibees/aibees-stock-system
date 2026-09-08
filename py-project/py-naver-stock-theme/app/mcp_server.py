@@ -25,7 +25,7 @@ from starlette.routing import Mount
 
 
 
-from app.config.db.database import dbConn
+from stock_shared.db.database import dbConn
 from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
 from app.ext_services.kis.KisEngine import KisEngine

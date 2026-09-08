@@ -32,7 +32,7 @@ from datetime import date, datetime, timedelta
 
 from app.batches.jobs.job import Job
 from app.batches.services.userService import UserService
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.kis.keyLoader import list_kis_user_ids
 from app.ext_services.kis.component.KisStockService import KisService

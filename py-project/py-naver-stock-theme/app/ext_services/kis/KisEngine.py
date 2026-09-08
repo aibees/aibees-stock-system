@@ -10,7 +10,7 @@ import json
 
 from pykis.api.stock.quote import KisQuoteResponse
 
-from app.config.db.database import dbConn
+from stock_shared.db.database import dbConn
 from app.domains.dao.userDetailDao import UserDetailDao
 from app.utils.constants.Literal import Literal
 

@@ -21,7 +21,7 @@ trade_candle_30m 데이터 건전성 진단.
 import argparse
 from collections import Counter, defaultdict
 
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 from app.test import sim_m3_alternate as sim
 from stock_shared.strategy.backtester import KisBacktester
 from stock_shared.vo.userCoinInfo import UserCoinInfo

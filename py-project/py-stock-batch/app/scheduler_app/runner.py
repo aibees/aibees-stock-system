@@ -3,7 +3,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.executors.pool import ProcessPoolExecutor as APProcessPoolExecutor
 from pytz import timezone
 
-from app.config.contextManager import get_session
+from stock_shared.db.contextManager import get_session
 from app.scheduler_app.job_runner import MP_CONTEXT, _execute_job, run_job_once  # noqa: F401
 from stock_shared.dao.batchJobMasterDao import BatchJobMasterDao
 

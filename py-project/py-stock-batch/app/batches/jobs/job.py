@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from app.common.utils.commUtils import *
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 from app.domain.dao.batchLogDao import BatchLogDao
 # [추가] 배치 시작/종료 push 알림 — notifyService 자체는 import 시점에 firebase_admin
 # 을 건드리지 않는다(pushUtils.py 의 lazy init). job_runner.py 의 "import 시점

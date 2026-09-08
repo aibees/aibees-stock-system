@@ -1,7 +1,7 @@
 from flask import Flask, request, g
 from flask_cors import CORS
 from app.flask_app.routers import register_blueprints
-from app.config.db.database import dbConn
+from stock_shared.db.database import dbConn
 import logging
 from app.flask_app.utils.apiResponse import ApiResponse
 logging.basicConfig(level=logging.ERROR)

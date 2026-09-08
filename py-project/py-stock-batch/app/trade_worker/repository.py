@@ -29,7 +29,7 @@ from decimal import Decimal
 from pytz import timezone
 from sqlalchemy import text
 
-from app.config.contextManager import get_session
+from stock_shared.db.contextManager import get_session
 
 log = logging.getLogger("trade_worker.repo")
 _KST = timezone("Asia/Seoul")

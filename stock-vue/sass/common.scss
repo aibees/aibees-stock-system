@@ -31,7 +31,15 @@ select {
     }
 }
 
-.div-flex {
+.d-flex {
     display: flex;
-    justify-content: space-between;
+    gap: 1rem;
+    // justify-content: space-between;
+}
+
+.d-flex-left {
+    float: left;
+}
+.d-flex-right {
+    float: right;
 }

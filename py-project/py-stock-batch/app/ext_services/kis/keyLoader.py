@@ -21,7 +21,7 @@ import os
 from sqlalchemy import text
 
 from app.common.utils.aesUtils import aesUtils
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 
 log = logging.getLogger("kis.keyLoader")
 

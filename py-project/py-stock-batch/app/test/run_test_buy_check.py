@@ -33,7 +33,7 @@ from datetime import datetime
 
 from sqlalchemy import select, text
 
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 from app.batches.services.userService import UserService
 from app.batches.services.stockService import StockService
 from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao

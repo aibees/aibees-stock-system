@@ -27,7 +27,7 @@ KospiStrategy1 을 쓰지 않고 조건을 직접 계산한다.
 """
 import argparse
 
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 from app.test import sim_m3_alternate as sim
 
 CONDS = ('macd_up', 'obv_up', 'ma20_up', 'rsi_ok')

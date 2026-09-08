@@ -12,7 +12,7 @@
 from flask import Blueprint, request
 
 from app.flask_app.utils.apiResponse import ApiResponse
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 from stock_shared.dao.devicePushTokenDao import DevicePushTokenDao
 from app.batches.services.notifyService import notifyService
 

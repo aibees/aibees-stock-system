@@ -7,7 +7,7 @@ from flask import Blueprint, request, g
 from stock_shared.dao.batchJobMasterDao import BatchJobMasterDao
 from app.domains.dao.nBatchLogDao import BatchLogDao
 from app.flask_app.utils.apiResponse import ApiResponse
-from app.config.db.database import dbConn
+from stock_shared.db.database import dbConn
 
 logging.basicConfig(level=logging.ERROR)
 

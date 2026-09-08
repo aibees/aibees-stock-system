@@ -3,7 +3,7 @@ import sys
 from app.batches.jobs.StockBuyCheckJob import StockBuyCheckJob
 from app.batches.jobs.StockCodeMasterJob import StockCodeMasterJob
 from app.batches.jobs.StockSellCheckJob import StockSellCheckJob
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 from app.batches.services.stockService import StockService
 from app.batches.services.userService import UserService
 

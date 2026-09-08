@@ -3,7 +3,7 @@ import os
 from flask import Flask, request, g
 from flask_cors import CORS
 from app.flask_app.router import register_blueprints
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 import logging
 
 from app.scheduler_app.runner import scheduleManage

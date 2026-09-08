@@ -5,7 +5,7 @@ import pandas as pd
 
 from app.batches.jobs.job import Job
 from app.batches.services.stockService import StockService
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 
 
 class StockCodeMasterJob(Job):

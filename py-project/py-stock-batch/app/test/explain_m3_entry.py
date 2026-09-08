@@ -23,7 +23,7 @@
 """
 import argparse
 
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 from app.test import sim_m3_alternate as sim
 from app.test.sim_m3_simple_trade import SimpleSignalStrategy, _f, run
 

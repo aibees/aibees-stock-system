@@ -10,10 +10,15 @@
 ```
 stock_shared/
 ├── base.py          공용 declarative Base (모든 모델이 이것 하나만 상속)
+├── db/              DB 커넥션(Database, dbConn) / 세션 contextmanager(get_session)
 ├── models/          ORM 모델 15개
 ├── dao/             공용 DAO 7개 (BaseDao + 6)
 └── vo/              UserCoinInfo (DAO 시그니처에 필요)
 ```
+
+두 프로젝트가 각자 갖고 있던 `Database`/`get_session` 구현이 완전히 동일해서
+`stock_shared.db` 로 합쳤다. 커넥션 문자열은 `DB_URL` 환경변수로 오버라이드한다
+(기본값은 개발 DB).
 
 ## 포함된 모델 (15)
 
@@ -53,9 +58,11 @@ stock-shared = { path = "../shared", develop = true }
 ```python
 from stock_shared.models import MasterStock, UserOptions
 from stock_shared.dao import MasterStockDao
+from stock_shared.db.contextManager import get_session
 
 dao = MasterStockDao()
-rows = dao.select_all_stocks(session)
+with get_session() as session:
+    rows = dao.select_all_stocks(session)
 ```
 
 ## Docker

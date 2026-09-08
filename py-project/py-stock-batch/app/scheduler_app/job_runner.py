@@ -72,7 +72,7 @@ def _execute_job(module_name: str, class_name: str, **kwargs):
     try:
         # 자식 전용 엔진을 새로 잡는다. spawn 이라 부모 풀을 물려받지
         # 않지만, 혹시 다른 컨텍스트로 돌더라도 소켓 FD 공유를 막는다.
-        from app.config.database import dbConn
+        from stock_shared.db.database import dbConn
         dbConn.engine.dispose()
 
         jobModule = importlib.import_module(module_name)

@@ -20,7 +20,7 @@ optimize_m3_options.py 가 이 모듈의 load_rows()/build_strategy()/run_once()
 import argparse
 
 from app.batches.services.userService import UserService
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 from stock_shared.dao.tradeCandle30mDao import TradeCandle30mDao
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from stock_shared.strategy.kospi1 import KospiStrategy1

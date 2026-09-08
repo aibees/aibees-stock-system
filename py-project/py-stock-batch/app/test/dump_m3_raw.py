@@ -24,7 +24,7 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 from app.ext_services.kis.KisEngine import KisEngine
 from stock_shared.dao.tradeCandle30mDao import TradeCandle30mDao
 

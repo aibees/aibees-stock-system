@@ -22,14 +22,14 @@
                     </div>
 
                     <div class="head-actions">
-                        <button v-if="isLogin" class="btn-sell-request" @click="goSellRequest">
+                        <!-- <button v-if="isLogin" class="btn-sell-request" @click="goSellRequest">
                             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M3 3v18h18"></path>
                                 <path d="m19 9-5 5-4-4-3 3"></path>
                             </svg>
                             매도신호 신청
-                        </button>
+                        </button> -->
 
                         <div class="date-picker-trigger" @click="openDatePicker">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -65,117 +65,107 @@
                 </section>
 
                 <section class="buy-target">
-                <div v-if="!isLoading && sortedData.length > 0" class="signal-grid">
-                    <div v-for="(item, index) in sortedData" :key="item.stock_code ?? index" class="signal-card"
-                        :class="{ 'super-signal': calculateSignalScore(item) >= 6 }">
+                    <div v-if="!isLoading && sortedData.length > 0" class="signal-grid">
+                        <div v-for="(item, index) in sortedData" :key="item.stock_code ?? index" class="signal-card">
 
-                        <div v-if="item.rank_no" class="rank-badge">
-                                    <span class="rank-label">RANK</span>
-                                    <span class="rank-no">{{ item.rank_no }}</span>
+                            <!-- 헤더: 순위 + 종목명/코드 + 액션 버튼 + 즐겨찾기 -->
+                            <div class="card-head">
+                                <div class="rank-num">{{ String(item.rank_no ?? index + 1).padStart(2, '0') }}</div>
+                                <div class="head-main">
+                                    <h3 class="name">{{ item.stock_name }}</h3>
+                                    <div class="code">{{ item.stock_code }}</div>
                                 </div>
-                        <!-- 종목명 + 순위 + 버튼 -->
-                        <div class="card-top">
-                            <div class="stock-info">
-                                <h3 class="name">{{ item.stock_name }}</h3>
-                                <span class="code">{{ item.stock_code }}</span>
-
-                            </div>
-                            <div class="top-right">
                                 <div class="actions-row">
                                     <button class="action-btn ai-btn" @click="goToStockInfo(item.stock_code, item.stock_name)">AI 개요</button>
                                     <button class="action-btn chart-btn" @click="goToChart(item.stock_code)">차트보기</button>
-                                    <span class="rate-badge" :class="rateClass(item.rate)">{{ item.rate }}</span>
+                                </div>
+                                <button type="button" class="star-btn" :class="{ on: isFavorite(item.stock_code) }"
+                                        @click="toggleFavorite(item.stock_code)" title="관심종목">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                        :fill="isFavorite(item.stock_code) ? 'currentColor' : 'none'" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <!-- 현재가 + 거래량 + 추천 -->
+                            <div class="stat-pair triple">
+                                <div class="stat-cell">
+                                    <span class="stat-label">현재가</span>
+                                    <div class="stat-main">{{ formatNumber(item.close) }}<span class="unit">원</span></div>
+                                    <div class="stat-sub" :class="rateClass(item.rate)">{{ item.rate ?? '-' }}</div>
+                                </div>
+                                <div class="stat-cell">
+                                    <span class="stat-label">거래량</span>
+                                    <div class="stat-main">{{ formatVolume(item.volume || 0) }}</div>
+                                </div>
+                                <div class="stat-cell">
+                                    <span class="stat-label">점수</span>
+                                    <div class="stat-main" :class="scoreClass(item.score)">{{ item.score ?? '-' }}<span class="unit">/100</span></div>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- 시/고/저/종 -->
-                        <div class="price-row">
-                            <div class="price-item">
-                                <span class="price-label">시가</span>
-                                <span class="price-value">{{ formatNumber(item.open) }}</span>
+                            <!-- 시/고/저/종 -->
+                            <div class="price-row">
+                                <div class="price-item">
+                                    <span class="price-label">시가</span>
+                                    <span class="price-value">{{ formatNumber(item.open) }}</span>
+                                </div>
+                                <div class="price-item high">
+                                    <span class="price-label">고가</span>
+                                    <span class="price-value">{{ formatNumber(item.high) }}</span>
+                                </div>
+                                <div class="price-item low">
+                                    <span class="price-label">저가</span>
+                                    <span class="price-value">{{ formatNumber(item.low) }}</span>
+                                </div>
+                                <div class="price-item close">
+                                    <span class="price-label">종가</span>
+                                    <span class="price-value">{{ formatNumber(item.close) }}</span>
+                                </div>
                             </div>
-                            <div class="price-item high">
-                                <span class="price-label">고가</span>
-                                <span class="price-value">{{ formatNumber(item.high) }}</span>
-                            </div>
-                            <div class="price-item low">
-                                <span class="price-label">저가</span>
-                                <span class="price-value">{{ formatNumber(item.low) }}</span>
-                            </div>
-                            <div class="price-item close">
-                                <span class="price-label">종가</span>
-                                <span class="price-value">{{ formatNumber(item.close) }}</span>
-                            </div>
-                        </div>
 
-                        <!-- 거래량 + 시그널 + 점수 -->
-                        <div class="signal-row">
-                            <div class="stat-item">
-                                <span class="stat-label">거래량</span>
-                                <span class="stat-value">{{ formatVolume(item.volume || 0) }}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">MACD</span>
-                                <span class="stat-value" :class="item.macd_cross === 'G' ? 'val-navy' : 'val-gray'">
-                                    {{ item.macd_cross === 'G' ? '골든' : '일반' }}
-                                </span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">OBV</span>
-                                <span class="stat-value" :class="item.obv_cross === 'G' ? 'val-navy' : 'val-gray'">
-                                    {{ item.obv_cross === 'G' ? '골든' : '일반' }}
-                                </span>
-                            </div>
-                            <div class="stat-item" v-if="item.score != null">
-                                <span class="stat-label">점수</span>
-                                <span class="stat-value val-score">{{ item.score }}</span>
-                            </div>
-                        </div>
+                            <!-- 근거 · 조건 (펼치기) -->
+                            <button type="button" class="detail-toggle" @click="toggleDetail(item.stock_code)">
+                                <span class="arrow" :class="{ open: expandedCard === item.stock_code }">▶</span>
+                                근거 · 재무 · 조건 보기
+                            </button>
 
-                        <!-- 펀더멘털 -->
-                        <div class="fundamental-row">
-                            <div class="fund-item">
-                                <span class="fund-label">PER</span>
-                                <span class="fund-value">{{ item.per ?? '-' }}</span>
-                            </div>
-                            <div class="fund-item">
-                                <span class="fund-label">PBR</span>
-                                <span class="fund-value">{{ item.pbr ?? '-' }}</span>
-                            </div>
-                            <div class="fund-item">
-                                <span class="fund-label">PEG</span>
-                                <span class="fund-value">{{ item.peg ?? '-' }}</span>
-                            </div>
-                            <div class="fund-item">
-                                <span class="fund-label">ROE</span>
-                                <span class="fund-value">{{ item.roe ?? '-' }}</span>
-                            </div>
-                            <div class="fund-item">
-                                <span class="fund-label">EPS</span>
-                                <span class="fund-value">{{ item.eps ? formatNumber(item.eps) : '-' }}</span>
-                            </div>
-                        </div>
+                            <div v-show="expandedCard === item.stock_code" class="detail-panel">
+                                <div class="detail-group">
+                                    <div class="detail-group-title">재무 펀더멘털</div>
+                                    <div class="detail-row" v-for="row in fundamentalRows(item)" :key="row.label">
+                                        <div class="detail-row-name">{{ row.label }}</div>
+                                        <div class="detail-row-verdict" :class="row.pass ? 'pass' : (row.pass === false ? 'fail' : 'neutral')">
+                                            {{ row.verdict }}
+                                        </div>
+                                        <div class="detail-row-desc">{{ row.desc }}</div>
+                                    </div>
+                                </div>
 
-                        <!-- 기술적 조건 칩 -->
-                        <div class="chip-row">
-                            <span :class="['chip', { on: item.is_vol_limit === 'Y' }]">거래제한</span>
-                            <span :class="['chip', { on: item.is_vol_surge === 'Y' }]">거래급등</span>
-                            <span :class="['chip', { on: item.is_bb_mid_breakout === 'Y' }]">BB중심돌파</span>
-                            <span :class="['chip', { on: item.is_under_bb_upper === 'Y' }]">BB상단아래</span>
-                            <span :class="['chip', { on: item.is_over_on_mid === 'Y' }]">중심선위</span>
-                        </div>
+                                <div class="detail-group">
+                                    <div class="detail-group-title">기술적 근거</div>
+                                    <div class="detail-row" v-for="row in technicalRows(item)" :key="row.label">
+                                        <div class="detail-row-name">{{ row.label }}</div>
+                                        <div class="detail-row-verdict" :class="row.pass ? 'pass' : 'neutral'">
+                                            {{ row.verdict }}
+                                        </div>
+                                        <div class="detail-row-desc">{{ row.desc }}</div>
+                                    </div>
+                                </div>
+                            </div>
 
-                        <div class="card-footer">
-                            <span class="action-type">{{ item.action_type }}</span>
-                            <span class="timestamp">{{ formatDate(item.ymd) }}</span>
+                            <!-- 푸터: 기준일 -->
+                            <div class="card-footer">
+                                <span class="timestamp">{{ formatDate(item.ymd) }} 기준</span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div v-else-if="isLoading" class="loader-grid">
-                    <div class="skeleton-card" v-for="n in 4" :key="n"></div>
-                </div>
+                    <div v-else-if="isLoading" class="loader-grid">
+                        <div class="skeleton-card" v-for="n in 4" :key="n"></div>
+                    </div>
 
                     <div v-else class="empty-box">
                         <p>분석된 데이터가 없습니다. 날짜를 변경해 보세요.</p>
@@ -370,13 +360,136 @@ watch(activeTab, (tab) => {
     }
 });
 
-const calculateSignalScore = (item) => {
-    let s = (item.macd_cross === 'G' ? 1 : 0) + (item.obv_cross === 'G' ? 1 : 0);
-    ['is_vol_limit', 'is_vol_surge', 'is_bb_mid_breakout', 'is_under_bb_upper', 'is_over_on_mid'].forEach(p => {
-        if (item[p] === 'Y') s++;
-    });
-    return s;
+/* ── 관심종목 (로컬 저장, 서버 연동 없음) ── */
+const FAVORITE_KEY = 'ssap_favorite_stocks';
+const favoriteStocks = ref(new Set());
+try {
+    const saved = JSON.parse(localStorage.getItem(FAVORITE_KEY) || '[]');
+    favoriteStocks.value = new Set(saved);
+} catch (e) { /* ignore malformed storage */ }
+
+const isFavorite = (code) => favoriteStocks.value.has(code);
+const toggleFavorite = (code) => {
+    const next = new Set(favoriteStocks.value);
+    next.has(code) ? next.delete(code) : next.add(code);
+    favoriteStocks.value = next;
+    localStorage.setItem(FAVORITE_KEY, JSON.stringify([...next]));
 };
+
+/* ── 카드 상세(근거·조건) 펼치기 ── */
+const expandedCard = ref(null);
+const toggleDetail = (code) => {
+    expandedCard.value = expandedCard.value === code ? null : code;
+};
+
+/* ── 재무 펀더멘털 판정 (일반적인 가치투자 기준선을 사용한 참고용 해석) ── */
+const numOrNull = (v) => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isNaN(n) ? null : n;
+};
+
+const fundamentalRows = (item) => {
+    const per = numOrNull(item.per);
+    const pbr = numOrNull(item.pbr);
+    const roe = numOrNull(item.roe);
+    const eps = numOrNull(item.eps);
+    const peg = numOrNull(item.peg);
+
+    return [
+        {
+            label: 'PER',
+            pass: per === null ? null : (per > 0 && per <= 15),
+            verdict: per === null ? '확인불가' : (per <= 0 ? '적자' : (per <= 15 ? '적합' : '높음')),
+            desc: per === null ? '주가수익비율 정보가 없습니다.' : `주가수익비율 ${per}배 · 15배 이하를 저평가 참고 기준으로 봅니다.`,
+        },
+        {
+            label: 'PBR',
+            pass: pbr === null ? null : (pbr > 0 && pbr <= 1),
+            verdict: pbr === null ? '확인불가' : (pbr <= 0 ? '확인불가' : (pbr <= 1 ? '적합' : '높음')),
+            desc: pbr === null ? '주가순자산비율 정보가 없습니다.' : `주가순자산비율 ${pbr}배 · 1배 이하를 저평가 참고 기준으로 봅니다.`,
+        },
+        {
+            label: 'ROE',
+            pass: roe === null ? null : roe > 0,
+            verdict: roe === null ? '확인불가' : (roe > 0 ? '적합' : '부적합'),
+            desc: roe === null ? '자기자본이익률 정보가 없습니다.' : `자기자본이익률 ${roe} · ${roe > 0 ? '이익을 내고 있습니다.' : '손실 상태입니다.'}`,
+        },
+        {
+            label: 'EPS',
+            pass: eps === null ? null : eps > 0,
+            verdict: eps === null ? '확인불가' : (eps > 0 ? '적합' : '부적합'),
+            desc: eps === null ? '주당순이익 정보가 없습니다.' : `주당순이익 ${formatNumber(eps)}원 · ${eps > 0 ? '흑자 기조입니다.' : '적자 상태입니다.'}`,
+        },
+        {
+            label: 'PEG',
+            pass: peg === null ? null : (peg > 0 && peg <= 1),
+            verdict: peg === null ? '확인불가' : (peg <= 0 ? '확인불가' : (peg <= 1 ? '적합' : '높음')),
+            desc: peg === null ? '이익성장 대비 주가 정보가 없습니다.' : `PEG ${peg} · 1 이하를 이익성장 대비 저평가 참고 기준으로 봅니다.`,
+        },
+    ];
+};
+
+/* ── 기술적 근거 판정 (실제 지표 플래그를 그대로 사용, 판정 문구만 서술형으로 변환)
+ * 조건 정의는 strategy/kospi1.py, KisStockService.py 계산 로직을 그대로 따름 ── */
+const technicalRows = (item) => [
+    {
+        label: 'MACD 크로스',
+        pass: item.macd_cross === 'G',
+        verdict: item.macd_cross === 'G' ? '충족' : '미충족',
+        desc: item.macd_cross === 'G'
+            ? '최근 며칠 내 MACD 선이 시그널선을 상향 돌파(골든크로스)했습니다.'
+            : '최근 MACD 골든크로스가 발생하지 않았습니다.',
+    },
+    {
+        label: 'OBV 크로스',
+        pass: item.obv_cross === 'G',
+        verdict: item.obv_cross === 'G' ? '충족' : '미충족',
+        desc: item.obv_cross === 'G'
+            ? '거래량 누적지표(OBV)가 최근 며칠 내 9일 이동평균을 상향 돌파했습니다.'
+            : '거래량 누적지표(OBV)가 아직 9일 이동평균을 돌파하지 못했습니다.',
+    },
+    {
+        label: '거래제한',
+        pass: item.is_vol_limit === 'Y',
+        verdict: item.is_vol_limit === 'Y' ? '충족' : '미충족',
+        desc: item.is_vol_limit === 'Y'
+            ? '오늘 거래량이 최소 거래량 기준선을 넘었습니다.'
+            : '오늘 거래량이 최소 거래량 기준선에 못 미칩니다.',
+    },
+    {
+        label: '거래급등',
+        pass: item.is_vol_surge === 'Y',
+        verdict: item.is_vol_surge === 'Y' ? '충족' : '미충족',
+        desc: item.is_vol_surge === 'Y'
+            ? '최근 며칠 중 전일 대비 거래량이 급증한 날이 있었습니다.'
+            : '최근 전일 대비 거래량 급증이 없었습니다.',
+    },
+    {
+        label: 'BB중심돌파',
+        pass: item.is_bb_mid_breakout === 'Y',
+        verdict: item.is_bb_mid_breakout === 'Y' ? '충족' : '미충족',
+        desc: item.is_bb_mid_breakout === 'Y'
+            ? '볼린저밴드 중심선 아래에 있다가 위로 돌파한 뒤 그 위에서 유지되고 있습니다.'
+            : '볼린저밴드 중심선 돌파 후 유지 패턴이 확인되지 않았습니다.',
+    },
+    {
+        label: 'BB상단아래',
+        pass: item.is_under_bb_upper === 'Y',
+        verdict: item.is_under_bb_upper === 'Y' ? '충족' : '미충족',
+        desc: item.is_under_bb_upper === 'Y'
+            ? '종가가 볼린저밴드 상단선 이하로, 단기 과열(추격 매수 구간)은 아닙니다.'
+            : '종가가 볼린저밴드 상단선을 이미 넘어서 단기 과열 구간입니다.',
+    },
+    {
+        label: '중심선위',
+        pass: item.is_over_on_mid === 'Y',
+        verdict: item.is_over_on_mid === 'Y' ? '충족' : '미충족',
+        desc: item.is_over_on_mid === 'Y'
+            ? '종가가 20일 이동평균선 위에 있습니다.'
+            : '종가가 20일 이동평균선 아래에 있습니다.',
+    },
+];
 
 const formattedDisplayDate = computed(() => {
     const d = new Date(selectedDate.value);
@@ -391,12 +504,23 @@ const rateClass = (rate) => {
     return '';
 };
 
+const scoreClass = (score) => {
+    if (score === null || score === undefined || score === '') return '';
+    const n = Number(score);
+    if (Number.isNaN(n)) return '';
+    if (n >= 80) return 'score-gold';
+    if (n >= 70) return 'score-bronze';
+    return '';
+};
+
 const formatNumber = (v) => Number(v).toLocaleString();
 const formatVolume = (v) => Number(v).toLocaleString();
 const formatDate = (v) => v ? `${v.substring(4, 6)}/${v.substring(6, 8)}` : '';
 </script>
 
 <style scoped lang="scss">
+@use '@@/common.scss' as *;
+
 $white:   #ffffff;
 $gray-50: #f8f9fa;
 $gray-100:#ebebeb;
@@ -409,6 +533,8 @@ $blue:    #1971c2;
 $navy:    #1c3d6e;
 $red:     #c92a2a;
 $amber:   #e67700;
+$gold:    #c9a227;
+$bronze:  #b0703c;
 
 #home {
     min-height: 100vh;
@@ -643,101 +769,72 @@ $amber:   #e67700;
 
 /* ── Grid ── */
 .signal-grid {
-    display: grid;
-    gap: 16px;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    // display: grid;
+    // gap: 16px;
+    // grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 
 /* ── Card ── */
 .signal-card {
     background: $white;
-    border: 1px solid $gray-200;
-    border-radius: 0.6rem;
+    border: 1px solid $gray-100;
+    border-radius: 1rem;
+    margin-bottom: 16px;
     overflow: hidden;
-    transition: box-shadow .15s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    transition: box-shadow .15s, border-color .15s;
 
     &:hover {
-        box-shadow: 0 4px 16px rgba(0,0,0,.08);
+        box-shadow: 0 6px 20px rgba(0,0,0,.08);
+        border-color: $gray-200;
     }
 
-    &.super-signal {
-        border-color: $amber;
-
-        .rank-badge {
-            background: $amber;
-        }
-    }
-
-
-    /* ── Rank Badge ── */
-    .rank-badge {
+    /* ── 헤더: 순위 · 종목명/코드 · 액션 버튼 · 즐겨찾기 ── */
+    .card-head {
         display: flex;
-        flex-direction: row;
         align-items: center;
-        justify-content: center;
-        background: $navy;
-        border-top-left-radius: 0.4rem;
-        border-top-right-radius: 0.4rem;
-        padding: 3px 10px 4px;
-        min-width: 44px;
-
-        .rank-label {
-            font-size: 0.7rem;
-            font-weight: 700;
-            color: rgba(255, 255, 255, 0.6);
-            letter-spacing: 0.08em;
-            line-height: 1;
-            margin-right: 0.5rem
-        }
-
-        .rank-no {
-            font-size: 1rem;
-            font-weight: 800;
-            color: $white;
-            line-height: 1.1;
-        }
-    }
-
-    /* ── Card Top ── */
-    .card-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 14px 14px 10px;
         gap: 10px;
+        padding: 10px 14px 8px;
 
-        .stock-info {
+        .rank-num {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: $amber;
+            line-height: 1;
+            flex-shrink: 0;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .head-main {
             flex: 1;
             min-width: 0;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
 
             .name {
-                font-size: 1.05rem;
+                font-size: 0.94rem;
                 font-weight: 700;
-                margin: 0 0 2px;
+                margin: 0;
                 color: $gray-900;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
+                text-align: start;
             }
             .code {
-                font-size: 0.78rem;
+                font-size: 0.72rem;
                 color: $gray-500;
+                text-align: start;
+                white-space: nowrap;
             }
         }
-
-        .top-right {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 6px;
-            flex-shrink: 0;
-        }
-
 
         .actions-row {
             display: flex;
             align-items: center;
             gap: 6px;
+            flex-shrink: 0;
         }
 
         .action-btn {
@@ -750,6 +847,7 @@ $amber:   #e67700;
             transition: background .12s, color .12s;
             font-family: inherit;
             line-height: 1.4;
+            white-space: nowrap;
 
             &.ai-btn {
                 background: #f0f4ff;
@@ -765,33 +863,95 @@ $amber:   #e67700;
                 &:hover { border-color: $blue; color: $blue; background: $gray-50; }
             }
         }
+
+        .star-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            flex-shrink: 0;
+            padding: 0;
+            border: none;
+            background: none;
+            color: $gray-200;
+            cursor: pointer;
+            transition: color .15s, transform .1s;
+
+            &:hover { color: $gray-400; }
+            &:active { transform: scale(0.9); }
+            &.on { color: $amber; }
+        }
+
+        @media (max-width: 480px) {
+            flex-wrap: wrap;
+
+            .actions-row { order: 3; width: 100%; padding-left: calc(1.2rem + 10px); }
+        }
     }
 
-    .rate-badge {
-        font-size: 0.8rem;
-        font-weight: 700;
-        padding: 4px 8px;
-        border-radius: 0.3rem;
-        background: $gray-100;
-        color: $gray-500;
+    /* ── 현재가/거래량/추천 3열 통계 ── */
+    .stat-pair {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-top: 1px solid $gray-100;
 
-        &.rate-up   { background: #ffe3e3; color: $red; }
-        &.rate-down { background: #dbe4ff; color: $navy; }
+        .stat-cell {
+            padding: 7px 14px;
+            text-align: left;
+
+            &:not(:last-child) { border-right: 1px solid $gray-100; }
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 0.66rem;
+            color: $gray-500;
+            margin-bottom: 1px;
+        }
+
+        .stat-main {
+            font-size: 0.94rem;
+            font-weight: 800;
+            color: $gray-900;
+            line-height: 1.2;
+
+            .unit {
+                font-size: 0.68rem;
+                font-weight: 600;
+                color: $gray-500;
+                margin-left: 2px;
+            }
+
+            &.score-gold   { color: $gold;   .unit { color: $gold; } }
+            &.score-bronze { color: $bronze; .unit { color: $bronze; } }
+        }
+
+        .stat-sub {
+            font-size: 0.7rem;
+            color: $gray-500;
+            line-height: 1.3;
+
+            &.rate-up   { color: $red; }
+            &.rate-down { color: $navy; }
+        }
+
+        &.triple { grid-template-columns: repeat(3, 1fr); }
     }
 
     /* ── OHLC ── */
     .price-row {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        border-top: 1px solid $gray-200;
-        border-bottom: 1px solid $gray-200;
+        border-top: 1px solid $gray-100;
+        border-bottom: 1px solid $gray-100;
         background: $gray-50;
 
         .price-item {
-            padding: 8px 0;
+            padding: 5px 0;
             text-align: center;
 
-            &:not(:last-child) { border-right: 1px solid $gray-200; }
+            &:not(:last-child) { border-right: 1px solid $gray-100; }
 
             &.high  .price-value { color: $red; }
             &.low   .price-value { color: $navy; }
@@ -800,98 +960,101 @@ $amber:   #e67700;
 
         .price-label {
             display: block;
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             color: $gray-500;
-            margin-bottom: 3px;
+            margin-bottom: 1px;
         }
 
         .price-value {
-            font-size: 0.84rem;
+            font-size: 0.76rem;
             font-weight: 600;
             color: $gray-700;
         }
     }
 
-    /* ── 거래량 + 시그널 ── */
-    .signal-row {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
-        border-bottom: 1px solid $gray-200;
-
-        .stat-item {
-            padding: 9px 0;
-            text-align: center;
-
-            &:not(:last-child) { border-right: 1px solid $gray-200; }
-        }
-
-        .stat-label {
-            display: block;
-            font-size: 0.65rem;
-            color: $gray-500;
-            margin-bottom: 3px;
-        }
-
-        .stat-value {
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: $gray-900;
-
-            &.val-navy  { color: $navy; }
-            &.val-gray  { color: $gray-400; }
-            &.val-score { color: $amber; font-size: 1rem; }
-        }
-    }
-
-    /* ── 펀더멘털 ── */
-    .fundamental-row {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr);
-        border-bottom: 1px solid $gray-200;
-        background: $gray-50;
-
-        .fund-item {
-            padding: 8px 0;
-            text-align: center;
-
-            &:not(:last-child) { border-right: 1px solid $gray-200; }
-        }
-
-        .fund-label {
-            display: block;
-            font-size: 0.62rem;
-            color: $gray-500;
-            font-weight: 600;
-            margin-bottom: 3px;
-        }
-
-        .fund-value {
-            font-size: 0.82rem;
-            font-weight: 700;
-            color: $gray-700;
-        }
-    }
-
-    /* ── Chips ── */
-    .chip-row {
+    /* ── 근거 · 조건 펼치기 ── */
+    .detail-toggle {
         display: flex;
-        flex-wrap: wrap;
+        align-items: center;
         gap: 6px;
-        padding: 10px 16px;
+        width: 100%;
+        padding: 8px 14px;
+        border: none;
+        border-top: 1px solid $gray-100;
+        background: none;
+        color: $gray-500;
+        font-family: inherit;
+        font-size: 0.74rem;
+        font-weight: 600;
+        text-align: left;
+        cursor: pointer;
 
-        .chip {
+        &:hover { color: $blue; }
+
+        .arrow {
+            display: inline-block;
+            font-size: 0.6rem;
+            transition: transform .15s;
+
+            &.open { transform: rotate(90deg); }
+        }
+    }
+
+    /* ── 근거 상세 패널 ── */
+    .detail-panel {
+        padding: 4px 14px 12px;
+        background: $gray-50;
+        text-align: left;
+
+        .detail-group {
+            margin-top: 10px;
+
+            &:first-child { margin-top: 0; }
+        }
+
+        .detail-group-title {
             font-size: 0.72rem;
-            font-weight: 600;
-            padding: 3px 9px;
-            border-radius: 0.3rem;
-            background: $gray-100;
+            font-weight: 700;
             color: $gray-500;
-            border: 1px solid $gray-200;
+            margin-bottom: 4px;
+        }
 
-            &.on {
-                background: #dbe4ff;
-                color: $navy;
-                border-color: #bac8ff;
+        .detail-row {
+            display: grid;
+            grid-template-columns: 5.5rem 3.5rem 1fr;
+            gap: 8px;
+            align-items: start;
+            padding: 6px 0;
+            border-top: 1px solid $gray-100;
+
+            &:first-of-type { border-top: none; }
+        }
+
+        .detail-row-name {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: $gray-900;
+        }
+
+        .detail-row-verdict {
+            font-size: 0.7rem;
+            font-weight: 700;
+
+            &.pass    { color: $navy; }
+            &.fail    { color: $red; }
+            &.neutral { color: $gray-400; }
+        }
+
+        .detail-row-desc {
+            font-size: 0.76rem;
+            color: $gray-500;
+            line-height: 1.4;
+        }
+
+        @media (max-width: 480px) {
+            .detail-row {
+                grid-template-columns: 1fr;
+                gap: 2px;
             }
         }
     }
@@ -899,21 +1062,14 @@ $amber:   #e67700;
     /* ── Footer ── */
     .card-footer {
         display: flex;
-        justify-content: space-between;
+        justify-content: flex-end;
         align-items: center;
-        padding: 10px 16px;
+        padding: 6px 14px;
         background: $gray-50;
         border-top: 1px solid $gray-100;
 
-        .action-type {
-            font-size: 0.78rem;
-            font-weight: 700;
-            color: $red;
-            text-transform: uppercase;
-        }
-
         .timestamp {
-            font-size: 0.78rem;
+            font-size: 0.72rem;
             color: $gray-500;
         }
     }

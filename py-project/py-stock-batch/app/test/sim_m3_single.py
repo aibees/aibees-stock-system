@@ -33,7 +33,7 @@ sim_m3_simple_trade.py 는 두 종목을 **교대**로 운용한다(둘 중 하�
 import argparse
 import itertools
 
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 from app.test import sim_m3_alternate as sim
 from app.test.sim_m3_simple_trade import _f
 from stock_shared.strategy.backtester import KisBacktester

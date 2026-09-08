@@ -11,9 +11,9 @@ import logging
 
 from app.common.utils.telegramUtils import telegramUtils
 # [추가] 체결 push — worker 소유자(user_id) 1명에게만 보낸다(broadcast 아님).
-# get_session()은 job.py 가 쓰는 것과 같은 dbConn(app.config.database)을 감싼
+# get_session()은 job.py 가 쓰는 것과 같은 dbConn(stock_shared.db.database)을 감싼
 # contextmanager 라 커넥션 풀을 새로 만들지 않는다.
-from app.config.contextManager import get_session
+from stock_shared.db.contextManager import get_session
 from app.batches.services.notifyService import notifyService
 
 log = logging.getLogger("trade_worker.notify")

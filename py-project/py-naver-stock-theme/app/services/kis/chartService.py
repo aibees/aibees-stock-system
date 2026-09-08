@@ -1,7 +1,7 @@
 import requests
 from datetime import datetime, timedelta
 
-from app.config.db.database import dbConn
+from stock_shared.db.database import dbConn
 from app.utils.mariaEnv import MariaEnv
 from app.services.kis.oauthService import KisAuthService
 from app.domains.dao.masterHolidayDao import MasterHolidayDao

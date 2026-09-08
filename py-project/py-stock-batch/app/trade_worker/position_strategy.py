@@ -18,7 +18,7 @@ import logging
 from datetime import date, timedelta
 
 from app.batches.services.userService import UserService
-from app.config.contextManager import get_session
+from stock_shared.db.contextManager import get_session
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.ext_services.kis.component.KisStockService import KisService
 from stock_shared.strategy import STRATEGY_BY_MODE

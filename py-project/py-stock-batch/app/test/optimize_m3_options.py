@@ -26,7 +26,7 @@ import argparse
 import itertools
 import time
 
-from app.config.database import dbConn
+from stock_shared.db.database import dbConn
 from app.test import sim_m3_alternate as sim
 from stock_shared.strategy.m3_alternate import ScoreConfig
 

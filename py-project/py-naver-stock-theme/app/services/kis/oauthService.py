@@ -1,7 +1,7 @@
 import requests
 from datetime import datetime
 
-from app.config.db.database import dbConn
+from stock_shared.db.database import dbConn
 from app.domains.dao.masterInfoDao import MasterInfosDao
 from app.utils.mariaEnv import MariaEnv
 
