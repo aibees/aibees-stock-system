@@ -30,7 +30,7 @@
     background-color: #2c2c2c;
     color: #fafafa;
     /* 밝고 부드러운 회색 계열 배경 */
-    border-radius: 10px;
+    border-radius: 0;
     padding: 1rem 1.5rem;
     // color: #333;
     /* 다크 그레이 */

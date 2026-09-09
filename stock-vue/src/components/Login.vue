@@ -287,11 +287,11 @@ const keyDownEvt = () => {
 </script>
 
 <style scoped lang="scss">
-/* ===== Tokens ===== */
-$bg: #212121;
-$card: #1d1f23;
-$text: #e9edf4;
-$muted: #a6afbd;
+/* ===== Tokens (무채색) ===== */
+$bg: #1a1a1a;
+$card: #1e1e1e;
+$text: #ececec;
+$muted: #9a9a9a;
 $border: rgba(255, 255, 255, 0.08);
 
 /* ===== Layout ===== */
@@ -308,18 +308,16 @@ $border: rgba(255, 255, 255, 0.08);
     padding: 24px 20px;
     /* <- 여기서 L/R 패딩 조절 */
 
-    /* 기존 배경은 유지 */
-    background: radial-gradient(1200px 600px at 20% -10%, #2c2f36 0%, transparent 60%),
-        radial-gradient(900px 600px at 100% 100%, #1b1d22 0%, transparent 60%),
-        #212121;
+    /* 무채색 배경 — 컬러 그라디언트 제거, 단색 다크 그레이 */
+    background: $bg;
     overflow: hidden;
 }
 
-/* 배경 블롭 위치는 그대로 사용 */
+/* 배경 블롭 — 컬러 제거, 무채색 음영만 */
 .bg .blob {
     position: absolute;
     filter: blur(60px);
-    opacity: .35;
+    opacity: .25;
     pointer-events: none;
 }
 
@@ -327,7 +325,7 @@ $border: rgba(255, 255, 255, 0.08);
     width: 480px;
     height: 480px;
     border-radius: 50%;
-    background: #4052ff;
+    background: #4a4a4a;
     top: -120px;
     left: -120px;
 }
@@ -336,7 +334,7 @@ $border: rgba(255, 255, 255, 0.08);
     width: 520px;
     height: 520px;
     border-radius: 50%;
-    background: #00c781;
+    background: #2e2e2e;
     bottom: -160px;
     right: -160px;
 }
@@ -348,10 +346,8 @@ $border: rgba(255, 255, 255, 0.08);
     /* 필요시 440~480px로 넓혀도 OK */
     margin: 0 auto;
     /* 혹시 모를 중앙정렬 보강 */
-    background: #1d1f23;
+    background: $card;
     border: 1px solid rgba(255, 255, 255, .08);
-    border-radius: 16px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, .35);
     padding: 28px 24px 22px;
     text-align: center;
 }
@@ -365,7 +361,6 @@ $border: rgba(255, 255, 255, 0.08);
     .btn {
         width: 100%;
         height: 48px;
-        border-radius: 12px;
         border: 1px solid transparent;
         font-weight: 800;
         font-size: 0.98rem;
@@ -394,7 +389,6 @@ $border: rgba(255, 255, 255, 0.08);
         .icon {
             width: 22px;
             height: 22px;
-            border-radius: 6px;
             display: inline-grid;
             place-items: center;
             font-size: 0.9rem;
@@ -403,18 +397,19 @@ $border: rgba(255, 255, 255, 0.08);
         }
     }
 
-    /* 브랜드 버튼 */
+    /* 브랜드 버튼 — 이메일(자체 UI)은 무채색, 네이버/카카오는 플랫폼 브랜드
+       가이드라인상 고유 색상을 유지한다(회색으로 바꾸면 인지·신뢰도가 떨어짐). */
     .brand.email {
         background: #ebebeb;
-        color: #444444;
+        color: #333333;
         border-color: rgba(0, 0, 0, 0.08);
 
         .icon {
-            background: #ffbf5e29;
+            background: rgba(0, 0, 0, 0.1);
         }
 
         &:hover {
-            box-shadow: 0 6px 18px rgba(3, 199, 90, 0.35);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
         }
     }
 
@@ -450,8 +445,7 @@ $border: rgba(255, 255, 255, 0.08);
         width: 100%;
         overflow: hidden;
         height: 0px;
-        border-radius: 12px;
-        background: #ffeed5;
+        background: #ebebeb;
         transition: height 0.4s ease;
         font-size: 0.9rem;
         font-weight: 900;
@@ -464,9 +458,8 @@ $border: rgba(255, 255, 255, 0.08);
             .label {
                 width: 50px;
                 padding-top: 1px;
-                border-radius: 6px;
-                color: black;
-                background-color: #ffbb6d;
+                color: #ffffff;
+                background-color: #333333;
             }
 
             input {
@@ -490,16 +483,16 @@ $border: rgba(255, 255, 255, 0.08);
 
             button {
                 padding: 4px 12px;
-                border-radius: 6px;
                 border: 1px solid rgb(231, 231, 231);
                 font-weight: 800;
                 font-size: 0.98rem;
                 letter-spacing: 0.1px;
-                background-color: #ffbb6d;
+                background-color: #333333;
+                color: #ffffff;
 
                 &:hover {
                     cursor: pointer;
-                    background-color: #f5a040;
+                    background-color: #000000;
                     transition: background-color 0.4s ease;
                 }
             }
@@ -529,7 +522,7 @@ $border: rgba(255, 255, 255, 0.08);
             input[type='checkbox'] {
                 width: 14px;
                 height: 14px;
-                accent-color: #f5a040;
+                accent-color: #333333;
                 cursor: pointer;
             }
         }
@@ -551,12 +544,12 @@ $border: rgba(255, 255, 255, 0.08);
 
     .reset-notice {
         padding: 10px 14px;
-        border-radius: 8px;
-        background: rgba(255, 80, 80, 0.12);
-        border: 1px solid rgba(255, 80, 80, 0.35);
-        color: #ff8080;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-left: 3px solid $text;
+        color: $text;
         font-size: 13px;
-        font-weight: 600;
+        font-weight: 700;
     }
 
     .hint {
@@ -593,10 +586,8 @@ $border: rgba(255, 255, 255, 0.08);
 .modal-card {
     width: 100%;
     max-width: 400px;
-    background: #1d1f23;
+    background: #1e1e1e;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     padding: 28px 24px 22px;
     display: flex;
     flex-direction: column;
@@ -606,13 +597,14 @@ $border: rgba(255, 255, 255, 0.08);
 .modal-title {
     font-size: 1.1rem;
     font-weight: 800;
-    color: #e9edf4;
+    color: #ececec;
     margin: 0;
 }
 
 .modal-desc {
     font-size: 0.85rem;
-    color: #ff8080;
+    color: #ececec;
+    font-weight: 700;
     margin: 0;
     line-height: 1.5;
 }
@@ -626,32 +618,32 @@ $border: rgba(255, 255, 255, 0.08);
 .field-label {
     font-size: 0.8rem;
     font-weight: 700;
-    color: #a6afbd;
+    color: #9a9a9a;
 }
 
 .field-input {
     height: 42px;
-    background: #16181c;
+    background: #161616;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    color: #e9edf4;
+    color: #ececec;
     padding: 0 12px;
     font-size: 0.9rem;
     transition: border-color 0.15s;
 
     &::placeholder {
-        color: #555c6a;
+        color: #6b6b6b;
     }
 
     &:focus {
         outline: none;
-        border-color: rgba(64, 82, 255, 0.6);
+        border-color: rgba(255, 255, 255, 0.5);
     }
 }
 
 .field-error {
     font-size: 0.75rem;
-    color: #ff8080;
+    color: #ececec;
+    font-weight: 700;
     margin: 0;
 }
 
@@ -663,7 +655,6 @@ $border: rgba(255, 255, 255, 0.08);
     .modal-btn {
         flex: 1;
         height: 42px;
-        border-radius: 10px;
         border: none;
         font-weight: 800;
         font-size: 0.9rem;
@@ -685,16 +676,16 @@ $border: rgba(255, 255, 255, 0.08);
 
         &.cancel {
             background: rgba(255, 255, 255, 0.06);
-            color: #a6afbd;
+            color: #9a9a9a;
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         &.confirm {
-            background: #4052ff;
-            color: #fff;
+            background: #ececec;
+            color: #141414;
 
             &:hover:not(:disabled) {
-                background: #5060ff;
+                background: #ffffff;
             }
         }
     }

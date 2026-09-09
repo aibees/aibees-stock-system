@@ -31,7 +31,7 @@
     color: #fafafa;
     padding: 0.6rem 1rem;
     border: none;
-    border-radius: 10px;
+    border-radius: 0;
     font-size: 15px;
     cursor: pointer;
     transition: background-color 0.2s;
@@ -46,10 +46,10 @@
 }
 
 .save {
-    background-color: #2db400;
+    background-color: #141414;
 
     &:hover {
-        background-color: #2c9409;
+        background-color: #000000;
     }
 }
 

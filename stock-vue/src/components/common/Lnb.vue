@@ -32,13 +32,18 @@
 
     <!-- ── Mobile: 하단 탭 바 ── -->
     <div id="comm-lnb">
-        <div class="left">
-            <div @click="goPath('/home')">
+        <div class="left" @click="goPath('/home')">
+            <div>
                 <font-awesome-icons :icon="['fa-solid', 'fa-home']" />
             </div>
         </div>
-        <div class="right">
-            <div @click="goPath('/menu')">
+        <div class="left" @click="goPath('/trade')">
+            <div>
+                <font-awesome-icons :icon="['fa-solid', 'fa-computer']" />
+            </div>
+        </div>
+        <div class="right" @click="goPath('/menu')">
+            <div>
                 <font-awesome-icons :icon="['fa-solid', 'fa-bars']" />
             </div>
         </div>
@@ -132,8 +137,8 @@ console.log(userSession.getRole);
     position: sticky;
     top: 0;
     z-index: 900;
-    background: #1c3d6e;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
+    background: $dc-gray-900;
+    border-bottom: 1px solid $dc-black;
 
     @include mobile {
         display: block;
@@ -154,7 +159,7 @@ console.log(userSession.getRole);
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #fff;
+    color: $dc-white;
     font-weight: 700;
     font-size: 0.92rem;
     white-space: nowrap;
@@ -191,7 +196,7 @@ console.log(userSession.getRole);
         gap: 6px;
         height: 100%;
         padding: 0 14px;
-        color: rgba(255, 255, 255, .82);
+        color: rgba($dc-white, .72);
         font-size: 0.86rem;
         font-weight: 600;
         white-space: nowrap;
@@ -201,8 +206,8 @@ console.log(userSession.getRole);
 
     &:hover .lnb-item-label,
     &.active .lnb-item-label {
-        color: #fff;
-        border-bottom-color: #4dabf7;
+        color: $dc-white;
+        border-bottom-color: $dc-white;
     }
 
     .caret {
@@ -226,33 +231,30 @@ console.log(userSession.getRole);
     top: 100%;
     left: 0;
     min-width: 180px;
-    background: #fff;
-    border: 1px solid #e9ecef;
-    border-radius: 0 0 0.5rem 0.5rem;
+    background: $dc-white;
+    border: 1px solid $dc-gray-200;
     box-shadow: 0 10px 24px rgba(0, 0, 0, .12);
     list-style: none;
     margin: 0;
-    padding: 6px;
+    padding: 0;
     z-index: 950;
 
     li {
         padding: 9px 12px;
         font-size: 0.82rem;
         font-weight: 500;
-        color: #333333;
-        border-radius: 0.35rem;
+        color: $dc-gray-900;
         cursor: pointer;
         white-space: nowrap;
         transition: background .12s, color .12s;
 
         &:hover {
-            background: #f1f5fb;
-            color: #1971c2;
+            background: $dc-gray-50;
         }
 
         &.active {
-            background: #e7f0fd;
-            color: #1c3d6e;
+            background: $dc-gray-900;
+            color: $dc-white;
             font-weight: 700;
         }
     }
@@ -275,7 +277,7 @@ console.log(userSession.getRole);
     white-space: nowrap;
 
     .lnb-user {
-        color: rgba(255, 255, 255, .85);
+        color: rgba($dc-white, .78);
         font-size: 0.8rem;
         font-weight: 600;
     }
@@ -294,33 +296,33 @@ console.log(userSession.getRole);
     // [수정] 헤더와 통일 — 검정 배경 대신 앱 배경(흰색)에 상단 border로 구분.
     // fixed 라서 스크롤되는 컨텐츠가 밑에서 올라올 수 있어 완전 투명은 피하고
     // 불투명한 흰색으로 뒀음(헤더는 relative라 투명해도 안전, 여긴 다름).
-    background-color: #ffffff;
-    border-top: 1px solid #1c3d6e; // [수정] "매도신호 신청" 버튼과 동일한 $navy
-    // [수정] 상하 여백 축소: 8px → 4px
-    padding: 0.5rem 0;
+    background-color: $dc-white;
+    border-top: 1px solid $dc-gray-900;
+    padding: 0;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    align-items: stretch;
     z-index: 1000;
     font-size: 1.4rem;
-    color: #1a1a1a; // [수정] white → 다크(흰 배경이라)
+    color: $dc-gray-900;
 
     @include mobile {
         display: none;
     }
 
-    .left {
-        // [수정] 상하 여백 축소: 0.4rem → 0.15rem
-        padding: 0.15rem 3rem;
-    }
-
+    // [수정] 간격 없이 꽉 채움 — 각 클릭 영역이 동일 너비로 나눠 가짐
+    .left,
     .right {
-        width: 1.8rem;
-        // [수정] 상하 여백 축소: 0.4rem → 0.15rem
-        padding: 0.15rem 3rem;
+        flex: 1;
+        width: auto;
+        padding: 0;
         display: flex;
-        justify-content: end;
+        justify-content: center;
         align-items: center;
+        border-right: 1px solid $dc-gray-200;
+
+        &:last-child {
+            border-right: none;
+        }
     }
 }
 </style>

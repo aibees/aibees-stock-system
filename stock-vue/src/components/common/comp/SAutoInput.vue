@@ -98,9 +98,9 @@ const selectItem = async (data) => {
 
 <style lang="scss" scoped>
 /* 테마에 맞는 컬러 변수 (프로젝트에 글로벌 변수가 있다면 교체하세요) */
-$bg-card: #2a2d34;
-$border-soft: #4a4d55;
-$color-accent: #00e5ff;
+$bg-card: #2b2b2b;
+$border-soft: #4d4d4d;
+$color-accent: #141414;
 $text-light: #ffffff;
 $text-dark: #000000;
 $hover-bg: rgba(0, 229, 255, 0.15);
@@ -117,7 +117,7 @@ $hover-bg: rgba(0, 229, 255, 0.15);
         background: $bg-card;
         margin: auto;
         padding: 6px 6px 6px 18px;
-        border-radius: 16px;
+        border-radius: 0;
         border: 1px solid $border-soft;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 
@@ -127,10 +127,10 @@ $hover-bg: rgba(0, 229, 255, 0.15);
         }
 
         .label-badge {
-            background-color: #52a703;
+            background-color: #141414;
             color: white;
             padding: 4px 10px;
-            border-radius: 8px;
+            border-radius: 0;
             font-size: 0.8rem;
             font-weight: 600;
             margin-right: 10px;
@@ -173,7 +173,7 @@ $hover-bg: rgba(0, 229, 255, 0.15);
             color: $text-dark;
             border: none;
             padding: 10px 20px;
-            border-radius: 12px;
+            border-radius: 0;
             font-weight: 800;
             cursor: pointer;
             transition: transform 0.2s;
@@ -193,7 +193,7 @@ $hover-bg: rgba(0, 229, 255, 0.15);
         width: 100%;
         background-color: $bg-card;
         border: 1px solid $border-soft;
-        border-radius: 12px;
+        border-radius: 0;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         z-index: 999;
         overflow: hidden;
@@ -255,7 +255,7 @@ $hover-bg: rgba(0, 229, 255, 0.15);
             }
             &::-webkit-scrollbar-thumb {
                 background: #555;
-                border-radius: 3px;
+                border-radius: 0;
             }
 
             .list-item {

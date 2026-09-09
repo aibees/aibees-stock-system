@@ -412,18 +412,19 @@ const executeBatch = async () => {
 
 <style scoped lang="scss">
 $white: #ffffff;
-$gray-50: #f8f9fa;
-$gray-100: #ebebeb;
-$gray-200: #d0d0d0;
-$gray-400: #909090;
-$gray-500: #6b6b6b;
-$gray-700: #333333;
-$gray-900: #111111;
-$blue: #1971c2;
-$navy: #1c3d6e;
-$red: #c92a2a;
-$amber: #e67700;
-$green: #2f9e44;
+$gray-50: #fafafa;
+$gray-100: #efefef;
+$gray-200: #dcdcdc;
+$gray-300: #c4c4c4;
+$gray-400: #9a9a9a;
+$gray-500: #737373;
+$gray-700: #3d3d3d;
+$gray-900: #141414;
+$blue: #141414;
+$navy: #141414;
+$red: #141414;
+$amber: #141414;
+$green: #141414;
 
 #batch-setting {
     min-height: 100vh;
@@ -480,7 +481,7 @@ $green: #2f9e44;
     background: $white;
     color: $gray-700;
     border: 1px solid $gray-200;
-    border-radius: 0.4rem;
+    border-radius: 0;
     font-size: 0.84rem;
     font-weight: 600;
     cursor: pointer;
@@ -522,7 +523,7 @@ $green: #2f9e44;
     background: $navy;
     color: $white;
     border: none;
-    border-radius: 0.4rem;
+    border-radius: 0;
     font-size: 0.84rem;
     font-weight: 600;
     cursor: pointer;
@@ -530,7 +531,7 @@ $green: #2f9e44;
     transition: background .15s;
 
     &:hover {
-        background: darken(#1c3d6e, 6%);
+        background: #000000;
     }
 }
 
@@ -538,7 +539,7 @@ $green: #2f9e44;
 .table-section {
     background: $white;
     border: 1px solid $gray-200;
-    border-radius: 0.6rem;
+    border-radius: 0;
     overflow: hidden;
     overflow-x: auto;
 
@@ -632,18 +633,18 @@ $green: #2f9e44;
     background: $gray-100;
     color: $gray-700;
     padding: 2px 7px;
-    border-radius: 0.3rem;
+    border-radius: 0;
     border: 1px solid $gray-200;
     word-break: break-all;
 }
 
 .cron-chip {
     font-size: 0.72rem;
-    background: #dbe4ff;
+    background: #efefef;
     color: $navy;
     padding: 2px 7px;
-    border-radius: 0.3rem;
-    border: 1px solid #bac8ff;
+    border-radius: 0;
+    border: 1px solid #c4c4c4;
     font-family: 'SFMono-Regular', Consolas, monospace;
     white-space: nowrap;
 }
@@ -661,7 +662,7 @@ $green: #2f9e44;
     position: relative;
     width: 36px;
     height: 20px;
-    border-radius: 10px;
+    border-radius: 0;
     border: none;
     cursor: pointer;
     transition: background .2s;
@@ -686,7 +687,7 @@ $green: #2f9e44;
         top: 3px;
         width: 14px;
         height: 14px;
-        border-radius: 50%;
+        border-radius: 0;
         background: $white;
         transition: left .2s;
     }
@@ -707,7 +708,7 @@ $green: #2f9e44;
     font-size: 0.75rem;
     font-weight: 600;
     border: 1px solid $gray-200;
-    border-radius: 0.3rem;
+    border-radius: 0;
     background: $white;
     color: $gray-700;
     cursor: pointer;
@@ -739,7 +740,7 @@ $green: #2f9e44;
 .skeleton-row {
     height: 42px;
     background: $gray-100;
-    border-radius: 0.4rem;
+    border-radius: 0;
     margin-bottom: 6px;
     animation: pulse 1.6s infinite ease-in-out;
 }
@@ -772,7 +773,7 @@ $green: #2f9e44;
 .batch-li {
     background: $white;
     border: 1px solid $gray-200;
-    border-radius: 0.6rem;
+    border-radius: 0;
     padding: 14px;
 
     &.li-disabled {
@@ -834,7 +835,7 @@ $green: #2f9e44;
 
 .popup-panel {
     background: $white;
-    border-radius: 0.7rem;
+    border-radius: 0;
     width: 100%;
     max-width: 560px;
     max-height: 90vh;
@@ -868,7 +869,7 @@ $green: #2f9e44;
         cursor: pointer;
         color: $gray-400;
         padding: 4px;
-        border-radius: 0.3rem;
+        border-radius: 0;
         display: flex;
         align-items: center;
         flex-shrink: 0;
@@ -916,7 +917,7 @@ $green: #2f9e44;
         input:not([type="radio"]) {
             padding: 8px 10px;
             border: 1px solid $gray-200;
-            border-radius: 0.4rem;
+            border-radius: 0;
             font-size: 0.84rem;
             color: $gray-900;
             font-family: inherit;
@@ -966,7 +967,7 @@ $green: #2f9e44;
     .json-area {
         padding: 10px;
         border: 1px solid $gray-200;
-        border-radius: 0.4rem;
+        border-radius: 0;
         font-size: 0.82rem;
         font-family: 'SFMono-Regular', Consolas, monospace;
         color: $gray-900;
@@ -997,7 +998,7 @@ $green: #2f9e44;
     .btn-cancel {
         padding: 8px 18px;
         border: 1px solid $gray-200;
-        border-radius: 0.4rem;
+        border-radius: 0;
         background: $white;
         color: $gray-700;
         font-size: 0.84rem;
@@ -1014,7 +1015,7 @@ $green: #2f9e44;
     .btn-save {
         padding: 8px 20px;
         border: none;
-        border-radius: 0.4rem;
+        border-radius: 0;
         background: $navy;
         color: $white;
         font-size: 0.84rem;
@@ -1024,7 +1025,7 @@ $green: #2f9e44;
         transition: background .15s;
 
         &:hover {
-            background: darken(#1c3d6e, 6%);
+            background: #000000;
         }
 
         &:disabled {

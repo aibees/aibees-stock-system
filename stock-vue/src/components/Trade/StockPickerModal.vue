@@ -72,11 +72,12 @@ const close = () => emit('close');
 </script>
 
 <style scoped lang="scss">
-$gray-100: #ebebeb;
-$gray-200: #d0d0d0;
-$gray-500: #6b6b6b;
-$gray-900: #111111;
-$blue: #1971c2;
+// 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
+$gray-100: #efefef;
+$gray-200: #dcdcdc;
+$gray-500: #737373;
+$gray-900: #141414;
+$blue: #141414;
 
 .picker-overlay {
     position: fixed;
@@ -91,9 +92,8 @@ $blue: #1971c2;
 .picker-panel {
     width: min(460px, 92vw);
     background: #fff;
-    border-radius: 12px;
+    border: 1px solid $gray-200;
     overflow: hidden;
-    box-shadow: 0 18px 48px rgba(0, 0, 0, .22);
 }
 
 .picker-header {
@@ -128,7 +128,6 @@ $blue: #1971c2;
         flex: 1;
         height: 36px;
         border: 1px solid $gray-200;
-        border-radius: 8px;
         padding: 0 10px;
         font-size: .86rem;
     }
@@ -137,7 +136,6 @@ $blue: #1971c2;
         height: 36px;
         padding: 0 16px;
         border: 0;
-        border-radius: 8px;
         background: $blue;
         color: #fff;
         font-size: .84rem;
@@ -158,12 +156,11 @@ $blue: #1971c2;
         align-items: center;
         gap: 10px;
         padding: 10px 12px;
-        border-radius: 8px;
         cursor: pointer;
         font-size: .86rem;
 
         &:hover {
-            background: #f1f5f9;
+            background: $gray-100;
         }
 
         &.empty {
@@ -181,7 +178,6 @@ $blue: #1971c2;
     .code-chip {
         font-family: monospace;
         background: $gray-100;
-        border-radius: 6px;
         padding: 2px 6px;
         font-size: .78rem;
     }

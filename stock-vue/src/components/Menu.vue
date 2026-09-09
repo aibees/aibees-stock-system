@@ -125,16 +125,17 @@
 
 <style lang="scss" scoped>
 $white:    #ffffff;
-$gray-50:  #f8f9fa;
-$gray-100: #ebebeb;
-$gray-200: #d0d0d0;
-$gray-400: #909090;
-$gray-500: #6b6b6b;
-$gray-700: #333333;
-$gray-900: #111111;
-$blue:     #1971c2;
-$navy:     #1c3d6e;
-$red:      #c92a2a;
+$gray-50:  #fafafa;
+$gray-100: #efefef;
+$gray-200: #dcdcdc;
+$gray-300: #c4c4c4;
+$gray-400: #9a9a9a;
+$gray-500: #737373;
+$gray-700: #3d3d3d;
+$gray-900: #141414;
+$blue:     #141414;
+$navy:     #141414;
+$red:      #141414;
 
 .common-menu {
     display: flex;
@@ -160,7 +161,7 @@ $red:      #c92a2a;
         gap: 6px;
         padding: 6px 12px;
         border: 1px solid $gray-200;
-        border-radius: 0.4rem;
+        border-radius: 0;
         background: $white;
         color: $gray-700;
         font-size: 0.82rem;
@@ -187,7 +188,7 @@ $red:      #c92a2a;
     padding: 14px 16px;
     background: $gray-50;
     border: 1px solid $gray-200;
-    border-radius: 0.6rem;
+    border-radius: 0;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -196,7 +197,7 @@ $red:      #c92a2a;
     .user-avatar {
         width: 38px;
         height: 38px;
-        border-radius: 50%;
+        border-radius: 0;
         background: $navy;
         color: $white;
         font-size: 1rem;
@@ -237,10 +238,10 @@ $red:      #c92a2a;
             font-size: 0.68rem;
             font-weight: 700;
             padding: 2px 8px;
-            border-radius: 0.3rem;
-            background: #dbe4ff;
+            border-radius: 0;
+            background: #efefef;
             color: $navy;
-            border: 1px solid #bac8ff;
+            border: 1px solid #c4c4c4;
             text-transform: uppercase;
         }
     }
@@ -265,7 +266,7 @@ $red:      #c92a2a;
         box-sizing: border-box;
         padding: 8px 12px 8px 32px;
         border: 1px solid $gray-200;
-        border-radius: 0.4rem;
+        border-radius: 0;
         background: $gray-50;
         font-size: 0.83rem;
         color: $gray-900;
@@ -312,7 +313,7 @@ $red:      #c92a2a;
     }
 
     .sub-li {
-        border-radius: 0.4rem;
+        border-radius: 0;
         overflow: hidden;
     }
 
@@ -321,7 +322,7 @@ $red:      #c92a2a;
         flex-direction: column;
         padding: 9px 12px;
         cursor: pointer;
-        border-radius: 0.4rem;
+        border-radius: 0;
         transition: background .12s;
 
         &:hover {
@@ -329,7 +330,7 @@ $red:      #c92a2a;
         }
 
         &:active {
-            background: #dbe4ff;
+            background: #efefef;
         }
 
         .link-title {

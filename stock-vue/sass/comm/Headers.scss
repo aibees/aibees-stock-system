@@ -9,7 +9,7 @@
     // 저절로 맞춰지기 때문 — hex를 박아두면 나중에 페이지 배경이 바뀔 때
     // 헤더만 따로 겉돌 수 있음.
     background-color: transparent;
-    border-bottom: 2px solid #1c3d6e; // [수정] "매도신호 신청" 버튼과 동일한 $navy
+    border-bottom: 2px solid $dc-gray-900;
     width: 100%;
     height: 50px;
     // box-sizing: content-box;
@@ -24,7 +24,7 @@
 
         .title {
             font-size: 1rem;
-            color: #1a1a1a; // [수정] white → 어두운 배경 아니라서 흰 글씨는 안 보임
+            color: $dc-gray-900; // [수정] white → 어두운 배경 아니라서 흰 글씨는 안 보임
             font-weight: bold;
             margin-left: 20px;
         }
@@ -37,7 +37,7 @@
             margin-right: 10px;
 
             .nav-item {
-                color: #1a1a1a; // [수정] white → 다크
+                color: $dc-gray-900; // [수정] white → 다크
                 font-weight: 600;
                 cursor: pointer;
                 font-size: 15px;
@@ -67,7 +67,7 @@
         .group,
         .users {
             cursor: pointer;
-            color: #1a1a1a; // [추가] #app 전역 color(#f7f7f7, 거의 흰색)를 상속받아
+            color: $dc-gray-900; // [추가] #app 전역 color(#f7f7f7, 거의 흰색)를 상속받아
                             // 밝은 배경에서 안 보이던 문제 — 명시적으로 다크 지정
 
             div {
@@ -85,7 +85,7 @@
                         display: inline-flex;
                         align-items: center;
                         gap: 6px;
-                        color: #1a1a1a; // [수정] white → 다크
+                        color: $dc-gray-900; // [수정] white → 다크
                         font-weight: 400;
                         background: transparent;
                         border: 0;
@@ -98,7 +98,7 @@
                         height: 0;
                         border-left: 5px solid transparent;
                         border-right: 5px solid transparent;
-                        border-top: 6px solid #1a1a1a; // [수정] white → 다크
+                        border-top: 6px solid $dc-gray-900; // [수정] white → 다크
                         transition: transform .18s ease;
         
                         &.open {
@@ -112,12 +112,11 @@
                         right: -15px;
                         top: calc(100% + 2px);
                         min-width: 100px;
-                        background: #2b2d32;
-                        color: #e9edf4;
-                        border: 1px solid rgba(255, 255, 255, .12);
-                        border-radius: 12px;
-                        box-shadow: 0 10px 24px rgba(0, 0, 0, .25);
-                        padding: 6px 0;
+                        background: $dc-white;
+                        color: $dc-gray-900;
+                        border: 1px solid $dc-gray-200;
+                        box-shadow: 0 10px 24px rgba(0, 0, 0, .12);
+                        padding: 0;
                         z-index: 1000;
         
                         /* 공통 아이템 스타일 */
@@ -129,10 +128,10 @@
                             cursor: pointer;
         
                             &:hover {
-                                background: rgba(255, 255, 255, .06);
+                                background: $dc-gray-50;
                             }
                         }
-        
+
                         /* 프로필 헤더 (비클릭) */
                         .profile {
                             display: flex;
@@ -141,15 +140,14 @@
                             gap: 12px;
                             padding: 14px 14px;
                             cursor: default; // 클릭 아님
-        
+
                             .avatar {
                                 width: 36px;
                                 height: 36px;
-                                border-radius: 50%;
-                                background: #353842;
+                                background: $dc-gray-100;
                                 display: grid;
                                 place-items: center;
-                                color: #cfd6e7;
+                                color: $dc-gray-700;
         
                                 svg {
                                     display: block;
@@ -165,29 +163,27 @@
                                 .subtitle {
                                     margin-top: 2px;
                                     font-size: 12px;
-                                    color: #a8b0bd;
+                                    color: $dc-gray-500;
                                 }
                             }
                         }
-        
-                    
-        
+
                         /* 분리선 */
                         .separator,
                         .divider {
                             height: 1px;
-                            margin: 6px 8px;
-                            background: rgba(255, 255, 255, .08);
+                            margin: 0;
+                            background: $dc-gray-100;
                             pointer-events: none;
                             padding: 0;
                         }
-        
+
                         /* 일반 메뉴 항목 (개인설정 등) */
                         .menu-item {
                             display: flex;
                             align-items: center;
                             gap: 8px;
-                            color: #e9edf4;
+                            color: $dc-gray-900;
 
                             .icon {
                                 opacity: .85;
@@ -197,7 +193,8 @@
                         /* 위험(로그아웃) */
 
                         .logout {
-                            color: #ffb1b1;
+                            color: $dc-gray-900;
+                            font-weight: 700;
                             align-items: center;
                             gap: 8px;
                             text-align: center;;

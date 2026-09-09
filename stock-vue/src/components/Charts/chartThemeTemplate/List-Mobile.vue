@@ -203,7 +203,6 @@
         width: 95%;
         height: 57px;
         margin: 5px auto;
-        border-radius: 7px;
         background-color: #353535;
         margin-top : 100px;
 

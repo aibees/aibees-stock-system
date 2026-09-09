@@ -154,18 +154,21 @@ const rateClass = computed(() => {
 </script>
 
 <style scoped lang="scss">
+// 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
 $white: #ffffff;
-$gray-50: #f8f9fa;
-$gray-100: #ebebeb;
-$gray-200: #d0d0d0;
-$gray-400: #909090;
-$gray-500: #6b6b6b;
-$gray-900: #111111;
-$blue: #1971c2;
-$navy: #1c3d6e;
-$red: #c92a2a;
-$amber: #e67700;
-$green: #2f9e44;
+$gray-50: #fafafa;
+$gray-100: #efefef;
+$gray-200: #dcdcdc;
+$gray-300: #c4c4c4;
+$gray-400: #9a9a9a;
+$gray-500: #737373;
+$gray-700: #3d3d3d;
+$gray-900: #141414;
+$blue: #141414;
+$navy: #141414;
+$red: #141414;
+$amber: #141414;
+$green: #141414;
 
 #auto-trade-status {
     min-height: 100vh;
@@ -194,7 +197,6 @@ $green: #2f9e44;
 .sum-item {
     background: $white;
     border: 1px solid $gray-100;
-    border-radius: 12px;
     padding: 14px;
     display: flex;
     flex-direction: column;
@@ -231,7 +233,6 @@ $green: #2f9e44;
 .card {
     background: $white;
     border: 1px solid $gray-100;
-    border-radius: 12px;
     padding: 18px;
     margin-bottom: 14px;
 
@@ -264,7 +265,6 @@ $green: #2f9e44;
     .code-chip {
         font-family: monospace;
         background: $gray-100;
-        border-radius: 6px;
         padding: 2px 7px;
         font-size: .76rem;
     }
@@ -297,7 +297,7 @@ $green: #2f9e44;
 
         li {
             background: $gray-50;
-            border-radius: 8px;
+            border: 1px solid $gray-100;
             padding: 10px;
             display: flex;
             flex-direction: column;
@@ -323,8 +323,8 @@ $green: #2f9e44;
 
 /* ── [MOCK] 시뮬레이터 ── */
 .mock-card {
-    border-color: #ffe08a;
-    background: #fffdf5;
+    border-color: $gray-300;
+    background: $gray-50;
 
     .mock-desc {
         margin: 0 0 12px;
@@ -343,7 +343,6 @@ $green: #2f9e44;
         height: 36px;
         padding: 0 16px;
         border: 0;
-        border-radius: 8px;
         background: $amber;
         color: #fff;
         font-size: .8rem;
@@ -368,7 +367,7 @@ $green: #2f9e44;
     font-size: .84rem;
     color: $gray-900;
     background: $gray-50;
-    border-radius: 8px;
+    border: 1px solid $gray-100;
     padding: 12px;
     line-height: 1.5;
 }
@@ -392,7 +391,6 @@ $green: #2f9e44;
     .tl-dot {
         width: 9px;
         height: 9px;
-        border-radius: 50%;
         background: $gray-200;
         margin-top: 6px;
         flex: 0 0 auto;

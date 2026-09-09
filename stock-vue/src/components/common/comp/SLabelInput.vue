@@ -72,7 +72,7 @@ const setWidth = () => {
         padding-left: 4px;
         padding-right: 4px;
         color: white;
-        background-color: #52a703;
+        background-color: #141414;
         border-top-left-radius: 5px;
         border-bottom-left-radius: 5px;
         font-weight: 600;

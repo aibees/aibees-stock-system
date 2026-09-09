@@ -306,19 +306,21 @@ const formatDateTime = (v) => v ? String(v).replace('T', ' ').replace(/\.\d+Z?$/
 </script>
 
 <style scoped lang="scss">
+// 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
 $white: #ffffff;
-$gray-50: #f8f9fa;
-$gray-100: #ebebeb;
-$gray-200: #d0d0d0;
-$gray-400: #909090;
-$gray-500: #6b6b6b;
-$gray-700: #333333;
-$gray-900: #111111;
-$blue: #1971c2;
-$navy: #1c3d6e;
-$red: #c92a2a;
-$amber: #e67700;
-$green: #2f9e44;
+$gray-50: #fafafa;
+$gray-100: #efefef;
+$gray-200: #dcdcdc;
+$gray-300: #c4c4c4;
+$gray-400: #9a9a9a;
+$gray-500: #737373;
+$gray-700: #3d3d3d;
+$gray-900: #141414;
+$blue: #141414;
+$navy: #141414;
+$red: #141414;
+$amber: #141414;
+$green: #141414;
 
 #my-wallet {
     min-height: 100vh;
@@ -350,9 +352,9 @@ $green: #2f9e44;
 .btn-refresh {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 8px 16px; background: $navy; color: $white; border: none;
-    border-radius: 0.4rem; font-size: 0.84rem; font-weight: 600; cursor: pointer;
+    font-size: 0.84rem; font-weight: 600; cursor: pointer;
     font-family: inherit; transition: background .15s;
-    &:hover { background: darken(#1c3d6e, 6%); }
+    &:hover { background: #000000; }
 }
 
 /* Summary cards */
@@ -368,10 +370,8 @@ $green: #2f9e44;
 .s-card {
     background: $white;
     border: 1px solid $gray-200;
-    border-radius: 0.7rem;
     padding: 18px 20px;
     min-height: 92px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, .04);
 
     &.total { background: $navy; border-color: $navy; }
     &.total .s-label { color: rgba(255,255,255,.7); }
@@ -422,7 +422,6 @@ $green: #2f9e44;
 .table-section {
     background: $white;
     border: 1px solid $gray-200;
-    border-radius: 0.6rem;
     overflow: hidden;
     overflow-x: auto;
     @media (max-width: 860px) { display: none; }
@@ -469,21 +468,21 @@ $green: #2f9e44;
 
 .code-chip {
     font-size: 0.72rem; font-weight: 600; background: $gray-100; color: $gray-700;
-    padding: 2px 7px; border-radius: 0.3rem; border: 1px solid $gray-200;
+    padding: 2px 7px; border: 1px solid $gray-200;
     font-family: 'SFMono-Regular', Consolas, monospace;
 }
 
 .action-badge {
-    font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 0.3rem; white-space: nowrap;
-    &.hold { background: #e7f5ff; color: $blue; border: 1px solid #a5d8ff; }
-    &.sell { background: #ffe3e3; color: $red; border: 1px solid #ffa8a8; }
+    font-size: 0.7rem; font-weight: 700; padding: 2px 8px; white-space: nowrap;
+    &.hold { background: $gray-100; color: $gray-900; border: 1px solid $gray-300; }
+    &.sell { background: $gray-900; color: $white; border: 1px solid $gray-900; }
     &.default { background: $gray-100; color: $gray-500; border: 1px solid $gray-200; }
 }
 
 /* skeleton */
 .loader-rows { padding: 8px; }
 .skeleton-row {
-    height: 42px; background: $gray-100; border-radius: 0.4rem;
+    height: 42px; background: $gray-100;
     margin-bottom: 6px; animation: pulse 1.6s infinite ease-in-out;
 }
 .empty-cell { text-align: center; padding: 60px 0; color: $gray-400; font-size: 0.88rem; }
@@ -491,7 +490,7 @@ $green: #2f9e44;
 /* Mobile list */
 .mobile-list { display: none; @media (max-width: 860px) { display: block; } }
 .m-ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.m-li { background: $white; border: 1px solid $gray-200; border-radius: 0.6rem; padding: 14px; }
+.m-li { background: $white; border: 1px solid $gray-200; padding: 14px; }
 .li-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .li-name { font-size: 0.95rem; font-weight: 700; color: $gray-900; margin-bottom: 8px; }
 .li-name .pct { font-size: 0.82rem; margin-left: 6px; }

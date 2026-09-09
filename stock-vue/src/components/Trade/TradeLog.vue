@@ -403,19 +403,21 @@ const formatDateTime = (v) => v ? String(v).replace('T', ' ').replace(/\.\d+Z?$/
 </script>
 
 <style scoped lang="scss">
+// 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
 $white: #ffffff;
-$gray-50: #f8f9fa;
-$gray-100: #ebebeb;
-$gray-200: #d0d0d0;
-$gray-400: #909090;
-$gray-500: #6b6b6b;
-$gray-700: #333333;
-$gray-900: #111111;
-$blue: #1971c2;
-$navy: #1c3d6e;
-$red: #c92a2a;
-$amber: #e67700;
-$green: #2f9e44;
+$gray-50: #fafafa;
+$gray-100: #efefef;
+$gray-200: #dcdcdc;
+$gray-300: #c4c4c4;
+$gray-400: #9a9a9a;
+$gray-500: #737373;
+$gray-700: #3d3d3d;
+$gray-900: #141414;
+$blue: #141414;
+$navy: #141414;
+$red: #141414;
+$amber: #141414;
+$green: #141414;
 
 #trade-log {
     min-height: 100vh;
@@ -436,9 +438,9 @@ $green: #2f9e44;
 
 .btn-refresh {
     display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
-    background: $navy; color: $white; border: none; border-radius: 0.4rem;
+    background: $navy; color: $white; border: none;
     font-size: 0.84rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s;
-    &:hover { background: darken(#1c3d6e, 6%); }
+    &:hover { background: #000000; }
 }
 
 /* Tabs */
@@ -455,33 +457,33 @@ $green: #2f9e44;
 .filter-bar {
     display: flex; flex-wrap: wrap; align-items: center; gap: 18px;
     margin-bottom: 16px; padding: 14px 16px;
-    background: $white; border: 1px solid $gray-200; border-radius: 0.6rem;
+    background: $white; border: 1px solid $gray-200;
 }
 .filter-group { display: flex; align-items: center; gap: 10px; }
 .filter-label { font-size: 0.76rem; font-weight: 700; color: $gray-500; letter-spacing: .03em; }
 .chip-group { display: flex; gap: 6px; }
 .filter-chip {
-    padding: 5px 13px; border: 1px solid $gray-200; border-radius: 1rem; background: $white;
+    padding: 5px 13px; border: 1px solid $gray-200; background: $white;
     color: $gray-700; font-size: 0.78rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .12s;
     &:hover { border-color: $blue; color: $blue; }
     &.active { background: $navy; border-color: $navy; color: $white; }
 }
 .filter-input {
-    padding: 6px 10px; border: 1px solid $gray-200; border-radius: 0.4rem;
+    padding: 6px 10px; border: 1px solid $gray-200;
     font-size: 0.8rem; color: $gray-900; font-family: inherit; outline: none; transition: border-color .15s;
     &:focus { border-color: $blue; }
     &.date { padding: 5px 8px; }
 }
 .tilde { color: $gray-400; }
 .btn-apply {
-    padding: 7px 18px; border: none; border-radius: 0.4rem; background: $navy; color: $white;
+    padding: 7px 18px; border: none; background: $navy; color: $white;
     font-size: 0.82rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: background .15s;
-    &:hover { background: darken(#1c3d6e, 6%); }
+    &:hover { background: #000000; }
 }
 
 /* Table */
 .table-section {
-    background: $white; border: 1px solid $gray-200; border-radius: 0.6rem;
+    background: $white; border: 1px solid $gray-200;
     overflow: hidden; overflow-x: auto;
     @media (max-width: 860px) { display: none; }
 }
@@ -504,35 +506,36 @@ $green: #2f9e44;
 
 .code-chip {
     font-size: 0.72rem; font-weight: 600; background: $gray-100; color: $gray-700;
-    padding: 2px 7px; border-radius: 0.3rem; border: 1px solid $gray-200;
+    padding: 2px 7px; border: 1px solid $gray-200;
     font-family: 'SFMono-Regular', Consolas, monospace;
 }
 
 .action-badge, .source-badge, .status-badge {
-    font-size: 0.7rem; font-weight: 700; padding: 2px 9px; border-radius: 0.3rem; white-space: nowrap;
-    &.buy { background: #ffe3e3; color: $red; border: 1px solid #ffa8a8; }
-    &.sell { background: #d0ebff; color: $blue; border: 1px solid #74c0fc; }
-    &.holding { background: #e7f5ff; color: $blue; border: 1px solid #a5d8ff; }
+    font-size: 0.7rem; font-weight: 700; padding: 2px 9px; white-space: nowrap;
+    &.buy { background: $gray-900; color: $white; border: 1px solid $gray-900; }
+    &.sell { background: $white; color: $gray-900; border: 1px solid $gray-300; }
+    &.holding { background: $gray-100; color: $gray-900; border: 1px solid $gray-300; }
     &.sold { background: $gray-100; color: $gray-700; border: 1px solid $gray-200; }
     &.default { background: $gray-100; color: $gray-500; border: 1px solid $gray-200; }
 }
+/* 심각도를 색상 대신 명도 단계로 구분: info < warn < error */
 .level-badge {
-    font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 0.3rem; white-space: nowrap;
-    &.info { background: #d3f9d8; color: $green; border: 1px solid #8ce99a; }
-    &.warn { background: #fff0b3; color: $amber; border: 1px solid #ffd43b; }
-    &.error { background: #ffe3e3; color: $red; border: 1px solid #ffa8a8; }
+    font-size: 0.7rem; font-weight: 700; padding: 2px 8px; white-space: nowrap;
+    &.info { background: $white; color: $gray-500; border: 1px solid $gray-200; }
+    &.warn { background: $gray-100; color: $gray-900; border: 1px solid $gray-400; }
+    &.error { background: $gray-900; color: $white; border: 1px solid $gray-900; }
     &.default { background: $gray-100; color: $gray-500; border: 1px solid $gray-200; }
 }
 
 /* skeleton / empty */
 .loader-rows { padding: 8px; }
-.skeleton-row { height: 42px; background: $gray-100; border-radius: 0.4rem; margin-bottom: 6px; animation: pulse 1.6s infinite ease-in-out; }
+.skeleton-row { height: 42px; background: $gray-100; margin-bottom: 6px; animation: pulse 1.6s infinite ease-in-out; }
 .empty-cell { text-align: center; padding: 60px 0; color: $gray-400; font-size: 0.88rem; }
 
 /* Mobile */
 .mobile-list { display: none; @media (max-width: 860px) { display: block; } }
 .m-ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.m-li { background: $white; border: 1px solid $gray-200; border-radius: 0.6rem; padding: 14px; }
+.m-li { background: $white; border: 1px solid $gray-200; padding: 14px; }
 .li-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .li-badges { display: flex; gap: 6px; }
 .li-name { font-size: 0.95rem; font-weight: 700; color: $gray-900; margin-bottom: 8px; }
@@ -547,7 +550,7 @@ $green: #2f9e44;
 /* Pagination (렌더 함수 컴포넌트가 생성) */
 .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 18px; }
 :deep(.page-btn) {
-    padding: 6px 14px; border: 1px solid $gray-200; border-radius: 0.4rem; background: $white; color: $gray-700;
+    padding: 6px 14px; border: 1px solid $gray-200; background: $white; color: $gray-700;
     font-size: 0.8rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: border-color .12s, color .12s;
     &:hover:not(:disabled) { border-color: $blue; color: $blue; }
     &:disabled { opacity: .45; cursor: not-allowed; }

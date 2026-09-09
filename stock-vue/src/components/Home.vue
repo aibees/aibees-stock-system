@@ -521,20 +521,23 @@ const formatDate = (v) => v ? `${v.substring(4, 6)}/${v.substring(6, 8)}` : '';
 <style scoped lang="scss">
 @use '@@/common.scss' as *;
 
+// 무채색 팔레트(/trade 대시보드와 통일). 기존 변수명은 그대로 두고 값만 회색조로 교체 —
+// 아래에서 참조하는 모든 곳(강조색 포함)이 자동으로 무채색이 된다.
 $white:   #ffffff;
-$gray-50: #f8f9fa;
-$gray-100:#ebebeb;
-$gray-200:#d0d0d0;
-$gray-400:#909090;
-$gray-500:#6b6b6b;
-$gray-700:#333333;
-$gray-900:#111111;
-$blue:    #1971c2;
-$navy:    #1c3d6e;
-$red:     #c92a2a;
-$amber:   #e67700;
-$gold:    #c9a227;
-$bronze:  #b0703c;
+$gray-50: #fafafa;
+$gray-100:#efefef;
+$gray-200:#dcdcdc;
+$gray-300:#c4c4c4;
+$gray-400:#9a9a9a;
+$gray-500:#737373;
+$gray-700:#3d3d3d;
+$gray-900:#141414;
+$blue:    #141414;
+$navy:    #141414;
+$red:     #141414;
+$amber:   #141414;
+$gold:    #141414;
+$bronze:  #3d3d3d;
 
 #home {
     min-height: 100vh;
@@ -552,8 +555,7 @@ $bronze:  #b0703c;
     padding: 10px 12px;
     margin-bottom: 12px;
     background: $white;
-    border: 1px solid $gray-100;
-    border-radius: 12px;
+    border: 1px solid $gray-200;
 
     .sort-label {
         font-size: 0.74rem;
@@ -570,7 +572,6 @@ $bronze:  #b0703c;
     .sort-chip {
         padding: 5px 12px;
         border: 1px solid $gray-200;
-        border-radius: 999px;
         background: $white;
         color: $gray-500;
         font-size: 0.76rem;
@@ -579,12 +580,12 @@ $bronze:  #b0703c;
         white-space: nowrap;
         transition: border-color .15s, background .15s, color .15s;
 
-        &:hover { border-color: $blue; color: $blue; }
+        &:hover { border-color: $gray-900; color: $gray-900; }
 
         &.on {
-            border-color: $blue;
-            background: #e7f0fd;
-            color: $blue;
+            border-color: $gray-900;
+            background: $gray-900;
+            color: $white;
         }
     }
 
@@ -594,7 +595,6 @@ $bronze:  #b0703c;
         gap: 5px;
         padding: 5px 11px;
         border: 1px solid $gray-200;
-        border-radius: 999px;
         background: $gray-50;
         color: $gray-700;
         font-size: 0.74rem;
@@ -602,12 +602,12 @@ $bronze:  #b0703c;
         cursor: pointer;
         white-space: nowrap;
 
-        &:hover { border-color: $blue; color: $blue; }
+        &:hover { border-color: $gray-900; color: $gray-900; }
 
         .dir-arrow {
             font-size: 0.85rem;
             line-height: 1;
-            color: $blue;
+            color: $gray-900;
         }
     }
 
@@ -726,16 +726,14 @@ $bronze:  #b0703c;
     background: $navy;
     color: $white;
     border: none;
-    border-radius: 0.5rem;
     font-size: 0.86rem;
     font-weight: 700;
     cursor: pointer;
     font-family: inherit;
     white-space: nowrap;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .1);
     transition: background .15s;
 
-    &:hover { background: darken(#1c3d6e, 6%); }
+    &:hover { background: #000000; }
 }
 
 /* ── Date Picker ── */
@@ -746,13 +744,11 @@ $bronze:  #b0703c;
     gap: 8px;
     padding: 8px 14px;
     border: 1px solid $gray-200;
-    border-radius: 0.5rem;
     background: $white;
     color: $gray-700;
     font-size: 0.88rem;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0,0,0,.06);
     transition: border-color .15s;
 
     &:hover { border-color: $blue; }
@@ -777,16 +773,13 @@ $bronze:  #b0703c;
 /* ── Card ── */
 .signal-card {
     background: $white;
-    border: 1px solid $gray-100;
-    border-radius: 1rem;
+    border: 1px solid $gray-200;
     margin-bottom: 16px;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,.04);
-    transition: box-shadow .15s, border-color .15s;
+    transition: border-color .15s;
 
     &:hover {
-        box-shadow: 0 6px 20px rgba(0,0,0,.08);
-        border-color: $gray-200;
+        border-color: $gray-900;
     }
 
     /* ── 헤더: 순위 · 종목명/코드 · 액션 버튼 · 즐겨찾기 ── */
@@ -839,7 +832,6 @@ $bronze:  #b0703c;
 
         .action-btn {
             padding: 4px 9px;
-            border-radius: 0.3rem;
             font-size: 0.72rem;
             font-weight: 600;
             cursor: pointer;
@@ -850,10 +842,10 @@ $bronze:  #b0703c;
             white-space: nowrap;
 
             &.ai-btn {
-                background: #f0f4ff;
+                background: $gray-50;
                 color: $navy;
-                border-color: #bac8ff;
-                &:hover { background: #dbe4ff; }
+                border-color: $gray-300;
+                &:hover { background: $gray-200; }
             }
 
             &.chart-btn {
@@ -1084,8 +1076,7 @@ $bronze:  #b0703c;
 
 .skeleton-card {
     height: 310px;
-    background: $gray-200;
-    border-radius: 0.6rem;
+    background: $gray-100;
     animation: pulse 1.6s infinite ease-in-out;
 }
 

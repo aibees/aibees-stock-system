@@ -28,14 +28,14 @@ app.use(pinia);
 import { library } from "@fortawesome/fontawesome-svg-core";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { faMagnifyingGlass, faXmark, faMinus, faHome,
-        faPlus, faDownload, faPen, faTrash, 
+        faPlus, faDownload, faPen, faTrash, faComputer,
         faUpload, faBars, faSave, faCircleXmark, 
         faCaretLeft, faCaretRight, faBurger } from "@fortawesome/free-solid-svg-icons";
 
 library.add(faMagnifyingGlass, faXmark, faMinus, faHome,
         faPlus, faDownload, faPen, faTrash, faUpload, 
         faBars, faSave, faCircleXmark, faCaretLeft, 
-        faCaretRight, faBurger);
+        faCaretRight, faBurger, faComputer);
 app.component("font-awesome-icons", FontAwesomeIcon)
 // ===============================
 

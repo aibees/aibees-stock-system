@@ -179,17 +179,20 @@ const onCancelTier = async (tier) => {
 </script>
 
 <style scoped lang="scss">
+// 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
 $white: #ffffff;
-$gray-50: #f8f9fa;
-$gray-100: #ebebeb;
-$gray-200: #d0d0d0;
-$gray-400: #909090;
-$gray-500: #6b6b6b;
-$gray-900: #111111;
-$blue: #1971c2;
-$navy: #1c3d6e;
-$red: #c92a2a;
-$green: #2f9e44;
+$gray-50: #fafafa;
+$gray-100: #efefef;
+$gray-200: #dcdcdc;
+$gray-300: #c4c4c4;
+$gray-400: #9a9a9a;
+$gray-500: #737373;
+$gray-700: #3d3d3d;
+$gray-900: #141414;
+$blue: #141414;
+$navy: #141414;
+$red: #141414;
+$green: #141414;
 
 #auto-trade-limit {
     min-height: 100vh;
@@ -222,8 +225,7 @@ $green: #2f9e44;
 
 .card {
     background: $white;
-    border: 1px solid $gray-100;
-    border-radius: 12px;
+    border: 1px solid $gray-200;
     padding: 10px 14px;
 
     @media (max-width: 480px) {
@@ -276,7 +278,6 @@ $green: #2f9e44;
         flex: 0 0 auto;
         font-family: monospace;
         background: $gray-100;
-        border-radius: 6px;
         padding: 2px 6px;
         font-size: .72rem;
     }
@@ -301,11 +302,12 @@ $green: #2f9e44;
     white-space: nowrap;
 
     .allocated {
-        color: $blue;
+        color: $gray-700;
         font-weight: 600;
 
         &.over {
-            color: $red;
+            color: $gray-900;
+            font-weight: 800;
         }
     }
 }
@@ -336,9 +338,9 @@ $green: #2f9e44;
     flex-wrap: wrap;
     gap: 6px 10px;
     padding: 8px 10px;
-    border-radius: 8px;
     font-size: .8rem;
     background: $gray-50;
+    border: 1px solid $gray-100;
     margin-bottom: 6px;
 
     &.done {
@@ -361,23 +363,23 @@ $green: #2f9e44;
     .tier-state {
         font-size: .72rem;
         padding: 2px 8px;
-        border-radius: 999px;
         background: $gray-200;
         color: $gray-900;
 
         &.armed {
-            background: rgba(25, 113, 194, .15);
-            color: $blue;
+            background: $gray-100;
+            color: $gray-900;
+            border: 1px solid $gray-300;
         }
 
         &.done {
-            background: rgba(47, 158, 68, .15);
-            color: $green;
+            background: $gray-900;
+            color: $white;
         }
 
         &.cancelled {
-            background: $gray-100;
-            color: $gray-500;
+            background: $gray-50;
+            color: $gray-400;
         }
     }
 
@@ -400,10 +402,9 @@ $green: #2f9e44;
 .btn-tier-cancel {
     margin-left: auto;
     flex: 0 0 auto;
-    border: 1px solid $red;
+    border: 1px solid $gray-300;
     background: transparent;
-    color: $red;
-    border-radius: 6px;
+    color: $gray-700;
     padding: 4px 10px;
     font-size: .76rem;
     cursor: pointer;
@@ -419,8 +420,7 @@ $green: #2f9e44;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
     background: $gray-50;
-    border: 1px dashed $gray-200;
-    border-radius: 10px;
+    border: 1px dashed $gray-300;
     padding: 12px;
 
     @media (max-width: 480px) {
@@ -457,7 +457,6 @@ $green: #2f9e44;
         width: 100%;
         height: 36px;
         border: 1px solid $gray-200;
-        border-radius: 8px;
         padding: 0 10px;
         font-size: .84rem;
         background: $white;
@@ -467,33 +466,34 @@ $green: #2f9e44;
 .toggle-btn {
     width: 44px;
     height: 24px;
-    border-radius: 999px;
-    border: 0;
+    border: 1px solid $gray-300;
     position: relative;
     cursor: pointer;
     flex: 0 0 auto;
+    background: $white;
 
     &.active {
-        background: $green;
+        background: $gray-900;
+        border-color: $gray-900;
     }
 
     &.inactive {
-        background: $gray-200;
+        background: $white;
     }
 
     .toggle-knob {
         position: absolute;
-        top: 3px;
-        left: 3px;
+        top: 2px;
+        left: 2px;
         width: 18px;
         height: 18px;
-        border-radius: 50%;
-        background: #fff;
-        transition: transform .18s;
+        background: $gray-300;
+        transition: transform .18s, background .18s;
     }
 
     &.active .toggle-knob {
-        transform: translateX(20px);
+        transform: translateX(19px);
+        background: $white;
     }
 }
 
@@ -501,7 +501,6 @@ $green: #2f9e44;
     grid-column: 1 / -1;
     height: 40px;
     border: 0;
-    border-radius: 8px;
     background: $navy;
     color: #fff;
     font-size: .84rem;

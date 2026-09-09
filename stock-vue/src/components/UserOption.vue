@@ -294,7 +294,7 @@ const save = async () => {
 <style scoped>
 #user-option {
     min-height: 100vh;
-    background: #f4f6f9;
+    background: #fafafa;
 }
 
 .contents {
@@ -313,21 +313,21 @@ const save = async () => {
     margin: 0;
     font-size: 1.25rem;
     font-weight: 700;
-    color: #1f2329;
+    color: #141414;
 }
 
 .head-desc .sub-text {
     margin: 6px 0 0;
     font-size: 0.85rem;
-    color: #6b7280;
+    color: #737373;
     line-height: 1.4;
 }
 
 /* ── 카드 ── */
 .setting-card {
     background: #fff;
-    border: 1px solid #e5e8ec;
-    border-radius: 14px;
+    border: 1px solid #efefef;
+    border-radius: 0;
     padding: 18px 18px 20px;
     margin-bottom: 14px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
@@ -341,27 +341,27 @@ const save = async () => {
     margin: 0;
     font-size: 1rem;
     font-weight: 700;
-    color: #2db400;
+    color: #141414;
 }
 
 .card-head .card-desc {
     display: block;
     margin-top: 4px;
     font-size: 0.78rem;
-    color: #8a929c;
+    color: #737373;
     line-height: 1.4;
 }
 
 .special-card {
     border-style: dashed;
-    border-color: #c9d3dd;
-    background: #fafcff;
+    border-color: #c4c4c4;
+    background: #fafafa;
 }
 
 .placeholder-note {
     margin: 0;
     font-size: 0.85rem;
-    color: #9aa3ad;
+    color: #9a9a9a;
 }
 
 /* ── 필드 ── */
@@ -380,7 +380,7 @@ const save = async () => {
 
 .field-hint {
     font-size: 0.74rem;
-    color: #9aa3ad;
+    color: #9a9a9a;
     line-height: 1.3;
 }
 
@@ -393,7 +393,7 @@ const save = async () => {
 .form-field label {
     font-size: 0.85rem;
     font-weight: 600;
-    color: #3b4149;
+    color: #3d3d3d;
 }
 
 .form-field input {
@@ -401,22 +401,22 @@ const save = async () => {
     box-sizing: border-box;
     height: 44px;
     padding: 0 12px;
-    border: 1px solid #d6dbe1;
-    border-radius: 10px;
+    border: 1px solid #dcdcdc;
+    border-radius: 0;
     font-size: 0.92rem;
-    color: #1f2329;
+    color: #141414;
     background: #fff;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .form-field input:focus {
     outline: none;
-    border-color: #2db400;
-    box-shadow: 0 0 0 3px rgba(45, 180, 0, 0.12);
+    border-color: #141414;
+    box-shadow: 0 0 0 3px rgba(20, 20, 20, 0.12);
 }
 
 .form-field input::placeholder {
-    color: #b3bac2;
+    color: #9a9a9a;
 }
 
 /* ── 비밀 입력 + 표시 토글 ── */
@@ -441,14 +441,14 @@ const save = async () => {
     place-items: center;
     border: 0;
     background: transparent;
-    color: #8a929c;
+    color: #737373;
     cursor: pointer;
-    border-radius: 8px;
+    border-radius: 0;
 }
 
 .btn-reveal:hover {
-    color: #2db400;
-    background: rgba(45, 180, 0, 0.08);
+    color: #141414;
+    background: rgba(20, 20, 20, 0.06);
 }
 
 /* ── 스위치 필드 ── */
@@ -471,7 +471,7 @@ const save = async () => {
 
 .switch-sub {
     font-size: 0.76rem;
-    color: #8a929c;
+    color: #737373;
     line-height: 1.3;
 }
 
@@ -479,16 +479,16 @@ const save = async () => {
     flex: 0 0 auto;
     width: 46px;
     height: 26px;
-    border-radius: 999px;
+    border-radius: 0;
     border: 0;
     position: relative;
     cursor: pointer;
     transition: background 0.18s;
-    background: #cfd6de;
+    background: #c4c4c4;
 }
 
 .toggle-btn.active {
-    background: #2db400;
+    background: #141414;
 }
 
 .toggle-knob {
@@ -498,7 +498,7 @@ const save = async () => {
     width: 20px;
     height: 20px;
     background: #fff;
-    border-radius: 50%;
+    border-radius: 0;
     transition: transform 0.18s;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
@@ -518,18 +518,18 @@ const save = async () => {
     margin: 4px -14px 0;
     background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(6px);
-    border-top: 1px solid #e5e8ec;
+    border-top: 1px solid #efefef;
 }
 
 .dirty-note {
     flex: 1;
     font-size: 0.8rem;
-    color: #d97706;
+    color: #141414;
     font-weight: 600;
 }
 
 .dirty-note.clean {
-    color: #9aa3ad;
+    color: #9a9a9a;
     font-weight: 500;
 }
 
@@ -537,7 +537,7 @@ const save = async () => {
 .btn-save {
     height: 42px;
     padding: 0 18px;
-    border-radius: 10px;
+    border-radius: 0;
     font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
@@ -546,8 +546,8 @@ const save = async () => {
 
 .btn-reset {
     background: #fff;
-    border-color: #d6dbe1;
-    color: #5b636c;
+    border-color: #dcdcdc;
+    color: #3d3d3d;
 }
 
 .btn-reset:disabled {
@@ -556,12 +556,12 @@ const save = async () => {
 }
 
 .btn-save {
-    background: #2db400;
+    background: #141414;
     color: #fff;
 }
 
 .btn-save:disabled {
-    background: #add9a0;
+    background: #dcdcdc;
     cursor: default;
 }
 
@@ -574,8 +574,8 @@ const save = async () => {
 
 .skeleton-row {
     height: 96px;
-    border-radius: 14px;
-    background: linear-gradient(90deg, #eceff3 25%, #f5f7f9 50%, #eceff3 75%);
+    border-radius: 0;
+    background: linear-gradient(90deg, #efefef 25%, #fafafa 50%, #efefef 75%);
     background-size: 200% 100%;
     animation: shimmer 1.2s infinite;
 }
@@ -593,7 +593,7 @@ const save = async () => {
 
     .setting-card {
         padding: 16px 14px 18px;
-        border-radius: 12px;
+        border-radius: 0;
     }
 
     .head-desc h2 {

@@ -38,6 +38,6 @@
     width: 100%;
     height: 100vh;
     margin: auto;
-    background-color: #212121;
+    background-color: #1a1a1a;
 }
 </style>

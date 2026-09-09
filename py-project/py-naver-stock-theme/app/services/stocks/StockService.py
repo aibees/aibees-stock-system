@@ -94,7 +94,7 @@ class StockService:
         # if start_date:
         #     start_date = (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=120)).strftime('%Y-%m-%d')
 
-        ohlcv:pd.DataFrame = self.kis.get_ohlcv_period(stock_code, period)
+        ohlcv:pd.DataFrame = self.kis.get_ohlcv_period_unit(stock_code, 200, unit=period or "day")
 
         if ohlcv is None:
             raise Exception("DF is NONE")

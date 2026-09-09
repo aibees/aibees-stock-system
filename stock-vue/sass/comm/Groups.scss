@@ -32,12 +32,12 @@
 
     &::before {
         left: 0;
-        background: linear-gradient(to right, rgba(10, 12, 16, .8), rgba(10, 12, 16, 0));
+        background: linear-gradient(to right, rgba(10, 10, 10, .8), rgba(10, 10, 10, 0));
     }
 
     &::after {
         right: 60px;
-        background: linear-gradient(to left, rgba(10, 12, 16, .8), rgba(10, 12, 16, 0));
+        background: linear-gradient(to left, rgba(10, 10, 10, .8), rgba(10, 10, 10, 0));
     }
 
     /* 편집 버튼 자리 확보 */
@@ -65,7 +65,7 @@
     padding: 8px 14px;
     font-weight: 600;
     font-size: 0.95rem;
-    color: #cfd6e7;
+    color: #d6d6d6;
     cursor: pointer;
     scroll-snap-align: start;
     border-radius: 0;
@@ -108,13 +108,13 @@
 
 .edit-button {
     background: transparent;
-    color: #e9edf4;
+    color: #ececec;
     border: none;
     font-size: 0.9rem;
     padding: 8px 12px;
     /* ← 단위 보정 */
     margin-right: 6px;
-    border-radius: 10px;
+    border-radius: 0;
     cursor: pointer;
 
     &:hover {
@@ -135,17 +135,17 @@
 
 .group-bar {
     border: 1px solid rgba(255, 255, 255, .08);
-    border-radius: 12px;
+    border-radius: 0;
     overflow: hidden;
-    background: #13161c;
+    background: #131313;
 }
 
 .group-bar-header {
-    background-color: #151922;
+    background-color: #151515;
     padding: 12px 16px;
     font-weight: 700;
     font-size: 1.05rem;
-    color: #e9edf4;
+    color: #ececec;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
@@ -155,7 +155,7 @@
 
 .stock-list {
     padding: 10px;
-    background: #0f1217;
+    background: #0f0f0f;
     margin: 0;
     list-style: none;
     text-align: left;
@@ -166,10 +166,10 @@
 
 .stock-item {
     padding: 10px 12px;
-    color: #d6dbe5;
+    color: #dcdcdc;
     font-size: 0.95rem;
     border: 1px solid rgba(255, 255, 255, .06);
-    border-radius: 10px;
+    border-radius: 0;
     background: rgba(255, 255, 255, .02);
     transition: background .12s ease, border-color .12s ease, transform .08s ease;
 
@@ -182,7 +182,7 @@
 /* 비어있을 때 */
 .group-empty {
     text-align: center;
-    color: #9aa5b1;
+    color: #9a9a9a;
     font-size: 1rem;
     margin: 2rem 0 0;
 }
@@ -190,12 +190,12 @@
 .add-button {
         margin-top: 1rem;
         padding: 10px 16px;
-        background-color: #4f46e5;
+        background-color: #3d3d3d;
         color: #fff;
         font-weight: 700;
         font-size: 0.95rem;
         border: none;
-        border-radius: 10px;
+        border-radius: 0;
         cursor: pointer;
         transition: filter .12s ease, transform .08s ease;
 
@@ -237,7 +237,7 @@
 .toggle-icon {
     font-size: .9rem;
     user-select: none;
-    color: #8b95a7;
+    color: #8a8a8a;
 }
 
 /* 반응형 */

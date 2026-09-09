@@ -116,14 +116,23 @@ const chartData    = ref(null);
 const chartOptions = ref(null);
 const isLoading    = ref(false);
 const slicedLength = ref(0);
+const windowWidth  = ref(window.innerWidth);
+
+const onResize = () => { windowWidth.value = window.innerWidth; };
 
 onMounted(async () => {
+    window.addEventListener('resize', onResize);
+
     const code = route.query.code || '';
     if (code) {
         searchParam.code = code;
         await setStockInfo(code);
         await fetchChart();
     }
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('resize', onResize);
 });
 
 const setStockInfo = async (code) => {
@@ -208,22 +217,26 @@ const fetchChart = async () => {
 };
 
 const dynamicWidth = computed(() => {
-    const px = window.innerWidth < 768 ? 10 : 20;
+    const px = windowWidth.value < 768 ? 10 : 20;
     return Math.max(slicedLength.value * px, 400) + 'px';
 });
 </script>
 
 <style scoped lang="scss">
+// 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
+// 캔들 색상(양봉/음봉)·이동평균선·볼린저밴드는 데이터를 구분하는 정보값이라
+// 예외적으로 유지한다 — 아래 <script>의 chartData/color 설정 참고.
 $white:    #ffffff;
-$gray-50:  #f8f9fa;
-$gray-100: #ebebeb;
-$gray-200: #d0d0d0;
-$gray-400: #909090;
-$gray-500: #6b6b6b;
-$gray-700: #333333;
-$gray-900: #111111;
-$blue:     #1971c2;
-$navy:     #1c3d6e;
+$gray-50:  #fafafa;
+$gray-100: #efefef;
+$gray-200: #dcdcdc;
+$gray-300: #c4c4c4;
+$gray-400: #9a9a9a;
+$gray-500: #737373;
+$gray-700: #3d3d3d;
+$gray-900: #141414;
+$blue:     #141414;
+$navy:     #141414;
 
 #chart-stocks {
     min-height: 100vh;
@@ -260,7 +273,7 @@ $navy:     #1c3d6e;
 .search-card {
     background: $white;
     border: 1px solid $gray-200;
-    border-radius: 0.75rem;
+    border-radius: 0;
     padding: 14px 16px;
     box-shadow: 0 2px 8px rgba(0,0,0,.05);
     margin-bottom: 16px;
@@ -277,14 +290,14 @@ $navy:     #1c3d6e;
         margin: 0 !important;
         background: $white;
         border: 1.5px solid $gray-200;
-        border-radius: 0.6rem;
+        border-radius: 0;
         padding: 6px 6px 6px 12px;
         box-shadow: none;
         transition: border-color .15s;
 
         &:focus-within {
             border-color: $blue;
-            box-shadow: 0 0 0 3px rgba(25,113,194,.08);
+            box-shadow: 0 0 0 3px rgba(20,20,20,.08);
         }
     }
 
@@ -300,7 +313,7 @@ $navy:     #1c3d6e;
     :deep(.search-bar .search-btn) {
         background: $navy;
         color: $white;
-        border-radius: 0.45rem;
+        border-radius: 0;
         padding: 8px 16px;
         font-size: 0.85rem;
         font-weight: 700;
@@ -313,7 +326,7 @@ $navy:     #1c3d6e;
     :deep(.suggestion-div) {
         background: $white;
         border: 1px solid $gray-200;
-        border-radius: 0.6rem;
+        border-radius: 0;
         box-shadow: 0 8px 24px rgba(0,0,0,.1);
     }
 
@@ -349,7 +362,7 @@ $navy:     #1c3d6e;
 .period-btn {
     padding: 6px 11px;
     border: 1.5px solid $gray-200;
-    border-radius: 0.45rem;
+    border-radius: 0;
     background: $white;
     color: $gray-500;
     font-size: 0.78rem;
@@ -386,7 +399,7 @@ $navy:     #1c3d6e;
         flex: 1;
         padding: 7px 10px;
         border: 1.5px solid $gray-200;
-        border-radius: 0.6rem;
+        border-radius: 0;
         font-size: 0.85rem;
         font-family: inherit;
         color: $gray-700;
@@ -394,7 +407,7 @@ $navy:     #1c3d6e;
         outline: none;
         transition: border-color .15s;
 
-        &:focus { border-color: $blue; box-shadow: 0 0 0 3px rgba(25,113,194,.08); }
+        &:focus { border-color: $blue; box-shadow: 0 0 0 3px rgba(20,20,20,.08); }
     }
 }
 
@@ -412,7 +425,7 @@ $navy:     #1c3d6e;
     background: $navy;
     color: $white;
     border: none;
-    border-radius: 0.6rem;
+    border-radius: 0;
     font-size: 0.85rem;
     font-weight: 700;
     font-family: inherit;
@@ -429,7 +442,7 @@ $navy:     #1c3d6e;
 .chart-card {
     background: $white;
     border: 1px solid $gray-200;
-    border-radius: 0.75rem;
+    border-radius: 0;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0,0,0,.05);
 
@@ -480,7 +493,7 @@ $navy:     #1c3d6e;
                 width: 18px;
                 height: 2px;
                 background: var(--c);
-                border-radius: 1px;
+                border-radius: 0;
             }
 
             &.leg-dashed::before {
@@ -491,7 +504,7 @@ $navy:     #1c3d6e;
             &.leg-bar::before {
                 width: 10px;
                 height: 10px;
-                border-radius: 2px;
+                border-radius: 0;
                 background: var(--c);
             }
         }
@@ -503,7 +516,7 @@ $navy:     #1c3d6e;
 
         &::-webkit-scrollbar         { height: 4px; }
         &::-webkit-scrollbar-track   { background: $gray-50; }
-        &::-webkit-scrollbar-thumb   { background: $gray-200; border-radius: 2px; }
+        &::-webkit-scrollbar-thumb   { background: $gray-200; border-radius: 0; }
     }
 
     .chart-wrap {
@@ -517,7 +530,7 @@ $navy:     #1c3d6e;
     height: 62vh;
     background: $gray-50;
     border: 1px solid $gray-100;
-    border-radius: 0.75rem;
+    border-radius: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -531,7 +544,7 @@ $navy:     #1c3d6e;
     width: 220px;
     height: 3px;
     background: $gray-100;
-    border-radius: 2px;
+    border-radius: 0;
     overflow: hidden;
 
     &::after {
@@ -540,7 +553,7 @@ $navy:     #1c3d6e;
         height: 100%;
         width: 40%;
         background: $navy;
-        border-radius: 2px;
+        border-radius: 0;
         animation: slide 1.2s ease-in-out infinite;
     }
 }
@@ -568,13 +581,59 @@ $navy:     #1c3d6e;
     50%       { opacity: .85; }
 }
 
+/* ── 태블릿 / 좁은 화면 ── */
+@media (max-width: 768px) {
+    .contents { padding: 16px 12px 80px; }
+
+    .search-card { padding: 12px; gap: 8px; }
+
+    .chart-header { padding: 10px 12px; }
+
+    .legend { gap: 8px; }
+    .leg-item { font-size: 0.68rem; }
+
+    .chart-scroll { padding: 12px; }
+
+    .chart-wrap { height: 52vh; }
+
+    .chart-skeleton { height: 52vh; }
+}
+
 /* ── 모바일 ── */
 @media (max-width: 480px) {
-    .date-row    { flex-direction: column; align-items: stretch; }
+    .contents { padding: 12px 8px 72px; }
+
+    .date-row    { flex-direction: column; align-items: stretch; gap: 8px; }
     .period-group { justify-content: space-between; }
-    .period-btn  { flex: 1; text-align: center; }
+    .period-btn  { flex: 1; text-align: center; padding: 8px 6px; }
     .date-field  { min-width: unset; }
+    .date-input  { font-size: 0.8rem; padding: 8px; }
     .search-btn  { width: 100%; justify-content: center; }
-    .legend      { display: none; }
+
+    .chart-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .legend {
+        width: 100%;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 2px;
+        -webkit-overflow-scrolling: touch;
+
+        &::-webkit-scrollbar { height: 3px; }
+    }
+    .leg-item { white-space: nowrap; }
+
+    .chart-wrap  { height: 46vh; min-width: 320px; }
+    .chart-skeleton { height: 46vh; }
+
+    .stock-name { font-size: 0.92rem; }
+    .stock-code { font-size: 0.7rem; }
+}
+
+@media (max-width: 360px) {
+    .period-btn { font-size: 0.72rem; padding: 7px 4px; }
 }
 </style>

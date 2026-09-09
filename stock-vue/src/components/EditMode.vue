@@ -96,9 +96,9 @@ function applyEdit() {
 }
 
 .edit-modal {
-  background-color: #1e1f24;
+  background-color: #1e1e1e;
   padding: 20px;
-  border-radius: 12px;
+  border-radius: 0;
   width: 92%;
   max-width: 420px;
   color: #fff;
@@ -112,11 +112,11 @@ function applyEdit() {
 }
 
 .add-group-button {
-  background: #4f46e5;
+  background: #3d3d3d;
   color: white;
   border: none;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: 0;
   font-size: 0.85rem;
   cursor: pointer;
 }
@@ -158,15 +158,16 @@ function applyEdit() {
   background: transparent;
   border: 1px solid rgba(255,255,255,0.2);
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: 0;
   font-size: 0.8rem;
   color: white;
   cursor: pointer;
 }
 
 .delete-btn {
-  border-color: #e74c3c;
-  color: #e74c3c;
+  border-color: #ffffff;
+  color: #ffffff;
+  font-weight: 700;
 }
 
 .switch {
@@ -186,7 +187,7 @@ function applyEdit() {
   right: 0; bottom: 0;
   background-color: #555;
   transition: 0.3s;
-  border-radius: 20px;
+  border-radius: 0;
 }
 .slider:before {
   position: absolute;
@@ -198,7 +199,7 @@ function applyEdit() {
   transition: 0.3s;
 }
 input:checked + .slider {
-  background-color: #4f46e5;
+  background-color: #3d3d3d;
 }
 input:checked + .slider:before {
   transform: translateX(18px);
@@ -214,7 +215,7 @@ input:checked + .slider:before {
 .cancel-btn,
 .apply-btn {
   padding: 6px 14px;
-  border-radius: 6px;
+  border-radius: 0;
   font-size: 0.85rem;
   border: none;
   cursor: pointer;
@@ -224,7 +225,7 @@ input:checked + .slider:before {
   color: white;
 }
 .apply-btn {
-  background: #4f46e5;
+  background: #3d3d3d;
   color: white;
 }
 </style>

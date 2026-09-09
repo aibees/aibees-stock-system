@@ -68,7 +68,7 @@ const setAlign = () => {
         padding: 3px 10px;
         background-color: transparent;
         border: 1px solid #cbcbcba1;
-        border-radius: 8px;
+        border-radius: 0;
         
         box-sizing: border-box;
     }

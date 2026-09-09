@@ -1,3 +1,17 @@
+// ── 무채색 디자인 토큰 (전 메뉴 공통) ──
+// 트레이딩 대시보드(/trade)에서 시작한 "네모 반듯 · 무채색" 디자인 시스템.
+// 다른 파일에서는 `@use '@@/__variables.scss' as *;` 로 그대로 가져다 쓴다.
+$dc-white:    #ffffff;
+$dc-gray-50:  #fafafa;
+$dc-gray-100: #efefef;
+$dc-gray-200: #dcdcdc;
+$dc-gray-300: #c4c4c4;
+$dc-gray-400: #9a9a9a;
+$dc-gray-500: #737373;
+$dc-gray-700: #3d3d3d;
+$dc-gray-900: #141414;
+$dc-black:    #000000;
+
 // Mobile breakpoints
 @mixin mobile {
     @media screen and (min-width: 640px) {

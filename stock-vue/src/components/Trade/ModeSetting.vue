@@ -339,22 +339,21 @@ const goManualSell = () => router.push({ path: '/auto-trade/limit-order' });
 </script>
 
 <style scoped lang="scss">
-$white: #ffffff;
-$gray-50: #f8f9fa;
-$gray-100: #ebebeb;
-$gray-200: #d0d0d0;
-$gray-400: #909090;
-$gray-500: #6b6b6b;
-$gray-900: #111111;
-$blue: #1971c2;
-$navy: #1c3d6e;
-$red: #c92a2a;
-$amber: #e67700;
-$green: #2f9e44;
+/* ── 무채색 팔레트 (/trade 대시보드와 동일) ── */
+$white:    #ffffff;
+$gray-50:  #fafafa;
+$gray-100: #efefef;
+$gray-200: #dcdcdc;
+$gray-300: #c4c4c4;
+$gray-400: #9a9a9a;
+$gray-500: #737373;
+$gray-700: #3d3d3d;
+$gray-900: #141414;
+$black:    #000000;
 
 #auto-trade-mode {
     min-height: 100vh;
-    background: $gray-50;
+    background: $white;
     color: $gray-900;
     font-family: 'Pretendard', -apple-system, sans-serif;
 }
@@ -372,22 +371,21 @@ $green: #2f9e44;
     align-items: center;
     gap: 12px;
     background: $white;
-    border: 1px solid $gray-100;
-    border-left: 5px solid $gray-400;
-    border-radius: 12px;
+    border: 1px solid $gray-200;
+    border-left: 4px solid $gray-300;
     padding: 16px 18px;
     margin-bottom: 14px;
 
     &.st-holding {
-        border-left-color: $green;
+        border-left-color: $gray-900;
     }
 
     &.st-armed {
-        border-left-color: $blue;
+        border-left-color: $gray-500;
     }
 
     &.st-switch_pending {
-        border-left-color: $amber;
+        border-left-color: $gray-400;
     }
 
     .state-left {
@@ -397,13 +395,13 @@ $green: #2f9e44;
     }
 
     .state-badge {
-        font-size: .74rem;
+        font-size: .72rem;
         font-weight: 700;
-        padding: 5px 10px;
-        border-radius: 999px;
-        background: $gray-100;
-        color: $navy;
+        padding: 4px 10px;
+        border: 1px solid $gray-300;
+        color: $gray-900;
         white-space: nowrap;
+        letter-spacing: .02em;
     }
 
     .state-mode {
@@ -436,35 +434,36 @@ $green: #2f9e44;
 }
 
 .toggle-btn {
-    width: 46px;
-    height: 26px;
-    border-radius: 999px;
-    border: 0;
+    width: 44px;
+    height: 24px;
+    border: 1px solid $gray-300;
     position: relative;
     cursor: pointer;
-    transition: background .18s;
+    background: $white;
+    transition: background .18s, border-color .18s;
 
     &.active {
-        background: $green;
+        background: $gray-900;
+        border-color: $gray-900;
     }
 
     &.inactive {
-        background: $gray-200;
+        background: $white;
     }
 
     .toggle-knob {
         position: absolute;
-        top: 3px;
-        left: 3px;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        background: #fff;
-        transition: transform .18s;
+        top: 2px;
+        left: 2px;
+        width: 18px;
+        height: 18px;
+        background: $gray-300;
+        transition: transform .18s, background .18s;
     }
 
     &.active .toggle-knob {
-        transform: translateX(20px);
+        transform: translateX(18px);
+        background: $white;
     }
 }
 
@@ -474,15 +473,14 @@ $green: #2f9e44;
     justify-content: space-between;
     align-items: center;
     gap: 12px;
-    background: #fff8e1;
-    border: 1px solid #ffe08a;
-    border-radius: 12px;
+    background: $gray-50;
+    border: 1px solid $gray-300;
     padding: 14px 18px;
     margin-bottom: 14px;
 
     strong {
         font-size: .86rem;
-        color: $amber;
+        color: $gray-900;
     }
 
     p {
@@ -497,15 +495,16 @@ $green: #2f9e44;
     }
 
     .btn-cancel {
-        border: 1px solid $amber;
-        background: transparent;
-        color: $amber;
-        border-radius: 8px;
+        border: 1px solid $gray-300;
+        background: $white;
+        color: $gray-700;
         padding: 8px 14px;
         font-size: .8rem;
         font-weight: 600;
         cursor: pointer;
         white-space: nowrap;
+
+        &:hover { background: $gray-900; color: $white; border-color: $gray-900; }
     }
 }
 
@@ -513,8 +512,7 @@ $green: #2f9e44;
     font-size: .8rem;
     color: $gray-500;
     background: $white;
-    border: 1px dashed $gray-200;
-    border-radius: 10px;
+    border: 1px dashed $gray-300;
     padding: 10px 14px;
     margin: 0 0 16px;
 }
@@ -523,7 +521,9 @@ $green: #2f9e44;
 .mode-cards {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    gap: 1px;
+    background: $gray-200;
+    border: 1px solid $gray-200;
     margin-bottom: 18px;
 
     @media (max-width: 700px) {
@@ -533,19 +533,16 @@ $green: #2f9e44;
 
 .mode-card {
     background: $white;
-    border: 1px solid $gray-100;
-    border-radius: 12px;
     padding: 16px 18px;
     cursor: pointer;
-    transition: border-color .15s, box-shadow .15s;
+    transition: background .12s;
 
     &:hover {
-        border-color: $gray-200;
+        background: $gray-50;
     }
 
     &.selected {
-        border-color: $blue;
-        box-shadow: 0 0 0 2px rgba(25, 113, 194, .12);
+        box-shadow: inset 0 0 0 1px $gray-900;
     }
 
     .card-head {
@@ -562,24 +559,23 @@ $green: #2f9e44;
     }
 
     .radio {
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        border: 2px solid $gray-200;
+        width: 14px;
+        height: 14px;
+        border: 1.5px solid $gray-300;
         flex: 0 0 auto;
 
         &.on {
-            border-color: $blue;
-            box-shadow: inset 0 0 0 3px $blue;
+            border-color: $gray-900;
+            background: $gray-900;
+            box-shadow: inset 0 0 0 2px $white;
         }
     }
 
     .chip-current {
-        font-size: .68rem;
+        font-size: .66rem;
         font-weight: 700;
-        color: $green;
-        background: #ebfbee;
-        border-radius: 999px;
+        color: $white;
+        background: $gray-900;
         padding: 3px 8px;
     }
 
@@ -594,14 +590,16 @@ $green: #2f9e44;
 /* ── 상세 설정 ── */
 .mode-config {
     background: $white;
-    border: 1px solid $gray-100;
-    border-radius: 12px;
+    border: 1px solid $gray-200;
     padding: 18px;
 
     h4 {
         margin: 0 0 14px;
-        font-size: .9rem;
+        font-size: .82rem;
         font-weight: 700;
+        color: $gray-500;
+        letter-spacing: .03em;
+        text-transform: uppercase;
     }
 
     .config-none {
@@ -609,24 +607,41 @@ $green: #2f9e44;
         font-size: .82rem;
         color: $gray-500;
     }
+}
 
-    .config-link {
-        p {
-            margin: 0 0 10px;
-            font-size: .82rem;
-            color: $gray-500;
-        }
+/* ── 매도 수기 등록 안내 (모드 무관, mode-config 밖의 독립 섹션) ── */
+.config-link {
+    background: $white;
+    border: 1px solid $gray-200;
+    padding: 16px 18px;
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
 
-        .btn-link {
-            border: 1px solid $blue;
-            color: $blue;
-            background: transparent;
-            border-radius: 8px;
-            padding: 8px 14px;
-            font-size: .82rem;
-            font-weight: 600;
-            cursor: pointer;
-        }
+    p {
+        margin: 0;
+        font-size: .82rem;
+        color: $gray-500;
+        line-height: 1.5;
+
+        b { color: $gray-900; }
+    }
+
+    .btn-link {
+        border: 1px solid $gray-300;
+        color: $gray-700;
+        background: $white;
+        padding: 8px 14px;
+        font-size: .82rem;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        flex: 0 0 auto;
+
+        &:hover { background: $gray-900; color: $white; border-color: $gray-900; }
     }
 }
 
@@ -656,17 +671,18 @@ $green: #2f9e44;
     }
 
     .req {
-        color: $red;
+        color: $gray-900;
+        font-weight: 700;
     }
 
     input,
     select {
         height: 38px;
-        border: 1px solid $gray-200;
-        border-radius: 8px;
+        border: 1px solid $gray-300;
         padding: 0 10px;
         font-size: .85rem;
         background: $white;
+        color: $gray-900;
     }
 }
 
@@ -682,14 +698,15 @@ $green: #2f9e44;
     .btn-pick {
         height: 38px;
         padding: 0 14px;
-        border: 1px solid $blue;
-        color: $blue;
-        background: transparent;
-        border-radius: 8px;
+        border: 1px solid $gray-300;
+        color: $gray-700;
+        background: $white;
         font-size: .8rem;
         font-weight: 600;
         cursor: pointer;
         white-space: nowrap;
+
+        &:hover { background: $gray-900; color: $white; border-color: $gray-900; }
 
         &:disabled {
             opacity: .45;
@@ -703,23 +720,24 @@ $green: #2f9e44;
     align-items: center;
     justify-content: space-between;
     height: 38px;
-    border: 1px solid $gray-200;
-    border-radius: 8px;
+    border: 1px solid $gray-300;
     padding: 0 6px;
 
     button {
-        width: 30px;
-        height: 28px;
-        border: 0;
-        border-radius: 6px;
-        background: $gray-100;
+        width: 28px;
+        height: 26px;
+        border: 1px solid $gray-300;
+        background: $white;
         font-size: .95rem;
         cursor: pointer;
+
+        &:hover { background: $gray-900; color: $white; border-color: $gray-900; }
     }
 
     span {
         font-size: .85rem;
         font-weight: 600;
+        font-variant-numeric: tabular-nums;
     }
 }
 
@@ -740,16 +758,17 @@ $green: #2f9e44;
 .btn-save {
     height: 42px;
     padding: 0 26px;
-    border: 0;
-    border-radius: 10px;
-    background: $navy;
-    color: #fff;
+    border: 1px solid $gray-900;
+    background: $gray-900;
+    color: $white;
     font-size: .88rem;
     font-weight: 700;
     cursor: pointer;
 
+    &:hover:not(:disabled) { background: $black; border-color: $black; }
+
     &:disabled {
-        opacity: .5;
+        opacity: .4;
         cursor: not-allowed;
     }
 }
@@ -761,20 +780,13 @@ $green: #2f9e44;
 
 .skeleton-row {
     height: 84px;
-    border-radius: 12px;
-    background: linear-gradient(90deg, #f1f3f5 25%, #e9ecef 37%, #f1f3f5 63%);
-    background-size: 400% 100%;
-    animation: shimmer 1.3s infinite;
+    background: $gray-100;
+    animation: pulse 1.6s infinite ease-in-out;
     margin-bottom: 10px;
 }
 
-@keyframes shimmer {
-    0% {
-        background-position: 100% 50%;
-    }
-
-    100% {
-        background-position: 0 50%;
-    }
+@keyframes pulse {
+    0%, 100% { opacity: .55; }
+    50%      { opacity: .9; }
 }
 </style>

@@ -33,8 +33,8 @@
         </ul>
         <div class="body-wrapper">
             <ul class="table-mobile body" v-for="(data, idx) in themeList" :key="idx" :id=data.theme_code>
-                <li class="lines" 
-                    :style="{ borderLeftColor: data.per_flow === 'UP' ? '#d70404' : '#2828ff' }"
+                <li class="lines"
+                    :style="{ borderLeftColor: data.per_flow === 'UP' ? '#141414' : '#9a9a9a' }"
                     >
                     <div class="list-item">
                         <div class="left">
@@ -47,7 +47,7 @@
                         <!-- <div class="percent"> -->
                             <div class="center">
                                 <div class="item"
-                                    :style="{ color: data.per_flow === 'UP' ? '#ff2b2b' : (data.per_flow === 'DOWN' ? '#d4d4ff' : '') }"
+                                    :style="{ color: data.per_flow === 'UP' ? '#ffffff' : (data.per_flow === 'DOWN' ? '#bfbfbf' : '') }"
                                     >
                                     <div>
                                         <img :src="data.per_flow === 'UP' ? '/src/img/upper_arrow.png' : (data.per_flow === 'DOWN' ? '/src/img/lower_arrow.png' : '')" />
@@ -57,7 +57,7 @@
                             </div>
                             <div class="right">
                                 <div class="item"
-                                    :style="{ color: data.three_day_avg >= 0 ? '#ff2b2b' : '#d4d4ff' }"
+                                    :style="{ color: data.three_day_avg >= 0 ? '#ffffff' : '#bfbfbf' }"
                                     >
                                     <div>
                                         <img :src="data.three_day_avg >= 0 ? '/src/img/upper_arrow.png' : '/src/img/lower_arrow.png'" />

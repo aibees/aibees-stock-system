@@ -353,18 +353,19 @@ const exitLabel = (t) => ({
 
 <style scoped lang="scss">
 $white:    #ffffff;
-$gray-50:  #f8f9fa;
-$gray-100: #ebebeb;
-$gray-200: #d0d0d0;
-$gray-400: #909090;
-$gray-500: #6b6b6b;
-$gray-700: #333333;
-$gray-900: #111111;
-$blue:     #1971c2;
-$navy:     #1c3d6e;
-$red:      #c92a2a;
-$green:    #2db400;
-$amber-on: #b8860b;
+$gray-50:  #fafafa;
+$gray-100: #efefef;
+$gray-200: #dcdcdc;
+$gray-300: #c4c4c4;
+$gray-400: #9a9a9a;
+$gray-500: #737373;
+$gray-700: #3d3d3d;
+$gray-900: #141414;
+$blue:     #141414;
+$navy:     #141414;
+$red:      #141414;
+$green:    #141414;
+$amber-on: #141414;
 
 #stock-strategy {
     min-height: 100vh;
@@ -399,7 +400,7 @@ $amber-on: #b8860b;
     gap: 5px;
     padding: 8px 14px;
     border: 1px solid $navy;
-    border-radius: 0.6rem;
+    border-radius: 0;
     background: $white;
     color: $navy;
     font-size: 0.82rem;
@@ -408,7 +409,7 @@ $amber-on: #b8860b;
     cursor: pointer;
     transition: background .12s;
     .gear { font-size: 0.9rem; }
-    &:hover { background: #eef3fb; }
+    &:hover { background: #fafafa; }
     &:active { transform: scale(0.97); }
 }
 
@@ -416,7 +417,7 @@ $amber-on: #b8860b;
 .setup-card {
     background: $white;
     border: 1px solid $gray-200;
-    border-radius: 0.85rem;
+    border-radius: 0;
     padding: 16px 14px;
     box-shadow: 0 2px 8px rgba(0,0,0,.05);
     display: flex;
@@ -434,7 +435,7 @@ $amber-on: #b8860b;
     height: 42px;
     padding: 0 10px;
     border: 1px solid $gray-200;
-    border-radius: 0.55rem;
+    border-radius: 0;
     font-size: 0.9rem;
     color: $gray-900;
     background: $white;
@@ -445,7 +446,7 @@ $amber-on: #b8860b;
 .run-btn {
     height: 46px;
     border: none;
-    border-radius: 0.6rem;
+    border-radius: 0;
     background: $navy;
     color: $white;
     font-size: 0.95rem;
@@ -455,7 +456,7 @@ $amber-on: #b8860b;
     transition: background .12s;
     &:hover:not(:disabled) { background: $blue; }
     &:active:not(:disabled) { transform: scale(0.98); }
-    &:disabled { background: #aab4c4; cursor: default; }
+    &:disabled { background: #9a9a9a; cursor: default; }
 }
 
 /* SAutoInput 라이트 테마 오버라이드 */
@@ -466,16 +467,16 @@ $amber-on: #b8860b;
     margin: 0 !important;
     background: $white;
     border: 1px solid $gray-200;
-    border-radius: 0.55rem;
+    border-radius: 0;
     padding: 4px 4px 4px 12px;
     box-shadow: none;
 }
 .field :deep(.search-bar input) { color: $gray-900; font-size: 0.92rem; &::placeholder { color: $gray-400; } }
 .field :deep(.search-bar .search-btn) {
-    background: $navy; color: $white; border-radius: 0.45rem;
+    background: $navy; color: $white; border-radius: 0;
     padding: 9px 14px; font-size: 0.82rem; font-weight: 700;
 }
-.field :deep(.suggestion-div) { background: $white; border: 1px solid $gray-200; border-radius: 0.55rem; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.field :deep(.suggestion-div) { background: $white; border: 1px solid $gray-200; border-radius: 0; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
 .field :deep(.suggestion-header) { background: $gray-50; .item { color: $gray-500; } }
 .field :deep(.list-item) { .s_code, .s_type { color: $gray-400; } .s_name { color: $gray-900; } &:hover { background: $gray-50; } }
 
@@ -483,12 +484,12 @@ $amber-on: #b8860b;
 .result-wrap { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
 
 .summary-head {
-    border-radius: 0.85rem;
+    border-radius: 0;
     padding: 16px;
     color: $white;
     text-align: left;
-    &.up { background: linear-gradient(135deg, #c92a2a, #e03131); }
-    &.down { background: linear-gradient(135deg, #1c3d6e, #1971c2); }
+    &.up { background: linear-gradient(135deg, #141414, #141414); }
+    &.down { background: linear-gradient(135deg, #141414, #141414); }
     .sh-label { font-size: 0.74rem; opacity: .9; }
     .sh-amount { font-size: 1.5rem; font-weight: 800; margin-top: 2px; }
     .sh-pct { font-size: 0.9rem; font-weight: 700; margin-top: 4px; display: flex; flex-direction: column; gap: 2px;
@@ -501,10 +502,10 @@ $amber-on: #b8860b;
     gap: 8px;
     background: $white;
     border: 1px solid $gray-200;
-    border-radius: 0.85rem;
+    border-radius: 0;
     padding: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,.05);
-    .stat { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: $gray-50; border-radius: 0.45rem; }
+    .stat { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: $gray-50; border-radius: 0; }
     .st-k { font-size: 0.74rem; color: $gray-500; }
     .st-v { font-size: 0.88rem; font-weight: 700; color: $gray-900; font-variant-numeric: tabular-nums; }
 }
@@ -515,7 +516,7 @@ $amber-on: #b8860b;
 .exit-breakdown { display: flex; flex-wrap: wrap; gap: 6px; }
 .exit-chip {
     font-size: 0.74rem; font-weight: 600; color: $gray-500;
-    background: $white; border: 1px solid $gray-200; border-radius: 999px; padding: 4px 10px;
+    background: $white; border: 1px solid $gray-200; border-radius: 0; padding: 4px 10px;
 }
 
 .trades-head { font-size: 0.85rem; font-weight: 700; color: $gray-700; text-align: left; margin-top: 2px; }
@@ -525,7 +526,7 @@ $amber-on: #b8860b;
     background: $white;
     border: 1px solid $gray-200;
     border-left-width: 4px;
-    border-radius: 0.6rem;
+    border-radius: 0;
     padding: 10px 12px;
     text-align: left;
     &.win { border-left-color: $red; }
@@ -534,8 +535,8 @@ $amber-on: #b8860b;
 .ti-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .ti-badge {
     font-size: 0.7rem; font-weight: 700; color: $gray-500;
-    background: $gray-100; border-radius: 0.3rem; padding: 2px 7px;
-    &.surge { color: $amber-on; background: #fff3bf; }
+    background: $gray-100; border-radius: 0; padding: 2px 7px;
+    &.surge { color: $amber-on; background: #efefef; }
 }
 .ti-ret { font-size: 0.95rem; font-weight: 800; }
 .ti-line { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: $gray-700; font-variant-numeric: tabular-nums;
@@ -561,9 +562,9 @@ $amber-on: #b8860b;
     width: 100%;
     max-width: 600px;
     max-height: 88vh;
-    border-radius: 1rem 1rem 0 0;
+    border-radius: 0;
     display: flex; flex-direction: column;
-    @media (min-width: 600px) { border-radius: 1rem; max-height: 84vh; }
+    @media (min-width: 600px) { border-radius: 0; max-height: 84vh; }
 }
 .popup-head {
     display: flex; align-items: center; justify-content: space-between;
@@ -583,17 +584,17 @@ $amber-on: #b8860b;
 }
 .opt-field input[type="number"], .opt-field select {
     width: 110px; box-sizing: border-box; height: 38px;
-    padding: 0 10px; border: 1px solid $gray-200; border-radius: 0.5rem;
+    padding: 0 10px; border: 1px solid $gray-200; border-radius: 0;
     font-size: 0.88rem; color: $gray-900; background: $white; font-family: inherit; text-align: right;
     &:focus { outline: none; border-color: $blue; }
 }
 .opt-field select { text-align: left; }
 
 .mini-toggle {
-    flex: 0 0 auto; width: 44px; height: 25px; border-radius: 999px; border: 0;
-    position: relative; cursor: pointer; transition: background .18s; background: #cfd6de;
+    flex: 0 0 auto; width: 44px; height: 25px; border-radius: 0; border: 0;
+    position: relative; cursor: pointer; transition: background .18s; background: #c4c4c4;
     &.on { background: $green; }
-    .mini-knob { position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; background: #fff; border-radius: 50%; transition: transform .18s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+    .mini-knob { position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; background: #fff; border-radius: 0; transition: transform .18s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
     &.on .mini-knob { transform: translateX(19px); }
 }
 
@@ -601,9 +602,9 @@ $amber-on: #b8860b;
     display: flex; gap: 10px; padding: 12px 16px;
     border-top: 1px solid $gray-100;
     background: rgba(255,255,255,.95);
-    button { flex: 1; height: 44px; border-radius: 0.6rem; font-size: 0.92rem; font-weight: 700; font-family: inherit; cursor: pointer; }
+    button { flex: 1; height: 44px; border-radius: 0; font-size: 0.92rem; font-weight: 700; font-family: inherit; cursor: pointer; }
     .pf-cancel { background: $white; border: 1px solid $gray-200; color: $gray-500; }
-    .pf-save { background: $navy; border: none; color: $white; &:disabled { background: #aab4c4; cursor: default; } }
+    .pf-save { background: $navy; border: none; color: $white; &:disabled { background: #9a9a9a; cursor: default; } }
 }
 
 /* 전환 */

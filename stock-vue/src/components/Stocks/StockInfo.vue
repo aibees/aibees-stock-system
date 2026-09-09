@@ -213,17 +213,18 @@ const formatRate = (v) => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
 <style scoped lang="scss">
 /* ── 색상 변수 (Home.vue 동일) ── */
 $white:    #ffffff;
-$gray-50:  #f8f9fa;
-$gray-100: #ebebeb;
-$gray-200: #d0d0d0;
-$gray-400: #909090;
-$gray-500: #6b6b6b;
-$gray-700: #333333;
-$gray-900: #111111;
-$blue:     #1971c2;
-$navy:     #1c3d6e;
-$red:      #c92a2a;
-$amber:    #e67700;
+$gray-50:  #fafafa;
+$gray-100: #efefef;
+$gray-200: #dcdcdc;
+$gray-300: #c4c4c4;
+$gray-400: #9a9a9a;
+$gray-500: #737373;
+$gray-700: #3d3d3d;
+$gray-900: #141414;
+$blue:     #141414;
+$navy:     #141414;
+$red:      #141414;
+$amber:    #141414;
 
 /* ── 기본 레이아웃 ── */
 #stock-analysis {
@@ -250,7 +251,7 @@ $amber:    #e67700;
         align-self: flex-end;
         padding: 5px 12px;
         border: 1px solid $gray-200;
-        border-radius: 0.3rem;
+        border-radius: 0;
         background: $white;
         color: $gray-700;
         font-size: 0.72rem;
@@ -275,7 +276,7 @@ $amber:    #e67700;
         margin: 0 !important;
         background: $white;
         border: 1.5px solid $gray-200;
-        border-radius: 0.75rem;
+        border-radius: 0;
         padding: 6px 6px 6px 14px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
         transition: border-color 0.15s;
@@ -301,7 +302,7 @@ $amber:    #e67700;
     :deep(.search-bar .search-btn) {
         background: $navy;
         color: $white;
-        border-radius: 0.5rem;
+        border-radius: 0;
         padding: 9px 18px;
         font-size: 0.88rem;
         font-weight: 700;
@@ -316,7 +317,7 @@ $amber:    #e67700;
     :deep(.suggestion-div) {
         background: $white;
         border: 1px solid $gray-200;
-        border-radius: 0.6rem;
+        border-radius: 0;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
     }
 
@@ -370,10 +371,10 @@ $amber:    #e67700;
         font-size: 0.68rem;
         font-weight: 700;
         color: $navy;
-        background: #dbe4ff;
-        border: 1px solid #bac8ff;
+        background: #efefef;
+        border: 1px solid #c4c4c4;
         padding: 2px 8px;
-        border-radius: 0.3rem;
+        border-radius: 0;
     }
 
     .token-info {
@@ -383,7 +384,7 @@ $amber:    #e67700;
         background: $gray-50;
         border: 1px solid $gray-100;
         padding: 2px 7px;
-        border-radius: 0.3rem;
+        border-radius: 0;
         white-space: nowrap;
         font-variant-numeric: tabular-nums;
     }
@@ -398,7 +399,7 @@ $amber:    #e67700;
 .ai-result-section {
     background: $white;
     border: 1px solid $gray-200;
-    border-radius: 0.75rem;
+    border-radius: 0;
     padding: 18px 16px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 
@@ -463,7 +464,7 @@ $amber:    #e67700;
         :deep(code) {
             background: $gray-50;
             border: 1px solid $gray-100;
-            border-radius: 0.3rem;
+            border-radius: 0;
             padding: 1px 5px;
             font-size: 0.82rem;
             color: $navy;
@@ -472,7 +473,7 @@ $amber:    #e67700;
         :deep(pre) {
             background: $gray-50;
             border: 1px solid $gray-100;
-            border-radius: 0.5rem;
+            border-radius: 0;
             padding: 12px 14px;
             overflow-x: auto;
 
@@ -489,7 +490,7 @@ $amber:    #e67700;
             padding: 4px 12px;
             color: $gray-500;
             background: $gray-50;
-            border-radius: 0 0.3rem 0.3rem 0;
+            border-radius: 0;
         }
 
         :deep(table) {
@@ -540,7 +541,7 @@ $amber:    #e67700;
                 width: 8px;
                 height: 8px;
                 background: $blue;
-                border-radius: 50%;
+                border-radius: 0;
                 animation: bounce 1.2s infinite ease-in-out;
 
                 &:nth-child(2) { animation-delay: 0.2s; }
@@ -559,14 +560,14 @@ $amber:    #e67700;
 .quarterly-section {
     background: $white;
     border: 1px solid $gray-200;
-    border-radius: 0.75rem;
+    border-radius: 0;
     padding: 18px 16px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .quarterly-table {
     border: 1px solid $gray-100;
-    border-radius: 0.5rem;
+    border-radius: 0;
     overflow: hidden;
 
     .qt-row {
@@ -619,7 +620,7 @@ $amber:    #e67700;
 .rec-section {
     background: $white;
     border: 1px solid $gray-200;
-    border-radius: 0.75rem;
+    border-radius: 0;
     padding: 18px 16px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
@@ -630,7 +631,7 @@ $amber:    #e67700;
     background: $gray-100;
     border: 1px solid $gray-200;
     padding: 2px 8px;
-    border-radius: 0.3rem;
+    border-radius: 0;
 }
 
 .rec-grid {
@@ -645,7 +646,7 @@ $amber:    #e67700;
     align-items: center;
     gap: 6px;
     padding: 14px 8px;
-    border-radius: 0.6rem;
+    border-radius: 0;
     border: 1px solid $gray-100;
     background: $gray-50;
     text-align: center;
@@ -655,8 +656,8 @@ $amber:    #e67700;
     }
 
     &.high-card {
-        border-color: #ffd8a8;
-        background: #fff9f0;
+        border-color: #c4c4c4;
+        background: #fafafa;
     }
 
     .rec-label {
@@ -686,11 +687,11 @@ $amber:    #e67700;
     font-size: 0.72rem;
     font-weight: 700;
     padding: 3px 8px;
-    border-radius: 0.3rem;
+    border-radius: 0;
 
     &.neutral  { background: $gray-100; color: $gray-500; }
-    &.rate-up  { background: #ffe3e3; color: $red; }
-    &.rate-down{ background: #dbe4ff; color: $navy; }
+    &.rate-up  { background: #efefef; color: $red; }
+    &.rate-down{ background: #efefef; color: $navy; }
 }
 
 /* ── 전환 애니메이션 ── */
