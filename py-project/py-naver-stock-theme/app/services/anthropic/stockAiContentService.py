@@ -68,7 +68,7 @@ class StockAiContentService:
         result = self._anthropic.chat(
             messages=build_overview_messages(stock_code),
             system=STOCK_ANALYSIS_SYSTEM,
-            use_web_search=False,
+            use_web_search=True,
         )
         return self._save(session, stock_code, "overview", result)
 
@@ -80,7 +80,7 @@ class StockAiContentService:
         result = self._anthropic.chat(
             messages=build_theme_messages(stock_code),
             system=STOCK_ANALYSIS_SYSTEM,
-            use_web_search=False,
+            use_web_search=True,
         )
         return self._save(session, stock_code, "theme", result)
 
@@ -98,7 +98,7 @@ class StockAiContentService:
         result = self._anthropic.chat(
             messages=build_news_messages(stock_code, headlines),
             system=STOCK_ANALYSIS_SYSTEM,
-            use_web_search=False,
+            use_web_search=True,
         )
         return self._save(session, stock_code, "news", result)
 

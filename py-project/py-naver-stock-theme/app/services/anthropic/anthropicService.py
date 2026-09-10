@@ -29,7 +29,7 @@ class AnthropicService:
 
     def chat(self, messages: list[dict], model: str = DEFAULT_MODEL,
         system: str | None = None, max_tokens: int = DEFAULT_MAX_TOKENS,
-        cache_key: str | None = None, use_web_search: bool = False,
+        cache_key: str | None = None, use_web_search: bool = True,
     ) -> dict:
         """
         단순 요청/응답.
