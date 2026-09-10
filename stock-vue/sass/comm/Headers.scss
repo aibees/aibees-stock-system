@@ -23,10 +23,14 @@
         text-align: left;
 
         .title {
-            font-size: 1rem;
+            font-size: 0.92rem;
             color: $dc-gray-900; // [수정] white → 어두운 배경 아니라서 흰 글씨는 안 보임
             font-weight: bold;
             margin-left: 20px;
+            // "AIbees" 의 대문자 I 가 일부 폰트에서 소문자 l 처럼 보여
+            // "Albees" 로 오독되는 문제 방지 — 대문자로 표시(실제 텍스트는 그대로 유지)
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
         }
     }
 

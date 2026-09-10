@@ -17,26 +17,60 @@
             <transition name="fade-slide">
                 <div v-if="stockDetail" class="body-box">
 
-                    <!-- ① AI 분석 결과 (화면 80% 공간) -->
+                    <!-- ① 기업개요 + 재무현황 (버튼 갱신, 실적발표월만) -->
                     <section class="ai-result-section">
                         <div class="section-header">
-                            <span class="section-icon">✨</span>
-                            <span class="section-title">AI 종목 분석</span>
-                            <span v-if="aiModel" class="section-badge">{{ aiModel }}</span>
-                            <!-- 토큰 사용량 -->
-                            <span v-if="aiTokens" class="token-info">
-                                in&nbsp;{{ aiTokens.input_tokens }}&nbsp;/&nbsp;out&nbsp;{{ aiTokens.output_tokens }}
-                            </span>
+                            <span class="section-icon">🏢</span>
+                            <span class="section-title">기업개요 · 재무현황</span>
+                            <span v-if="overview" class="token-info">{{ formatUpdatedAt(overview.updated_at) }} 업데이트</span>
+                            <button type="button" class="ai-refresh-btn" :disabled="overviewButtonDisabled" @click="refreshOverview">
+                                {{ overviewButtonLabel }}
+                            </button>
                         </div>
-                        <div class="ai-result-body">
-                            <!-- marked로 변환된 HTML 렌더링 -->
-                            <div v-if="aiHtml" class="markdown-body" v-html="aiHtml" />
-                            <div v-else class="ai-loading">
-                                <div class="loading-dots">
-                                    <span></span><span></span><span></span>
-                                </div>
-                                <span class="loading-label">AI 종목분석 중입니다. <br/> Agent 질문처럼 오래 걸리니 기다려주세요.</span>
+                        <div class="ai-result-body compact">
+                            <div v-if="overviewHtml" class="markdown-body" v-html="overviewHtml" />
+                            <div v-else-if="overviewLoading || overviewRefreshing" class="ai-loading">
+                                <div class="loading-dots"><span></span><span></span><span></span></div>
+                                <span class="loading-label">불러오는 중입니다…</span>
                             </div>
+                            <div v-else class="ai-empty">아직 생성된 내용이 없습니다. 새로고침을 눌러주세요.</div>
+                        </div>
+                    </section>
+
+                    <!-- ② 현재 테마 (버튼 갱신, 주 1회 권장) -->
+                    <section class="ai-result-section">
+                        <div class="section-header">
+                            <span class="section-icon">🔥</span>
+                            <span class="section-title">현재 테마</span>
+                            <span v-if="theme" class="token-info">{{ formatUpdatedAt(theme.updated_at) }} 업데이트</span>
+                            <button type="button" class="ai-refresh-btn" :disabled="themeButtonDisabled" @click="refreshTheme">
+                                {{ themeButtonLabel }}
+                            </button>
+                        </div>
+                        <div class="ai-result-body compact">
+                            <div v-if="themeHtml" class="markdown-body" v-html="themeHtml" />
+                            <div v-else-if="themeLoading || themeRefreshing" class="ai-loading">
+                                <div class="loading-dots"><span></span><span></span><span></span></div>
+                                <span class="loading-label">불러오는 중입니다…</span>
+                            </div>
+                            <div v-else class="ai-empty">아직 생성된 내용이 없습니다. 새로고침을 눌러주세요.</div>
+                        </div>
+                    </section>
+
+                    <!-- ③ 최근 공시·뉴스 (자동, 2시간 캐시) -->
+                    <section class="ai-result-section">
+                        <div class="section-header">
+                            <span class="section-icon">📰</span>
+                            <span class="section-title">최근 공시 · 뉴스</span>
+                            <span v-if="news" class="token-info">{{ formatUpdatedAt(news.updated_at) }} 업데이트</span>
+                        </div>
+                        <div class="ai-result-body compact">
+                            <div v-if="newsHtml" class="markdown-body" v-html="newsHtml" />
+                            <div v-else-if="newsLoading" class="ai-loading">
+                                <div class="loading-dots"><span></span><span></span><span></span></div>
+                                <span class="loading-label">뉴스 확인 중입니다…</span>
+                            </div>
+                            <div v-else class="ai-empty">확인된 뉴스가 없습니다.</div>
                         </div>
                     </section>
 
@@ -111,6 +145,7 @@
 import { ref, computed } from 'vue';
 import { marked } from 'marked';
 import aibeesApi from '@scripts/aibeesApi.js';
+import { assUserSession } from '@scripts/stores/user-stores';
 
 // marked 옵션
 marked.setOptions({ breaks: true, gfm: true });
@@ -119,16 +154,72 @@ const route = useRoute();
 const router = useRouter();
 const title = ref('종목 심층 분석');
 const stockDetail = ref(null);
-const aiSummary = ref('');       // 원본 markdown 텍스트
-const aiTokens = ref(null);      // { input, output } — API 응답에서 채워짐
-const aiModel = ref('');
 const inputName = ref('');
 const inputCode = ref('');
 
-// markdown → HTML 변환 (v-html에 바인딩)
-const aiHtml = computed(() =>
-    aiSummary.value ? marked.parse(aiSummary.value) : ''
+const userSession = assUserSession();
+const ADMIN_USER_ID = 1;
+const ANNOUNCEMENT_MONTHS = [2, 5, 8, 11];
+const MIN_REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1시간
+
+const isAdmin = computed(() =>
+    userSession.isUserSession() && Number(userSession.user.loginInfo.user_id) === ADMIN_USER_ID
 );
+const isAnnouncementMonth = computed(() => ANNOUNCEMENT_MONTHS.includes(new Date().getMonth() + 1));
+
+/* ── 기업개요 + 재무현황 (버튼 갱신) ── */
+const overview = ref(null);          // { content, updated_at, input_tokens, output_tokens, model } | null
+const overviewLoading = ref(false);
+const overviewRefreshing = ref(false);
+const overviewHtml = computed(() => overview.value?.content ? marked.parse(overview.value.content) : '');
+const overviewOnCooldown = computed(() => cooldownRemainingMs(overview.value?.updated_at) > 0);
+// 한 번도 생성된 적 없는 종목(overview === null)은 발표월 무관 최초 1회 허용 — 백엔드와 동일 규칙
+const overviewButtonDisabled = computed(() =>
+    overviewRefreshing.value
+    || (!!overview.value && !isAnnouncementMonth.value)
+    || (overviewOnCooldown.value && !isAdmin.value)
+);
+const overviewButtonLabel = computed(() => {
+    if (overviewRefreshing.value) return '갱신 중…';
+    if (overview.value && !isAnnouncementMonth.value) return '실적발표월(2·5·8·11월)만 가능';
+    if (overviewOnCooldown.value && !isAdmin.value) return `${cooldownUntilLabel(overview.value.updated_at)} 이후 가능`;
+    return '새로고침';
+});
+
+/* ── 현재 테마 (버튼 갱신) ── */
+const theme = ref(null);
+const themeLoading = ref(false);
+const themeRefreshing = ref(false);
+const themeHtml = computed(() => theme.value?.content ? marked.parse(theme.value.content) : '');
+const themeOnCooldown = computed(() => cooldownRemainingMs(theme.value?.updated_at) > 0);
+const themeButtonDisabled = computed(() =>
+    themeRefreshing.value || (themeOnCooldown.value && !isAdmin.value)
+);
+const themeButtonLabel = computed(() => {
+    if (themeRefreshing.value) return '갱신 중…';
+    if (themeOnCooldown.value && !isAdmin.value) return `${cooldownUntilLabel(theme.value.updated_at)} 이후 가능`;
+    return '새로고침';
+});
+
+/* ── 최근 공시·뉴스 (자동, 버튼 없음) ── */
+const news = ref(null);
+const newsLoading = ref(false);
+const newsHtml = computed(() => news.value?.content ? marked.parse(news.value.content) : '');
+
+const cooldownRemainingMs = (updatedAt) => {
+    if (!updatedAt) return 0;
+    return new Date(updatedAt).getTime() + MIN_REFRESH_INTERVAL_MS - Date.now();
+};
+const cooldownUntilLabel = (updatedAt) => {
+    const until = new Date(new Date(updatedAt).getTime() + MIN_REFRESH_INTERVAL_MS);
+    return `${String(until.getHours()).padStart(2, '0')}:${String(until.getMinutes()).padStart(2, '0')}`;
+};
+const formatUpdatedAt = (v) => {
+    if (!v) return '';
+    const d = new Date(v);
+    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} `
+        + `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
 
 // 최근 분기 실적 (mock)
 const quarterlyResults = ref([
@@ -158,31 +249,110 @@ const goToChart = () => {
 const stockSearchHandler = (code) => {
     if (!code) return;
     stockDetail.value = { code };
-    aiSummary.value = '';
-    aiTokens.value = null;
-    aiModel.value = '';
+    overview.value = null;
+    theme.value = null;
+    news.value = null;
 
-    getAiResult(code);
+    getOverview(code);
+    getTheme(code);
+    getNews(code);
     getRecommandResult(code);
 };
 
-const getAiResult = async (code) => {
+const getOverview = async (code) => {
+    overviewLoading.value = true;
     try {
-        const { data } = await aibeesApi.get(`/api/v1/anthropic/stock-analysis?stock_code=${code}`);
-        // data.data 응답 구조:
-        // {
-        //   content : string,          // markdown 형식의 AI 분석 결과
-        //   usage   : { input_tokens, output_tokens },
-        //   model   : string           // 사용 모델명 (예: "gemini-2.0-flash")
-        // }
-        aiSummary.value = data.data.content ?? '';
-        aiTokens.value  = data.data.usage   ?? null;
-        aiModel.value   = data.data.model   ?? '';
+        const { data } = await aibeesApi.get('/api/v1/anthropic/stock-analysis/overview', { params: { stock_code: code } });
+        overview.value = data.data;
     } catch (e) {
         console.error(e);
-        aiSummary.value = '분석 결과를 불러오지 못했습니다.';
+        overview.value = null;
+    } finally {
+        overviewLoading.value = false;
     }
-}
+};
+
+const getTheme = async (code) => {
+    themeLoading.value = true;
+    try {
+        const { data } = await aibeesApi.get('/api/v1/anthropic/stock-analysis/theme', { params: { stock_code: code } });
+        theme.value = data.data;
+    } catch (e) {
+        console.error(e);
+        theme.value = null;
+    } finally {
+        themeLoading.value = false;
+    }
+};
+
+const getNews = async (code) => {
+    newsLoading.value = true;
+    try {
+        const { data } = await aibeesApi.get('/api/v1/anthropic/stock-analysis/news', { params: { stock_code: code } });
+        news.value = data.data;
+    } catch (e) {
+        console.error(e);
+        news.value = null;
+    } finally {
+        newsLoading.value = false;
+    }
+};
+
+const refreshOverview = async () => {
+    if (!userSession.isUserSession()) {
+        alert('로그인 후 이용할 수 있습니다.');
+        return;
+    }
+
+    let force = false;
+    if (overviewOnCooldown.value) {
+        if (!isAdmin.value) return;
+        if (!confirm('1시간 이내에 이미 갱신되었습니다. 그래도 다시 갱신하시겠습니까?')) return;
+        force = true;
+    }
+
+    overviewRefreshing.value = true;
+    try {
+        const { data } = await aibeesApi.post(
+            '/api/v1/anthropic/stock-analysis/overview',
+            { force },
+            { params: { stock_code: inputCode.value } },
+        );
+        overview.value = data.data;
+    } catch (e) {
+        console.error(e);
+    } finally {
+        overviewRefreshing.value = false;
+    }
+};
+
+const refreshTheme = async () => {
+    if (!userSession.isUserSession()) {
+        alert('로그인 후 이용할 수 있습니다.');
+        return;
+    }
+
+    let force = false;
+    if (themeOnCooldown.value) {
+        if (!isAdmin.value) return;
+        if (!confirm('1시간 이내에 이미 갱신되었습니다. 그래도 다시 갱신하시겠습니까?')) return;
+        force = true;
+    }
+
+    themeRefreshing.value = true;
+    try {
+        const { data } = await aibeesApi.post(
+            '/api/v1/anthropic/stock-analysis/theme',
+            { force },
+            { params: { stock_code: inputCode.value } },
+        );
+        theme.value = data.data;
+    } catch (e) {
+        console.error(e);
+    } finally {
+        themeRefreshing.value = false;
+    }
+};
 
 const getRecommandResult = async (code) => {
     try {
@@ -393,6 +563,22 @@ $amber:    #141414;
         font-size: 0.72rem;
         color: $gray-400;
     }
+
+    .ai-refresh-btn {
+        flex-shrink: 0;
+        padding: 4px 10px;
+        border: 1px solid $gray-200;
+        background: $white;
+        color: $gray-700;
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: border-color .15s, color .15s;
+
+        &:hover:not(:disabled) { border-color: $blue; color: $blue; }
+        &:disabled { color: $gray-400; cursor: not-allowed; }
+    }
 }
 
 /* ── ① AI 분석 결과 섹션 ── */
@@ -413,6 +599,25 @@ $amber:    #141414;
         @media (min-width: 600px) {
             min-height: 400px;
         }
+
+        /* 3개 섹션으로 나뉘며 공간을 덜 차지하도록 축소 */
+        &.compact {
+            max-height: 40vh;
+
+            @media (min-width: 600px) {
+                min-height: 160px;
+            }
+        }
+    }
+
+    .ai-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        padding: 24px 0;
+        font-size: 0.85rem;
+        color: $gray-400;
     }
 
     /* ── marked 렌더링 영역 ── */

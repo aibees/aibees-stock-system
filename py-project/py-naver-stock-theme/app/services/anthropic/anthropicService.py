@@ -5,8 +5,11 @@ from app.config.anthropicConfig import anthropic_settings
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "claude-sonnet-4-6"
+DEFAULT_MODEL = "claude-sonnet-5"
 DEFAULT_MAX_TOKENS = 8096
+# 재시도할 가치가 있는(=우리 쪽 재요청으로 나아질 수 있는) 일시적 오류만 재시도한다.
+# 429 레이트리밋, 529 과부하, 500/502/503/504 서버 오류.
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504, 529}
 
 # stock-analysis 결과 캐시: {cache_key: {"result": ..., "cached_at": float}}
 _CACHE: dict = {}
@@ -44,20 +47,32 @@ class AnthropicService:
 
         kwargs = dict(model=model, max_tokens=max_tokens, messages=messages)
         if use_web_search:
-            kwargs["tools"] = [{"type": "web_search_20260209", "name": "web_search"}]
+            # max_uses=1: 검색 1회당 $0.01 과금 외에도 검색결과 자체가 input 토큰으로 크게 붙는다
+            # (실측: 검색 3회 = input 약 79,000토큰, 요청당 약 $0.26 — 검색 미사용 대비 약 37배).
+            # 최신 공시 1건 확인이 목적이므로 1회로 제한해 비용을 억제한다.
+            kwargs["tools"] = [{"type": "web_search_20260209", "name": "web_search", "max_uses": 1}]
         if system:
             kwargs["system"] = system
 
-        # RateLimitError 발생 시 지수 백오프 재시도 (최대 3회)
+        # 일시적 오류(레이트리밋 429, 서버 과부하 529, 5xx, 연결 오류) 지수 백오프 재시도 (최대 3회)
+        # 429만 잡던 예전 코드는 Anthropic 서버가 잠깐 과부하(529)일 때 재시도 없이 바로
+        # 에러를 사용자에게 노출시켜 "input/output limit over" 로 보이는 원인이 됐다.
+        # 400/401/403/404 등 재시도해도 똑같이 실패할 오류는 즉시 전파한다.
         last_exc = None
         for attempt in range(3):
             try:
                 response = self.client.messages.create(**kwargs)
                 break
-            except anthropic.RateLimitError as e:
+            except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+                status = getattr(e, "status_code", None)
+                if isinstance(e, anthropic.APIStatusError) and status not in RETRYABLE_STATUS_CODES:
+                    raise
                 last_exc = e
                 wait = 2 ** attempt * 5  # 5s, 10s, 20s
-                logger.warning("Rate limit hit (attempt %d), retrying in %ds…", attempt + 1, wait)
+                logger.warning(
+                    "일시적 오류(status=%s, attempt %d/3), %ds 후 재시도: %s",
+                    status, attempt + 1, wait, e,
+                )
                 time.sleep(wait)
         else:
             raise last_exc

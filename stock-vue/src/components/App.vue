@@ -13,7 +13,7 @@ import Lnb from './common/Lnb.vue';
 @use '@@/__variables.scss' as *;
 body {
   height: 100%;
-  background-color: #1a1a1a;
+  background-color: #f7f7f7;
   margin: 0;
 
 }

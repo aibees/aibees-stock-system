@@ -8,8 +8,8 @@
                 <button class="tab-btn" :class="{ active: activeTab === 'buy' }" @click="activeTab = 'buy'">
                     매수타겟
                 </button>
-                <button class="tab-btn" :class="{ active: activeTab === 'sell' }" @click="activeTab = 'sell'">
-                    매도신호
+                <button class="tab-btn" :class="{ active: activeTab === 'world' }" @click="activeTab = 'world'">
+                    세계주요지표
                 </button>
             </nav>
 
@@ -22,15 +22,6 @@
                     </div>
 
                     <div class="head-actions">
-                        <!-- <button v-if="isLogin" class="btn-sell-request" @click="goSellRequest">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M3 3v18h18"></path>
-                                <path d="m19 9-5 5-4-4-3 3"></path>
-                            </svg>
-                            매도신호 신청
-                        </button> -->
-
                         <div class="date-picker-trigger" @click="openDatePicker">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -173,52 +164,67 @@
                 </section>
             </div>
 
-            <!-- ════════ 매도신호 탭 ════════ -->
-            <div v-show="activeTab === 'sell'" class="tab-panel">
-                <!-- 비로그인: 안내 문구 -->
-                <div v-if="!isLogin" class="login-required">
-                    <p>로그인 후 사용 가능합니다</p>
-                </div>
+            <!-- ════════ 세계주요지표 탭 ════════ -->
+            <div v-show="activeTab === 'world'" class="tab-panel">
+                <section class="head-desc">
+                    <div class="head-left">
+                        <h2>세계주요지표</h2>
+                        <p class="sub-text">최근 60일 (FRED 제공)</p>
+                    </div>
 
-                <!-- 로그인: 매도신호 조회 -->
-                <template v-else>
-                    <section class="head-desc">
-                        <div class="head-left">
-                            <h2>매도신호 현황</h2>
-                            <p class="sub-text">보유 종목의 청산 시그널</p>
-                        </div>
+                    <div class="head-actions">
+                        <button class="btn-world-refresh" :disabled="isWorldLoading" @click="getWorldIndicators">
+                            {{ isWorldLoading ? '불러오는 중…' : '새로고침' }}
+                        </button>
+                    </div>
+                </section>
 
-                        <div class="head-actions">
-                            <div class="date-picker-trigger" @click="openSellDatePicker">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                                    <line x1="3" y1="10" x2="21" y2="10"></line>
-                                </svg>
-                                <span class="date-value">{{ formattedSellDisplayDate }}</span>
-                                <input type="date" ref="sellDateInput" class="hidden-input" v-model="sellSelectedDate"
-                                    @change="handleSellDateChange" />
+                <nav v-if="!isWorldLoading && worldGroups.length > 0" class="indicator-shortcuts">
+                    <a v-for="group in worldGroups" :key="group.category" :href="`#indicator-${group.category}`"
+                        class="shortcut-chip">{{ group.category_label }}</a>
+                </nav>
+
+                <section class="world-indicator">
+                    <template v-if="!isWorldLoading && worldGroups.length > 0">
+                        <div v-for="group in worldGroups" :key="group.category" :id="`indicator-${group.category}`"
+                            class="indicator-group">
+                            <h3 class="indicator-group-title">{{ group.category_label }}</h3>
+                            <div class="indicator-grid">
+                                <div v-for="item in group.items" :key="item.series_id" class="indicator-card">
+                                    <div class="indicator-head">
+                                        <h4>{{ item.label }}</h4>
+                                        <div class="indicator-value" :class="rateClass(item.change)">
+                                            {{ formatIndicatorValue(item.latest_value, group.unit) }}
+                                            <span v-if="item.change != null" class="indicator-change">
+                                                {{ formatIndicatorChange(item.change, group.unit) }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="indicator-chart">
+                                        <IndicatorMiniChart :points="item.observations" />
+                                    </div>
+                                    <p class="indicator-summary">
+                                        {{ item.label }} {{ group.metric_word }} {{ formatIndicatorValue(item.latest_value, group.unit) }}
+                                        ({{ item.latest_date ?? '-' }})
+                                        <template v-if="item.change != null">
+                                            · 전일대비
+                                            <span class="summary-change" :class="rateClass(item.change)">{{ formatIndicatorChange(item.change, group.unit) }}</span>
+                                        </template>
+                                        · 최근 {{ item.observations.length }}일 범위 {{ formatIndicatorRange(item.observations, group.unit) }}
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    </section>
+                    </template>
 
-                    <section class="sell-signal">
-                        <div v-if="!isSellLoading && sellData.length > 0" class="signal-grid">
-                            <!-- TODO: 매도신호 카드 (매수타겟과 동일한 카드 형태, 구체 항목 추후 정의) -->
-                        </div>
+                    <div v-else-if="isWorldLoading" class="loader-grid">
+                        <div class="skeleton-card" v-for="n in 4" :key="n"></div>
+                    </div>
 
-                        <div v-else-if="isSellLoading" class="loader-grid">
-                            <div class="skeleton-card" v-for="n in 4" :key="n"></div>
-                        </div>
-
-                        <div v-else class="empty-box">
-                            <p>조회된 매도신호가 없습니다.</p>
-                        </div>
-                    </section>
-                </template>
+                    <div v-else class="empty-box">
+                        <p>지표 데이터를 가져오지 못했습니다.</p>
+                    </div>
+                </section>
             </div>
         </div>
     </div>
@@ -226,18 +232,13 @@
 
 <script setup>
 import Lnb from './common/Lnb.vue';
+import IndicatorMiniChart from './common/comp/IndicatorMiniChart.vue';
 import aibeesApi from '@scripts/aibeesApi.js';
-import { assUserSession } from '@scripts/stores/user-stores';
 
 const router = useRouter();
-const title = ref('SSAP');
-
-const userSession = assUserSession();
-const isLogin = ref(false);
+const title = ref('AIbees Trading');
 
 const activeTab = ref('buy');
-
-const goSellRequest = () => router.push({ path: '/sell-request' });
 
 const goToStockInfo = (stock_code, stock_name) => {
     router.push({ path: '/stock/info', query: { stock_code, stock_name } });
@@ -251,7 +252,6 @@ const selectedDate = ref(new Date().toISOString().slice(0, 10));
 const dateInput = ref(null);
 
 onMounted(async () => {
-    isLogin.value = userSession.isUserSession();
     await getStockMainData();
 });
 
@@ -326,39 +326,44 @@ const sortedData = computed(() => {
     });
 });
 
-/* ── 매도신호 탭 ── */
-const sellData = ref([]);
-const isSellLoading = ref(false);
-const sellSelectedDate = ref(new Date().toISOString().slice(0, 10));
-const sellDateInput = ref(null);
+/* ── 세계주요지표 탭 (국채 금리 · 국제 유가 등, FRED) ── */
+const worldGroups = ref([]);
+const isWorldLoading = ref(false);
 
-const getSellSignalData = async () => {
-    if (!isLogin.value) return;
-    isSellLoading.value = true;
+const getWorldIndicators = async () => {
+    isWorldLoading.value = true;
     try {
-        // TODO: 매도신호 조회 API 연동 (구체 스펙 추후 정의)
-        sellData.value = [];
+        const { data } = await aibeesApi.get('/api/v1/indicators/world');
+        worldGroups.value = data.data ?? [];
     } catch (e) {
         console.error(e);
+        worldGroups.value = [];
     } finally {
-        isSellLoading.value = false;
+        isWorldLoading.value = false;
     }
 };
 
-const handleSellDateChange = () => getSellSignalData();
-const openSellDatePicker = () => sellDateInput.value?.showPicker();
-
-const formattedSellDisplayDate = computed(() => {
-    const d = new Date(sellSelectedDate.value);
-    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
-});
-
-// 매도신호 탭 최초 진입 시 1회 로드
+// 세계주요지표 탭 최초 진입 시 1회 로드
 watch(activeTab, (tab) => {
-    if (tab === 'sell' && isLogin.value && sellData.value.length === 0) {
-        getSellSignalData();
+    if (tab === 'world' && worldGroups.value.length === 0) {
+        getWorldIndicators();
     }
 });
+
+const formatIndicatorValue = (value, unit) => {
+    if (value == null) return '-';
+    return unit === 'usd' ? `$${value.toFixed(2)}` : `${value.toFixed(2)}%`;
+};
+const formatIndicatorChange = (change, unit) => {
+    if (change == null) return '';
+    const sign = change >= 0 ? '+' : '';
+    return unit === 'usd' ? `${sign}${change.toFixed(2)}달러` : `${sign}${change}%p`;
+};
+const formatIndicatorRange = (observations, unit) => {
+    if (!observations || observations.length === 0) return '-';
+    const values = observations.map(o => o.value);
+    return `${formatIndicatorValue(Math.min(...values), unit)}~${formatIndicatorValue(Math.max(...values), unit)}`;
+};
 
 /* ── 관심종목 (로컬 저장, 서버 연동 없음) ── */
 const FAVORITE_KEY = 'ssap_favorite_stocks';
@@ -671,15 +676,6 @@ $bronze:  #3d3d3d;
     }
 }
 
-/* ── Login Required (매도신호) ── */
-.login-required {
-    text-align: center;
-    padding: 100px 0;
-    color: $gray-500;
-    font-size: 1rem;
-    font-weight: 600;
-}
-
 /* ── Header ── */
 .head-desc {
     display: flex;
@@ -718,22 +714,20 @@ $bronze:  #3d3d3d;
     }
 }
 
-.btn-sell-request {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    background: $navy;
-    color: $white;
-    border: none;
+.btn-world-refresh {
+    padding: 8px 16px;
+    border: 1px solid $gray-200;
+    background: $white;
+    color: $gray-700;
     font-size: 0.86rem;
     font-weight: 700;
     cursor: pointer;
     font-family: inherit;
     white-space: nowrap;
-    transition: background .15s;
+    transition: border-color .15s, color .15s;
 
-    &:hover { background: #000000; }
+    &:hover { border-color: $blue; color: $blue; }
+    &:disabled { color: $gray-400; cursor: not-allowed; }
 }
 
 /* ── Date Picker ── */
@@ -1064,6 +1058,114 @@ $bronze:  #3d3d3d;
             font-size: 0.72rem;
             color: $gray-500;
         }
+    }
+}
+
+/* ── 세계주요지표 ── */
+:global(html) {
+    scroll-behavior: smooth;
+}
+
+.indicator-shortcuts {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.shortcut-chip {
+    padding: 6px 14px;
+    border: 1px solid $gray-200;
+    background: $white;
+    color: $gray-700;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: border-color .15s, color .15s;
+
+    &:hover { border-color: $blue; color: $blue; }
+}
+
+.indicator-group {
+    margin-bottom: 28px;
+
+    &:last-child { margin-bottom: 0; }
+}
+
+.indicator-group-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: $gray-900;
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid $gray-200;
+}
+
+.indicator-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.indicator-card {
+    background: $white;
+    border: 1px solid $gray-200;
+    padding: 14px;
+    transition: border-color .15s;
+
+    &:hover { border-color: $gray-900; }
+}
+
+.indicator-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+
+    h4 {
+        font-size: 0.9rem;
+        font-weight: 700;
+        margin: 0;
+        color: $gray-900;
+    }
+}
+
+.indicator-value {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: $gray-900;
+    white-space: nowrap;
+
+    &.rate-up { color: $red; }
+    &.rate-down { color: $navy; }
+}
+
+.indicator-change {
+    margin-left: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: $gray-500;
+}
+
+.indicator-chart {
+    height: 90px;
+    margin-bottom: 8px;
+}
+
+.indicator-summary {
+    margin: 0;
+    font-size: 0.76rem;
+    color: $gray-500;
+    line-height: 1.4;
+    text-align: left;
+
+    .summary-change {
+        font-weight: 700;
+
+        &.rate-up { color: #d92b2b; }
+        &.rate-down { color: #2b62d9; }
     }
 }
 

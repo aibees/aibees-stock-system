@@ -9,6 +9,7 @@ MCP Server — Streamable HTTP + Bearer Auth
 """
 from __future__ import annotations
 
+import hmac
 import json
 import os
 from contextlib import asynccontextmanager, contextmanager
@@ -53,11 +54,17 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS":
             return await call_next(request)
 
+        # MCP_CLIENT_SECRET 미설정 시 무조건 거부 — 빈 문자열끼리 비교돼
+        # 인증이 뚫려버리는 것을 방지한다.
+        if not _BEARER_TOKEN:
+            return self._unauthorized("Server misconfigured: MCP_CLIENT_SECRET not set")
+
         auth = request.headers.get("Authorization", "")
         if not auth.startswith("Bearer "):
             return self._unauthorized("Bearer token required")
 
-        if auth[7:] != _BEARER_TOKEN:
+        # 타이밍 공격 방지를 위해 상수 시간 비교 사용
+        if not hmac.compare_digest(auth[7:], _BEARER_TOKEN):
             return self._unauthorized("Invalid token")
 
         return await call_next(request)
@@ -137,6 +144,7 @@ class StockMcpServer:
                 return json.dumps(
                     [r.to_dict() if hasattr(r, "to_dict") else str(r) for r in results],
                     ensure_ascii=False,
+                    default=str,
                 )
 
         @mcp.tool(

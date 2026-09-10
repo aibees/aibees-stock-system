@@ -292,7 +292,7 @@ console.log(userSession.getRole);
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 2.5rem;
+    height: 3.5rem;
     // [수정] 헤더와 통일 — 검정 배경 대신 앱 배경(흰색)에 상단 border로 구분.
     // fixed 라서 스크롤되는 컨텐츠가 밑에서 올라올 수 있어 완전 투명은 피하고
     // 불투명한 흰색으로 뒀음(헤더는 relative라 투명해도 안전, 여긴 다름).

@@ -191,3 +191,41 @@ class KisEngine:
         }
 
         return result
+
+    # 종합 시황/공시(제목) [국내주식-141] — 전체 시황 피드를 주므로 stock_code(iscd1)로
+    # 클라이언트 필터링한다. 매칭 결과가 없으면 종목명으로 제목 검색(FID_TITL_CNTT)을
+    # 한 번 더 시도해 적중률을 보완한다.
+    def get_news_title(self, code: str, stock_name: str = None, count: int = 8) -> list:
+        matched = self.__fetch_news_title(fid_input_iscd=code)
+        matched = [row for row in matched if row.get('iscd1') == code]
+
+        if not matched and stock_name:
+            matched = self.__fetch_news_title(fid_titl_cntt=stock_name)
+
+        return [
+            {
+                'title': row.get('hts_pbnt_titl_cntt', ''),
+                'source': row.get('dorg', ''),
+                'date': row.get('data_dt', ''),
+                'time': row.get('data_tm', ''),
+            }
+            for row in matched[:count]
+        ]
+
+    def __fetch_news_title(self, fid_input_iscd: str = '', fid_titl_cntt: str = '') -> list:
+        now = datetime.now()
+        resp = self.kis.fetch(
+            '/uapi/domestic-stock/v1/quotations/news-title',
+            api='FHKST01011800',
+            params={
+                'FID_NEWS_OFER_ENTP_CODE': '',
+                'FID_COND_MRKT_CLS_CODE': '',
+                'FID_INPUT_ISCD': fid_input_iscd,
+                'FID_TITL_CNTT': fid_titl_cntt,
+                'FID_INPUT_DATE_1': now.strftime('%Y%m%d'),
+                'FID_INPUT_HOUR_1': now.strftime('%H%M%S'),
+                'FID_RANK_SORT_CLS_CODE': '',
+                'FID_INPUT_SRNO': '',
+            },
+        )
+        return resp.__response__.json().get('output', [])

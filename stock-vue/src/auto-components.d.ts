@@ -13,6 +13,7 @@ declare module 'vue' {
     CBodyArea: typeof import('./components/common/comp/CBodyArea.vue')['default']
     CSearchItem: typeof import('./components/common/comp/CSearchItem.vue')['default']
     Headers: typeof import('./components/common/comp/Headers.vue')['default']
+    IndicatorMiniChart: typeof import('./components/common/comp/IndicatorMiniChart.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SAutoInput: typeof import('./components/common/comp/SAutoInput.vue')['default']
