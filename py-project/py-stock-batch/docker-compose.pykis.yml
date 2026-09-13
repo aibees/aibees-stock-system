@@ -83,6 +83,22 @@ services:
       - FCM_CREDENTIALS_PATH=/workdir/firebase-service-account.json
 #    networks: { aibees: { ipv4_address: 172.21.1.13 } }
 
+  kis-user4:
+    <<: *worker-common
+    container_name: kis-user4
+    environment:
+      - KIS_USER_ID=4
+      - KIS_VIRTUAL=false
+      - BUY_TIME=09:00           # KRX 정규장 시장가 매수
+      - NXT_PREMARKET=true        # NXT 프리마켓 선매수 라운드
+      - NXT_BUY_TIME=08:00        # 프리마켓 08:00~08:50 (지정가만 가능)
+      - NXT_LIMIT_SLIP_PCT=2.0    # 매수 지정가 = 전일종가 +2%
+      - SELL_LIMIT_SLIP_PCT=1.0   # NXT 장외 매도 지정가 = 체결가 -1%
+      - KIS_ALLOW_FILE_FALLBACK=false
+      - DB_URL=mysql+pymysql://stock:stock123!!@210.103.60.108:3333/stock
+      - FCM_CREDENTIALS_PATH=/workdir/firebase-service-account.json
+#    networks: { aibees: { ipv4_address: 172.21.1.14 } }
+
 #networks:
 #  aibees:
 #    external: true
