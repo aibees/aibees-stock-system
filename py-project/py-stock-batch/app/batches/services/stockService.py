@@ -1,5 +1,6 @@
 from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
+from stock_shared.dao.tradeBuyTargetChartDao import TradeBuyTargetChartDao
 from app.domain.dao.tradeSellTargetStockDao import TradeSellTargetStockDao
 from stock_shared.dao.stockSellRequestDao import StockSellRequestDao
 from stock_shared.strategy import scoring
@@ -10,6 +11,7 @@ class StockService:
         self.__name__ = "StockService"
         self.stockMasterDaoImpl = MasterStockDao()
         self.tradeBuyTargetStockDaoImpl = TradeBuyTargetStockDao()
+        self.tradeBuyTargetChartDaoImpl = TradeBuyTargetChartDao()
         self.tradeSellTargetStockDaoImpl = TradeSellTargetStockDao()
         self.stockSellRequestDaoImpl = StockSellRequestDao()
 
@@ -71,6 +73,19 @@ class StockService:
 
     def clean_buy_target_stock_by_ymd(self, session, ymd: str) -> int:
         return self.tradeBuyTargetStockDaoImpl.delete_by_ymd(session, ymd)
+
+    def clean_buy_target_chart_by_ymd(self, session, ymd: str) -> int:
+        return self.tradeBuyTargetChartDaoImpl.delete_by_ymd(session, ymd)
+
+    def save_buy_target_chart_bulk(self, session, data: list) -> None:
+        """종목별 간이차트(최근 120영업일 OHLCV+SMA) 일괄 upsert.
+        result_list 각 항목의 'chart_data' 키(있는 것만)를 저장한다."""
+        rows = [
+            {"ymd": r["ymd"], "stock_code": r["stock_code"], "chart_data": r["chart_data"]}
+            for r in data
+            if r.get("chart_data")
+        ]
+        self.tradeBuyTargetChartDaoImpl.upsert_bulk(session, rows)
 
     def save_buy_target_stock_one(self, session, data: dict) -> None:
         self.tradeBuyTargetStockDaoImpl.upsert_trade_buy_target_stock(session, [data])

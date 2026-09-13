@@ -44,17 +44,22 @@ def _ono(order_number) -> Optional[str]:
     return str(n) if n else str(order_number)
 
 
+# 지정가 계열 ORD_DVSN — 시장가('01')가 아니라 반드시 호가를 넣어야 하는 코드들.
+# '00'=지정가(NXT 프리/애프터마켓), '41'=KRX애프터마켓지정가(2026-09-14 KRX 애프터마켓 신설).
+_LIMIT_ORD_DVSN = frozenset({"00", "41"})
+
+
 @dataclass(frozen=True)
 class MarketSession:
     """지금 이 종목을 어느 거래소에 어떤 호가유형으로 낼 수 있는지."""
     tradable: bool
     exchange: str        # KRX / NXT / SOR
-    ord_dvsn: str        # '01'=시장가 / '00'=지정가
+    ord_dvsn: str        # '01'=시장가 / '00'=지정가(NXT) / '41'=KRX애프터마켓지정가
     name: str            # 로그용 세션명
 
     @property
     def limit_only(self) -> bool:
-        return self.ord_dvsn == "00"
+        return self.ord_dvsn in _LIMIT_ORD_DVSN
 
 
 @dataclass
@@ -456,15 +461,27 @@ class Broker:
             return eq, avg, f["rejected"], f["reason"]
 
     # ── 거래 세션 판정 (NXT / KRX 분리) ─────────────────────────────
-    #   KRX  : 09:00~15:30 정규장(시장가 가능)
-    #   NXT  : 프리마켓 08:00~08:50 · 메인 09:00~15:20 · 애프터마켓 15:30~20:00
+    #   KRX  : 09:00~15:30 정규장(시장가 가능) · 15:30~16:00 시간외종가매매(이 워커 비관여)
+    #          · 16:00~20:00 KRX애프터마켓 — 2026-09-14 신설, **지정가 계열만**
+    #            (ORD_DVSN='41' KRX애프터마켓지정가. 정규장 지정가'00'과는 다른 별개 코드다.
+    #             시장가 불가·ETP 거래 불가는 KIS 공지 기준.)
+    #   NXT  : 프리마켓 08:00~08:50 · 메인 09:00~15:20 · 애프터마켓 15:40~20:00
+    #          (2026-09-14 부로 개장이 15:30→15:40 으로 지연됨)
     #          프리/애프터마켓은 **지정가 호가만** 허용 → ORD_DVSN='00', 거래소 'NXT' 고정.
-    #          (이 시간대 KRX 는 닫혀 있어 SOR 통합 라우팅이 성립하지 않는다)
+    #          (이 시간대 KRX 정규장은 닫혀 있어 SOR 통합 라우팅이 성립하지 않는다)
     #   메인 세션은 SOR(KRX+NXT 통합 최선체결) 로 시장가.
     #   NXT 메인은 15:20 에 끝나므로 15:20~15:30 은 KRX 단독 시장가로 넘긴다.
+    #   NXT 대상 종목은 16:00~20:00 에도 기존처럼 NXT애프터마켓을 그대로 쓴다(정책 변경 없음) —
+    #   KRX애프터마켓은 NXT 미대상(KRX 전용) 종목에만 적용된다.
+    #   ※ 매수는 이 세션과 무관하다 — BUY_TIME/NXT_BUY_TIME cron 에서만 실행되고 오후에는
+    #     매수를 트리거하는 경로 자체가 없다. 이 세션 확장은 매도(청산)에만 영향을 준다.
     @staticmethod
-    def market_session(nxt: bool, now: Optional[datetime] = None) -> "MarketSession":
-        """(nxt_flag 기준) 지금 이 종목을 주문할 수 있는 세션. 불가면 tradable=False."""
+    def market_session(nxt: bool, now: Optional[datetime] = None,
+                        krx_aftermarket: bool = True) -> "MarketSession":
+        """(nxt_flag 기준) 지금 이 종목을 주문할 수 있는 세션. 불가면 tradable=False.
+
+        krx_aftermarket: False 로 두면 KRX 전용 종목은 예전처럼 15:30 에 세션이 끝난다
+        (WorkerConfig.krx_aftermarket_enabled 로 운영 중 즉시 끌 수 있는 킬스위치)."""
         now = now or datetime.now(TIMEZONE_KST)
         if now.weekday() >= 5:
             return MarketSession(False, "", "", "주말")
@@ -477,8 +494,10 @@ class Broker:
         if 15 * 60 + 20 <= hm < 15 * 60 + 30:
             # NXT 메인 종료, KRX 만 열려 있음
             return MarketSession(True, "KRX", "01", "정규장(KRX단독)")
-        if nxt and 15 * 60 + 30 <= hm < 20 * 60:
+        if nxt and 15 * 60 + 40 <= hm < 20 * 60:
             return MarketSession(True, "NXT", "00", "NXT애프터마켓")
+        if krx_aftermarket and not nxt and 16 * 60 <= hm < 20 * 60:
+            return MarketSession(True, "KRX", "41", "KRX애프터마켓지정가")
         return MarketSession(False, "", "", "장운영시간외")
 
     # ── 호가단위 ────────────────────────────────────────────────────

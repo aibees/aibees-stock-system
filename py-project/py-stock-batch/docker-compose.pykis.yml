@@ -43,6 +43,7 @@ services:
       - NXT_BUY_TIME=08:00        # 프리마켓 08:00~08:50 (지정가만 가능)
       - NXT_LIMIT_SLIP_PCT=2.0    # 매수 지정가 = 전일종가 +2%
       - SELL_LIMIT_SLIP_PCT=1.0   # NXT 장외 매도 지정가 = 체결가 -1%
+      - KRX_AFTERMARKET_ENABLED=true  # 2026-09-14 KRX애프터마켓(16:00~20:00) 매도 세션. 매수엔 영향 없음
       - KIS_ALLOW_FILE_FALLBACK=false
       - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
       - FCM_CREDENTIALS_PATH=/workdir/firebase-service-account.json
@@ -59,6 +60,7 @@ services:
       - NXT_BUY_TIME=08:00        # 프리마켓 08:00~08:50 (지정가만 가능)
       - NXT_LIMIT_SLIP_PCT=2.0    # 매수 지정가 = 전일종가 +2%
       - SELL_LIMIT_SLIP_PCT=1.0   # NXT 장외 매도 지정가 = 체결가 -1%
+      - KRX_AFTERMARKET_ENABLED=true  # 2026-09-14 KRX애프터마켓(16:00~20:00) 매도 세션. 매수엔 영향 없음
       - KIS_ALLOW_FILE_FALLBACK=false
       - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
       - FCM_CREDENTIALS_PATH=/workdir/firebase-service-account.json
@@ -75,6 +77,7 @@ services:
       - NXT_BUY_TIME=08:00        # 프리마켓 08:00~08:50 (지정가만 가능)
       - NXT_LIMIT_SLIP_PCT=2.0    # 매수 지정가 = 전일종가 +2%
       - SELL_LIMIT_SLIP_PCT=1.0   # NXT 장외 매도 지정가 = 체결가 -1%
+      - KRX_AFTERMARKET_ENABLED=true  # 2026-09-14 KRX애프터마켓(16:00~20:00) 매도 세션. 매수엔 영향 없음
       - KIS_ALLOW_FILE_FALLBACK=false
       - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
       - FCM_CREDENTIALS_PATH=/workdir/firebase-service-account.json

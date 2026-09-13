@@ -1,6 +1,7 @@
 import pandas as pd
 
 from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
+from stock_shared.dao.tradeBuyTargetChartDao import TradeBuyTargetChartDao
 from app.ext_services.kis.KisEngine import KisEngine
 from app.services.stocks.StockModService import StockModService
 from app.utils.constants.Literal import Literal
@@ -11,11 +12,22 @@ class StockService:
 
     def __init__(self):
         self.buyTargetStockDaoImpl = TradeBuyTargetStockDao()
+        self.buyTargetChartDaoImpl = TradeBuyTargetChartDao()
         self.modService = StockModService()
         self.kis = KisEngine(virtual=False)
 
     def get_buy_target_stock_list(self, session, ymd):
-        return self.buyTargetStockDaoImpl.select_trade_buy_target_daily(session, ymd)
+        results = self.buyTargetStockDaoImpl.select_trade_buy_target_daily(session, ymd)
+        if not results:
+            return results
+
+        # 전 종목이 같은 날짜(ymd 미지정 시 DAO가 자동 resolve한 최신 영업일)이므로
+        # 첫 행의 ymd로 차트 데이터를 한 번에 조회해 붙인다(종목별 N회 조회 대신).
+        resolved_ymd = results[0]["ymd"]
+        chart_map = self.buyTargetChartDaoImpl.select_by_ymd(session, resolved_ymd)
+        for item in results:
+            item["chart_data"] = chart_map.get(item["stock_code"], [])
+        return results
 
     def get_target_rec_record(self, session, params):
         stock_code = params.get(Literal.STOCK_CODE, None)

@@ -339,10 +339,14 @@ def main():
     #   장중에는 SellExecutor 가 소켓 체결가로 peak_high 를 메모리에서만 갱신한다
     #   (틱마다 DB UPDATE 를 하면 부하가 감당되지 않는다).
     #   세션이 닫히는 시점에 1회 저장해 다음날 reload_positions 가 이어받게 한다.
-    #     · 15:31 : KRX 마감(15:30) 직후 — KRX 전용 종목의 당일 고점 확정
-    #     · 20:01 : NXT 애프터마켓 마감(20:00) 직후 — NXT 대상 종목까지 확정
+    #     · 15:31 : KRX 정규장(15:30) 마감 직후 — 중간 저장 체크포인트
+    #     · 20:01 : NXT·KRX 애프터마켓(20:00) 마감 직후 — 최종 확정
+    #   2026-09-14 KRX애프터마켓 신설로 KRX 전용 종목도 20:00까지 peak_high 가 계속
+    #   갱신될 수 있어, 15:31 은 더 이상 "KRX 전용 종목의 당일 확정"이 아니다 — 그냥 중간
+    #   체크포인트일 뿐이고, 진짜 확정은 두 세션 다 닫히는 20:01 이다.
     #   두 job 모두 전 종목을 훑지만 flush_peaks 는 dirty 로 표시된 종목만 쓰므로
-    #   15:31 에 저장된 종목은 20:01 에 중복 저장되지 않는다(그 사이 고점 갱신분만 저장).
+    #   15:31 에 저장된 종목은 20:01 에 중복 저장되지 않는다(그 사이 고점 갱신분만 저장) —
+    #   이 멱등성 덕분에 로직 변경 없이 코멘트 정정만으로 충분하다.
     def _flush_peaks(tag: str):
         now_kst = datetime.now(_KST)
         if now_kst.weekday() >= 5:
@@ -354,13 +358,13 @@ def main():
         except Exception as e:  # noqa: BLE001
             log.exception("고점 flush(%s) 실패: %s", tag, e)
 
-    scheduler.add_job(lambda: _flush_peaks("KRX마감"),
+    scheduler.add_job(lambda: _flush_peaks("정규장마감(중간저장)"),
                       CronTrigger(hour=15, minute=31, timezone=_KST),
                       id="peak_flush_krx", max_instances=1)
-    scheduler.add_job(lambda: _flush_peaks("NXT마감"),
+    scheduler.add_job(lambda: _flush_peaks("애프터마켓마감(최종확정)"),
                       CronTrigger(hour=20, minute=1, timezone=_KST),
                       id="peak_flush_nxt", max_instances=1)
-    log.info("고점 flush 등록: 15:31 / 20:01 (KST) · 주말·휴장일 skip")
+    log.info("고점 flush 등록: 15:31(중간) / 20:01(최종) (KST) · 주말·휴장일 skip")
 
     # 계좌 예수금·보유종목 주기 갱신 (기본 10초). WALLET_POLL_SEC<=0 이면 비활성.
     #   reconcile_wallet: 실제 KIS 계좌 조회 → user_wallet(예수금·보유평가·총자산) + user_holdings 갱신.

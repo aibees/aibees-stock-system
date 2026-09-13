@@ -8,6 +8,7 @@ from app.batches.jobs.job import Job
 from app.batches.services.stockService import StockService
 from app.batches.services.userService import UserService
 from app.common.utils.smtpUtils import emailUtils
+from app.common.constants.Literal import Literal
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.kis.keyLoader import list_kis_user_ids
 from app.ext_services.kis.component.KisStockService import KisService
@@ -20,6 +21,9 @@ from stock_shared.dto.userOptionMeta import UserOptionMeta
 # 없으면 재등장 종목도 여전히 rank1이 될 수 있다). 같은 종목 연속 반복 매수 완화 목적.
 # (2026-08-08 추가. 값만 바꾸면 즉시 적용됨.)
 REPEAT_PENALTY_DAYS = 5
+
+# Home.vue 매수타겟 카드 간이차트용 슬라이스 길이(영업일). trade_buy_target_chart 저장.
+CHART_DAYS = 120
 
 
 class StockBuyCheckJob(Job):
@@ -40,6 +44,26 @@ class StockBuyCheckJob(Job):
         if strategy_param == 'KOSPI_2':
             return KospiStrategy1()  # TODO : more strategy
         return KospiStrategy1()
+
+    @staticmethod
+    def _build_chart_data(trade_data: list) -> list:
+        """최근 CHART_DAYS 영업일의 OHLCV+SMA(ema20/60) 슬림 슬라이스.
+        trade_data 는 compute_indicator_df() 가 만든 지표 20여 개 포함 전체 컬럼이라,
+        간이차트에 불필요한 컬럼(MACD/BB/ATR/OBV 등)은 제외하고 필요한 것만 뽑는다."""
+        rows = trade_data[-CHART_DAYS:]
+        return [
+            {
+                "date": r.get(Literal.DATETIME),
+                "open": r.get(Literal.OPEN),
+                "high": r.get(Literal.HIGH),
+                "low": r.get(Literal.LOW),
+                "close": r.get(Literal.CLOSE),
+                "volume": r.get(Literal.VOLUME),
+                "ma20": r.get(Literal.EMA_20),
+                "ma60": r.get(Literal.EMA_60),
+            }
+            for r in rows
+        ]
 
     @staticmethod
     def _split_even(items: list, n: int) -> list:
@@ -66,8 +90,9 @@ class StockBuyCheckJob(Job):
 
         # 배치 시작 전: 해당 ymd 기존 데이터 삭제
         deleted_cnt = self.stockServiceImpl.clean_buy_target_stock_by_ymd(self.session, ymd)
+        deleted_chart_cnt = self.stockServiceImpl.clean_buy_target_chart_by_ymd(self.session, ymd)
         self.session.commit()
-        print(f'[{ymd}] 기존 데이터 {deleted_cnt}건 삭제 완료', flush=True)
+        print(f'[{ymd}] 기존 데이터 {deleted_cnt}건(차트 {deleted_chart_cnt}건) 삭제 완료', flush=True)
 
         print(f'배치 대상 stock size : {len(stock_list)}', flush=True)
 
@@ -129,6 +154,15 @@ class StockBuyCheckJob(Job):
                 self.session.rollback()
                 print(f"[일괄 저장 실패] {e}", flush=True)
                 raise
+
+            # 간이차트 저장은 부가기능이라 실패해도 본 배치(매수타겟/이메일)를 막지 않는다.
+            try:
+                self.stockServiceImpl.save_buy_target_chart_bulk(self.session, result_list)
+                self.session.commit()
+                print(f"매수타겟 간이차트 저장 완료: {len(result_list)}건", flush=True)
+            except Exception as e:
+                self.session.rollback()
+                print(f"[간이차트 저장 실패, 매수타겟 저장은 유지됨] {e}", flush=True)
 
         return_result = {
             'status': 'SUCCESS',
@@ -199,6 +233,7 @@ class StockBuyCheckJob(Job):
                     result['stock_name'] = stock_name
                     result['ymd'] = ymd
                     result['fin'] = fin_result
+                    result['chart_data'] = self._build_chart_data(trade_data)
                     pprint.pprint(result)
                     results.append(result)
 

@@ -11,14 +11,19 @@
   2) 장중        : on_price → _advance_peak 이 **메모리에서만** 갱신하고 trail_line 재계산.
                    틱마다 DB 를 때리지 않는다(_peak_dirty 로 변경분만 표시).
   3) 세션 종료   : flush_peaks() 가 메모리 peak_high / trail_line 을 DB 에 1회 저장.
-                   KRX 전용은 15:30, NXT 대상은 20:00 이후(main.py cron).
+                   15:31 / 20:01 두 번 도는데(main.py cron) dirty 종목만 쓰므로 중복저장
+                   없이 안전하다 — 2026-09-14 KRX애프터마켓 신설로 KRX 전용 종목도 20:00까지
+                   갱신될 수 있지만, 20:01 job 이 전종목을 다시 훑어 그대로 커버된다.
   4) 다음날 부팅 : reload_positions 가 DB 에서 다시 읽어 메모리로 이어받는다.
   고점 기준은 peak_high 단일이다. 구 trail_basis('close'/'high') 선택 개념은 제거됐다.
 
-거래 세션 분리 (broker.market_session):
+거래 세션 분리 (broker.market_session, 2026-09-14 KRX애프터마켓 신설 반영):
   - NXT 대상(master_stock.nxt_flag='Y'): 08:00~08:50 프리마켓(지정가) · 09:00~15:20 메인(시장가)
-    · 15:20~15:30 KRX 단독(시장가) · 15:30~20:00 애프터마켓(지정가)
-  - KRX 전용: 09:00~15:30 만 (시장가)
+    · 15:20~15:30 KRX 단독(시장가) · 15:40~20:00 NXT애프터마켓(지정가, 기존 15:30→15:40 지연)
+  - KRX 전용: 09:00~15:30 정규장(시장가) · 16:00~20:00 KRX애프터마켓(지정가, ORD_DVSN='41')
+    · WorkerConfig.krx_aftermarket_enabled=False 로 즉시 옵트아웃 가능(킬스위치)
+  - 매수는 이 세션과 무관 — BUY_TIME/NXT_BUY_TIME cron 에서만 실행되고 오후에는 매수를
+    트리거하는 경로 자체가 없다. 세션 확장은 매도(청산)에만 영향을 준다.
   통합 실시간 스트림(H0UNCNT0)은 장외에도 틱이 오므로, 세션 가드 없이는 KRX 가 닫힌
   시간에 SOR 시장가가 나가 거부되고 연속 실패로 종목이 자동 비활성된다.
 
@@ -221,12 +226,15 @@ class BaseSellExecutor(ABC):
     # ── 세션 가드 ────────────────────────────────────────────────────
     def _session(self, pos: dict):
         """이 종목이 지금 주문 가능한 세션인지. NXT 대상과 KRX 전용은 창이 다르다.
-          - NXT 대상 : 08:00~08:50(지정가) · 09:00~15:20 · 15:20~15:30 · 15:30~20:00(지정가)
-          - KRX 전용 : 09:00~15:30 만
+          - NXT 대상 : 08:00~08:50(지정가) · 09:00~15:20 · 15:20~15:30 · 15:40~20:00(지정가)
+          - KRX 전용 : 09:00~15:30 · 16:00~20:00(지정가, KRX애프터마켓 — krx_aftermarket_enabled)
         통합 스트림(H0UNCNT0)은 장외에도 틱을 뿜기 때문에 이 가드가 없으면
         KRX 닫힌 시간에 SOR 시장가가 나가 '장운영시간이 아닙니다'로 거부되고,
         _register_fail 이 쌓여 종목이 자동 비활성(_disabled)까지 간다."""
-        return self.broker.market_session(pos.get("nxt_flag") == "Y")
+        return self.broker.market_session(
+            pos.get("nxt_flag") == "Y",
+            krx_aftermarket=self.cfg.krx_aftermarket_enabled,
+        )
 
     # ── 실시간 라인 돌파 ─────────────────────────────────────────────
     def on_price(self, symbol: str, price: Decimal):
@@ -613,7 +621,7 @@ class BaseSellExecutor(ABC):
                 self.wlog.info("[매도] %s %s → 주문 보류(실패로 세지 않음)", symbol, sess.name)
                 return
 
-            # 지정가 세션(NXT 프리/애프터마켓)은 시장가가 없다.
+            # 지정가 세션(NXT 프리/애프터마켓, KRX애프터마켓)은 시장가가 없다.
             # 손절/익절은 체결 속도가 생명이므로 체결가보다 한 틱 아래로 걸어 즉시 체결을 유도한다.
             order_px = price
             if sess.limit_only:

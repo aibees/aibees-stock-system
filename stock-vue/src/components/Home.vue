@@ -17,8 +17,8 @@
             <div v-show="activeTab === 'buy'" class="tab-panel">
                 <section class="head-desc">
                     <div class="head-left">
-                        <h2>전략매수 포착 현황</h2>
-                        <p class="sub-text">일간 지표로 계산한 기술적 타점</p>
+                        <h2>오늘의 추천종목</h2>
+                        <p class="sub-text">{{ formattedDisplayDate }} 기준</p>
                     </div>
 
                     <div class="head-actions">
@@ -52,32 +52,29 @@
                         <span class="dir-arrow">{{ sortDir === 'desc' ? '↓' : '↑' }}</span>
                         {{ sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel }}
                     </button>
-                    <span class="sort-count">{{ sortedData.length }}종목</span>
                 </section>
 
                 <section class="buy-target">
                     <div v-if="!isLoading && sortedData.length > 0" class="signal-grid">
                         <div v-for="(item, index) in sortedData" :key="item.stock_code ?? index" class="signal-card">
 
-                            <!-- 헤더: 순위 + 종목명/코드 + 액션 버튼 + 즐겨찾기 -->
+                            <!-- 헤더: 순위 + 종목명/코드 + 액션 버튼 + 금일 변동률 -->
                             <div class="card-head">
-                                <div class="rank-num">{{ String(item.rank_no ?? index + 1).padStart(2, '0') }}</div>
+                                <div class="rank-num">{{ String(rankNumber(index)).padStart(2, '0') }}</div>
                                 <div class="head-main">
                                     <h3 class="name">{{ item.stock_name }}</h3>
                                     <div class="code">{{ item.stock_code }}</div>
                                 </div>
                                 <div class="actions-row">
-                                    <button class="action-btn ai-btn" @click="goToStockInfo(item.stock_code, item.stock_name)">AI 개요</button>
+                                    <button class="action-btn ai-btn" @click="goToStockInfo(item.stock_code, item.stock_name)">AI 분석</button>
                                     <button class="action-btn chart-btn" @click="goToChart(item.stock_code)">차트보기</button>
                                 </div>
-                                <button type="button" class="star-btn" :class="{ on: isFavorite(item.stock_code) }"
-                                        @click="toggleFavorite(item.stock_code)" title="관심종목">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                        :fill="isFavorite(item.stock_code) ? 'currentColor' : 'none'" stroke="currentColor"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                    </svg>
-                                </button>
+                                <div class="rate-badge" :class="rateClass(item.rate)">{{ item.rate ?? '-' }}</div>
+                            </div>
+
+                            <!-- 간이 차트: 최근 120영업일 종가 (카드와 같은 너비, 지표 미니차트의 2배 높이) -->
+                            <div v-if="item.chart_data && item.chart_data.length" class="mini-chart">
+                                <IndicatorMiniChart :points="buyTargetChartPoints(item)" :color="buyTargetChartColor(item)" />
                             </div>
 
                             <!-- 현재가 + 거래량 + 추천 -->
@@ -85,7 +82,6 @@
                                 <div class="stat-cell">
                                     <span class="stat-label">현재가</span>
                                     <div class="stat-main">{{ formatNumber(item.close) }}<span class="unit">원</span></div>
-                                    <div class="stat-sub" :class="rateClass(item.rate)">{{ item.rate ?? '-' }}</div>
                                 </div>
                                 <div class="stat-cell">
                                     <span class="stat-label">거래량</span>
@@ -248,7 +244,57 @@ const goToChart = (stock_code) => {
 };
 const resultData = ref([]);
 const isLoading = ref(true);
-const selectedDate = ref(new Date().toISOString().slice(0, 10));
+
+/* ── 매수타겟 기준일 기본값: 가장 최신 배치 데이터가 있는 날 ──
+ * - 배치는 KST 기준 평일 20:00에 완료된다.
+ * - 주말(토·일)은 항상 직전 금요일 데이터가 최신이다.
+ * - 평일 20:00 이전에는 당일 배치가 아직 안 끝났으므로 직전 영업일 데이터가 최신이다
+ *   (월요일 20시 이전이면 일·토를 건너뛰어 금요일까지 거슬러 올라간다).
+ * - 평일 20:00 이후에는 당일 데이터가 최신이다.
+ * 뷰어의 브라우저 시간대와 무관하게 KST 기준으로 판단해야 하므로 Intl 로 명시적으로 구한다.
+ */
+const getKstNow = () => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', hour12: false, weekday: 'short',
+    }).formatToParts(new Date());
+    const get = (type) => parts.find(p => p.type === type)?.value;
+    const WEEKDAY_NUM = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    return {
+        year: Number(get('year')),
+        month: Number(get('month')),
+        day: Number(get('day')),
+        hour: Number(get('hour')) % 24, // 일부 브라우저가 자정을 '24'로 반환하는 것 방어
+        weekday: WEEKDAY_NUM[get('weekday')],
+    };
+};
+
+const toYmdString = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+const shiftDate = (y, m, d, deltaDays) => {
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    dt.setUTCDate(dt.getUTCDate() + deltaDays);
+    return { year: dt.getUTCFullYear(), month: dt.getUTCMonth() + 1, day: dt.getUTCDate(), weekday: dt.getUTCDay() };
+};
+
+const getLatestBatchDate = () => {
+    const kst = getKstNow();
+    const isWeekend = kst.weekday === 0 || kst.weekday === 6;
+
+    if (!isWeekend && kst.hour >= 20) {
+        return toYmdString(kst.year, kst.month, kst.day); // 평일 20시 이후: 오늘
+    }
+
+    // 주말이거나 평일 20시 이전: 직전 영업일까지 거슬러 올라간다
+    let d = shiftDate(kst.year, kst.month, kst.day, -1);
+    while (d.weekday === 0 || d.weekday === 6) {
+        d = shiftDate(d.year, d.month, d.day, -1);
+    }
+    return toYmdString(d.year, d.month, d.day);
+};
+
+const selectedDate = ref(getLatestBatchDate());
 const dateInput = ref(null);
 
 onMounted(async () => {
@@ -305,6 +351,12 @@ const setSortKey = (key) => {
     sortDir.value = SORT_OPTIONS.find(o => o.key === key)?.dir ?? 'desc';
 };
 const toggleSortDir = () => { sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc'; };
+
+// 카드 번호: 정렬 기준의 "기본 방향"일 때만 1위부터 매기고, 방향을 뒤집으면
+// 목록을 새로 매기는 게 아니라 같은 순위를 거꾸로 보여준다(마지막 번호부터 역순).
+const rankNumber = (index) => (
+    sortDir.value === currentSort.value.dir ? index + 1 : sortedData.value.length - index
+);
 
 const sortNum = (v) => {
     if (v === null || v === undefined || v === '') return null;
@@ -363,22 +415,6 @@ const formatIndicatorRange = (observations, unit) => {
     if (!observations || observations.length === 0) return '-';
     const values = observations.map(o => o.value);
     return `${formatIndicatorValue(Math.min(...values), unit)}~${formatIndicatorValue(Math.max(...values), unit)}`;
-};
-
-/* ── 관심종목 (로컬 저장, 서버 연동 없음) ── */
-const FAVORITE_KEY = 'ssap_favorite_stocks';
-const favoriteStocks = ref(new Set());
-try {
-    const saved = JSON.parse(localStorage.getItem(FAVORITE_KEY) || '[]');
-    favoriteStocks.value = new Set(saved);
-} catch (e) { /* ignore malformed storage */ }
-
-const isFavorite = (code) => favoriteStocks.value.has(code);
-const toggleFavorite = (code) => {
-    const next = new Set(favoriteStocks.value);
-    next.has(code) ? next.delete(code) : next.add(code);
-    favoriteStocks.value = next;
-    localStorage.setItem(FAVORITE_KEY, JSON.stringify([...next]));
 };
 
 /* ── 카드 상세(근거·조건) 펼치기 ── */
@@ -509,6 +545,17 @@ const rateClass = (rate) => {
     return '';
 };
 
+/* ── 매수타겟 카드 간이차트 (최근 120영업일 종가) ── */
+const buyTargetChartPoints = (item) => (
+    (item.chart_data || []).map(d => ({ date: d.date, value: Number(d.close) }))
+);
+const buyTargetChartColor = (item) => {
+    const v = parseFloat(item.rate);
+    if (v > 0) return '#d92b2b';
+    if (v < 0) return '#2b62d9';
+    return '#9a9a9a';
+};
+
 const scoreClass = (score) => {
     if (score === null || score === undefined || score === '') return '';
     const n = Number(score);
@@ -555,6 +602,7 @@ $bronze:  #3d3d3d;
 .sort-bar {
     display: flex;
     align-items: center;
+    justify-content: left;
     gap: 8px;
     flex-wrap: wrap;
     padding: 10px 12px;
@@ -682,6 +730,7 @@ $bronze:  #3d3d3d;
     justify-content: space-between;
     align-items: flex-end;
     margin-bottom: 24px;
+    text-align: start;
 
     h2 {
         font-size: 1.4rem;
@@ -776,7 +825,7 @@ $bronze:  #3d3d3d;
         border-color: $gray-900;
     }
 
-    /* ── 헤더: 순위 · 종목명/코드 · 액션 버튼 · 즐겨찾기 ── */
+    /* ── 헤더: 순위 · 종목명/코드 · 액션 버튼 · 금일 변동률 ── */
     .card-head {
         display: flex;
         align-items: center;
@@ -850,23 +899,16 @@ $bronze:  #3d3d3d;
             }
         }
 
-        .star-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 26px;
-            height: 26px;
+        .rate-badge {
             flex-shrink: 0;
-            padding: 0;
-            border: none;
-            background: none;
-            color: $gray-200;
-            cursor: pointer;
-            transition: color .15s, transform .1s;
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: $gray-500;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
 
-            &:hover { color: $gray-400; }
-            &:active { transform: scale(0.9); }
-            &.on { color: $amber; }
+            &.rate-up { color: #d92b2b; }
+            &.rate-down { color: #2b62d9; }
         }
 
         @media (max-width: 480px) {
@@ -874,6 +916,15 @@ $bronze:  #3d3d3d;
 
             .actions-row { order: 3; width: 100%; padding-left: calc(1.2rem + 10px); }
         }
+    }
+
+    /* ── 간이 차트: 카드와 같은 너비, 지표 미니차트(90px)의 2배 높이 ── */
+    .mini-chart {
+        width: 100%;
+        height: 180px;
+        padding: 4px 14px 8px;
+        box-sizing: border-box;
+        border-top: 1px solid $gray-100;
     }
 
     /* ── 현재가/거래량/추천 3열 통계 ── */
@@ -894,9 +945,11 @@ $bronze:  #3d3d3d;
             font-size: 0.66rem;
             color: $gray-500;
             margin-bottom: 1px;
+            text-align: right;
         }
 
         .stat-main {
+            text-align: right;
             font-size: 0.94rem;
             font-weight: 800;
             color: $gray-900;
@@ -934,8 +987,8 @@ $bronze:  #3d3d3d;
         background: $gray-50;
 
         .price-item {
-            padding: 5px 0;
-            text-align: center;
+            padding: 0.3rem 0.8rem;
+            text-align: right;
 
             &:not(:last-child) { border-right: 1px solid $gray-100; }
 

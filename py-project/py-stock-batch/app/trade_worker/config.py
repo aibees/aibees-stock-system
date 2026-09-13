@@ -26,6 +26,10 @@ worker 는 유저 1명당 1 프로세스(상시 daemon)로 뜬다. KIS_USER_ID �
 | BUY_FILL_WAIT_RETRIES | 3 | 매수 미체결(PENDING) 시 즉시 취소 전 추가 체결대기 재확인 횟수 |
 | BUY_FILL_WAIT_SEC | 10 | 매수 체결대기 재확인 1회당 대기 시간(초) |
 | WALLET_POLL_SEC | 10 | 계좌 예수금·보유종목 주기 갱신 간격(초). 0 이하면 폴링 비활성 |
+| KRX_AFTERMARKET_ENABLED | true | 2026-09-14 KRX 애프터마켓(16:00~20:00) 매도 세션 사용 여부. KRX 전용 종목도
+    이 시간까지 청산 가능해진다(ORD_DVSN=41 KRX애프터마켓지정가). **매수에는 영향 없음** —
+    매수는 지금처럼 BUY_TIME/NXT_BUY_TIME cron 에서만 실행되고, 오후에는 매수를 트리거하는
+    경로 자체가 없다. |
 """
 import os
 from dataclasses import dataclass
@@ -59,6 +63,8 @@ class WorkerConfig:
     wallet_poll_sec: int
     # user_options(s1_*) 변경 감지 주기(초). 0 이면 비활성 → 재기동해야 반영된다.
     settings_poll_sec: int
+    # 2026-09-14 KRX 애프터마켓(16:00~20:00) 매도 세션 사용 여부. 매수 경로에는 영향 없음.
+    krx_aftermarket_enabled: bool
 
 
 def load() -> WorkerConfig:
@@ -92,4 +98,5 @@ def load() -> WorkerConfig:
         buy_fill_wait_sec=int(os.getenv("BUY_FILL_WAIT_SEC", "10")),
         wallet_poll_sec=int(os.getenv("WALLET_POLL_SEC", "30")),
         settings_poll_sec=int(os.getenv("SETTINGS_POLL_SEC", "60")),
+        krx_aftermarket_enabled=_bool(os.getenv("KRX_AFTERMARKET_ENABLED"), True),
     )
