@@ -67,14 +67,26 @@
                                 </div>
                                 <div class="actions-row">
                                     <button class="action-btn ai-btn" @click="goToStockInfo(item.stock_code, item.stock_name)">AI 분석</button>
-                                    <button class="action-btn chart-btn" @click="goToChart(item.stock_code)">차트보기</button>
+                                    <button class="action-btn chart-btn" @click="toggleChart(item.stock_code)">
+                                        {{ expandedCharts.has(item.stock_code) ? '차트접기' : '차트보기' }}
+                                    </button>
                                 </div>
                                 <div class="rate-badge" :class="rateClass(item.rate)">{{ item.rate ?? '-' }}</div>
                             </div>
 
-                            <!-- 간이 차트: 최근 120영업일 종가 (카드와 같은 너비, 지표 미니차트의 2배 높이) -->
-                            <div v-if="item.chart_data && item.chart_data.length" class="mini-chart">
-                                <IndicatorMiniChart :points="buyTargetChartPoints(item)" :color="buyTargetChartColor(item)" />
+                            <!-- 간이 차트: 최근 120영업일 봉차트 + 20/60/120일선 (기본 숨김, 차트보기로 토글) -->
+                            <div v-if="expandedCharts.has(item.stock_code) && item.chart_data && item.chart_data.length" class="mini-chart">
+                                <div class="mini-chart-head">
+                                    <div class="mini-legend">
+                                        <span class="leg-item" style="--c:#efa55b">MA20</span>
+                                        <span class="leg-item" style="--c:#d0fe48">MA60</span>
+                                        <span class="leg-item" style="--c:#01b6f3">MA120</span>
+                                    </div>
+                                    <button type="button" class="mini-chart-detail" @click="goToChart(item.stock_code)">자세히보기 ›</button>
+                                </div>
+                                <div class="mini-chart-canvas">
+                                    <CandlestickChart :chartData="buyTargetCandleData(item)" :extraOptions="miniCandleOptions" />
+                                </div>
                             </div>
 
                             <!-- 현재가 + 거래량 + 추천 -->
@@ -229,6 +241,7 @@
 <script setup>
 import Lnb from './common/Lnb.vue';
 import IndicatorMiniChart from './common/comp/IndicatorMiniChart.vue';
+import CandlestickChart from './common/comp/CandlestickChart.vue';
 import aibeesApi from '@scripts/aibeesApi.js';
 
 const router = useRouter();
@@ -545,15 +558,57 @@ const rateClass = (rate) => {
     return '';
 };
 
-/* ── 매수타겟 카드 간이차트 (최근 120영업일 종가) ── */
-const buyTargetChartPoints = (item) => (
-    (item.chart_data || []).map(d => ({ date: d.date, value: Number(d.close) }))
-);
-const buyTargetChartColor = (item) => {
-    const v = parseFloat(item.rate);
-    if (v > 0) return '#d92b2b';
-    if (v < 0) return '#2b62d9';
-    return '#9a9a9a';
+/* ── 매수타겟 카드 간이차트 (최근 120영업일 봉차트 + 5/20/60/120일선) ──
+ * 기본 숨김 — "차트보기" 버튼으로 종목별 개별 토글. ChartStock.vue(전체 차트 페이지)와
+ * 동일한 CandlestickChart 컴포넌트·색상 배색을 재사용해 일관성을 맞춘다.
+ */
+const expandedCharts = ref(new Set());
+const toggleChart = (code) => {
+    const next = new Set(expandedCharts.value);
+    next.has(code) ? next.delete(code) : next.add(code);
+    expandedCharts.value = next;
+};
+
+const buyTargetCandleData = (item) => {
+    const rows = item.chart_data || [];
+    const toXY = (key) => rows.map(r => ({
+        x: (r.date || '').slice(0, 10),
+        y: r[key] != null ? Number(r[key]) : null,
+    }));
+
+    return {
+        labels: rows.map(r => (r.date || '').slice(0, 10)),
+        datasets: [
+            {
+                label: 'Candle',
+                data: rows.map(r => ({
+                    x: (r.date || '').slice(0, 10),
+                    o: Number(r.open), h: Number(r.high), l: Number(r.low), c: Number(r.close),
+                })),
+                color: { up: '#c51300', down: '#03748d', unchanged: '#999999' },
+            },
+            { label: 'MA20',  data: toXY('ma20'),  borderColor: '#efa55b', type: 'line', pointRadius: 0 },
+            { label: 'MA60',  data: toXY('ma60'),  borderColor: '#d0fe48', type: 'line', pointRadius: 0 },
+            { label: 'MA120', data: toXY('ma120'), borderColor: '#01b6f3', type: 'line', pointRadius: 0 },
+        ],
+    };
+};
+
+// 카드 내 미니 프리뷰용 — 줌/팬 비활성화, 범례는 커스텀 legend로 대체, 축은 최소화
+const miniCandleOptions = {
+    plugins: {
+        legend: { display: false },
+        zoom: {
+            pan: { enabled: false },
+            zoom: { wheel: { enabled: false }, pinch: { enabled: false } },
+        },
+    },
+    scales: {
+        // x축 display:false 를 바로 주면(Chart.js 3.9 + category 스케일) 범위(min/max) 계산 자체가
+        // 깨져서 데이터가 거의 안 보이는 버그가 있다 — 축은 켜두고 눈금표시(ticks)만 숨긴다.
+        x: { type: 'category', grid: { display: false }, ticks: { display: false } },
+        y: { position: 'right', beginAtZero: false, ticks: { font: { size: 9 } } },
+    },
 };
 
 const scoreClass = (score) => {
@@ -918,13 +973,64 @@ $bronze:  #3d3d3d;
         }
     }
 
-    /* ── 간이 차트: 카드와 같은 너비, 지표 미니차트(90px)의 2배 높이 ── */
+    /* ── 간이 차트: 봉차트 + 이평선, 카드와 같은 너비 (기본 숨김, 차트보기로 토글) ── */
     .mini-chart {
         width: 100%;
-        height: 180px;
-        padding: 4px 14px 8px;
+        padding: 8px 14px 10px;
         box-sizing: border-box;
         border-top: 1px solid $gray-100;
+
+        .mini-chart-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .mini-legend {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .leg-item {
+            font-size: 0.62rem;
+            font-weight: 600;
+            color: $gray-500;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+
+            &::before {
+                content: '';
+                display: inline-block;
+                width: 10px;
+                height: 2px;
+                background: var(--c);
+            }
+        }
+
+        .mini-chart-detail {
+            flex-shrink: 0;
+            padding: 2px 8px;
+            border: 1px solid $gray-200;
+            background: $white;
+            color: $gray-700;
+            font-size: 0.68rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            font-family: inherit;
+            transition: border-color .15s, color .15s;
+
+            &:hover { border-color: $blue; color: $blue; }
+        }
+
+        .mini-chart-canvas {
+            width: 100%;
+            height: 220px;
+        }
     }
 
     /* ── 현재가/거래량/추천 3열 통계 ── */

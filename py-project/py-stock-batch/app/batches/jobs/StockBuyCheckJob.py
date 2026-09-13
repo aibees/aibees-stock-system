@@ -47,9 +47,9 @@ class StockBuyCheckJob(Job):
 
     @staticmethod
     def _build_chart_data(trade_data: list) -> list:
-        """최근 CHART_DAYS 영업일의 OHLCV+SMA(ema20/60) 슬림 슬라이스.
+        """최근 CHART_DAYS 영업일의 OHLCV+SMA(5/20/60/120) 슬림 슬라이스.
         trade_data 는 compute_indicator_df() 가 만든 지표 20여 개 포함 전체 컬럼이라,
-        간이차트에 불필요한 컬럼(MACD/BB/ATR/OBV 등)은 제외하고 필요한 것만 뽑는다."""
+        간이차트(봉차트+이평선)에 불필요한 컬럼(MACD/BB/ATR/OBV 등)은 제외하고 필요한 것만 뽑는다."""
         rows = trade_data[-CHART_DAYS:]
         return [
             {
@@ -61,6 +61,7 @@ class StockBuyCheckJob(Job):
                 "volume": r.get(Literal.VOLUME),
                 "ma20": r.get(Literal.EMA_20),
                 "ma60": r.get(Literal.EMA_60),
+                "ma120": r.get(Literal.EMA_120),
             }
             for r in rows
         ]
