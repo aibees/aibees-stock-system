@@ -27,10 +27,12 @@ REPEAT_PENALTY_DAYS = 5
 # Home.vue 매수타겟 카드 간이차트용 슬라이스 길이(영업일). trade_buy_target_chart 저장.
 CHART_DAYS = 120
 
-# shape 모델 추론값(0~1) 하한. 미만이면 매수후보에서 아예 제외한다(2026-09 세션).
+# shape 모델 추론값(0~1) 하한 기본값. 미만이면 매수후보에서 아예 제외한다(2026-09 세션).
 # 0.3~0.35 구간 실측 적중률(5봉내 net_edge>=15%p)이 기준선(15.1%) 대비 약 2배였던
 # 캘리브레이션 근거로 정함. assign_ranks() 는 이 필터를 통과한 후보만 받는다고 가정한다.
-SHAPE_PROBA_MIN = 0.35
+# user_options.s1_shape_proba_min 이 설정돼 있으면 그 값이 이 기본값을 덮어쓴다
+# (_process_chunk 의 _resolve_shape_proba_min 참고).
+SHAPE_PROBA_MIN_DEFAULT = 0.3
 
 
 class StockBuyCheckJob(Job):
@@ -239,11 +241,14 @@ class StockBuyCheckJob(Job):
                 if result['action_type'] != 'HOLD':
                     shape_proba = shape_score(
                         {c: trade_data[-1].get(c) for c in SHAPE_FEATURE_COLUMNS})
-                    # shape_proba < SHAPE_PROBA_MIN(0.35) 이면 후보에서 제외한다(2026-09 세션).
+                    shape_proba_min = stock_option_meta.s1_shape_proba_min
+                    if shape_proba_min is None:
+                        shape_proba_min = SHAPE_PROBA_MIN_DEFAULT
+                    # shape_proba < shape_proba_min 이면 후보에서 제외한다(2026-09 세션).
                     # 모델 로딩 실패 등으로 shape_proba 를 못 구한 경우(None)는 배치가
                     # 죽지 않게 통과시킨다 — sklearn/아티팩트 문제로 추천이 0건 되는 걸 막기 위함.
-                    if shape_proba is not None and shape_proba < SHAPE_PROBA_MIN:
-                        print(f"[{tag}] skip ==> shape_proba 미달 ({shape_proba:.3f} < {SHAPE_PROBA_MIN})", flush=True)
+                    if shape_proba is not None and shape_proba < shape_proba_min:
+                        print(f"[{tag}] skip ==> shape_proba 미달 ({shape_proba:.3f} < {shape_proba_min})", flush=True)
                     else:
                         result['stock_code'] = stock_code
                         result['stock_name'] = stock_name
