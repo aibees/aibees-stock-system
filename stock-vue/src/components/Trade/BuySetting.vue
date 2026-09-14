@@ -145,6 +145,7 @@
                                     <th class="tr">score</th>
                                     <th class="tr">거래량</th>
                                     <th class="tr">등락률</th>
+                                    <th class="tr">급등패턴</th>
                                     <th class="tc">rank</th>
                                 </tr>
                             </thead>
@@ -156,6 +157,7 @@
                                     <td class="tr num">{{ r.score ?? '–' }}</td>
                                     <td class="tr num">{{ r.volume === null ? '–' : r.volume.toLocaleString() }}</td>
                                     <td class="tr num" :class="pctClass(r.rate)">{{ r.rate ?? '–' }}</td>
+                                    <td class="tr num">{{ r.shape_proba ?? '–' }}</td>
                                     <td class="tc num">{{ r.rank_no ?? '–' }}</td>
                                 </tr>
                             </tbody>
@@ -356,9 +358,17 @@ const ORDER_FIELD_META = {
         label: '종가', descLabel: '높은 순', ascLabel: '낮은 순',
         hint: '전일 종가. 저가주/고가주 선호를 반영할 때 씁니다.',
     },
+    shape_proba: {
+        label: '급등패턴 확률 (shape_proba)', descLabel: '높은 순', ascLabel: '낮은 순',
+        hint: '14봉 가격패턴 모델이 예측한 "5일 내 순엣지 15%p+" 확률(0~1). 배치가 이미 이 값' +
+              ' 0.35 미만인 종목은 후보에서 제외한 뒤 계산하므로, 통과한 종목은 전부 그 이상입니다.',
+    },
 };
 const ORDER_FIELDS = Object.keys(ORDER_FIELD_META);
-const DEFAULT_ORDER_SPEC = 'score:desc,rank_no:asc';
+// 2026-09: 배치 rank_no 산정 기준이 shape_proba 내림차순으로 바뀌면서, worker 기본
+// 정렬(stock_shared.strategy.buy_order.DEFAULT_BUY_ORDER)도 rank_no 우선으로 뒤집었다 —
+// 여기 기본값도 그와 동일하게 맞춘다(둘이 다르면 "미리보기"가 실제 매수 순서와 어긋난다).
+const DEFAULT_ORDER_SPEC = 'rank_no:asc,score:desc';
 
 /* orderRows: 화면 순서 = 우선순위. on=false 면 정렬에 쓰지 않음 */
 const orderRows = ref([]);
@@ -433,11 +443,11 @@ const resetOrderToDefault = () => { orderRows.value = specToRows(DEFAULT_ORDER_S
  * ymd 없이 호출하면 서버가 가장 최근 영업일자를 찾아 반환한다.
  * 조회 실패/데이터 없음이면 아래 FALLBACK_ROWS 로 떨어져 화면이 비지 않게 한다. */
 const FALLBACK_ROWS = [
-    { stock_code: '005070', stock_name: '코스모신소재', score: 90, volume: 512000, rate: '12.5%', rank_no: 1 },
-    { stock_code: '066430', stock_name: '와이오엠', score: 90, volume: 9120000, rate: '-3.2%', rank_no: 2 },
-    { stock_code: '015760', stock_name: '한국전력', score: 80, volume: 1030000, rate: '5.0%', rank_no: 3 },
-    { stock_code: '109070', stock_name: '컨버즈', score: null, volume: 24500000, rate: '29.9%', rank_no: null },
-    { stock_code: '048910', stock_name: '대원미디어', score: 80, volume: null, rate: null, rank_no: 4 },
+    { stock_code: '005070', stock_name: '코스모신소재', score: 90, volume: 512000, rate: '12.5%', rank_no: 1, shape_proba: 0.41 },
+    { stock_code: '066430', stock_name: '와이오엠', score: 90, volume: 9120000, rate: '-3.2%', rank_no: 2, shape_proba: 0.37 },
+    { stock_code: '015760', stock_name: '한국전력', score: 80, volume: 1030000, rate: '5.0%', rank_no: 3, shape_proba: 0.36 },
+    { stock_code: '109070', stock_name: '컨버즈', score: null, volume: 24500000, rate: '29.9%', rank_no: null, shape_proba: 0.35 },
+    { stock_code: '048910', stock_name: '대원미디어', score: 80, volume: null, rate: null, rank_no: 4, shape_proba: 0.35 },
 ];
 
 const targetRows = ref([]);      // 실제 매수타겟 (비어 있으면 fallback 사용)
@@ -488,6 +498,7 @@ const FIELD_VALUE = {
     rate: r => pctOf(r.rate),
     rank_no: r => numOf(r.rank_no),
     close: r => numOf(r.close),
+    shape_proba: r => numOf(r.shape_proba),
 };
 
 const sortedSample = computed(() => {

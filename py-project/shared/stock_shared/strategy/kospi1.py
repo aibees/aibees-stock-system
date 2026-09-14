@@ -113,6 +113,13 @@ class KospiStrategy1(StockStrategy):
         self.enable_vol_avg_filter   = True  # 20일 평균 거래량 이상
         self.enable_regime_gate      = True  # 적응형 추세국면 게이트
 
+        # ── 유동성 하한(절대치) ────────────────────────────────────────
+        # 기존 vol_limit(=오늘 하루 거래량 > 사용자 하한)과 다르다 — 그건 하루 반짝
+        # 거래량 튄 저유동성 종목도 통과시킨다. 이건 20일 평균 거래량 자체가
+        # 기준 미달이면 그날 거래량과 무관하게 차단한다(진짜 유동성 필터).
+        self.enable_avg_vol_filter   = True
+        self.avg_vol_min             = 500_000  # 20일 평균 거래량 이 미만이면 진입 차단
+
         # ── 대조군 분석 반영 (2026-08-08, WIN 34건 vs CONTROL 470건 비교) ──────
         # trade_buy_target_stock 전체 504건 중 30%+ 도달 34건과 나머지를 비교한
         # 결과를 게이트/스코어에 반영한다. (근거: 매수추천_성공패턴_대조군분석.xlsx)
@@ -205,6 +212,8 @@ class KospiStrategy1(StockStrategy):
             'enable_vol_avg_filter':  _bool(user_info.s1_enable_vol_avg_filter),
             'enable_regime_gate':     _bool(user_info.s1_enable_regime_gate),
             'enable_shape_exhaustion_filter': _bool(user_info.s1_enable_shape_exhaustion_filter),
+            'enable_avg_vol_filter':  _bool(user_info.s1_enable_avg_vol_filter),
+            'avg_vol_min':            _f(user_info.s1_avg_vol_min, int),
             # core 진입 신호 mode
             'macd_signal_mode':       user_info.s1_macd_signal_mode if user_info.s1_macd_signal_mode else None,
             'obv_signal_mode':        user_info.s1_obv_signal_mode  if user_info.s1_obv_signal_mode  else None,
@@ -449,6 +458,9 @@ class KospiStrategy1(StockStrategy):
 
         # ── 대조군 분석(2026-08-08) 반영 지표 ────────────────────────────
         is_vol_limit  = coin_info.volume > user_info.vol_limit        # 당일 거래량 > 사용자 하한(필수조건에 가까움)
+        # 20일 평균 거래량 자체가 유동성 하한 미달이면 그날 거래량과 무관하게 차단.
+        # vol_avg<=0 은 lookback 부족(신규상장 등) → 판단 보류(통과).
+        is_avg_vol_ok = (coin_info.vol_avg <= 0) or (coin_info.vol_avg >= self.avg_vol_min)
         # atr_pct 필드는 라이브(compute_indicator_df)에만 채워지고 trade_candle_data
         # DB 컬럼엔 없어(백테스터/DB 재생 경로에서 0으로 빠짐) atr/close 로 직접 계산한다.
         atr_ratio     = (float(coin_info.atr or 0.0) / float(coin_info.close)) if coin_info.close else 0.0
@@ -547,6 +559,8 @@ class KospiStrategy1(StockStrategy):
                 'shape_exhaustion':     'Y' if is_shape_exhausted    else 'N',
                 'shape_total_ret_14':   round(float(coin_info.shape_total_ret_14 or 0), 4),
                 'shape_bars_since_min': coin_info.shape_bars_since_min,
+                'is_avg_vol_ok':        'Y' if is_avg_vol_ok         else 'N',   # 20일 평균거래량 하한
+                'vol_avg':              round(float(coin_info.vol_avg or 0), 0),
             }
             if extra:
                 indicator.update(extra)
@@ -583,6 +597,10 @@ class KospiStrategy1(StockStrategy):
             return _build_result(Action.HOLD)
 
         if self.enable_vol_avg_filter and not is_vol_above_avg:
+            return _build_result(Action.HOLD)
+
+        # ── [유동성 하한] 20일 평균 거래량이 avg_vol_min 미만이면 매수 금지 ──
+        if self.enable_avg_vol_filter and not is_avg_vol_ok:
             return _build_result(Action.HOLD)
 
         # ── [소진 게이트] 눌림 없이 이미 크게 오른 데다 당일도 급등 중이면 매수 금지 ──

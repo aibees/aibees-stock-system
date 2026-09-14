@@ -27,6 +27,11 @@ REPEAT_PENALTY_DAYS = 5
 # Home.vue 매수타겟 카드 간이차트용 슬라이스 길이(영업일). trade_buy_target_chart 저장.
 CHART_DAYS = 120
 
+# shape 모델 추론값(0~1) 하한. 미만이면 매수후보에서 아예 제외한다(2026-09 세션).
+# 0.3~0.35 구간 실측 적중률(5봉내 net_edge>=15%p)이 기준선(15.1%) 대비 약 2배였던
+# 캘리브레이션 근거로 정함. assign_ranks() 는 이 필터를 통과한 후보만 받는다고 가정한다.
+SHAPE_PROBA_MIN = 0.35
+
 
 class StockBuyCheckJob(Job):
     def __init__(self):
@@ -232,16 +237,22 @@ class StockBuyCheckJob(Job):
 
                 result = strategy.get_result_with_action(trade_data, stock_option_meta)
                 if result['action_type'] != 'HOLD':
-                    result['stock_code'] = stock_code
-                    result['stock_name'] = stock_name
-                    result['ymd'] = ymd
-                    result['fin'] = fin_result
-                    result['chart_data'] = self._build_chart_data(trade_data)
-                    # shape 모델 추론(참고용) — 실패해도 매수추천 자체는 막지 않는다.
-                    result['shape_proba'] = shape_score(
+                    shape_proba = shape_score(
                         {c: trade_data[-1].get(c) for c in SHAPE_FEATURE_COLUMNS})
-                    pprint.pprint(result)
-                    results.append(result)
+                    # shape_proba < SHAPE_PROBA_MIN(0.35) 이면 후보에서 제외한다(2026-09 세션).
+                    # 모델 로딩 실패 등으로 shape_proba 를 못 구한 경우(None)는 배치가
+                    # 죽지 않게 통과시킨다 — sklearn/아티팩트 문제로 추천이 0건 되는 걸 막기 위함.
+                    if shape_proba is not None and shape_proba < SHAPE_PROBA_MIN:
+                        print(f"[{tag}] skip ==> shape_proba 미달 ({shape_proba:.3f} < {SHAPE_PROBA_MIN})", flush=True)
+                    else:
+                        result['stock_code'] = stock_code
+                        result['stock_name'] = stock_name
+                        result['ymd'] = ymd
+                        result['fin'] = fin_result
+                        result['chart_data'] = self._build_chart_data(trade_data)
+                        result['shape_proba'] = shape_proba
+                        pprint.pprint(result)
+                        results.append(result)
 
                 idx += 1
 

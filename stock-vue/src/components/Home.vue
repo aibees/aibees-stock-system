@@ -345,9 +345,10 @@ const openDatePicker = () => dateInput.value?.showPicker();
  *   · 전부 동점이면 stock_code 로 최종 결정 (매 조회마다 순서가 흔들리지 않도록)
  */
 const SORT_OPTIONS = [
-    { key: 'rank_no', label: '추천순위', dir: 'asc', ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
-    { key: 'score',   label: '점수',     dir: 'desc', ascLabel: '낮은 점수 먼저', descLabel: '높은 점수 먼저' },
-    { key: 'volume',  label: '거래량',   dir: 'desc', ascLabel: '적은 순',        descLabel: '많은 순' },
+    { key: 'rank_no',     label: '추천순위',     dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
+    { key: 'score',       label: '점수',         dir: 'desc', ascLabel: '낮은 점수 먼저', descLabel: '높은 점수 먼저' },
+    { key: 'volume',      label: '거래량',       dir: 'desc', ascLabel: '적은 순',        descLabel: '많은 순' },
+    { key: 'shape_proba', label: '급등패턴 순위', dir: 'desc', ascLabel: '낮은 확률 먼저', descLabel: '높은 확률 먼저' },
 ];
 
 const sortKey = ref('rank_no');

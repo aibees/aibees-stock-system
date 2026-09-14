@@ -56,17 +56,21 @@ ORDER_FIELDS = {
     "rate":    (lambda r: _pct(r.get("rate")),    "desc"),
     "rank_no": (lambda r: _num(r.get("rank_no")), "asc"),
     "close":   (lambda r: _num(r.get("close")),   "desc"),
-    # shape 모델 추론값(0~1). 2026-09 세션 리서치: 상단 잠재력 탐지엔 재현성 있게
-    # 검증됐지만, 실전 손절/익절(OCO) 백테스트에서는 rank_no(과열최저) 기본 정렬보다
-    # 전 구간에서 승률·평균손익이 낮았다 — 그래서 DEFAULT_BUY_ORDER 엔 안 넣었고,
-    # 옵트인(s1_buy_order="shape_proba:desc,...")으로만 쓸 수 있게 등록만 해둔다.
+    # shape 모델 추론값(0~1). 참고: 2026-08 초 리서치 당시엔 shape_proba 단독 정렬이
+    # 과열최저(rate) 기본 정렬보다 실전 OCO 백테스트에서 나빴었다. 2026-09 결정으로
+    # rank_no 자체를 shape_proba 내림차순으로 다시 산정하기로 했다(assign_ranks 참고,
+    # SHAPE_PROBA_MIN=0.35 미만은 애초에 후보에서 제외됨) — 이제 rank_no:asc 기본
+    # 정렬만으로 사실상 shape_proba 순이 된다. 이 필드는 별도로 재정렬하고 싶을 때 씀.
     "shape_proba": (lambda r: _num(r.get("shape_proba")), "desc"),
     # ── 추가 예시(조회 컬럼만 넣으면 즉시 동작) ──
     # "per":   (lambda r: _num(r.get("per")),     "asc"),
 }
 
-# 스펙 미설정(NULL) 시 기본
-DEFAULT_BUY_ORDER = "score:desc,rank_no:asc"
+# 스펙 미설정(NULL) 시 기본.
+# rank_no 를 1순위로 둔다 — assign_ranks() 가 이미 shape_proba 내림차순으로 산정해뒀으므로
+# (2026-09), 여기서 score 를 먼저 보면 그 순서를 덮어써버린다. rank_no 는 매일 1..N 순열이라
+# 동률이 없어 사실상 score 는 절대 안 쓰인다(그래도 이론상 안전하려고 tiebreak 로만 남긴다).
+DEFAULT_BUY_ORDER = "rank_no:asc,score:desc"
 
 
 def parse_buy_order(spec):

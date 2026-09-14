@@ -26,10 +26,15 @@ class KisBacktester:
     SELL_ACTIONS = {Action.SELL_PROFIT, Action.SELL_STOP_LOSS, Action.SELL_STOP_PROFIT,
                     Action.SELL_TRAIL, Action.SELL_TIME}
 
-    def __init__(self, strategy=None, fee_rate: float = 0.0015):
+    def __init__(self, strategy=None, fee_rate: float = 0.0015, gap_block_pct: float | None = None):
         # fee_rate: 편도 수수료+세금 근사 (왕복은 2*fee_rate 차감). KOSPI 매도세 등 감안 기본 0.15%/편도
+        # gap_block_pct: 진입 봉 시가가 전봉 종가 대비 이만큼(비율) 넘게 갭이면 진입을 건너뛴다.
+        #   None(기본)이면 갭 체크 없이 기존과 동일하게 동작한다.
+        #   BuyExecutor1(app/trade_worker/modes/mode_1/buy_executor1.py) 의 실거래
+        #   GAP_BLOCK_PCT 게이트와 같은 의미 — worker/시뮬레이션이 같은 규칙을 쓰게 맞췄다.
         self.strategy = strategy or KospiStrategy1()
         self.fee_rate = fee_rate
+        self.gap_block_pct = gap_block_pct
 
     # ──────────────────────────────────────────────────────────────
     @staticmethod
@@ -194,21 +199,30 @@ class KisBacktester:
             prev_info = UserCoinInfo.from_dict(rows[i - 1])
             coin_info = UserCoinInfo.from_dict(rows[i])
 
-            # ── 전봉 BUY 시그널 → 이번 봉 시초가로 진입 ──
+            # ── 전봉 BUY 시그널 → 이번 봉 시초가로 진입(갭 게이트 통과 시에만) ──
             if pending_buy:
-                in_pos = True
-                entry_price = float(coin_info.open) if coin_info.open else float(coin_info.close)
-                entry_dt = coin_info.datetime
-                entry_action = pending_entry_action
-                ui.has_position = True
-                ui.avg_price = entry_price
-                ui.entry_price = entry_price
-                ui.entry_atr = coin_info.atr
-                ui.peak_high = coin_info.high
-                ui.peak_close = coin_info.close
-                ui.bars_since_peak = 0
-                ui.bars_held = 0
+                open_px = float(coin_info.open) if coin_info.open else float(coin_info.close)
+                prev_close = float(prev_info.close) if prev_info.close else 0.0
+                gapped = (
+                    self.gap_block_pct is not None
+                    and prev_close > 0
+                    and abs(open_px - prev_close) / prev_close > self.gap_block_pct
+                )
                 pending_buy = False
+                if not gapped:
+                    in_pos = True
+                    entry_price = open_px
+                    entry_dt = coin_info.datetime
+                    entry_action = pending_entry_action
+                    ui.has_position = True
+                    ui.avg_price = entry_price
+                    ui.entry_price = entry_price
+                    ui.entry_atr = coin_info.atr
+                    ui.peak_high = coin_info.high
+                    ui.peak_close = coin_info.close
+                    ui.bars_since_peak = 0
+                    ui.bars_held = 0
+                # gapped=True 면 이번 신호는 버리고 이 봉을 다시 watch 로 평가한다(아래).
 
             if not in_pos:
                 res = self.strategy.get_action_with_prev('watch', prev_info, coin_info, ui)
