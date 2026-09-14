@@ -663,6 +663,14 @@ class Broker:
         # 통합 실시간체결가 TR을 파서 레지스트리에 등록(멱등). H0STCNT0과 동일 스펙.
         WEBSOCKET_RESPONSES_MAP.setdefault("H0UNCNT0", KisDomesticRealtimePrice)
 
+        # KIS가 H0STCNT0/H0UNCNT0 응답에 필드를 46→47개로 늘렸다(마지막에 MARKET_CLS_CODE
+        # 장구분코드 1:프리 2:정규 3:애프터 5:종가 신설. apiportal.koreainvestment.com 실시간-003/통합 스펙 확인).
+        # python-kis 2.1.6(PyPI 최신)는 아직 46개 기준으로 파싱해 "Invalid data length: 47"로
+        # 틱마다 파싱을 실패시키고 조용히 드롭한다(라이브 시세 유실 — 매매 판단에 직접 영향).
+        # 상위 라이브러리 릴리즈 전까지, 신규 필드는 쓰지 않으므로 더미 슬롯만 채워 오프셋을 맞춘다(멱등).
+        if len(KisDomesticRealtimePrice.__fields__) == 46:
+            KisDomesticRealtimePrice.__fields__.append(None)
+
         tr_id = "H0UNCNT0" if nxt else "H0STCNT0"
         log.info("실시간 체결가 구독 %s TR=%s", symbol, tr_id)
 
