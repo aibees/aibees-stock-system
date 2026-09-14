@@ -45,7 +45,7 @@ services:
       - SELL_LIMIT_SLIP_PCT=1.0   # NXT 장외 매도 지정가 = 체결가 -1%
       - KRX_AFTERMARKET_ENABLED=true  # 2026-09-14 KRX애프터마켓(16:00~20:00) 매도 세션. 매수엔 영향 없음
       - KIS_ALLOW_FILE_FALLBACK=false
-      - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
+      - DB_URL=mysql+pymysql://stock:stock123!!@210.103.60.108:3333/stock
       - FCM_CREDENTIALS_PATH=/workdir/firebase-service-account.json
 #    networks: { aibees: { ipv4_address: 172.21.1.11 } }
 #
@@ -62,7 +62,7 @@ services:
       - SELL_LIMIT_SLIP_PCT=1.0   # NXT 장외 매도 지정가 = 체결가 -1%
       - KRX_AFTERMARKET_ENABLED=true  # 2026-09-14 KRX애프터마켓(16:00~20:00) 매도 세션. 매수엔 영향 없음
       - KIS_ALLOW_FILE_FALLBACK=false
-      - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
+      - DB_URL=mysql+pymysql://stock:stock123!!@210.103.60.108:3333/stock
       - FCM_CREDENTIALS_PATH=/workdir/firebase-service-account.json
 #    networks: { aibees: { ipv4_address: 172.21.1.12 } }
 
@@ -79,7 +79,7 @@ services:
       - SELL_LIMIT_SLIP_PCT=1.0   # NXT 장외 매도 지정가 = 체결가 -1%
       - KRX_AFTERMARKET_ENABLED=true  # 2026-09-14 KRX애프터마켓(16:00~20:00) 매도 세션. 매수엔 영향 없음
       - KIS_ALLOW_FILE_FALLBACK=false
-      - DB_URL=mysql+pymysql://stock:stock123!!@210.183.63.247:3333/stock
+      - DB_URL=mysql+pymysql://stock:stock123!!@210.103.60.108:3333/stock
       - FCM_CREDENTIALS_PATH=/workdir/firebase-service-account.json
 #    networks: { aibees: { ipv4_address: 172.21.1.13 } }
 
