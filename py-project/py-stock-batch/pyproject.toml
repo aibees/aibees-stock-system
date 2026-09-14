@@ -35,6 +35,8 @@ finance-datareader = "^0.9.102"
 opendartreader = "^0.2.3"
 python-telegram-bot = "^22.8"
 firebase-admin = "^6.5.0"
+scikit-learn = "1.9.1"
+joblib = "1.6.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

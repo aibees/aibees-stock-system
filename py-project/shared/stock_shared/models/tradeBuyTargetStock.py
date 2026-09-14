@@ -37,6 +37,8 @@ class TradeBuyTargetStock(Base):
     roe = Column(String(45), nullable=True)
     peg = Column(String(45), nullable=True)
     score = Column(DECIMAL(6, 2), nullable=True)
+    shape_proba = Column(DECIMAL(6, 4), nullable=True)       # shape 모델 추론값(0~1), 참고용
+    shape_exhaustion = Column(String(1), nullable=True)      # 'Y'/'N' — 소진게이트 발동 여부
 
     def to_dict(self):
         return {
@@ -64,4 +66,6 @@ class TradeBuyTargetStock(Base):
             "roe": self.roe,
             "peg": self.peg,
             "score": self.score,
+            "shape_proba": self.shape_proba,
+            "shape_exhaustion": self.shape_exhaustion,
         }

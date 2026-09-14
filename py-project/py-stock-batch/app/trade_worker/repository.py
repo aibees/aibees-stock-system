@@ -88,7 +88,7 @@ class Repository:
         """
         sql = text(
             "SELECT t.ymd, t.stock_code, t.stock_name, t.rate, t.close, "
-            "       t.volume, t.score, t.rank_no, ms.nxt_flag "
+            "       t.volume, t.score, t.rank_no, t.shape_proba, t.shape_exhaustion, ms.nxt_flag "
             "FROM trade_buy_target_stock t "
             "LEFT JOIN master_stock ms ON ms.stock_code = t.stock_code "
             "WHERE t.ymd = :ymd"

@@ -39,6 +39,8 @@ _UPSERT_COLS = (
     "peg",
     "score",
     "rank_no",
+    "shape_proba",
+    "shape_exhaustion",
 )
 
 
@@ -197,6 +199,8 @@ class TradeBuyTargetStockDao(BaseDao):
                 "peg": d["fin"]["peg"],
                 "score": d.get("score"),
                 "rank_no": d.get("rank_no"),
+                "shape_proba": d.get("shape_proba"),
+                "shape_exhaustion": d.get("indicator", {}).get("shape_exhaustion"),
             }
 
             stmt = insert(TradeBuyTargetStock).values(row)

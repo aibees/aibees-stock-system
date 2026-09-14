@@ -8,6 +8,7 @@ BaseBuyExecutor 에서 갈리는 지점은 **후보 선정 하나**뿐이다.
 후보 선정 블록을 **동작 변경 없이** 그대로 옮긴 것이다.
 """
 from decimal import Decimal
+from typing import Optional
 
 from app.trade_worker.buy_executor import BaseBuyExecutor, BuyCandidate
 from app.trade_worker.repository import describe_buy_order
@@ -18,9 +19,39 @@ class BuyExecutor1(BaseBuyExecutor):
 
     MODE_CODE = "M1"
 
+    # 장 시작 갭(현재가 vs 전일종가) 차단 임계값. 2026-09 세션 리서치 반영 —
+    # 갭 그 자체를 게이트로 신설. 0%로 두면 정상 호가단위 노이즈만으로도 거의
+    # 매번 걸리므로, "유의미한 갭"과 "체결 틱 노이즈"를 가르는 최소값을 둔다.
+    GAP_BLOCK_PCT = Decimal("0.01")   # 1%
+
     def supports_premarket(self) -> bool:
         """NXT 프리마켓(08:00) 선매수 라운드를 쓴다."""
         return True
+
+    def _resolve_price(self, cand: BuyCandidate, premarket: bool) -> Optional[Decimal]:
+        """베이스 가격 조회 + 갭 게이트.
+
+        프리마켓 라운드는 지정가 자체가 '전일종가×(1+슬리피지%)'라 갭 개념이 없다
+        (BaseBuyExecutor._resolve_price 참고) — 정규장(09:00) 라운드에서만 적용한다.
+        전일종가(ref_close)가 없으면(신규 편입 등) 갭을 판정할 수 없으므로 통과시킨다.
+        """
+        price = super()._resolve_price(cand, premarket)
+        if price is None or premarket:
+            return price
+
+        ref_close = cand.ref_close
+        if not ref_close or Decimal(str(ref_close)) <= 0:
+            return price
+
+        ref_close = Decimal(str(ref_close))
+        gap_pct = abs(price - ref_close) / ref_close
+        if gap_pct > self.GAP_BLOCK_PCT:
+            self.wlog.info(
+                "[매수] %s 시가갭 %.2f%%(전일종가=%s, 현재가=%s) > 허용치 %.1f%% → skip",
+                cand.code, float(gap_pct * 100), ref_close, price, float(self.GAP_BLOCK_PCT * 100),
+            )
+            return None
+        return price
 
     def _buy_order_spec(self) -> str | None:
         """유저 매수타겟 정렬 스펙(user_options.s1_buy_order).

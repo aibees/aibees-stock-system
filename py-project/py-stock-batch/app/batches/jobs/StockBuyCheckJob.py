@@ -14,6 +14,8 @@ from app.ext_services.kis.keyLoader import list_kis_user_ids
 from app.ext_services.kis.component.KisStockService import KisService
 from stock_shared.strategy.kospi1 import KospiStrategy1
 from stock_shared.dto.userOptionMeta import UserOptionMeta
+from stock_shared.ml.shape_features import SHAPE_FEATURE_COLUMNS
+from stock_shared.ml.shape_model import score as shape_score
 
 
 # 최근 N일(캘린더) 내 매수추천에 등장했던 종목은 오늘 다시 조건을 만족해도
@@ -235,6 +237,9 @@ class StockBuyCheckJob(Job):
                     result['ymd'] = ymd
                     result['fin'] = fin_result
                     result['chart_data'] = self._build_chart_data(trade_data)
+                    # shape 모델 추론(참고용) — 실패해도 매수추천 자체는 막지 않는다.
+                    result['shape_proba'] = shape_score(
+                        {c: trade_data[-1].get(c) for c in SHAPE_FEATURE_COLUMNS})
                     pprint.pprint(result)
                     results.append(result)
 

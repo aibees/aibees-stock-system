@@ -56,6 +56,11 @@ ORDER_FIELDS = {
     "rate":    (lambda r: _pct(r.get("rate")),    "desc"),
     "rank_no": (lambda r: _num(r.get("rank_no")), "asc"),
     "close":   (lambda r: _num(r.get("close")),   "desc"),
+    # shape 모델 추론값(0~1). 2026-09 세션 리서치: 상단 잠재력 탐지엔 재현성 있게
+    # 검증됐지만, 실전 손절/익절(OCO) 백테스트에서는 rank_no(과열최저) 기본 정렬보다
+    # 전 구간에서 승률·평균손익이 낮았다 — 그래서 DEFAULT_BUY_ORDER 엔 안 넣었고,
+    # 옵트인(s1_buy_order="shape_proba:desc,...")으로만 쓸 수 있게 등록만 해둔다.
+    "shape_proba": (lambda r: _num(r.get("shape_proba")), "desc"),
     # ── 추가 예시(조회 컬럼만 넣으면 즉시 동작) ──
     # "per":   (lambda r: _num(r.get("per")),     "asc"),
 }

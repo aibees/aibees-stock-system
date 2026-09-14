@@ -9,6 +9,9 @@ packages = [{ include = "stock_shared" }]
 [tool.poetry.dependencies]
 python = "^3.12"
 SQLAlchemy = "*"
+# stock_shared.ml.shape_model 전용 선택 의존성. shape_features 는 이 없이도 동작한다.
+scikit-learn = "1.9.1"
+joblib = "1.6.0"
 
 [build-system]
 requires = ["poetry-core"]

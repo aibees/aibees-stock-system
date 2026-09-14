@@ -58,6 +58,7 @@ def extractor(x) -> UserOptionMeta:
     user_meta.s1_enable_bb_upper_filter = x.get('s1_enable_bb_upper_filter')
     user_meta.s1_enable_vol_avg_filter  = x.get('s1_enable_vol_avg_filter')
     user_meta.s1_enable_regime_gate     = x.get('s1_enable_regime_gate')
+    user_meta.s1_enable_shape_exhaustion_filter = x.get('s1_enable_shape_exhaustion_filter')
     user_meta.s1_macd_signal_mode       = x.get('s1_macd_signal_mode')
     user_meta.s1_obv_signal_mode        = x.get('s1_obv_signal_mode')
     user_meta.s1_ma20_signal_mode       = x.get('s1_ma20_signal_mode')

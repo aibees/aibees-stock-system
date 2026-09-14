@@ -12,10 +12,13 @@ trade_candle_data(또는 동일 스키마의 dict 리스트)를 시간순으로 
 - 다음 봉이 없는 경우(마지막 봉 시그널)에는 현재 종가로 체결.
 - 한 종목당 동시에 1 포지션, 전액 진입(수익률은 트레이드별 % 복리 집계).
 """
+import pandas as pd
+
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from stock_shared.strategy.base import Action
 from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.ml.shape_features import compute_shape_features, SHAPE_FEATURE_COLUMNS
 
 
 class KisBacktester:
@@ -161,6 +164,15 @@ class KisBacktester:
             lo = float(rows[i].get('low') or 0)
             cl = float(rows[i].get('close') or 0)
             rows[i]['chegyul_strength'] = ((cl - lo) / (hi - lo) * 200.0) if hi > lo else 100.0
+
+        # ── shape_* (14봉 정규화 가격패턴) 주입 — kospi1 소진게이트가 이 값을 읽는다.
+        #    DB(trade_candle_data) 재생 경로엔 이 컬럼들이 없어 여기서 직접 계산해야 한다.
+        shape_df = compute_shape_features(pd.DataFrame(rows))
+        shape_df[SHAPE_FEATURE_COLUMNS + ['shape_ret_1d_today']] = \
+            shape_df[SHAPE_FEATURE_COLUMNS + ['shape_ret_1d_today']].fillna(0.0)
+        for i, shape_row in enumerate(shape_df.to_dict(orient='records')):
+            for col in SHAPE_FEATURE_COLUMNS + ['shape_ret_1d_today']:
+                rows[i][col] = shape_row[col]
 
         return rows
 

@@ -8,6 +8,7 @@ from app.common.constants.Literal import Literal
 matplotlib.use('Agg')
 from stock_shared.dao.userMasterDao import UserMasterDao
 from stock_shared.dto.userOptionMeta import UserOptionMeta
+from stock_shared.ml.shape_features import compute_shape_features
 
 kst = pytz.timezone("Asia/Seoul")
 choices = ['G', 'D']
@@ -142,6 +143,12 @@ class KisService:
         ####################################################################
         below_e60 = (df_close < data[Literal.EMA_60]).where(data[Literal.EMA_60].notna())
         data[Literal.DOWNTREND_RATIO] = below_e60.rolling(window=90, min_periods=20).mean()
+
+        ####################################################################
+        # 4. shape_* (14봉 정규화 가격패턴) — 매수추천 shape 모델/소진게이트 입력
+        #    (2026-09 세션 리서치. stock_shared.ml.shape_features 참고)
+        ####################################################################
+        data = compute_shape_features(data)
 
         return data
 

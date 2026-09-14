@@ -81,6 +81,19 @@ class UserCoinInfo:
         self.bb_mid_breakout = 0.0
         self.recent_high = 0.0
 
+        # shape_* (14봉 정규화 가격패턴). from_dict 자동매핑.
+        # stock_shared.ml.shape_features.compute_shape_features() 가 채운다.
+        self.shape_total_ret_14 = 0.0
+        self.shape_min_ret_14 = 0.0
+        self.shape_bars_since_min = 0.0
+        self.shape_recovery_from_min = 0.0
+        self.shape_early_ret_9 = 0.0
+        self.shape_late_ret_5 = 0.0
+        self.shape_down_ratio_14 = 0.0
+        self.shape_path_std_14 = 0.0
+        self.shape_vol_trend = 0.0
+        self.shape_ret_1d_today = 0.0
+
         self.macd = 0.0
         self.macd_s = 0.0
         self.macd_recent_min = 0.0

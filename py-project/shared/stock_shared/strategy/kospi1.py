@@ -10,6 +10,7 @@ M2~M4 와 달리 유일하게 로직이 구현되어 있다. 여기를 고치면
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from stock_shared.strategy.base import StockStrategy, Action
+from stock_shared.ml.shape_features import is_exhaustion_risk
 
 
 class KospiStrategy1(StockStrategy):
@@ -134,6 +135,12 @@ class KospiStrategy1(StockStrategy):
         #    (백테스터 등 사전 스킵을 거치지 않는 경로에서도) 안전하게 강제한다.
         self.enable_vol_limit_filter = True
 
+        # ── 소진(exhaustion) 게이트 (2026-09 세션 리서치, 손실 감소 조건) ─────
+        # "14봉 내내 눌림 없이 이미 크게 올랐고, 오늘도 또 급등" 상태에서 진입하면
+        # 익일 급반전 확률이 높았다(사례: 유티아이 2026-09-01 → 익일 -25.3%).
+        # 임계값은 stock_shared.ml.shape_features 에 있다(모델 없이도 항상 동작).
+        self.enable_shape_exhaustion_filter = True
+
         # ── core 진입 신호 mode (MACD/OBV Optional) ─────────────────────
         # 각각 'off'(사용안함) / 'golden'(골든크로스 여부) / 'slope'(기울기 상승여부).
         #   기본값 'golden' = 기존 동작(MACD+OBV 동시 골든크로스)과 동일.
@@ -197,6 +204,7 @@ class KospiStrategy1(StockStrategy):
             'enable_bb_upper_filter': _bool(user_info.s1_enable_bb_upper_filter),
             'enable_vol_avg_filter':  _bool(user_info.s1_enable_vol_avg_filter),
             'enable_regime_gate':     _bool(user_info.s1_enable_regime_gate),
+            'enable_shape_exhaustion_filter': _bool(user_info.s1_enable_shape_exhaustion_filter),
             # core 진입 신호 mode
             'macd_signal_mode':       user_info.s1_macd_signal_mode if user_info.s1_macd_signal_mode else None,
             'obv_signal_mode':        user_info.s1_obv_signal_mode  if user_info.s1_obv_signal_mode  else None,
@@ -451,6 +459,13 @@ class KospiStrategy1(StockStrategy):
         # 음권 골든크로스 허용 조건: macd > macd_s(이미 골든크로스 상태) + 기울기 양수(전봉 대비 상승)
         is_macd_rising_fast = (coin_info.macd > coin_info.macd_s) and \
                               (coin_info.macd > prev_info.macd)
+        # 소진(exhaustion) 게이트 — 2026-09 세션 리서치. shape_* 는 compute_indicator_df 가
+        # 채운다(백테스터/DB 재생 경로처럼 안 채워졌으면 전부 0.0 → 조건 미달로 항상 False).
+        is_shape_exhausted = is_exhaustion_risk(
+            coin_info.shape_bars_since_min,
+            coin_info.shape_total_ret_14,
+            coin_info.shape_ret_1d_today,
+        )
         # MACD 조건: 양권(0선 위) OR 음권이지만 빠르게 상승 중 OR 크로스 임박(갭 축소 중)
         macd_ok = is_macd_above_zero or is_macd_rising_fast or is_macd_gap_closing
         # 중기 추세 필터: ema20 > ema60 (상승 정렬). 매수 필수 조건.
@@ -528,6 +543,10 @@ class KospiStrategy1(StockStrategy):
                 'atr_ratio':            round(atr_ratio, 4),                    # ATR/종가(변동성)
                 'is_atr_ok':            'Y' if is_atr_ok             else 'N',
                 'dip_from_high':        round(dip_from_high, 4),                # 고점 대비 눌림 깊이(<=0)
+                # ── shape 소진게이트(2026-09 세션 리서치) ─────────────────
+                'shape_exhaustion':     'Y' if is_shape_exhausted    else 'N',
+                'shape_total_ret_14':   round(float(coin_info.shape_total_ret_14 or 0), 4),
+                'shape_bars_since_min': coin_info.shape_bars_since_min,
             }
             if extra:
                 indicator.update(extra)
@@ -564,6 +583,10 @@ class KospiStrategy1(StockStrategy):
             return _build_result(Action.HOLD)
 
         if self.enable_vol_avg_filter and not is_vol_above_avg:
+            return _build_result(Action.HOLD)
+
+        # ── [소진 게이트] 눌림 없이 이미 크게 오른 데다 당일도 급등 중이면 매수 금지 ──
+        if self.enable_shape_exhaustion_filter and is_shape_exhausted:
             return _build_result(Action.HOLD)
 
         # ── [MA20 기울기 게이트] 'slope' 모드일 때만 오늘 ema20 > 전봉 ema20 요구 ──
