@@ -3,8 +3,6 @@
         <Headers :prop_title="'매도 수기 등록'" />
 
         <div class="contents">
-            <p class="page-sub">보유 종목에 지정가를 등록하면, 그 종목만 자동 매도 대신 이 가격에 체결합니다.</p>
-
             <section class="card">
                 <p v-if="loadingHoldings" class="empty-msg">불러오는 중...</p>
                 <p v-else-if="holdings.length === 0" class="empty-msg">계좌에 보유 중인 종목이 없습니다.</p>

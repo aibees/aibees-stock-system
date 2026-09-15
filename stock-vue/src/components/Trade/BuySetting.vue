@@ -7,10 +7,7 @@
             <!-- ── 상단 타이틀 ── -->
             <section class="head-desc">
                 <div class="head-left">
-                    <h2>매수조건 개인화 설정</h2>
-                    <p class="sub-text">
-                        자동매수 후보를 <b>어떤 순서로 살지</b>, 후보를 <b>어떤 조건으로 뽑을지</b>를 설정합니다.
-                    </p>
+                    <h2 style="text-align: left;">매수조건 개인화 설정</h2>
                 </div>
                 <div class="head-right">
                     <button class="btn-refresh" @click="reloadAll" :disabled="isLoading">

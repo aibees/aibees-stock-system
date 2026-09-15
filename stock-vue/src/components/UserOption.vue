@@ -6,8 +6,7 @@
 
             <!-- ── 상단 타이틀 ── -->
             <section class="head-desc">
-                <h2>개인설정</h2>
-                <p class="sub-text">내 정보와 연동 키, 알림 설정을 변경할 수 있습니다. 변경한 항목만 저장됩니다.</p>
+                <h2 style="text-align: left;">개인설정</h2>
             </section>
 
             <div v-if="isLoading" class="loader-rows">

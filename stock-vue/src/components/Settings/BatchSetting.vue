@@ -7,8 +7,7 @@
             <!-- ── 상단 타이틀 + 추가 버튼 ── -->
             <section class="head-desc">
                 <div class="head-left">
-                    <h2>배치 작업 설정</h2>
-                    <p class="sub-text">등록된 배치 작업을 관리하고 단독 실행할 수 있습니다</p>
+                    <h2 style="text-align: left;">배치 작업 설정</h2>
                 </div>
                 <div class="head-actions">
                     <button class="btn-reload" @click="reloadScheduler" :disabled="isReloading">

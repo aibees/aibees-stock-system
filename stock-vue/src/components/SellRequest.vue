@@ -7,8 +7,7 @@
             <!-- ── 상단 타이틀 + 추가 버튼 ── -->
             <section class="head-desc">
                 <div class="head-left">
-                    <h2>매도신호 신청</h2>
-                    <p class="sub-text">매도 체크를 원하는 종목을 등록하면 배치가 매도 신호를 점검합니다 (최대 {{ MAX_COUNT }}개)</p>
+                    <h2 style="text-align: left;">매도신호 신청</h2>
                 </div>
                 <button class="btn-add" @click="openAdd" :disabled="isMaxReached"
                     :title="isMaxReached ? `최대 ${MAX_COUNT}개까지 등록할 수 있습니다` : ''">

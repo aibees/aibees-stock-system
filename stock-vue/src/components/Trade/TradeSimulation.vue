@@ -7,11 +7,7 @@
             <!-- ── 상단 ── -->
             <section class="head-desc">
                 <div class="head-left">
-                    <h2>내 설정 시뮬레이션</h2>
-                    <p class="sub-text">
-                        지금 저장된 <b>내 worker 설정</b>으로 과거 매수추천을 되짚어 매매했다면
-                        어떤 결과였을지 계산합니다.
-                    </p>
+                    <h2 style="text-align: left;">내 설정 시뮬레이션</h2>
                 </div>
             </section>
 

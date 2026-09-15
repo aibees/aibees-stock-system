@@ -7,8 +7,7 @@
             <!-- ── 상단 타이틀 ── -->
             <section class="head-desc">
                 <div class="head-left">
-                    <h2>거래 내역</h2>
-                    <p class="sub-text">체결 내역 · worker 매매 이력 · 운영 로그를 조회합니다 (최신순)</p>
+                    <h2 style="text-align: left;">거래 내역</h2>
                 </div>
                 <div class="head-right">
                     <button class="btn-refresh" @click="reloadCurrent">

@@ -7,11 +7,7 @@
             <!-- ── 상단 타이틀 ── -->
             <section class="head-desc">
                 <div class="head-left">
-                    <h2>계좌 현황</h2>
-                    <p class="sub-text">
-                        증권사 계좌와 동기화된 자산 스냅샷입니다
-                        <span v-if="account?.updated_at" class="basis-time">· 기준시각 {{ formatDateTime(account.updated_at) }}</span>
-                    </p>
+                    <h2 style="text-align: left;">계좌 현황</h2>
                 </div>
                 <div class="head-right">
                     <button class="btn-refresh" @click="reloadAll">
@@ -73,6 +69,7 @@
                                 <th class="tr">현재가</th>
                                 <th class="tr">평가금액</th>
                                 <th class="tr">평가손익</th>
+                                <th class="tr">수익률</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -84,16 +81,25 @@
                                 <td class="tr num">{{ fmtWon(row.cur_price) }}</td>
                                 <td class="tr num">{{ fmtWon(row.eval_amount) }}</td>
                                 <td class="tr num" :class="pnlClass(row.profit)">{{ fmtSigned(row.profit) }}</td>
+                                <td class="tr num" :class="pnlClass(rowProfitPct(row))">{{ fmtPct(rowProfitPct(row)) }}</td>
                             </tr>
                             <tr v-if="holdings.length === 0">
-                                <td colspan="7" class="empty-cell">보유 종목이 없습니다.</td>
+                                <td colspan="8" class="empty-cell">보유 종목이 없습니다.</td>
                             </tr>
                         </tbody>
                         <tfoot v-if="summary && holdings.length > 0">
                             <tr class="total-row">
-                                <td class="tl" colspan="5">합계</td>
-                                <td class="tr num">{{ fmtWon(summary.stock_amount) }}</td>
-                                <td class="tr num sub-note">예수금 {{ fmtWon(summary.cash) }}</td>
+                                <td class="tl" colspan="5">종목 소계</td>
+                                <td class="tr num">{{ fmtWon(portfolioTotals.evalAmount) }}</td>
+                                <td class="tr num" :class="pnlClass(portfolioTotals.profitSum)">{{ fmtSigned(portfolioTotals.profitSum) }}</td>
+                                <td class="tr num" :class="pnlClass(portfolioTotals.profitPct)">{{ fmtPct(portfolioTotals.profitPct) }}</td>
+                            </tr>
+                            <tr class="total-row sub">
+                                <td class="tl" colspan="5">합계(예수금 포함)</td>
+                                <td class="tr num" colspan="3">
+                                    {{ fmtWon(summary.stock_amount) }}원
+                                    <span class="sub-note">· 예수금 {{ fmtWon(summary.cash) }}원</span>
+                                </td>
                             </tr>
                         </tfoot>
                     </table>
@@ -104,19 +110,30 @@
                     <div v-if="loadingPortfolio" class="loader-rows">
                         <div v-for="n in 3" :key="n" class="skeleton-row"></div>
                     </div>
-                    <ul v-else class="m-ul">
-                        <li v-for="row in holdings" :key="row.stock_code" class="m-li">
-                            <div class="li-top">
-                                <span class="code-chip">{{ row.stock_code }}</span>
-                                <span class="num" :class="pnlClass(row.profit)">{{ fmtSigned(row.profit) }}</span>
-                            </div>
-                            <div class="li-name">{{ row.stock_name }}</div>
-                            <div class="li-row"><span class="li-label">수량</span><span>{{ fmtQty(row.qty) }}</span></div>
-                            <div class="li-row"><span class="li-label">매입/현재</span><span>{{ fmtWon(row.avg_price) }} / {{ fmtWon(row.cur_price) }}</span></div>
-                            <div class="li-row"><span class="li-label">평가금액</span><span>{{ fmtWon(row.eval_amount) }} 원</span></div>
-                        </li>
-                        <li v-if="holdings.length === 0" class="empty-cell">보유 종목이 없습니다.</li>
-                    </ul>
+                    <template v-else>
+                        <div v-if="holdings.length > 0" class="m-subtotal">
+                            <span class="m-subtotal-label">종목 소계</span>
+                            <span class="m-subtotal-amt">{{ fmtWon(portfolioTotals.evalAmount) }}원</span>
+                            <span class="num" :class="pnlClass(portfolioTotals.profitSum)">
+                                {{ fmtSigned(portfolioTotals.profitSum) }} ({{ fmtPct(portfolioTotals.profitPct) }})
+                            </span>
+                        </div>
+                        <ul class="m-ul">
+                            <li v-for="row in holdings" :key="row.stock_code" class="m-li">
+                                <div class="li-top">
+                                    <span class="code-chip">{{ row.stock_code }}</span>
+                                    <span class="num" :class="pnlClass(row.profit)">
+                                        {{ fmtSigned(row.profit) }} ({{ fmtPct(rowProfitPct(row)) }})
+                                    </span>
+                                </div>
+                                <div class="li-name">{{ row.stock_name }}</div>
+                                <div class="li-row"><span class="li-label">수량</span><span>{{ fmtQty(row.qty) }}</span></div>
+                                <div class="li-row"><span class="li-label">매입/현재</span><span>{{ fmtWon(row.avg_price) }} / {{ fmtWon(row.cur_price) }}</span></div>
+                                <div class="li-row"><span class="li-label">평가금액</span><span>{{ fmtWon(row.eval_amount) }} 원</span></div>
+                            </li>
+                            <li v-if="holdings.length === 0" class="empty-cell">보유 종목이 없습니다.</li>
+                        </ul>
+                    </template>
                 </section>
             </div>
 
@@ -266,6 +283,39 @@ onMounted(() => {
     fetchPortfolio();
 });
 
+/* ── 종목별 수익률 / 소계 ── */
+// 매입가 대비 현재가 수익률(%). row.profit(평가손익 금액)이 있으면 수량*매입가 대비로,
+// 없으면 avg_price/cur_price 로 직접 계산 — 백엔드 응답에 따라 어느 쪽이든 동작하게.
+const rowProfitPct = (row) => {
+    const avg = toNum(row.avg_price);
+    if (avg === null || avg === 0) return null;
+    const profit = toNum(row.profit);
+    const qty = toNum(row.qty);
+    if (profit !== null && qty) return (profit / (avg * qty)) * 100;
+    const cur = toNum(row.cur_price);
+    if (cur === null) return null;
+    return ((cur - avg) / avg) * 100;
+};
+
+// 보유종목 전체 소계: 평가금액 합, 평가손익 합, 원가 대비 가중평균 수익률(%).
+const portfolioTotals = computed(() => {
+    let evalAmount = 0;
+    let profitSum = 0;
+    let costBasis = 0;
+    for (const row of holdings.value) {
+        evalAmount += toNum(row.eval_amount) ?? 0;
+        profitSum += toNum(row.profit) ?? 0;
+        const avg = toNum(row.avg_price);
+        const qty = toNum(row.qty);
+        if (avg !== null && qty !== null) costBasis += avg * qty;
+    }
+    return {
+        evalAmount,
+        profitSum,
+        profitPct: costBasis > 0 ? (profitSum / costBasis) * 100 : null,
+    };
+});
+
 /* ── 헬퍼 ── */
 const toNum = (v) => (v === null || v === undefined || v === '') ? null : Number(v);
 
@@ -282,6 +332,12 @@ const fmtSigned = (v) => {
     if (n === null || Number.isNaN(n)) return '-';
     const s = n.toLocaleString(undefined, { maximumFractionDigits: 0 });
     return n > 0 ? `+${s}` : s;
+};
+const fmtPct = (v) => {
+    const n = toNum(v);
+    if (n === null || Number.isNaN(n)) return '-';
+    const s = n.toFixed(2);
+    return n > 0 ? `+${s}%` : `${s}%`;
 };
 // 국내 관례: 이익=적색, 손실=청색
 const pnlClass = (v) => {
@@ -460,7 +516,13 @@ $green: #141414;
         color: $gray-900;
         border-top: 2px solid $gray-200;
     }
-    .sub-note { font-weight: 600; color: $gray-500; font-size: 0.78rem; }
+    tfoot .total-row.sub td {
+        border-top: none;
+        font-weight: 500;
+        font-size: 0.78rem;
+        color: $gray-500;
+    }
+    .sub-note { font-weight: 600; color: $gray-500; font-size: 0.78rem; margin-left: 4px; }
 }
 
 .stk { display: flex; align-items: center; gap: 8px; }
@@ -489,6 +551,14 @@ $green: #141414;
 
 /* Mobile list */
 .mobile-list { display: none; @media (max-width: 860px) { display: block; } }
+.m-subtotal {
+    display: flex; align-items: center; gap: 8px;
+    background: $white; border: 1px solid $gray-200; padding: 10px 14px;
+    margin-bottom: 10px; font-size: 0.82rem;
+    .m-subtotal-label { font-weight: 700; color: $gray-900; }
+    .m-subtotal-amt { color: $gray-700; margin-left: auto; }
+    .num { font-weight: 700; }
+}
 .m-ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .m-li { background: $white; border: 1px solid $gray-200; padding: 14px; }
 .li-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }

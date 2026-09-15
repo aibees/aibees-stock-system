@@ -7,10 +7,7 @@
             <!-- ── 상단 타이틀 ── -->
             <section class="head-desc">
                 <div class="head-left">
-                    <h2 style="text-align: start;">매도조건 개인화 설정</h2>
-                    <p class="sub-text">
-                        자동화시스템 매도 판정 파라미터 설정합니다.
-                    </p>
+                    <h2 style="text-align: left;">매도조건 개인화 설정</h2>
                 </div>
                 <div class="head-right">
                     <button class="btn-refresh" @click="fetchOptions" :disabled="isLoading">

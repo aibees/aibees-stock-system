@@ -1,11 +1,9 @@
 <template>
-    <div id="home">
+    <div id="stock-buy-target">
         <Headers :prop_title="title" />
 
         <div class="contents">
-            <!-- ════════ 추천종목 섹션 (제목+정렬+카드를 한 패널로 묶음 — 아래에 다른 섹션이 이어 붙을 예정) ════════ -->
-            <section class="reco-section">
-                <div class="head-desc">
+            <section class="head-desc">
                 <div class="head-left">
                     <h2 style="text-align: left;">오늘의 추천종목</h2>
                 </div>
@@ -23,12 +21,11 @@
                         <input type="date" ref="dateInput" class="hidden-input" v-model="selectedDate"
                             @change="handleDateChange" />
                     </div>
-                    <button type="button" class="btn-detail" @click="goToBuyTargetDetail">상세보기 ›</button>
                 </div>
-                </div>
+            </section>
 
-                <!-- ── 정렬 옵션 ── -->
-                <div v-if="!isLoading && resultData.length > 0" class="sort-bar">
+            <!-- ── 정렬 옵션 ── -->
+            <section v-if="!isLoading && resultData.length > 0" class="sort-bar">
                 <span class="sort-label">정렬</span>
                 <div class="sort-chips">
                     <button v-for="o in SORT_OPTIONS" :key="o.key" type="button"
@@ -42,15 +39,15 @@
                     <span class="dir-arrow">{{ sortDir === 'desc' ? '↓' : '↑' }}</span>
                     {{ sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel }}
                 </button>
-                </div>
+            </section>
 
-                <div class="buy-target">
-                <div v-if="!isLoading && top3Data.length > 0" class="signal-grid">
-                    <div v-for="(item, index) in top3Data" :key="item.stock_code ?? index" class="signal-card">
+            <section class="buy-target">
+                <div v-if="!isLoading && sortedData.length > 0" class="signal-grid">
+                    <div v-for="(item, index) in sortedData" :key="item.stock_code ?? index" class="signal-card">
 
                         <!-- 헤더: 순위 + 종목명/코드 + 액션 버튼 + 금일 변동률 -->
                         <div class="card-head">
-                            <div class="rank-num">{{ String(index + 1).padStart(2, '0') }}</div>
+                            <div class="rank-num">{{ String(rankNumber(index)).padStart(2, '0') }}</div>
                             <div class="head-main">
                                 <h3 class="name">{{ item.stock_name }}</h3>
                                 <div class="code">{{ item.stock_code }}</div>
@@ -153,12 +150,11 @@
                 </div>
 
                 <div v-else-if="isLoading" class="loader-grid">
-                    <div class="skeleton-card" v-for="n in 3" :key="n"></div>
+                    <div class="skeleton-card" v-for="n in 4" :key="n"></div>
                 </div>
 
                 <div v-else class="empty-box">
                     <p>분석된 데이터가 없습니다. 날짜를 변경해 보세요.</p>
-                </div>
                 </div>
             </section>
         </div>
@@ -166,20 +162,17 @@
 </template>
 
 <script setup>
-import CandlestickChart from './common/comp/CandlestickChart.vue';
+import CandlestickChart from '../common/comp/CandlestickChart.vue';
 import aibeesApi from '@scripts/aibeesApi.js';
 
 const router = useRouter();
-const title = ref('AIbees Trading');
+const title = ref('매수추천');
 
 const goToStockInfo = (stock_code, stock_name) => {
     router.push({ path: '/stock/info', query: { stock_code, stock_name } });
 };
 const goToChart = (stock_code) => {
     router.push({ path: '/charts/stock', query: { code: stock_code } });
-};
-const goToBuyTargetDetail = () => {
-    router.push({ path: '/stock/buy-target' });
 };
 const resultData = ref([]);
 const isLoading = ref(true);
@@ -262,8 +255,13 @@ const getStockMainData = async () => {
 const handleDateChange = () => getStockMainData();
 const openDatePicker = () => dateInput.value?.showPicker();
 
-/* ══════════════ 매수타겟 정렬 (TOP 3 미리보기 — home 은 height 축소가 목적이라
- * 정렬만 바꿀 수 있고 순위번호 역순 표기는 안 씀. 전체 목록/역순은 /stock/buy-target 참고) ══
+/* ══════════════ 매수타겟 정렬 ══════════════
+ * 조회는 하루치 전체를 한 번에 받아오므로 클라이언트에서 정렬한다(재조회 없음).
+ *
+ * 규칙은 worker(trade_worker/repository.py _ORDER_FIELDS)와 맞춘다:
+ *   · 필드별 기본 방향 — rank_no 는 작을수록 상위(asc), score/volume 은 클수록 상위(desc)
+ *   · 값이 없는(null) 종목은 정렬 방향과 무관하게 항상 뒤
+ *   · 전부 동점이면 stock_code 로 최종 결정 (매 조회마다 순서가 흔들리지 않도록)
  */
 const SORT_OPTIONS = [
     { key: 'rank_no',     label: '추천순위',     dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
@@ -278,12 +276,20 @@ const sortDir = ref('asc');
 const currentSort = computed(
     () => SORT_OPTIONS.find(o => o.key === sortKey.value) ?? SORT_OPTIONS[0]);
 
+// 기준을 바꾸면 그 필드의 기본 방향으로 되돌린다.
+// (거래량을 고르고 '적은 순'이 남아 있으면 의도와 반대 결과가 나온다)
 const setSortKey = (key) => {
     if (sortKey.value === key) return;
     sortKey.value = key;
     sortDir.value = SORT_OPTIONS.find(o => o.key === key)?.dir ?? 'desc';
 };
 const toggleSortDir = () => { sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc'; };
+
+// 카드 번호: 정렬 기준의 "기본 방향"일 때만 1위부터 매기고, 방향을 뒤집으면
+// 목록을 새로 매기는 게 아니라 같은 순위를 거꾸로 보여준다(마지막 번호부터 역순).
+const rankNumber = (index) => (
+    sortDir.value === currentSort.value.dir ? index + 1 : sortedData.value.length - index
+);
 
 const sortNum = (v) => {
     if (v === null || v === undefined || v === '') return null;
@@ -304,9 +310,6 @@ const sortedData = computed(() => {
         return String(a.stock_code ?? '').localeCompare(String(b.stock_code ?? ''));
     });
 });
-
-// home 화면은 높이를 줄이는 게 목적이라 TOP 3만 보여준다. 전체 목록은 "상세보기" → /stock/buy-target.
-const top3Data = computed(() => sortedData.value.slice(0, 3));
 
 /* ── 카드 상세(근거·조건) 펼치기 ── */
 const expandedCard = ref(null);
@@ -524,7 +527,7 @@ $amber:   #141414;
 $gold:    #141414;
 $bronze:  #3d3d3d;
 
-#home {
+#stock-buy-target {
     min-height: 100vh;
     background: $gray-50;
     color: $gray-900;
@@ -532,24 +535,16 @@ $bronze:  #3d3d3d;
 }
 
 /* ── 매수타겟 정렬 바 ── */
-// 추천종목 섹션 전체를 감싸는 패널 — 제목/정렬/카드가 한 공간에 들어있는 것처럼 보이게 한다.
-// 이 아래로 다른 섹션(칼럼 등)이 이어 붙을 예정이라 margin-bottom 으로 다음 섹션과 간격을 둔다.
-.reco-section {
-    background: $white;
-    border: 1px solid $gray-200;
-    padding: 20px 20px 16px;
-    margin-bottom: 24px;
-}
-
 .sort-bar {
     display: flex;
     align-items: center;
     justify-content: left;
     gap: 8px;
     flex-wrap: wrap;
-    padding-bottom: 16px;
-    margin-bottom: 16px;
-    border-bottom: 1px solid $gray-100;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    background: $white;
+    border: 1px solid $gray-200;
 
     .sort-label {
         font-size: 0.74rem;
@@ -604,6 +599,19 @@ $bronze:  #3d3d3d;
             color: $gray-900;
         }
     }
+
+    .sort-count {
+        margin-left: auto;
+        font-size: 0.72rem;
+        color: $gray-400;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 560px) {
+    .sort-bar {
+        .sort-count { margin-left: 0; width: 100%; }
+    }
 }
 
 .contents {
@@ -617,9 +625,7 @@ $bronze:  #3d3d3d;
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    padding-bottom: 16px;
-    margin-bottom: 16px;
-    border-bottom: 1px solid $gray-100;
+    margin-bottom: 24px;
     text-align: start;
 
     h2 {
@@ -640,27 +646,11 @@ $bronze:  #3d3d3d;
 .head-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 
     @media (max-width: 600px) {
         width: 100%;
     }
-}
-
-// 상단 우측 소형 "상세보기" 버튼 — 전체 목록(/stock/buy-target)으로 이동.
-.btn-detail {
-    padding: 8px 12px;
-    border: 1px solid $gray-200;
-    background: $white;
-    color: $gray-700;
-    font-size: 0.8rem;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: inherit;
-    white-space: nowrap;
-    transition: border-color .15s, color .15s;
-
-    &:hover { border-color: $blue; color: $blue; }
 }
 
 /* ── Date Picker ── */

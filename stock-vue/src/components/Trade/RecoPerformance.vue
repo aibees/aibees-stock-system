@@ -6,11 +6,7 @@
 
             <section class="head-desc">
                 <div class="head-left">
-                    <h2>추천 성과 추적</h2>
-                    <p class="sub-text">
-                        매수추천이 나온 뒤 <b>어디까지 올랐고 어디까지 빠졌는지</b>를 추천 건별로 봅니다.
-                        같은 종목이 여러 번 추천됐으면 추천일마다 따로 나옵니다.
-                    </p>
+                    <h2 style="text-align: left;">추천 성과 추적</h2>
                 </div>
             </section>
 

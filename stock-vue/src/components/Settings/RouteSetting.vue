@@ -7,8 +7,7 @@
             <!-- ── 상단 타이틀 + 추가 버튼 ── -->
             <section class="head-desc">
                 <div class="head-left">
-                    <h2>메뉴 라우트 설정</h2>
-                    <p class="sub-text">시스템에 등록된 메뉴 경로를 관리합니다</p>
+                    <h2 style="text-align: left;">메뉴 라우트 설정</h2>
                 </div>
                 <button class="btn-add" @click="openAdd">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
