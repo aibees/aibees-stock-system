@@ -32,7 +32,7 @@ from stock_shared.strategy.kospi1 import KospiStrategy1
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 
 SELL_ACTIONS = {Action.SELL_PROFIT, Action.SELL_STOP_LOSS, Action.SELL_STOP_PROFIT,
-                Action.SELL_TRAIL, Action.SELL_TIME}
+                Action.SELL_TRAIL, Action.SELL_TIME, Action.SELL_OBV_DEAD}
 
 # 편도 수수료+세금 근사. 왕복 2배로 반영한다.
 DEFAULT_FEE_RATE = 0.0011
@@ -41,6 +41,7 @@ DEFAULT_INIT_CASH = 1_000_000
 EXIT_REASON_KR = {
     'SELL_PROFIT': '익절', 'SELL_STOP_LOSS': '손절', 'SELL_STOP_PROFIT': '익절',
     'SELL_TRAIL': '트레일링', 'SELL_TIME': '타임스탑', 'EOD': '기간종료 청산',
+    'SELL_OBV_DEAD': 'OBV데드크로스',
 }
 
 

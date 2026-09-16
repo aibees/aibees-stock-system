@@ -21,8 +21,8 @@ class KospiStrategy1(StockStrategy):
         super().__init__()
         # ── 005070 백테스트 결론 반영 ─────────────────────────────
         # 진입 엣지: MACD + OBV '동시' 골든크로스 (단독 신호는 동전던지기)
-        # 청산 우선순위: 1.손절(-5% or OBV 데드크로스) > 2.익절(+30%)
-        #             > 3.트레일링(고점-k*ATR) > 4.동적 타임스탑(12봉)
+        # 청산 우선순위: 1.손절(-5%) > 1-1.OBV 데드크로스(SELL_OBV_DEAD, 가격과 무관)
+        #             > 2.익절(+30%) > 3.트레일링(고점-k*ATR) > 4.동적 타임스탑(12봉)
         self.stop_loss_pct = 0.05      # -5% 손절
         self.take_profit_pct = 0.30    # +30% 익절 (전량)
         self.max_hold_bars = 12         # 12봉 보유 한도(동적 타임스탑 기준)
@@ -284,7 +284,7 @@ class KospiStrategy1(StockStrategy):
 
     # ──────────────────────────────────────────────────────────────────
     # 매도 판별 (전량 매도 정책 / 분할 없음)
-    #  우선순위: 1.손절(-5% or OBV 데드크로스) > 2.익절(+30%)
+    #  우선순위: 1.손절(-5%) > 1-1.OBV데드크로스(SELL_OBV_DEAD) > 2.익절(+30%)
     #          > 3.트레일링(#1, max(고점-k*ATR, 고점*(1-dd%))) > 4.동적 타임스탑(#4)
     #  포지션 상태(entry_price/bars_held/peak_high/bars_since_peak)는
     #  백테스트 엔진이 진입 시 세팅하고 매 봉 갱신해야 한다.
@@ -316,9 +316,18 @@ class KospiStrategy1(StockStrategy):
         trail_on = self.use_trailing and peak_gain >= self.trail_activate_pct
         trail_valid = trail_on and (close <= trail_line)
 
-        # ── 1. 손절 (최우선) : 유효한 가격손절 또는 유효한 OBV 데드크로스 ──
-        if price_stop_valid or obv_dead_valid:
+        # ── 1. 손절 (최우선) : 가격이 실제로 손절선을 하회한 경우만 ──────
+        # OBV 데드크로스는 가격과 무관한 별개 사유(SELL_OBV_DEAD)로 분리한다.
+        # 둘을 SELL_STOP_LOSS 하나로 합쳐두면 가격이 손절선 근처에도 안 갔는데
+        # (심지어 수익 중이어도) "손절"로 표시돼 사용자가 오인하기 쉽다.
+        if price_stop_valid:
             return self._build_sell(coin_info, user_info, Action.SELL_STOP_LOSS, profit_pct,
+                                    stop_price, target_price,
+                                    extra={'is_above_ema20': 'Y' if is_above_ema20 else 'N'})
+
+        # ── 1-1. OBV 데드크로스 (모멘텀 이탈) : 가격 손절선과 무관 ─────
+        if obv_dead_valid:
+            return self._build_sell(coin_info, user_info, Action.SELL_OBV_DEAD, profit_pct,
                                     stop_price, target_price,
                                     extra={'obv_dead': 'Y' if is_obv_dead else 'N',
                                            'obv_dead_valid': 'Y' if obv_dead_valid else 'N',

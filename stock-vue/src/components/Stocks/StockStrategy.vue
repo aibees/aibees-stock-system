@@ -344,6 +344,7 @@ const entryLabel = (t) => (t === 'BUY_SURGE' ? '급등매수' : '매수');
 const exitLabel = (t) => ({
     SELL_PROFIT: '익절',
     SELL_STOP_LOSS: '손절',
+    SELL_OBV_DEAD: 'OBV 데드크로스',
     SELL_TRAIL: '트레일링',
     SELL_TIME_STOP: '타임스탑',
     SELL_MAX_HOLD: '보유만료',

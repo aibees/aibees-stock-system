@@ -62,6 +62,7 @@ class TelegramSender:
         """
         action_label = {
             'SELL_STOP_LOSS': '🛑 손절',
+            'SELL_OBV_DEAD':  '📉 OBV 데드크로스',
             'SELL_PROFIT':    '✅ 익절',
             'SELL_TRAIL':     '📊 트레일링 스탑',
             'SELL_TIME':      '⏱ 타임스탑',

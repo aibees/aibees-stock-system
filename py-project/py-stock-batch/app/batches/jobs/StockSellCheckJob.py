@@ -278,7 +278,8 @@ class StockSellCheckJob(Job):
     @staticmethod
     def _build_sell_reason(action_type: str, sell_ctx: dict) -> str:
         reasons = {
-            'SELL_STOP_LOSS': f"손절: OBV데드={sell_ctx.get('obv_dead_valid')} / 20일선위={sell_ctx.get('is_above_ema20')}",
+            'SELL_STOP_LOSS': f"손절: 가격 {sell_ctx.get('profit_pct')} (손절가 {sell_ctx.get('stop_price')} 하회) / 20일선위={sell_ctx.get('is_above_ema20')}",
+            'SELL_OBV_DEAD':  f"OBV 데드크로스(모멘텀 이탈): 20일선위={sell_ctx.get('is_above_ema20')} / 진입후{sell_ctx.get('bars_held')}봉",
             'SELL_PROFIT':    f"익절: 수익률 {sell_ctx.get('profit_pct')} 도달",
             'SELL_TRAIL':     f"트레일링: 고점={sell_ctx.get('peak')} / 라인={sell_ctx.get('trail_line')}",
             'SELL_TIME':      f"타임스탑: 보유={sell_ctx.get('bars_held')}봉 / hard_cap={sell_ctx.get('over_hard')}",
