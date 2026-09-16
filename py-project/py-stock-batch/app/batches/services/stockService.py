@@ -94,6 +94,10 @@ class StockService:
         병렬 배치에서 스레드는 조회/계산만 하고, 메인 스레드가 랭크 산정 후 이 메서드로 일괄 저장한다."""
         self.tradeBuyTargetStockDaoImpl.upsert_trade_buy_target_stock(session, data)
 
+    def save_composite_top10(self, session, data: list) -> None:
+        """2단계(top10→모멘텀 재정렬) 결과 upsert. watch 게이트와 병행 저장."""
+        self.tradeBuyTargetStockDaoImpl.upsert_composite_top10(session, data)
+
     def update_buy_target_rank(self, session, data: dict) -> None:
         """단일 종목의 종합점수/순위만 갱신 (배치 종료 후 순위 패스용)"""
         self.tradeBuyTargetStockDaoImpl.update_rank(

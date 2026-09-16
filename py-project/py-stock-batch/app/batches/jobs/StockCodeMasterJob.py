@@ -164,5 +164,12 @@ class StockCodeMasterJob(Job):
         os.remove(tmp1_path)
         os.remove(tmp2_path)
 
-        return df[['corp_code', 'stock_code', 'stock_name', 'stock_type', 'stock_type_yf', 'group_code', 'market_stop']].to_dict('records')
+        # 관리종목/정리매매 는 이미 .mst 파일에 있는 'Y'/'N' 플래그를 그대로 저장한다
+        # (2026-09 세션: 매수추천이 관리종목에 쏠리는 문제 확인 → 별도 API 호출 없이
+        # 여기서 같이 채워서 StockBuyCheckJob 이 안정성 필터로 바로 쓸 수 있게 함).
+        df['admin_issue'] = df['관리종목']
+        df['trading_halt'] = df['정리매매']
+
+        return df[['corp_code', 'stock_code', 'stock_name', 'stock_type', 'stock_type_yf',
+                   'group_code', 'market_stop', 'admin_issue', 'trading_halt']].to_dict('records')
 

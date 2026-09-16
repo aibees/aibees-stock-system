@@ -108,10 +108,17 @@ class TradeBuyTargetStockDao(BaseDao):
         if not ymd:
             return []
 
+        # composite_rank_no(2단계 모멘텀 재정렬, 1~10) 우선 — NULL(그날 top10 밖)은
+        # MySQL 기본 ASC 정렬에서 최솟값 취급돼 맨 앞으로 튀어나오므로 IS NULL 로 먼저
+        # 밀어낸 뒤에 정렬해야 한다. worker 의 DEFAULT_BUY_ORDER 와 동일한 우선순위.
         stmt = (
             select(TradeBuyTargetStock)
             .where(TradeBuyTargetStock.ymd == ymd)
-            .order_by(TradeBuyTargetStock.rank_no)
+            .order_by(
+                TradeBuyTargetStock.composite_rank_no.is_(None),
+                TradeBuyTargetStock.composite_rank_no,
+                TradeBuyTargetStock.rank_no,
+            )
         )
         results = session.execute(stmt).scalars().all()
         return [item.to_dict() for item in results]
@@ -206,6 +213,43 @@ class TradeBuyTargetStockDao(BaseDao):
             stmt = insert(TradeBuyTargetStock).values(row)
             upsert_stmt = stmt.on_duplicate_key_update(
                 **{c: stmt.inserted[c] for c in _UPSERT_COLS}
+            )
+            session.execute(upsert_stmt)
+
+    def upsert_composite_top10(self, session, data_list: list[dict]) -> None:
+        """2단계(top10→모멘텀 재정렬) 결과 upsert.
+
+        watch 게이트(upsert_trade_buy_target_stock)와 병행으로 채워지는 컬럼이라,
+        이미 그날 행이 있으면(watch 게이트도 통과) momentum_composite/composite_rank_no
+        만 갱신하고 나머지는 건드리지 않는다. 행이 없으면(watch 게이트 미통과, 2단계
+        전용 픽) stock_name/close/shape_proba 까지만 채운 최소 행을 새로 만든다.
+
+        data 키: ymd, stock_code, stock_name, close, shape_proba, momentum_composite,
+                 composite_rank_no
+        """
+        if not data_list:
+            return
+
+        for d in data_list:
+            row = {
+                "ymd": d["ymd"],
+                "stock_code": d["stock_code"],
+                "stock_name": d.get("stock_name"),
+                "close": d.get("close"),
+                "shape_proba": d.get("shape_proba"),
+                "momentum_composite": d.get("momentum_composite"),
+                "composite_rank_no": d.get("composite_rank_no"),
+            }
+            stmt = insert(TradeBuyTargetStock).values(row)
+            upsert_stmt = stmt.on_duplicate_key_update(
+                momentum_composite=stmt.inserted["momentum_composite"],
+                composite_rank_no=stmt.inserted["composite_rank_no"],
+                # watch 게이트 미통과 행(신규 insert)에만 의미 있고, 기존 행이면
+                # 이미 더 정확한 값(watch 경로가 채운 shape_proba/close)이 있으므로
+                # VALUES() 로 덮어써도 사실상 같은 값이라 무해하다.
+                shape_proba=stmt.inserted["shape_proba"],
+                close=stmt.inserted["close"],
+                stock_name=stmt.inserted["stock_name"],
             )
             session.execute(upsert_stmt)
 

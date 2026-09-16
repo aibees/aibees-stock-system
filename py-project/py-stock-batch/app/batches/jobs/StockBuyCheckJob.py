@@ -4,6 +4,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 
+import pandas as pd
+
 from app.batches.jobs.job import Job
 from app.batches.services.stockService import StockService
 from app.batches.services.userService import UserService
@@ -31,6 +33,22 @@ CHART_DAYS = 120
 # 후보를 걸러냈었지만, 실전 순차매매 시뮬레이션 검증 후 되돌렸다. 상수 자체는
 # user_options.s1_shape_proba_min 등 다른 곳에서 참조할 수 있어 남겨둔다.)
 SHAPE_PROBA_MIN_DEFAULT = 0.3
+
+# ── 2단계(top10 → 모멘텀 합성 재정렬) 매수추천 — 2026-09 세션 후속 리서치 ──────────
+# KospiStrategy1 watch 신호(기존 경로, "watch 게이트")와 **병행**으로 동작한다.
+# 전종목(get_stock_master_list) 중 watch 신호 통과 여부와 무관하게 아래 안정성
+# 필터를 통과한 종목 전체를 모아, shape+OBV 모델 상위 10개를 추린 뒤, 같은 계열
+# 모멘텀 지표(OBV/MACD/RSI/거래량)로 재정렬한 1위를 종합picks 1위로 삼는다.
+# 편향 없는 전종목 스캔(2,608~2,664종목) 기준 여러 학습 cutoff 에서 재현된 결과:
+# 단독 top1 대비 승률 +5~9%p 개선(승률 13.6%→22.7%, 평균net_edge +1.11%p→+3.80%p 등).
+COMPOSITE_TOP_N = 10
+COMPOSITE_PENNY_PRICE_MIN = 1000
+COMPOSITE_EXTREME_MOVE_PCT = 15.0      # 최근 COMPOSITE_EXTREME_LOOKBACK일 내 이 이상 등락 있으면 제외
+COMPOSITE_EXTREME_LOOKBACK = 10
+COMPOSITE_ATR_RATIO_MAX = 0.10         # ATR/종가 상한(kospi1.atr_ratio_min=0.05 하한과 별개)
+COMPOSITE_SMA20_TREND_BARS = 14        # 14봉 전 대비 sma20(ema20 필드) 상승 여부
+# 모멘텀 합성점수 = 아래 5개를 그날 후보 pool 내 z-score 로 정규화한 평균.
+COMPOSITE_MOMENTUM_COLS = ['obv_gap_norm', 'obv_slope3', 'ind_vol_ratio_today', 'ind_macd_hist_norm']
 
 
 class StockBuyCheckJob(Job):
@@ -129,6 +147,7 @@ class StockBuyCheckJob(Job):
 
         # ── 스레드는 KIS 조회+지표계산만 수행(무 DB). 결과(비-HOLD)만 리턴 ──
         result_list = []
+        composite_pool = []
         with ThreadPoolExecutor(max_workers=n) as ex:
             futures = []
             for (uid, engine), chunk in zip(engines, chunks):
@@ -141,9 +160,25 @@ class StockBuyCheckJob(Job):
                 ))
             for f in futures:
                 try:
-                    result_list.extend(f.result())
+                    chunk_results, chunk_composite = f.result()
+                    result_list.extend(chunk_results)
+                    composite_pool.extend(chunk_composite)
                 except Exception as e:
                     print(f"[run_batch] 워커 실패: {e}", flush=True)
+
+        # ── 2단계(top10→모멘텀 재정렬) — watch 게이트와 병행 저장 ──────────
+        try:
+            composite_top10 = self._compute_composite_top10(composite_pool, ymd)
+            if composite_top10:
+                self.stockServiceImpl.save_composite_top10(self.session, composite_top10)
+                self.session.commit()
+                print(f"2단계 top10 저장 완료: {len(composite_top10)}건 "
+                      f"(1위: {composite_top10[0]['stock_name']}({composite_top10[0]['stock_code']}))", flush=True)
+            else:
+                print("2단계 후보 pool 이 비어있어(안정성 필터 통과 종목 없음) top10 미생성", flush=True)
+        except Exception as e:
+            self.session.rollback()
+            print(f"[2단계 top10 저장 실패, watch 게이트 결과는 유지됨] {e}", flush=True)
 
         # ── 메인 스레드: 후보 전체 모은 뒤 랭크 산정 → 한 번에 저장 ──
         if result_list:
@@ -188,17 +223,91 @@ class StockBuyCheckJob(Job):
 
         return return_result
 
+    @staticmethod
+    def _compute_composite_top10(composite_pool: list, ymd: str) -> list:
+        """2단계 후보 pool 전체(안정성 필터 통과분)에서 top10 을 추리고 모멘텀
+        합성점수로 재정렬한다. z-score 는 그날 pool 전체 기준(top10 으로 좁히기 전)
+        이어야 한다 — 리서치 검증 당시와 동일 조건."""
+        if not composite_pool:
+            return []
+
+        pool = pd.DataFrame(composite_pool).dropna(subset=['proba'] + COMPOSITE_MOMENTUM_COLS + ['ind_rsi14'])
+        if pool.empty:
+            return []
+
+        def _zscore(s: pd.Series) -> pd.Series:
+            std = s.std()
+            return (s - s.mean()) / std if std and std > 0 else s * 0.0
+
+        for col in COMPOSITE_MOMENTUM_COLS:
+            pool[f'z_{col}'] = _zscore(pool[col])
+        pool['z_rsi_centered'] = _zscore(pool['ind_rsi14'] - 50)
+        z_cols = [f'z_{c}' for c in COMPOSITE_MOMENTUM_COLS] + ['z_rsi_centered']
+        pool['momentum_composite'] = pool[z_cols].mean(axis=1)
+
+        top10 = pool.sort_values('proba', ascending=False).head(COMPOSITE_TOP_N)
+        top10 = top10.sort_values('momentum_composite', ascending=False).reset_index(drop=True)
+        top10['composite_rank_no'] = range(1, len(top10) + 1)
+
+        return [
+            {
+                'ymd': ymd,
+                'stock_code': r['stock_code'],
+                'stock_name': r['stock_name'],
+                'close': r['close'],
+                'shape_proba': round(float(r['proba']), 4),
+                'momentum_composite': round(float(r['momentum_composite']), 4),
+                'composite_rank_no': int(r['composite_rank_no']),
+            }
+            for _, r in top10.iterrows()
+        ]
+
+    @staticmethod
+    def _composite_eligible(computed: pd.DataFrame, stock: dict) -> bool:
+        """2단계(top10→모멘텀 재정렬) 후보 안정성 필터. watch 게이트와 무관하게 별도 평가한다."""
+        if str(stock.get('admin_issue') or 'N').upper() == 'Y':
+            return False
+        if str(stock.get('trading_halt') or 'N').upper() == 'Y':
+            return False
+        if len(computed) < COMPOSITE_SMA20_TREND_BARS + 1:
+            return False
+
+        last = computed.iloc[-1]
+        close = float(last.get(Literal.CLOSE) or 0)
+        if close <= 0:
+            return False
+
+        ema20_now = float(last.get(Literal.EMA_20) or 0)
+        ema20_prev = float(computed.iloc[-1 - COMPOSITE_SMA20_TREND_BARS].get(Literal.EMA_20) or 0)
+        if not (ema20_now > ema20_prev):
+            return False
+
+        atr_ratio = float(last.get(Literal.ATR) or 0) / close
+        if atr_ratio > COMPOSITE_ATR_RATIO_MAX:
+            return False
+
+        recent = computed.tail(COMPOSITE_EXTREME_LOOKBACK + 1)[Literal.CLOSE].astype(float)
+        daily_ret_pct = recent.pct_change().abs() * 100
+        if (daily_ret_pct >= COMPOSITE_EXTREME_MOVE_PCT).any():
+            return False
+
+        if bool(last.get('shape_exhaustion_flag', False)):
+            return False
+
+        return True
+
     ####################################################
     # 청크 워커 (스레드) — KIS 조회 + 지표계산만. DB 접근 금지.
     #   각 스레드는 자기 KisEngine(고유 appkey) 과 독립 KisService/전략 인스턴스를 사용한다.
-    #   반환: 비-HOLD 결과 dict 리스트.
+    #   반환: (watch게이트 결과 dict 리스트, 2단계 후보 lightweight dict 리스트) 튜플.
     ####################################################
     def _process_chunk(self, uid, engine: KisEngine, chunk: list, strategy_param: str,
-                       stock_option_meta: UserOptionMeta, start_date: str, end_date: str, ymd: str) -> list:
+                       stock_option_meta: UserOptionMeta, start_date: str, end_date: str, ymd: str):
         tag = f"u{uid}" if uid is not None else "file"
         kis_service = KisService()          # 스레드 로컬
         strategy = self._make_strategy(strategy_param)
         results = []
+        composite_pool = []
         idx = 0
 
         while idx < len(chunk):
@@ -218,7 +327,7 @@ class StockBuyCheckJob(Job):
                     continue
 
                 last_close = ohlcv.iloc[-1]['close']
-                if last_close < 1000:
+                if last_close < COMPOSITE_PENNY_PRICE_MIN:
                     print(f"[{tag}] skip ==> 1000원 이하 종목", flush=True)
                     idx += 1
                     continue
@@ -229,20 +338,29 @@ class StockBuyCheckJob(Job):
                     idx += 1
                     continue
 
-                fin_result = engine.get_finance_info(stock_code)
-
                 computed = kis_service.compute_indicator_df(ohlcv, user_info=stock_option_meta)
+                # 2단계 소진게이트 판정은 fillna(0.0) 전에(0으로 뭉개지면 오탐 발생) 미리 해둔다.
+                last_row_raw = computed.iloc[-1]
+                is_exh = bool(
+                    (last_row_raw.get('shape_bars_since_min', 0) or 0) >= 13
+                    and (last_row_raw.get('shape_total_ret_14', 0) or 0) >= 0.25
+                    and (last_row_raw.get('shape_ret_1d_today', 0) or 0) >= 0.10
+                )
+                computed['shape_exhaustion_flag'] = False
+                computed.iloc[-1, computed.columns.get_loc('shape_exhaustion_flag')] = is_exh
+
                 computed.fillna(0.0, inplace=True)
                 trade_data = computed.to_dict(orient='records')
 
                 result = strategy.get_result_with_action(trade_data, stock_option_meta)
+
+                # shape+OBV proba 는 watch 게이트 통과 여부와 무관하게 항상 계산한다
+                # (2단계 병행 후보 선정에 필요 — 2026-09 세션 후속 리서치).
+                last_features = {c: trade_data[-1].get(c) for c in SHAPE_FEATURE_COLUMNS}
+                shape_proba = shape_score(last_features)
+
                 if result['action_type'] != 'HOLD':
-                    # shape_proba 는 계속 계산·저장한다(분석용 데이터 축적 목적).
-                    # 예전엔 이 값으로 후보를 걸러냈지만(2026-09 세션), 실전 순차매매
-                    # 시뮬레이션에서 갭하락 리스크에 취약해 기존 scoring 방식보다 못한
-                    # 것으로 확인되어 필터링은 되돌렸다 — 후보 제외에는 더 이상 안 쓴다.
-                    shape_proba = shape_score(
-                        {c: trade_data[-1].get(c) for c in SHAPE_FEATURE_COLUMNS})
+                    fin_result = engine.get_finance_info(stock_code)
                     result['stock_code'] = stock_code
                     result['stock_name'] = stock_name
                     result['ymd'] = ymd
@@ -251,6 +369,19 @@ class StockBuyCheckJob(Job):
                     result['shape_proba'] = shape_proba
                     pprint.pprint(result)
                     results.append(result)
+
+                if shape_proba is not None and self._composite_eligible(computed, stock):
+                    composite_pool.append({
+                        'stock_code': stock_code,
+                        'stock_name': stock_name,
+                        'close': float(last_close),
+                        'proba': shape_proba,
+                        'obv_gap_norm': last_features.get('obv_gap_norm'),
+                        'obv_slope3': last_features.get('obv_slope3'),
+                        'ind_vol_ratio_today': last_features.get('ind_vol_ratio_today'),
+                        'ind_macd_hist_norm': last_features.get('ind_macd_hist_norm'),
+                        'ind_rsi14': last_features.get('ind_rsi14'),
+                    })
 
                 idx += 1
 
@@ -268,8 +399,8 @@ class StockBuyCheckJob(Job):
                 idx += 1
                 continue
 
-        print(f"[{tag}] 청크 완료: 후보 {len(results)}건", flush=True)
-        return results
+        print(f"[{tag}] 청크 완료: watch게이트 후보 {len(results)}건 / 2단계 pool {len(composite_pool)}건", flush=True)
+        return results, composite_pool
 
 
     # smtpUtils.py 파일에서 emailUtils 객체를 임포트한다고 가정합니다.

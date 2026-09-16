@@ -20,10 +20,16 @@
 이어지는지" 를 구분하는 힘이 부족했다(k-means 로 PC1=크기 축을 제거해도 남는 3개
 아키타입 확인). rsi/macd/거래량 같은 전통 지표를 모델 입력에 "그대로" 추가했더니
 walk-forward top5%/top10% 구간에서 일관된 개선이 나왔다(재현 확인, 두 fold 모두).
-OBV 파생(obv_gap_norm)은 기여도가 거의 없어 제외했다 — RSI/MACD-hist/거래량비율 3개만
-추가한다. 이 3개는 창(window) lookback 이 필요 없는 "당일 스냅샷" 값이라 shape_* 와
-달리 for-loop 없이 벡터 연산으로 채운다(compute_indicator_df/enrich_rows 가 이미
-rsi/macd/macd_s/vol_avg 를 계산해 data 에 넣어준 뒤 이 함수를 호출하는 것이 전제).
+당시엔 OBV 파생(obv_gap_norm)이 기여도가 거의 없어 제외했었다.
+
+2026-09 세션 재차 후속 리서치(편향 없는 전종목 스캔 이후): 실제 상한가(≥29%) 741건을
+전종목/대조군으로 비교해보니 OBV 매집 신호(obv_gap_norm/obv_slope3)가 재현성 있게
+유의미했다(p<0.001). shape9+ind3 모델에 OBV 파생 2종을 다시 추가해 top10 후보를
+추린 뒤, 같은 계열 지표(OBV/MACD/RSI/거래량)로 재정렬하는 2단계 방식이 여러 학습
+cutoff에서 일관되게 단독 top1 픽보다 우수했다(승률 +5~9%p). 이번엔 채택한다.
+이 2개도 ind_* 와 마찬가지로 lookback 이 obv/obv_signal/vol_avg 롤링 계산에만 있고
+(compute_indicator_df/enrich_rows 가 이미 obv/obv_signal/vol_avg 를 채워둔 뒤 호출된다는
+전제), for-loop 없이 벡터 연산으로 채운다.
 """
 from __future__ import annotations
 
@@ -42,6 +48,8 @@ COL_RSI = "rsi"
 COL_MACD = "macd"
 COL_MACD_S = "macd_s"
 COL_VOL_AVG = "vol_avg"
+COL_OBV = "obv"
+COL_OBV_SIGNAL = "obv_signal"
 
 WINDOW = 14  # 정규화 lookback 봉수. 리서치에서 검증된 고정값 — 바꾸면 재검증 필요.
 
@@ -61,6 +69,12 @@ IND_FEATURE_COLUMNS = [
     "ind_vol_ratio_today",
 ]
 
+# OBV 매집 신호 파생(상한가 741건 대조군 분석으로 재검증, p<0.001). 당일 스냅샷값.
+OBV_FEATURE_COLUMNS = [
+    "obv_gap_norm",
+    "obv_slope3",
+]
+
 SHAPE_FEATURE_COLUMNS = [
     "shape_total_ret_14",
     "shape_min_ret_14",
@@ -71,7 +85,7 @@ SHAPE_FEATURE_COLUMNS = [
     "shape_down_ratio_14",
     "shape_path_std_14",
     "shape_vol_trend",
-] + IND_FEATURE_COLUMNS
+] + IND_FEATURE_COLUMNS + OBV_FEATURE_COLUMNS
 
 
 def compute_shape_features(data: pd.DataFrame, window: int = WINDOW) -> pd.DataFrame:
@@ -166,6 +180,17 @@ def compute_shape_features(data: pd.DataFrame, window: int = WINDOW) -> pd.DataF
         data["ind_vol_ratio_today"] = volumes / (vol_avg + 1e-9)
     else:
         data["ind_vol_ratio_today"] = np.nan
+
+    # ── obv_* (매집 신호, 당일 스냅샷) ─────────────────────────────────
+    if COL_OBV in data.columns and COL_OBV_SIGNAL in data.columns and COL_VOL_AVG in data.columns:
+        obv = data[COL_OBV].astype(float)
+        obv_signal = data[COL_OBV_SIGNAL].astype(float)
+        vol_avg = data[COL_VOL_AVG].astype(float)
+        data["obv_gap_norm"] = (obv - obv_signal) / (vol_avg + 1e-9)
+        data["obv_slope3"] = (obv - obv.shift(3)) / (vol_avg * 3 + 1e-9)
+    else:
+        data["obv_gap_norm"] = np.nan
+        data["obv_slope3"] = np.nan
 
     return data
 

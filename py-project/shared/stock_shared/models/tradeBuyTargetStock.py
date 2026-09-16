@@ -39,6 +39,10 @@ class TradeBuyTargetStock(Base):
     score = Column(DECIMAL(6, 2), nullable=True)
     shape_proba = Column(DECIMAL(6, 4), nullable=True)       # shape 모델 추론값(0~1), 참고용
     shape_exhaustion = Column(String(1), nullable=True)      # 'Y'/'N' — 소진게이트 발동 여부
+    # 2단계(top10→모멘텀 재정렬) 매수추천 — 2026-09 세션 후속. watch 게이트와 별개로
+    # composite_rank_no<=10 인 행만 존재(그 외는 NULL). 워커는 이 값을 1순위로 본다.
+    momentum_composite = Column(DECIMAL(8, 4), nullable=True)
+    composite_rank_no = Column(Integer, nullable=True)
 
     def to_dict(self):
         return {
@@ -68,4 +72,6 @@ class TradeBuyTargetStock(Base):
             "score": self.score,
             "shape_proba": self.shape_proba,
             "shape_exhaustion": self.shape_exhaustion,
+            "momentum_composite": self.momentum_composite,
+            "composite_rank_no": self.composite_rank_no,
         }

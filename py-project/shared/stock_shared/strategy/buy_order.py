@@ -62,14 +62,19 @@ ORDER_FIELDS = {
     # (assign_ranks 참고). 원하는 사용자가 s1_buy_order 에 opt-in 으로만 쓸 수 있게
     # 필드만 남겨둔다.
     "shape_proba": (lambda r: _num(r.get("shape_proba")), "desc"),
+    # 2단계(top10→모멘텀 재정렬) 결과 순위(1~10, 그 외는 NULL). watch 게이트와 별개로
+    # 전종목 스캔에서 뽑힌다 — 2026-09 세션 후속 리서치, 여러 학습 cutoff 에서 재현된
+    # 개선(단독 top1 대비 승률 +5~9%p) 반영해 기본 1순위로 승격한다(DEFAULT_BUY_ORDER).
+    # NULL(그날 top10 밖)인 종목은 make_buy_order_key 의 NULL-always-last 규칙에 따라
+    # 자동으로 score 기준 정렬로 폴백된다.
+    "composite_rank_no": (lambda r: _num(r.get("composite_rank_no")), "asc"),
     # ── 추가 예시(조회 컬럼만 넣으면 즉시 동작) ──
     # "per":   (lambda r: _num(r.get("per")),     "asc"),
 }
 
-# 스펙 미설정(NULL) 시 기본. score 를 1순위로, 동률이면 rank_no(과열최저 순서) 로 tie-break.
-# (2026-09 세션 중 한때 rank_no:asc 를 1순위로 바꿨었지만, shape_proba 기반 rank_no 산정을
-# 되돌리면서 기본 정렬도 원래 방식으로 되돌렸다.)
-DEFAULT_BUY_ORDER = "score:desc,rank_no:asc"
+# 스펙 미설정(NULL) 시 기본. composite_rank_no(2단계 모멘텀 재정렬) 를 1순위로,
+# 그 종목이 없는 날(NULL)은 자동으로 score 기준으로 폴백, 동률이면 rank_no 로 tie-break.
+DEFAULT_BUY_ORDER = "composite_rank_no:asc,score:desc,rank_no:asc"
 
 
 def parse_buy_order(spec):

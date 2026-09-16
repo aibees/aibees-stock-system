@@ -144,6 +144,7 @@
                                     <th class="tr">등락률</th>
                                     <th class="tr">급등패턴</th>
                                     <th class="tc">rank</th>
+                                    <th class="tc">종합순위</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -156,6 +157,7 @@
                                     <td class="tr num" :class="pctClass(r.rate)">{{ r.rate ?? '–' }}</td>
                                     <td class="tr num">{{ r.shape_proba ?? '–' }}</td>
                                     <td class="tc num">{{ r.rank_no ?? '–' }}</td>
+                                    <td class="tc num">{{ r.composite_rank_no ?? '–' }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -357,15 +359,22 @@ const ORDER_FIELD_META = {
     },
     shape_proba: {
         label: '급등패턴 확률 (shape_proba)', descLabel: '높은 순', ascLabel: '낮은 순',
-        hint: '14봉 가격패턴 모델이 예측한 "5일 내 순엣지 15%p+" 확률(0~1). 참고용으로 계속' +
-              ' 계산·저장되지만 기본 정렬에는 쓰이지 않습니다 — 원하면 직접 추가해서 opt-in으로 쓰세요.',
+        hint: '14봉 가격패턴+OBV 모델이 예측한 "5일 내 순엣지 15%p+" 확률(0~1). 참고용으로 계속' +
+              ' 계산·저장됩니다 — 종합순위(composite_rank_no) 산정에 쓰이는 원점수이기도 합니다.',
+    },
+    composite_rank_no: {
+        label: '종합 순위 (composite_rank_no)', descLabel: '큰 순', ascLabel: '작은 순',
+        hint: 'watch 신호 게이트와 별개로, 전종목 중 안정성 필터(관리종목/거래정지/동전주/' +
+              '급변동 이력 제외 등) 통과 종목의 shape+OBV 모델 top10을 OBV/MACD/RSI/거래량' +
+              ' 합성점수로 재정렬한 순위(1~10). 그날 top10 밖이면 값이 없어 자동으로 score' +
+              ' 기준으로 밀립니다. 2026-09 세션 후속 리서치 — 기본 1순위입니다.',
     },
 };
 const ORDER_FIELDS = Object.keys(ORDER_FIELD_META);
 // worker 기본 정렬(stock_shared.strategy.buy_order.DEFAULT_BUY_ORDER)과 동일하게 맞춘다
-// (둘이 다르면 "미리보기"가 실제 매수 순서와 어긋난다). 2026-09 세션 중 한때 rank_no 를
-// shape_proba 기반으로 1순위 삼았었지만, 실전 시뮬레이션 검증 후 기존 score 우선으로 되돌렸다.
-const DEFAULT_ORDER_SPEC = 'score:desc,rank_no:asc';
+// (둘이 다르면 "미리보기"가 실제 매수 순서와 어긋난다). 2026-09 세션 후속 리서치로
+// top10→모멘텀 재정렬(composite_rank_no) 방식이 재현성 있게 우수함을 확인해 1순위로 승격.
+const DEFAULT_ORDER_SPEC = 'composite_rank_no:asc,score:desc,rank_no:asc';
 
 /* orderRows: 화면 순서 = 우선순위. on=false 면 정렬에 쓰지 않음 */
 const orderRows = ref([]);
@@ -440,11 +449,11 @@ const resetOrderToDefault = () => { orderRows.value = specToRows(DEFAULT_ORDER_S
  * ymd 없이 호출하면 서버가 가장 최근 영업일자를 찾아 반환한다.
  * 조회 실패/데이터 없음이면 아래 FALLBACK_ROWS 로 떨어져 화면이 비지 않게 한다. */
 const FALLBACK_ROWS = [
-    { stock_code: '005070', stock_name: '코스모신소재', score: 90, volume: 512000, rate: '12.5%', rank_no: 1, shape_proba: 0.41 },
-    { stock_code: '066430', stock_name: '와이오엠', score: 90, volume: 9120000, rate: '-3.2%', rank_no: 2, shape_proba: 0.37 },
-    { stock_code: '015760', stock_name: '한국전력', score: 80, volume: 1030000, rate: '5.0%', rank_no: 3, shape_proba: 0.36 },
-    { stock_code: '109070', stock_name: '컨버즈', score: null, volume: 24500000, rate: '29.9%', rank_no: null, shape_proba: 0.35 },
-    { stock_code: '048910', stock_name: '대원미디어', score: 80, volume: null, rate: null, rank_no: 4, shape_proba: 0.35 },
+    { stock_code: '005070', stock_name: '코스모신소재', score: 90, volume: 512000, rate: '12.5%', rank_no: 1, shape_proba: 0.41, composite_rank_no: 1 },
+    { stock_code: '066430', stock_name: '와이오엠', score: 90, volume: 9120000, rate: '-3.2%', rank_no: 2, shape_proba: 0.37, composite_rank_no: 3 },
+    { stock_code: '015760', stock_name: '한국전력', score: 80, volume: 1030000, rate: '5.0%', rank_no: 3, shape_proba: 0.36, composite_rank_no: null },
+    { stock_code: '109070', stock_name: '컨버즈', score: null, volume: 24500000, rate: '29.9%', rank_no: null, shape_proba: 0.35, composite_rank_no: 2 },
+    { stock_code: '048910', stock_name: '대원미디어', score: 80, volume: null, rate: null, rank_no: 4, shape_proba: 0.35, composite_rank_no: null },
 ];
 
 const targetRows = ref([]);      // 실제 매수타겟 (비어 있으면 fallback 사용)
@@ -496,6 +505,7 @@ const FIELD_VALUE = {
     rank_no: r => numOf(r.rank_no),
     close: r => numOf(r.close),
     shape_proba: r => numOf(r.shape_proba),
+    composite_rank_no: r => numOf(r.composite_rank_no),
 };
 
 const sortedSample = computed(() => {

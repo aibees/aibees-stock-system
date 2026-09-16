@@ -77,8 +77,8 @@ class Repository:
         """해당 ymd 추천 전체를 order_spec 순서로 정렬해 반환.
 
         order_spec: user_options.s1_buy_order (예 "score:desc,volume:desc").
-                    None/빈값이면 DEFAULT_BUY_ORDER(= score:desc,rank_no:asc).
-                    문법·필드 상세는 파일 상단 _ORDER_FIELDS 주석 참고.
+                    None/빈값이면 DEFAULT_BUY_ORDER(= composite_rank_no:asc,score:desc,rank_no:asc).
+                    문법·필드 상세는 buy_order.py 의 ORDER_FIELDS 주석 참고.
 
         ※ 정렬 결과의 **1순위가 곧 매수 종목**이다(BuyExecutor 는 위에서부터
           체결 가능한 첫 종목을 산다. 프리마켓 라운드는 아예 targets[0] 만 본다).
@@ -88,7 +88,8 @@ class Repository:
         """
         sql = text(
             "SELECT t.ymd, t.stock_code, t.stock_name, t.rate, t.close, "
-            "       t.volume, t.score, t.rank_no, t.shape_proba, t.shape_exhaustion, ms.nxt_flag "
+            "       t.volume, t.score, t.rank_no, t.shape_proba, t.shape_exhaustion, "
+            "       t.momentum_composite, t.composite_rank_no, ms.nxt_flag "
             "FROM trade_buy_target_stock t "
             "LEFT JOIN master_stock ms ON ms.stock_code = t.stock_code "
             "WHERE t.ymd = :ymd"
