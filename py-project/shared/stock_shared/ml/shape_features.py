@@ -15,6 +15,15 @@
 
 이 모듈은 numpy/pandas 만 쓴다(scikit-learn 의존성 없음) — exhaustion 게이트는
 모델 없이도 항상 동작해야 하기 때문이다. 모델 추론(shape_proba)은 shape_model.py 참고.
+
+2026-09 세션 후속 리서치: shape_* 9종만으로는 "당일 상승분 중 어떤 패턴이 다음날도
+이어지는지" 를 구분하는 힘이 부족했다(k-means 로 PC1=크기 축을 제거해도 남는 3개
+아키타입 확인). rsi/macd/거래량 같은 전통 지표를 모델 입력에 "그대로" 추가했더니
+walk-forward top5%/top10% 구간에서 일관된 개선이 나왔다(재현 확인, 두 fold 모두).
+OBV 파생(obv_gap_norm)은 기여도가 거의 없어 제외했다 — RSI/MACD-hist/거래량비율 3개만
+추가한다. 이 3개는 창(window) lookback 이 필요 없는 "당일 스냅샷" 값이라 shape_* 와
+달리 for-loop 없이 벡터 연산으로 채운다(compute_indicator_df/enrich_rows 가 이미
+rsi/macd/macd_s/vol_avg 를 계산해 data 에 넣어준 뒤 이 함수를 호출하는 것이 전제).
 """
 from __future__ import annotations
 
@@ -27,6 +36,13 @@ import pandas as pd
 COL_CLOSE = "close"
 COL_VOLUME = "volume"
 
+# rsi/macd/macd_s/vol_avg 는 compute_shape_features 호출 전에 이미 채워져 있다고 가정
+# (KisStockService.compute_indicator_df, KisBacktester.enrich_rows 둘 다 순서 보장).
+COL_RSI = "rsi"
+COL_MACD = "macd"
+COL_MACD_S = "macd_s"
+COL_VOL_AVG = "vol_avg"
+
 WINDOW = 14  # 정규화 lookback 봉수. 리서치에서 검증된 고정값 — 바꾸면 재검증 필요.
 
 # 소진(exhaustion) 게이트 임계값. 전부 동시에 만족해야 발동한다.
@@ -38,6 +54,13 @@ EXHAUSTION_BARS_SINCE_MIN_MIN = WINDOW - 1     # 13 이상(사실상 눌림 없�
 EXHAUSTION_TOTAL_RET_14_MIN = 0.25             # +25%p 이상
 EXHAUSTION_RET_1D_TODAY_MIN = 0.10             # 당일 +10%p 이상
 
+# 2026-09 세션 후속 리서치로 추가된 전통 지표 파생 피처(당일 스냅샷, lookback 불필요).
+IND_FEATURE_COLUMNS = [
+    "ind_rsi14",
+    "ind_macd_hist_norm",
+    "ind_vol_ratio_today",
+]
+
 SHAPE_FEATURE_COLUMNS = [
     "shape_total_ret_14",
     "shape_min_ret_14",
@@ -48,7 +71,7 @@ SHAPE_FEATURE_COLUMNS = [
     "shape_down_ratio_14",
     "shape_path_std_14",
     "shape_vol_trend",
-]
+] + IND_FEATURE_COLUMNS
 
 
 def compute_shape_features(data: pd.DataFrame, window: int = WINDOW) -> pd.DataFrame:
@@ -121,6 +144,28 @@ def compute_shape_features(data: pd.DataFrame, window: int = WINDOW) -> pd.DataF
     data["shape_path_std_14"] = path_std
     data["shape_vol_trend"] = vol_trend
     data["shape_ret_1d_today"] = ret_1d_today
+
+    # ── ind_* (전통 지표 파생, 당일 스냅샷) ────────────────────────────
+    # 호출부가 rsi/macd/macd_s/vol_avg 컬럼을 미리 채워두지 않은 경우(예: 다른
+    # 프로젝트의 임시 스크립트)를 대비해 컬럼 부재 시 NaN 으로 안전 처리한다.
+    if COL_RSI in data.columns:
+        data["ind_rsi14"] = data[COL_RSI].astype(float)
+    else:
+        data["ind_rsi14"] = np.nan
+
+    if COL_MACD in data.columns and COL_MACD_S in data.columns:
+        macd = data[COL_MACD].astype(float)
+        macd_s = data[COL_MACD_S].astype(float)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            data["ind_macd_hist_norm"] = (macd - macd_s) / closes
+    else:
+        data["ind_macd_hist_norm"] = np.nan
+
+    if COL_VOL_AVG in data.columns:
+        vol_avg = data[COL_VOL_AVG].astype(float)
+        data["ind_vol_ratio_today"] = volumes / (vol_avg + 1e-9)
+    else:
+        data["ind_vol_ratio_today"] = np.nan
 
     return data
 
