@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import select, update
 
 from stock_shared.dao.baseDao import BaseDao
 from stock_shared.models.userAuth import UserAuth
@@ -134,34 +134,6 @@ class UserMasterDao(BaseDao):
             .where(UserOptions.stock_buy_target_mail_flag == "Y")
         )
         return session.execute(stmt).scalars().all()
-
-    def select_sell_target_users(self, session) -> list:
-        """
-        매도 알림 대상 유저 전체 조회.
-        stock_sell_mail_flag='Y' 또는 stock_sell_tele_flag='Y' 인 유저를
-        UserMaster + UserOptions + UserDetail 조인하여 반환.
-        """
-        stmt = (
-            select(UserMaster, UserOptions, UserDetail)
-            .join(UserOptions, UserMaster.user_id == UserOptions.user_id)
-            .join(UserDetail, UserMaster.user_id == UserDetail.user_id)
-            .where(
-                or_(
-                    UserOptions.stock_sell_mail_flag == "Y",
-                    UserOptions.stock_sell_tele_flag == "Y",
-                )
-            )
-        )
-        result = session.execute(stmt).mappings().all()
-        return [
-            {
-                **row["UserMaster"].to_dict(),
-                **row["UserOptions"].to_dict(),
-                "tele_bot_id": row["UserDetail"].tele_bot_id,
-                "tele_chat_id": row["UserDetail"].tele_chat_id,
-            }
-            for row in result
-        ]
 
     def select_user_upbit_options(self, session, data):
         """upbit_push_flag 기준 유저 + 업비트 키 조회."""

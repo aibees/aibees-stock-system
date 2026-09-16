@@ -8,7 +8,8 @@ worker 전용 포지션(trade_worker_position)의 HOLDING 종목에 대해:
   - 일봉 OHLCV(KisEngine.get_daily_ohlcv) → 지표계산(KisService.compute_indicator_df)
   - 포지션 상태(entry_price/entry_atr/bars_held/peak/bars_since_peak) 주입
   - <모드 전략>.get_action_in_active 로 action + stop/target/trail 산출
-을 수행한다. daily 배치(StockSellCheckJob)·trade_sell_target_stock 과 무관하게 자체 계산.
+을 수행한다. (구 daily 배치 StockSellCheckJob·trade_sell_target_stock 은 "매도신호 신청"
+메뉴와 함께 폐기됨 — worker 는 그것과 무관하게 원래부터 자체 계산해왔다.)
 
 ※ 미구현(스켈레톤) 모드로 전환되면 UnsupportedModeError 를 던진다.
   부팅 시에는 worker 를 세우고, 장중 전환 시에는 **기존 전략을 유지**한다 —

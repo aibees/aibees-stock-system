@@ -53,44 +53,4 @@ class TelegramSender:
         except Exception as e:
             return {'result': 'fail', 'msg': str(e)}
 
-    def sendSellAlert(self, bot_id: str, chat_id: str, sell_list: list) -> dict:
-        """
-        매도 시그널 종목 리스트를 텔레그램으로 발송.
-
-        :param sell_list: StockSellCheckJob의 sell_alerts 리스트
-                          각 항목: {'stock_name', 'stock_code', 'action_type', 'sell_ctx'}
-        """
-        action_label = {
-            'SELL_STOP_LOSS': '🛑 손절',
-            'SELL_OBV_DEAD':  '📉 OBV 데드크로스',
-            'SELL_PROFIT':    '✅ 익절',
-            'SELL_TRAIL':     '📊 트레일링 스탑',
-            'SELL_TIME':      '⏱ 타임스탑',
-        }
-
-        lines = [f'<b>📉 매도 시그널 감지 ({len(sell_list)}건)</b>\n']
-        for stock in sell_list:
-            name       = stock.get('stock_name', '')
-            code       = stock.get('stock_code', '')
-            action     = stock.get('action_type', '')
-            sell_ctx   = stock.get('sell_ctx', {})
-            label      = action_label.get(action, action)
-            profit     = sell_ctx.get('profit_pct', '-')
-            stop_p     = sell_ctx.get('stop_price', '-')
-            target_p   = sell_ctx.get('target_price', '-')
-            bars       = sell_ctx.get('bars_held', '-')
-
-            lines.append(
-                f'▪ <b>{name} [{code}]</b>  {label}\n'
-                f'  수익률: {profit} | 보유봉: {bars}\n'
-                f'  손절가: {int(stop_p):,}  익절가: {int(target_p):,}'
-                if stop_p not in ('-', None) and target_p not in ('-', None)
-                else f'▪ <b>{name} [{code}]</b>  {label}\n'
-                     f'  수익률: {profit} | 보유봉: {bars}'
-            )
-
-        text = '\n'.join(lines)
-        return self.sendMessage(bot_id=bot_id, chat_id=chat_id, text=text)
-
-
 telegramUtils = TelegramSender()

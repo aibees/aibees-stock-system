@@ -96,11 +96,6 @@ class UserService:
             logging.warning('user_option_m3 조회 실패(user_id=%s) → 기본값 사용: %s',
                             user_id, e)
 
-    def get_all_sell_target_users(self, session) -> list[UserOptionMeta]:
-        """매도 알림(email 또는 telegram) 설정된 유저 전체를 UserOptionMeta 리스트로 반환"""
-        rows = self.userMasterDaoImpl.select_sell_target_users(session)
-        return [extractor(r) for r in rows]
-
     def get_user_email_by_condition(self, session, option):
         if option == 'email':
             return self.userMasterDaoImpl.select_target_emails(session)
