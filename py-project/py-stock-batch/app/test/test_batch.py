@@ -2,7 +2,6 @@ import sys
 
 from app.batches.jobs.StockBuyCheckJob import StockBuyCheckJob
 from app.batches.jobs.StockCodeMasterJob import StockCodeMasterJob
-from app.batches.jobs.StockSellCheckJob import StockSellCheckJob
 from stock_shared.db.database import dbConn
 from app.batches.services.stockService import StockService
 from app.batches.services.userService import UserService
@@ -20,8 +19,6 @@ def test(name):
         job = StockBuyCheckJob()
     elif name == 'StockCodeMasterJob':
         job = StockCodeMasterJob()
-    elif name == 'StockSellCheckJob':
-        job = StockSellCheckJob()
     else:
         job = None
 

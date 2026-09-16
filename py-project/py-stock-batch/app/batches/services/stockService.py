@@ -1,8 +1,6 @@
 from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
 from stock_shared.dao.tradeBuyTargetChartDao import TradeBuyTargetChartDao
-from app.domain.dao.tradeSellTargetStockDao import TradeSellTargetStockDao
-from stock_shared.dao.stockSellRequestDao import StockSellRequestDao
 from stock_shared.strategy import scoring
 
 
@@ -12,8 +10,6 @@ class StockService:
         self.stockMasterDaoImpl = MasterStockDao()
         self.tradeBuyTargetStockDaoImpl = TradeBuyTargetStockDao()
         self.tradeBuyTargetChartDaoImpl = TradeBuyTargetChartDao()
-        self.tradeSellTargetStockDaoImpl = TradeSellTargetStockDao()
-        self.stockSellRequestDaoImpl = StockSellRequestDao()
 
     def get_stock_master_list(self, session, search_type: str) -> list:
 
@@ -201,118 +197,6 @@ class StockService:
         if to_ymd < from_ymd:
             return set()
         return self.tradeBuyTargetStockDaoImpl.select_recent_codes(session, from_ymd, to_ymd)
-
-    # ──────────────────────────────────────────────────────────────────
-    # stock_sell_request (Vue 입력 테이블) 관련 메서드
-    # ──────────────────────────────────────────────────────────────────
-    def get_sell_request_list(self, session, user_id: int) -> list:
-        """user_id 기준 enabled_flag='Y'인 매도 체크 희망 종목 조회 (배치 입력)"""
-        return self.stockSellRequestDaoImpl.select_enabled_list(session, user_id)
-
-    def get_sell_request_all(self, session) -> list:
-        """전체 목록 조회 (Vue 관리 화면용)"""
-        return self.stockSellRequestDaoImpl.select_all(session)
-
-    def save_sell_request(self, session, data: dict) -> None:
-        """Vue에서 종목 등록/수정"""
-        self.stockSellRequestDaoImpl.upsert(session, data)
-
-    def toggle_sell_request(self, session, user_id: int, stock_code: str, enabled_flag: str) -> None:
-        """Vue에서 활성화/비활성화 토글"""
-        self.stockSellRequestDaoImpl.update_enabled_flag(session, user_id, stock_code, enabled_flag)
-
-    # ──────────────────────────────────────────────────────────────────
-    # trade_sell_target_stock (배치 결과 테이블) 관련 메서드
-    # ──────────────────────────────────────────────────────────────────
-    def get_sell_target_by_code(self, session, user_id: int, stock_code: str) -> dict | None:
-        """복합 PK(user_id + stock_code) 기준 포지션 추적값 조회"""
-        return self.tradeSellTargetStockDaoImpl.select_by_user_and_code(session, user_id, stock_code)
-
-    def upsert_sell_check_result(self, session, data: dict) -> None:
-        """배치 체크 결과 upsert (신규면 INSERT, 기존이면 추적값+판단 UPDATE)"""
-        self.tradeSellTargetStockDaoImpl.upsert_check_result(session, data)
-
-    def mark_sell_target_as_sold(self, session, user_id: int, stock_code: str) -> None:
-        """매도 체결 완료 후 status='sold' 처리"""
-        self.tradeSellTargetStockDaoImpl.update_status(session, user_id, stock_code, 'sold')
-
-    def create_sell_mail_html(self, stocks_data: list) -> str:
-        """매도 시그널 종목 이메일 HTML 생성"""
-        html = """
-        <div style="background-color: #f4f5f7; padding: 20px 10px; font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;">
-            <div style="max-width: 400px; margin: 0 auto;">
-                <h2 style="text-align: center; color: #333; margin-bottom: 20px;">📉 매도 시그널 감지</h2>
-        """
-
-        if not stocks_data:
-            html += """
-                <div style="background-color: #ffffff; padding: 30px 20px; border-radius: 12px; text-align: center; color: #666;">
-                    매도 시그널 종목이 없습니다.
-                </div>
-            """
-        else:
-            action_label = {
-                'SELL_STOP_LOSS': '🛑 손절',
-                'SELL_OBV_DEAD':  '📉 OBV 데드크로스',
-                'SELL_PROFIT':    '✅ 익절',
-                'SELL_TRAIL':     '📊 트레일링 스탑',
-                'SELL_TIME':      '⏱ 타임스탑',
-            }
-            for stock in stocks_data:
-                code        = stock.get('stock_code', '')
-                name        = stock.get('stock_name', '')
-                action      = stock.get('action_type', '')
-                sell_ctx    = stock.get('sell_ctx', {})
-                today_stock = stock.get('todayStock', {})
-
-                label    = action_label.get(action, action)
-                profit   = sell_ctx.get('profit_pct', '-')
-                entry    = sell_ctx.get('entry_price', '-')
-                stop_p   = sell_ctx.get('stop_price', '-')
-                target_p = sell_ctx.get('target_price', '-')
-                bars     = sell_ctx.get('bars_held', '-')
-                curr_c   = today_stock.get('close', '-')
-
-                profit_color = '#e22926' if str(profit).startswith('-') is False and profit != '-' else '#2679ed'
-
-                html += f"""
-                <div style="background-color: #ffffff; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.08);">
-                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
-                        <tr>
-                            <td style="font-size: 17px; font-weight: bold; color: #111;">{name} [{code}]</td>
-                            <td align="right">
-                                <span style="background-color: #e55; color: #fff; padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: bold;">
-                                    {label}
-                                </span>
-                            </td>
-                        </tr>
-                    </table>
-                    <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 12px; border-collapse: collapse; text-align: center; border: 1px solid #eee;">
-                        <tr style="background-color: #f9f9f9; color: #555; height: 28px;">
-                            <th style="border-bottom: 1px solid #eee;">현재가</th>
-                            <th style="border-bottom: 1px solid #eee;">수익률</th>
-                            <th style="border-bottom: 1px solid #eee;">진입가</th>
-                            <th style="border-bottom: 1px solid #eee;">손절가</th>
-                            <th style="border-bottom: 1px solid #eee;">익절가</th>
-                            <th style="border-bottom: 1px solid #eee;">보유봉</th>
-                        </tr>
-                        <tr style="height: 28px;">
-                            <td style="font-weight:bold;">{format(int(curr_c), ',') if curr_c != '-' else '-'}</td>
-                            <td style="font-weight:bold; color:{profit_color};">{profit}</td>
-                            <td>{format(int(entry), ',') if entry != '-' else '-'}</td>
-                            <td style="color:#2679ed;">{format(int(stop_p), ',') if stop_p != '-' else '-'}</td>
-                            <td style="color:#e22926;">{format(int(target_p), ',') if target_p != '-' else '-'}</td>
-                            <td>{bars}</td>
-                        </tr>
-                    </table>
-                </div>
-                """
-
-        html += """
-            </div>
-        </div>
-        """
-        return html
 
     def evaluate_financials(self, key, value_str):
         try:

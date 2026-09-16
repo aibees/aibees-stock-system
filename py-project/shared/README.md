@@ -27,7 +27,6 @@ stock_shared/
 | BatchJobMaster | batch_job_master | 8 |
 | MasterStock | master_stock | 10 |
 | NStockBatchLog | stock_batch_log | 7 |
-| StockSellRequest | stock_sell_request | 10 |
 | TradeBuyTargetStock | trade_buy_target_stock | 24 |
 | TradeCandleData | trade_candle_data | 50 |
 | UserDetail | user_detail | 21 |
