@@ -327,7 +327,6 @@ const exitBreakdown = computed(() => {
     const KR = {
         SELL_PROFIT: '익절', SELL_STOP_LOSS: '손절', SELL_STOP_PROFIT: '익절',
         SELL_TRAIL: '트레일링', SELL_TIME: '타임스탑', EOD: '기간종료',
-        SELL_OBV_DEAD: 'OBV 데드크로스',
     };
     return Object.entries(b).map(([k, v]) => ({ key: k, label: KR[k] ?? k, count: v }));
 });

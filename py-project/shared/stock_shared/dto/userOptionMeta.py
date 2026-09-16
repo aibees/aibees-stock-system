@@ -125,7 +125,6 @@ class UserOptionMeta:
         self.s1_time_stop_band        = None
         self.s1_time_stop_grace       = None
         self.s1_max_hold_bars_hard    = None
-        self.s1_obv_dead_min_bars     = None
 
         # ── KospiStrategy1 매수 필터 on/off 스위치 (None이면 기본값 True 사용) ──
         self.s1_enable_macd_filter      = None

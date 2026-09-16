@@ -46,7 +46,6 @@ def extractor(x) -> UserOptionMeta:
     user_meta.s1_time_stop_band         = x.get('s1_time_stop_band')
     user_meta.s1_time_stop_grace        = x.get('s1_time_stop_grace')
     user_meta.s1_max_hold_bars_hard     = x.get('s1_max_hold_bars_hard')
-    user_meta.s1_obv_dead_min_bars      = x.get('s1_obv_dead_min_bars')
     user_meta.s1_trail_giveback_pct     = x.get('s1_trail_giveback_pct')
     user_meta.s1_trail_fib_use          = x.get('s1_trail_fib_use')
     user_meta.s1_trail_fib_level        = x.get('s1_trail_fib_level')

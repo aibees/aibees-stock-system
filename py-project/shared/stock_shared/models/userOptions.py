@@ -59,7 +59,6 @@ class UserOptions(Base):
     s1_time_stop_band = Column(DECIMAL(6, 4), nullable=True)
     s1_time_stop_grace = Column(Integer, nullable=True)
     s1_max_hold_bars_hard = Column(Integer, nullable=True)
-    s1_obv_dead_min_bars = Column(Integer, nullable=True)
 
     # ── 매수 필터 on/off 스위치 (NULL = 전략 기본값 True) ──────────────
     # KospiStrategy1.get_action_in_watch 의 각 게이트를 개별로 끈다.
@@ -132,7 +131,6 @@ class UserOptions(Base):
             "s1_time_stop_band": self.s1_time_stop_band,
             "s1_time_stop_grace": self.s1_time_stop_grace,
             "s1_max_hold_bars_hard": self.s1_max_hold_bars_hard,
-            "s1_obv_dead_min_bars": self.s1_obv_dead_min_bars,
             "s1_enable_macd_filter": self.s1_enable_macd_filter,
             "s1_enable_rsi_filter": self.s1_enable_rsi_filter,
             "s1_enable_bb_upper_filter": self.s1_enable_bb_upper_filter,

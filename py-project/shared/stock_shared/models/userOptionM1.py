@@ -51,7 +51,6 @@ class UserOptionM1(Base):
     time_stop_band         = Column(DECIMAL(6, 4), nullable=True)  # 정체 판정 수익밴드 (기본 0.02)
     time_stop_grace        = Column(Integer, nullable=True)  # 신고가 갱신 허용 봉수 (기본 3)
     max_hold_bars_hard     = Column(Integer, nullable=True)  # 절대 보유 한도 (기본 20)
-    obv_dead_min_bars      = Column(Integer, nullable=True)  # OBV 데드크로스 노이즈 무시 봉수 (기본 5)
     enable_macd_filter     = Column(TINYINT(1), nullable=True)  # 매수필터: MACD 조건(macd_ok) 사용
     enable_rsi_filter      = Column(TINYINT(1), nullable=True)  # 매수필터: RSI 과매수 진입차단 사용
     enable_bb_upper_filter = Column(TINYINT(1), nullable=True)  # 매수필터: BB 상단 추격금지 사용
@@ -96,7 +95,6 @@ class UserOptionM1(Base):
         "time_stop_band",
         "time_stop_grace",
         "max_hold_bars_hard",
-        "obv_dead_min_bars",
         "enable_macd_filter",
         "enable_rsi_filter",
         "enable_bb_upper_filter",
@@ -140,7 +138,6 @@ class UserOptionM1(Base):
             "time_stop_band": self.time_stop_band,
             "time_stop_grace": self.time_stop_grace,
             "max_hold_bars_hard": self.max_hold_bars_hard,
-            "obv_dead_min_bars": self.obv_dead_min_bars,
             "enable_macd_filter": self.enable_macd_filter,
             "enable_rsi_filter": self.enable_rsi_filter,
             "enable_bb_upper_filter": self.enable_bb_upper_filter,

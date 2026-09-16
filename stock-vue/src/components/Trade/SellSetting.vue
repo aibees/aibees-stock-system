@@ -293,23 +293,18 @@ const currentModeName = computed(
 const GROUPS = [
     {
         id: 'A', priority: 1, title: '손실 감수매도 기준',
-        desc: '일정% 손절 또는 OBV 데드크로스(세력 청산 신호). <br/>가장 먼저 평가되는 최우선 조건입니다.',
+        desc: '일정% 손절. 가장 먼저 평가되는 최우선 조건입니다.',
         fields: [
             {
-                k: 's1_stop_loss_pct', 
-                label: '손실', 
-                unit: '%', 
-                type: 'pct', 
+                k: 's1_stop_loss_pct',
+                label: '손실',
+                unit: '%',
+                type: 'pct',
                 def: 0.05,
-                min: 2, 
-                max: 15, 
+                min: 2,
+                max: 15,
                 step: 0.5,
                 hint: '진입가 대비 −N% 하회 시 전량 손절합니다.',
-            },
-            {
-                k: 's1_obv_dead_min_bars', label: 'OBV 데드크로스 무시 봉 갯수', unit: '', type: 'int', def: 5,
-                min: 0, max: 20, step: 1, ui: 'stepper',
-                hint: '진입 후 이 봉수 이내의 OBV 데드크로스는 노이즈로 보고 무시합니다.',
             },
         ],
     },

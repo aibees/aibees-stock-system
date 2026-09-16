@@ -93,7 +93,6 @@ class UserOptionsDao(BaseDao):
                 's1_time_stop_band':          _f(uo.s1_time_stop_band) if uo else None,
                 's1_time_stop_grace':         uo.s1_time_stop_grace if uo else None,
                 's1_max_hold_bars_hard':      uo.s1_max_hold_bars_hard if uo else None,
-                's1_obv_dead_min_bars':       uo.s1_obv_dead_min_bars if uo else None,
             },
         }
 
@@ -144,7 +143,7 @@ class UserOptionsDao(BaseDao):
             's1_trail_activate_pct', 's1_k_trail_atr', 's1_trail_floor_pct',
             's1_trail_drawdown_pct', 's1_trail_dual',
             's1_time_stop_extend', 's1_time_stop_band', 's1_time_stop_grace',
-            's1_max_hold_bars_hard', 's1_obv_dead_min_bars',
+            's1_max_hold_bars_hard',
         }
         ALLOWED_ADMIN = {'vol_limit', 'vol_surge'}
 
@@ -173,7 +172,7 @@ class UserOptionsDao(BaseDao):
             's1_trail_activate_pct', 's1_k_trail_atr', 's1_trail_floor_pct',
             's1_trail_drawdown_pct', 's1_trail_dual',
             's1_time_stop_extend', 's1_time_stop_band', 's1_time_stop_grace',
-            's1_max_hold_bars_hard', 's1_obv_dead_min_bars',
+            's1_max_hold_bars_hard',
         ]
         values = {c: data.get(c) for c in cols}
         stmt = insert(UserOptions).values(user_id=data['user_id'], **values)
@@ -222,7 +221,6 @@ class UserOptionsDao(BaseDao):
             's1_time_stop_band':       _f(uo.s1_time_stop_band),
             's1_time_stop_grace':      uo.s1_time_stop_grace,
             's1_max_hold_bars_hard':   uo.s1_max_hold_bars_hard,
-            's1_obv_dead_min_bars':    uo.s1_obv_dead_min_bars,
             # 매수 필터 on/off · core 신호 mode (관리자 전용 편집)
             's1_enable_macd_filter':     uo.s1_enable_macd_filter,
             's1_enable_rsi_filter':      uo.s1_enable_rsi_filter,
@@ -253,7 +251,6 @@ class UserOptionsDao(BaseDao):
             's1_trail_dual', 's1_trail_fib_use', 's1_trail_fib_level',
             's1_time_stop_extend',
             's1_time_stop_band', 's1_time_stop_grace', 's1_max_hold_bars_hard',
-            's1_obv_dead_min_bars',
             # 매수 필터 on/off · core 신호 mode
             #   라우터(_S1_ADMIN_ONLY_COLS)에서 관리자 여부를 먼저 막는다.
             #   여기 화이트리스트는 '존재하는 컬럼인가'만 본다.
