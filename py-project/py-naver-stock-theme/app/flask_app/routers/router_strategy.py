@@ -117,7 +117,6 @@ _S1_COLS: dict[str, str] = {
     's1_time_stop_band':       'decimal',
     's1_time_stop_grace':      'int',
     's1_max_hold_bars_hard':   'int',
-    's1_obv_dead_min_bars':    'int',
     # ── 매수 필터 on/off · core 진입신호 mode ──
     's1_enable_macd_filter':     'tinyint',
     's1_enable_rsi_filter':      'tinyint',
@@ -512,7 +511,6 @@ def delete_param_guide(param_key):
 _WORKER_SELL_FIELDS = [
     ('s1_stop_loss_pct',      '손절',              'pct',  0.05),
     ('s1_take_profit_pct',    '익절',              'pct',  0.30),
-    ('s1_obv_dead_min_bars',  'OBV 데드크로스 무시', 'bars', 5),
     ('s1_use_trailing',       '트레일링 사용',      'bool', 1),
     ('s1_trail_activate_pct', '트레일링 활성화',    'pct',  0.08),
     ('s1_k_trail_atr',        'ATR 배수(k)',       'num',  3.0),

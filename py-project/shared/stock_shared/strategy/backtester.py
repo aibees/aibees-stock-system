@@ -24,7 +24,7 @@ from stock_shared.ml.shape_features import compute_shape_features, SHAPE_FEATURE
 class KisBacktester:
     BUY_ACTIONS = {Action.BUY, Action.BUY_BREAKOUT, Action.BUY_DIP, Action.BUY_ALL, Action.BUY_SURGE}
     SELL_ACTIONS = {Action.SELL_PROFIT, Action.SELL_STOP_LOSS, Action.SELL_STOP_PROFIT,
-                    Action.SELL_TRAIL, Action.SELL_TIME, Action.SELL_OBV_DEAD}
+                    Action.SELL_TRAIL, Action.SELL_TIME}
 
     def __init__(self, strategy=None, fee_rate: float = 0.0015, gap_block_pct: float | None = None):
         # fee_rate: 편도 수수료+세금 근사 (왕복은 2*fee_rate 차감). KOSPI 매도세 등 감안 기본 0.15%/편도

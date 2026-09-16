@@ -265,9 +265,6 @@ const S1_GROUPS = [
         { k: 's1_time_stop_grace', label: '신고가 갱신 허용 봉수', type: 'int', def: 3 },
         { k: 's1_max_hold_bars_hard', label: '절대 보유 한도', type: 'int', def: 20 },
     ]},
-    { title: 'OBV', fields: [
-        { k: 's1_obv_dead_min_bars', label: 'OBV 데드크로스 무시 봉수', type: 'int', def: 5 },
-    ]},
 ];
 
 const ALL_KEYS = S1_GROUPS.flatMap(g => g.fields.map(f => f.k));
@@ -344,7 +341,6 @@ const entryLabel = (t) => (t === 'BUY_SURGE' ? '급등매수' : '매수');
 const exitLabel = (t) => ({
     SELL_PROFIT: '익절',
     SELL_STOP_LOSS: '손절',
-    SELL_OBV_DEAD: 'OBV 데드크로스',
     SELL_TRAIL: '트레일링',
     SELL_TIME_STOP: '타임스탑',
     SELL_MAX_HOLD: '보유만료',
