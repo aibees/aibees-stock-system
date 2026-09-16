@@ -88,7 +88,7 @@ daoImpl = TradeCandleDataDao()
 userServiceImpl = UserService()
 
 SELL_ACTIONS = {Action.SELL_PROFIT, Action.SELL_STOP_LOSS, Action.SELL_STOP_PROFIT,
-                Action.SELL_TRAIL, Action.SELL_TIME}
+                Action.SELL_TRAIL, Action.SELL_TIME, Action.SELL_OBV_DEAD}
 
 _candle_cache = {}
 
@@ -201,7 +201,8 @@ def _buy_reason(code: str, ymd: str, action_type: str, rate) -> str:
 
 
 _SELL_ACTION_KR = {'SELL_PROFIT': '익절', 'SELL_STOP_LOSS': '손절', 'SELL_STOP_PROFIT': '익절',
-                   'SELL_TRAIL': '트레일', 'SELL_TIME': '타임', 'EOD': '종료청산'}
+                   'SELL_TRAIL': '트레일', 'SELL_TIME': '타임', 'EOD': '종료청산',
+                   'SELL_OBV_DEAD': 'OBV데드크로스'}
 
 
 def _sell_reason(action, ctx: dict) -> str:
@@ -212,9 +213,9 @@ def _sell_reason(action, ctx: dict) -> str:
     label = _SELL_ACTION_KR.get(name, name)
 
     if name == 'SELL_STOP_LOSS':
-        if ctx.get('obv_dead_valid') == 'Y':
-            return f"{label}(OBV데드크로스, 진입후{ctx.get('bars_held')}봉 유예종료)"
         return f"{label}(가격 -{abs(float(str(ctx.get('profit_pct','0%')).rstrip('%') or 0)):.1f}%, 손절가{ctx.get('stop_price')}↓)"
+    if name == 'SELL_OBV_DEAD':
+        return f"{label}(진입후{ctx.get('bars_held')}봉 유예종료, 가격은 손절선과 무관)"
     if name in ('SELL_PROFIT', 'SELL_STOP_PROFIT'):
         return f"{label}(목표가{ctx.get('target_price')} 도달)"
     if name == 'SELL_TRAIL':
@@ -632,7 +633,8 @@ def _plot_result(trades, init_cash=INIT_CASH, out_dir=PLOT_DIR, tag='') -> str:
 
 
 _REASON_KR = {'SELL_PROFIT': '익절', 'SELL_STOP_LOSS': '손절', 'SELL_STOP_PROFIT': '익절',
-              'SELL_TRAIL': '트레일', 'SELL_TIME': '타임', 'EOD': '종료청산'}
+              'SELL_TRAIL': '트레일', 'SELL_TIME': '타임', 'EOD': '종료청산',
+              'SELL_OBV_DEAD': 'OBV데드크로스'}
 
 
 def _trunc(s, n=24) -> str:

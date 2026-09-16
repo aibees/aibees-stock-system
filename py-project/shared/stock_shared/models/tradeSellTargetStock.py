@@ -47,7 +47,7 @@ class TradeSellTargetStock(Base):
     curr_rate   = Column(String(45))           # 전일 대비 등락률
 
     # ── 매도 판단 결과 (매 체크마다 갱신) ────────────────
-    # action_type: HOLD / SELL_STOP_LOSS / SELL_PROFIT / SELL_TRAIL / SELL_TIME
+    # action_type: HOLD / SELL_STOP_LOSS / SELL_OBV_DEAD / SELL_PROFIT / SELL_TRAIL / SELL_TIME
     action_type  = Column(String(45), default='HOLD')
     profit_pct   = Column(String(45))          # 수익률 ex) "12.34%"
     stop_price   = Column(DECIMAL(18, 8))      # 현재 손절가
