@@ -140,14 +140,13 @@ class StockService:
 
     def assign_ranks(self, result_list: list, recent_codes: set = None) -> list:
         """result_list 각 항목에 score/rank_no 주입 후 반환.
-        rank_no = **shape_proba 내림차순**(급등패턴 확률 1순위) 기준(2026-09 세션, worker
-        는 rank_no=1만 사고 rank_no가 곧 화면 "추천순위" 라 정렬기준 자체를 바꿨다 —
-        과거의 과열최저(rate 오름차순) 방식은 shape_proba 동률일 때 타이브레이크로만 쓴다).
-        동률(shape_proba 같음)이면 rate 오름차순 → score 내림차순 순서로 타이브레이크.
-        score 는 참고용으로 계속 계산.
+        rank_no = 과열최저(rate 오름차순) → score 내림차순 순서 기준(기존 방식).
 
-        ※ StockBuyCheckJob 이 shape_proba < SHAPE_PROBA_MIN(0.35) 인 후보를 이미 걸러내고
-          넘기므로, 여기 들어오는 result_list 는 전부 그 기준을 통과한 것들이다.
+        2026-09 세션 중 한때 rank_no 를 shape_proba 내림차순 우선으로 바꿨었지만,
+        실전 시뮬레이션(순차 단일 포지션 복리 매매) 검증 결과 갭하락 리스크에 취약해
+        기존 scoring 방식보다 못한 것으로 확인되어 되돌렸다. shape_proba 는 계속
+        계산·저장은 하되(BuySetting.vue 에서 opt-in 정렬 기준으로만 노출), rank_no
+        산정에는 관여하지 않는다.
 
         recent_codes: 최근 N일 내 이미 매수추천에 등장했던 종목코드 집합(선택, 2026-08-08 추가).
           주어지면 '재추천 페널티' — 신규 등장 종목보다 항상 후순위로 밀린다(제외는 아님,
@@ -172,13 +171,11 @@ class StockService:
             fund = scoring.fund_score(r.get('fin', {}))
             r['score'] = round(scoring.total_score(tech, fund, liqs[i]), 2)
 
-        # 재추천 페널티(0=신규, 1=최근 N일 내 재등장) → shape_proba 내림차순 → rank_no.
-        # 동률이면 rate 오름차순 → score 내림차순.
+        # 재추천 페널티(0=신규, 1=최근 N일 내 재등장) → rate 오름차순(과열최저) → score 내림차순.
         ranked = sorted(
             result_list,
             key=lambda x: (
                 1 if x.get('stock_code') in recent_codes else 0,
-                -(x.get('shape_proba') or 0.0),
                 self._parse_rate(x),
                 -x.get('score', 0.0),
             ),

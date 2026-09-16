@@ -357,15 +357,15 @@ const ORDER_FIELD_META = {
     },
     shape_proba: {
         label: '급등패턴 확률 (shape_proba)', descLabel: '높은 순', ascLabel: '낮은 순',
-        hint: '14봉 가격패턴 모델이 예측한 "5일 내 순엣지 15%p+" 확률(0~1). 배치가 이미 이 값' +
-              ' 0.35 미만인 종목은 후보에서 제외한 뒤 계산하므로, 통과한 종목은 전부 그 이상입니다.',
+        hint: '14봉 가격패턴 모델이 예측한 "5일 내 순엣지 15%p+" 확률(0~1). 참고용으로 계속' +
+              ' 계산·저장되지만 기본 정렬에는 쓰이지 않습니다 — 원하면 직접 추가해서 opt-in으로 쓰세요.',
     },
 };
 const ORDER_FIELDS = Object.keys(ORDER_FIELD_META);
-// 2026-09: 배치 rank_no 산정 기준이 shape_proba 내림차순으로 바뀌면서, worker 기본
-// 정렬(stock_shared.strategy.buy_order.DEFAULT_BUY_ORDER)도 rank_no 우선으로 뒤집었다 —
-// 여기 기본값도 그와 동일하게 맞춘다(둘이 다르면 "미리보기"가 실제 매수 순서와 어긋난다).
-const DEFAULT_ORDER_SPEC = 'rank_no:asc,score:desc';
+// worker 기본 정렬(stock_shared.strategy.buy_order.DEFAULT_BUY_ORDER)과 동일하게 맞춘다
+// (둘이 다르면 "미리보기"가 실제 매수 순서와 어긋난다). 2026-09 세션 중 한때 rank_no 를
+// shape_proba 기반으로 1순위 삼았었지만, 실전 시뮬레이션 검증 후 기존 score 우선으로 되돌렸다.
+const DEFAULT_ORDER_SPEC = 'score:desc,rank_no:asc';
 
 /* orderRows: 화면 순서 = 우선순위. on=false 면 정렬에 쓰지 않음 */
 const orderRows = ref([]);
