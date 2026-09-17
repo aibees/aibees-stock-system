@@ -266,13 +266,16 @@ const openDatePicker = () => dateInput.value?.showPicker();
  * 정렬만 바꿀 수 있고 순위번호 역순 표기는 안 씀. 전체 목록/역순은 /stock/buy-target 참고) ══
  */
 const SORT_OPTIONS = [
+    { key: 'composite_rank_no', label: '종합 순위(신규)', dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
     { key: 'rank_no',     label: '추천순위',     dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
     { key: 'score',       label: '점수',         dir: 'desc', ascLabel: '낮은 점수 먼저', descLabel: '높은 점수 먼저' },
     { key: 'volume',      label: '거래량',       dir: 'desc', ascLabel: '적은 순',        descLabel: '많은 순' },
     { key: 'shape_proba', label: '급등패턴 순위', dir: 'desc', ascLabel: '낮은 확률 먼저', descLabel: '높은 확률 먼저' },
 ];
 
-const sortKey = ref('rank_no');
+// 2026-09 세션 후속: watch 게이트와 병행하는 2단계(top10→모멘텀 재정렬) 방식이 실전
+// 시뮬레이션에서 재현성 있게 우수해 기본 정렬을 composite_rank_no 로 승격.
+const sortKey = ref('composite_rank_no');
 const sortDir = ref('asc');
 
 const currentSort = computed(

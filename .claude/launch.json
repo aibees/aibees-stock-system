@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "stock-vue"],
       "port": 19010
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd /Users/user/Documents/workspace3/aibees-stock-system/py-project/py-naver-stock-theme && .venv/bin/python3 app/main.py"],
+      "port": 5556
     }
   ]
 }
