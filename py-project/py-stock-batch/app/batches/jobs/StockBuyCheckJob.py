@@ -162,12 +162,36 @@ class StockBuyCheckJob(Job):
                     print(f"[run_batch] 워커 실패: {e}", flush=True)
 
         # ── 2단계(top10→모멘텀 재정렬) — watch 게이트와 병행 저장 ──────────
+        #   watch 게이트를 안 거친 종목이어도 trade_buy_target_stock 행은 OHLCV/지표가
+        #   항상 채워져 있어야 한다 — 그래서 "전체 행" upsert(save_buy_target_stocks_bulk)
+        #   를 먼저 태우고, composite 전용 필드(momentum_composite/composite_rank_no)는
+        #   그 다음에 별도 upsert 한다. 이 전체 행 upsert를 **watch 게이트 저장(아래)보다
+        #   먼저** 실행해야 한다 — 같은 종목이 양쪽 다 해당되는 날, watch 게이트 쪽이
+        #   나중에 real score/rank_no/재무정보로 다시 덮어써야 하기 때문이다(순서 반대면
+        #   watch 게이트가 채운 score/rank_no 를 이 블록이 NULL 로 되돌려버린다).
         try:
             composite_top10 = self._compute_composite_top10(composite_pool, ymd)
             if composite_top10:
+                empty_fin = {'eps': None, 'pbr': None, 'per': None, 'roe': None, 'peg': None}
+                full_rows = [
+                    {
+                        'ymd': item['ymd'],
+                        'stock_code': item['stock_code'],
+                        'stock_name': item['stock_name'],
+                        'action_type': item['action_type'],
+                        'todayStock': item['todayStock'],
+                        'indicator': item['indicator'],
+                        'fin': empty_fin,
+                        'chart_data': item['chart_data'],
+                        'shape_proba': item['shape_proba'],
+                    }
+                    for item in composite_top10
+                ]
+                self.stockServiceImpl.save_buy_target_stocks_bulk(self.session, full_rows)
+                self.stockServiceImpl.save_buy_target_chart_bulk(self.session, full_rows)
                 self.stockServiceImpl.save_composite_top10(self.session, composite_top10)
                 self.session.commit()
-                print(f"2단계 top10 저장 완료: {len(composite_top10)}건 "
+                print(f"2단계 top10 저장 완료: {len(composite_top10)}건 (OHLCV/지표 포함) "
                       f"(1위: {composite_top10[0]['stock_name']}({composite_top10[0]['stock_code']}))", flush=True)
             else:
                 print("2단계 후보 pool 이 비어있어(안정성 필터 통과 종목 없음) top10 미생성", flush=True)
@@ -253,6 +277,12 @@ class StockBuyCheckJob(Job):
                 'shape_proba': round(float(r['proba']), 4),
                 'momentum_composite': round(float(r['momentum_composite']), 4),
                 'composite_rank_no': int(r['composite_rank_no']),
+                # watch 게이트를 안 거쳤어도 OHLCV/지표는 항상 채워야 한다 — 아래에서
+                # save_buy_target_stocks_bulk(전체 행 upsert)에 그대로 넘길 원본.
+                'action_type': r['action_type'],
+                'todayStock': r['today_stock'],
+                'indicator': r['indicator'],
+                'chart_data': r['chart_data'],
             }
             for _, r in top10.iterrows()
         ]
@@ -366,6 +396,10 @@ class StockBuyCheckJob(Job):
                     results.append(result)
 
                 if shape_proba is not None and self._composite_eligible(computed, stock):
+                    # watch 게이트 통과 여부와 무관하게, trade_buy_target_stock 에 들어갈
+                    # 행은 항상 OHLCV/지표가 채워져 있어야 한다 — result['todayStock']/
+                    # ['indicator'] 는 이미 매 종목 계산돼 있으니(위 get_result_with_action)
+                    # 그대로 참조만 하면 된다(재계산/재조회 불필요).
                     composite_pool.append({
                         'stock_code': stock_code,
                         'stock_name': stock_name,
@@ -376,6 +410,10 @@ class StockBuyCheckJob(Job):
                         'ind_vol_ratio_today': last_features.get('ind_vol_ratio_today'),
                         'ind_macd_hist_norm': last_features.get('ind_macd_hist_norm'),
                         'ind_rsi14': last_features.get('ind_rsi14'),
+                        'action_type': result['action_type'],
+                        'today_stock': result['todayStock'],
+                        'indicator': result['indicator'],
+                        'chart_data': self._build_chart_data(trade_data),
                     })
 
                 idx += 1
