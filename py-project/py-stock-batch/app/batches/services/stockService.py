@@ -32,41 +32,6 @@ class StockService:
     def update_stock_nxt_flag(self, session, data: list) -> None:
         self.stockMasterDaoImpl.update_stock_nxt_flag(session, data)
 
-    def get_buy_target_stock_list(self, session, param:dict) -> list:
-        target = self.tradeBuyTargetStockDaoImpl.select_stock_master_list(session, param)
-
-        def form_trade_data(data: dict) -> dict:
-            return {
-                'stock_code': data['stock_code'],
-                'stock_name': data['stock_name'],
-                'action_type': data['action_type'],
-                'todayStock': {
-                    'open': data['open'],
-                    'high': data['high'],
-                    'low': data['low'],
-                    'close': data['close'],
-                    'volume': data['volume'],
-                    'rate': data['rate'],
-                },
-                'indicator': {
-                    'macd_cross': data['macd_cross'],
-                    'obv_cross': data['obv_cross'],
-                    'is_vol_limit': data['is_vol_limit'],
-                    'is_under_bb_upper': data['is_under_bb_upper'],
-                    'is_over_on_mid': data['is_over_on_mid'],
-                    'is_vol_surge': data['is_vol_surge'],
-                    'is_bb_mid_breakout': data['is_bb_mid_breakout'],
-                },
-                'fin': {
-                    'eps': data['eps'],
-                    'per': data['per'],
-                    'pbr': data['pbr'],
-                    'roe': data['roe'],
-                    'peg': data['peg'],
-                }
-            }
-        return [form_trade_data(t) for t in target]
-
     def clean_buy_target_stock_by_ymd(self, session, ymd: str) -> int:
         return self.tradeBuyTargetStockDaoImpl.delete_by_ymd(session, ymd)
 
@@ -83,12 +48,6 @@ class StockService:
         ]
         self.tradeBuyTargetChartDaoImpl.upsert_bulk(session, rows)
 
-    def save_buy_target_stock_one(self, session, data: dict) -> None:
-        self.tradeBuyTargetStockDaoImpl.upsert_trade_buy_target_stock(session, [data])
-
-    def save_buy_target_stock_log(self, session, data:list) -> None:
-        self.tradeBuyTargetStockDaoImpl.upsert_trade_buy_target_stock(session, data)
-
     def save_buy_target_stocks_bulk(self, session, data: list) -> None:
         """랭킹(score/rank_no)까지 포함된 매수타겟 전체를 한 번에 upsert.
         병렬 배치에서 스레드는 조회/계산만 하고, 메인 스레드가 랭크 산정 후 이 메서드로 일괄 저장한다."""
@@ -97,12 +56,6 @@ class StockService:
     def save_composite_top10(self, session, data: list) -> None:
         """2단계(top10→모멘텀 재정렬) 결과 upsert. watch 게이트와 병행 저장."""
         self.tradeBuyTargetStockDaoImpl.upsert_composite_top10(session, data)
-
-    def update_buy_target_rank(self, session, data: dict) -> None:
-        """단일 종목의 종합점수/순위만 갱신 (배치 종료 후 순위 패스용)"""
-        self.tradeBuyTargetStockDaoImpl.update_rank(
-            session, data['ymd'], data['stock_code'], data['score'], data['rank_no']
-        )
 
     # ──────────────────────────────────────────────────────────────────
     # 종합 적합도 점수 & 순위 (기술 50% + 재무 30% + 유동성 20%)

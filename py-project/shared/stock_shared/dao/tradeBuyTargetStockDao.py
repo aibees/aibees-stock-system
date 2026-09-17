@@ -253,16 +253,3 @@ class TradeBuyTargetStockDao(BaseDao):
             )
             session.execute(upsert_stmt)
 
-    def update_rank(self, session, ymd: str, stock_code: str, score, rank_no) -> None:
-        """이미 저장된 매수타겟 행의 종합점수/순위만 갱신."""
-        stmt = (
-            update(TradeBuyTargetStock)
-            .where(
-                and_(
-                    TradeBuyTargetStock.ymd == ymd,
-                    TradeBuyTargetStock.stock_code == stock_code,
-                )
-            )
-            .values(score=score, rank_no=rank_no)
-        )
-        session.execute(stmt)

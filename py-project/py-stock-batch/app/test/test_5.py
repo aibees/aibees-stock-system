@@ -11,17 +11,11 @@ from app.batches.services.stockService import StockService
 from app.batches.services.userService import UserService
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.kis.component.KisStockService import KisService
-from app.ext_services.upbit.component.UpbitScoreService import UpbitScoreService
-from app.ext_services.upbit.component.UpbitService import UpbitService
-from app.ext_services.upbit.component.UpbitUserService import UpbitUserService
 
 timeframe = '1h'
 session = dbConn.get_session()
 daoImpl = TradeCandleDataDao()
-serviceImpl = UpbitService()
 kisServiceImpl = KisService()
-userServiceImpl = UpbitUserService()
-scoreServiceImpl = UpbitScoreService()
 
 # KIS 백테스트용
 kis = KisEngine()
@@ -241,14 +235,6 @@ def test(coin: str):
             # 주의: DataFrame 컬럼명에 공백/특수문자가 있다면 itertuples가 이름을 변경했을 수 있음
             val = getattr(row, col_name, 0.0)
             setattr(coin_info, attr_name, val)
-
-        # 이제 coin_info_list에 변환된 객체들이 담겨 있습니다.
-        # scoreServiceImpl.get_indicator_score_trend(coin_info)
-        # scoreServiceImpl.get_indicator_score_momentum(coin_info)
-        # scoreServiceImpl.get_indicator_score_volume(coin_info)
-        # scoreServiceImpl.get_indicator_score_volatility(coin_info)
-        #
-        # scoreServiceImpl.get_final_strategy(coin_info)
 
         daoImpl.update_candle_data_kis(session, coin_info)
 

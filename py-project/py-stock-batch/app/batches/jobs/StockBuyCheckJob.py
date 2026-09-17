@@ -29,11 +29,6 @@ REPEAT_PENALTY_DAYS = 5
 # Home.vue 매수타겟 카드 간이차트용 슬라이스 길이(영업일). trade_buy_target_chart 저장.
 CHART_DAYS = 120
 
-# (더 이상 후보 필터링에 쓰이지 않음 — 2026-09 세션 중 한때 shape_proba 하한으로
-# 후보를 걸러냈었지만, 실전 순차매매 시뮬레이션 검증 후 되돌렸다. 상수 자체는
-# user_options.s1_shape_proba_min 등 다른 곳에서 참조할 수 있어 남겨둔다.)
-SHAPE_PROBA_MIN_DEFAULT = 0.3
-
 # ── 2단계(top10 → 모멘텀 합성 재정렬) 매수추천 — 2026-09 세션 후속 리서치 ──────────
 # KospiStrategy1 watch 신호(기존 경로, "watch 게이트")와 **병행**으로 동작한다.
 # 전종목(get_stock_master_list) 중 watch 신호 통과 여부와 무관하게 아래 안정성

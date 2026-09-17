@@ -19,7 +19,7 @@ class KisService:
     # - UserService init
     ####################################################
     def __init__(self):
-        self.__name__ = 'UpbitService'
+        self.__name__ = 'KisService'
         self.userMasterDaoImpl = UserMasterDao()
 
     def compute_indicator_df(self, data: pd.DataFrame, user_info: UserOptionMeta) -> pd.DataFrame:

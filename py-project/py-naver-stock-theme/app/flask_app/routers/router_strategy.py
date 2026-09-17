@@ -163,9 +163,12 @@ _S1_ADMIN_ONLY_COLS = frozenset({
     's1_macd_signal_mode', 's1_obv_signal_mode', 's1_ma20_signal_mode',
 })
 
-# s1_buy_order 허용 필드 — trade_worker/repository.py _ORDER_FIELDS 와 동일해야 한다.
+# s1_buy_order 허용 필드 — stock_shared.strategy.buy_order.ORDER_FIELDS 와 동일해야 한다.
 # (worker 는 모르는 필드를 조용히 무시하지만, 저장 시점에 걸러야 사용자가 오타를 안다)
-_BUY_ORDER_FIELDS = ('score', 'volume', 'rate', 'rank_no', 'close')
+# ※ 여기 빠진 필드는 화면에서 고를 수 있어도 저장이 거부된다 — ORDER_FIELDS 에 항목을
+#   추가하면 이 튜플에도 반드시 같이 넣어야 한다.
+_BUY_ORDER_FIELDS = ('score', 'volume', 'rate', 'rank_no', 'close',
+                     'shape_proba', 'composite_rank_no')
 _BUY_ORDER_DIRS = ('asc', 'desc')
 
 
