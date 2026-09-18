@@ -135,6 +135,7 @@ class UserOptionMeta:
         self.s1_enable_shape_exhaustion_filter = None  # 2026-09 세션 리서치. None이면 기본값 True
         self.s1_enable_avg_vol_filter   = None  # None이면 기본값 True
         self.s1_avg_vol_min             = None  # None이면 기본값 500,000
+        self.s1_enable_sma120_filter    = None  # 2026-09 세션, 저가>sma120 필수조건. None이면 기본값 True
 
         # ── core 진입 신호 mode (None이면 기본값 'golden' 사용) ──
         # 'off'(사용안함) / 'golden'(골든크로스 여부) / 'slope'(기울기 상승여부)

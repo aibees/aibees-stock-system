@@ -141,6 +141,11 @@ class KospiStrategy1(StockStrategy):
         #    (백테스터 등 사전 스킵을 거치지 않는 경로에서도) 안전하게 강제한다.
         self.enable_vol_limit_filter = True
 
+        # ── SMA120 위치 필터 (2026-09 세션, 필수조건) ─────────────────────
+        # 저가(low)가 sma120(ema120 필드, 실제론 120일 단순이평)보다 낮으면 진입 금지.
+        # 장기추세선 아래로 하루 중 한 번이라도 흔들린 종목(불안정한 장기추세)을 배제한다.
+        self.enable_sma120_filter = True
+
         # ── 소진(exhaustion) 게이트 (2026-09 세션 리서치, 손실 감소 조건) ─────
         # "14봉 내내 눌림 없이 이미 크게 올랐고, 오늘도 또 급등" 상태에서 진입하면
         # 익일 급반전 확률이 높았다(사례: 유티아이 2026-09-01 → 익일 -25.3%).
@@ -210,6 +215,7 @@ class KospiStrategy1(StockStrategy):
             'enable_vol_avg_filter':  _bool(user_info.s1_enable_vol_avg_filter),
             'enable_regime_gate':     _bool(user_info.s1_enable_regime_gate),
             'enable_shape_exhaustion_filter': _bool(user_info.s1_enable_shape_exhaustion_filter),
+            'enable_sma120_filter':   _bool(user_info.s1_enable_sma120_filter),
             'enable_avg_vol_filter':  _bool(user_info.s1_enable_avg_vol_filter),
             'avg_vol_min':            _f(user_info.s1_avg_vol_min, int),
             # core 진입 신호 mode
@@ -479,6 +485,8 @@ class KospiStrategy1(StockStrategy):
         macd_ok = is_macd_above_zero or is_macd_rising_fast or is_macd_gap_closing
         # 중기 추세 필터: ema20 > ema60 (상승 정렬). 매수 필수 조건.
         is_uptrend = bool(coin_info.ema20 and coin_info.ema60 and coin_info.ema20 > coin_info.ema60)
+        # 장기 추세 필터: 저가(low) > sma120(ema120 필드). 매수 필수 조건.
+        is_above_sma120 = bool(coin_info.ema120 and coin_info.low > coin_info.ema120)
 
         # ── 적응형 추세국면 게이트 (구 is_uptrend 단일 게이트 대체) ──────────
         # 1) 국면 분류: 최근 N봉 중 close<ema60 비율로 하락국면 여부 판정
@@ -558,6 +566,8 @@ class KospiStrategy1(StockStrategy):
                 'shape_bars_since_min': coin_info.shape_bars_since_min,
                 'is_avg_vol_ok':        'Y' if is_avg_vol_ok         else 'N',   # 20일 평균거래량 하한
                 'vol_avg':              round(float(coin_info.vol_avg or 0), 0),
+                'is_above_sma120':      'Y' if is_above_sma120       else 'N',   # 저가 > sma120(장기추세)
+                'ema120':               round(float(coin_info.ema120 or 0), 2),
             }
             if extra:
                 indicator.update(extra)
@@ -613,6 +623,10 @@ class KospiStrategy1(StockStrategy):
             return _build_result(Action.HOLD)
 
         if self.enable_vol_limit_filter and not is_vol_limit:
+            return _build_result(Action.HOLD)
+
+        # ── [장기 추세 게이트] 저가(low) > sma120 필수조건 ──────────────────
+        if self.enable_sma120_filter and not is_above_sma120:
             return _build_result(Action.HOLD)
 
         # ── [추세국면 게이트] 구 is_uptrend 단일 게이트 대체 ──────────────────

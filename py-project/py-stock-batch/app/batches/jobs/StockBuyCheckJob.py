@@ -307,6 +307,12 @@ class StockBuyCheckJob(Job):
         if not (ema20_now > ema20_prev):
             return False
 
+        # 장기 추세 필터: 저가(low) > sma120(ema120 필드). 매수 필수 조건(kospi1.py와 동일).
+        low_today = float(last.get(Literal.LOW) or 0)
+        ema120_now = float(last.get(Literal.EMA_120) or 0)
+        if ema120_now <= 0 or not (low_today > ema120_now):
+            return False
+
         atr_ratio = float(last.get(Literal.ATR) or 0) / close
         if atr_ratio > COMPOSITE_ATR_RATIO_MAX:
             return False
