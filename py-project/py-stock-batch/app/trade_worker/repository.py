@@ -493,7 +493,7 @@ class Repository:
         메모리에 들고 있는다."""
         sql = text(
             "SELECT id, user_id, stock_code, stock_name, sell_price, qty_ratio, "
-            "       base_qty, state, enabled_flag, memo "
+            "       base_qty, filled_qty, state, enabled_flag, memo "
             "  FROM trade_worker_manual_sell "
             " WHERE user_id = :uid AND state = 'ARMED' AND enabled_flag = 'Y'"
         )
@@ -577,7 +577,7 @@ class Repository:
         sql = text(
             """
             UPDATE trade_worker_manual_sell
-            SET state = 'DONE', filled_price = :price, filled_qty = :qty,
+            SET state = 'DONE', filled_price = :price, filled_qty = COALESCE(filled_qty, 0) + :qty,
                 filled_at = :now, updated_at = :now
             WHERE user_id = :uid AND id = :id AND state = 'ARMED'
             """
@@ -585,6 +585,18 @@ class Repository:
         with get_session() as s:
             s.execute(sql, {"price": str(filled_price), "qty": str(filled_qty),
                             "now": datetime.now(), "uid": user_id, "id": manual_sell_id})
+            s.commit()
+
+    def add_manual_sell_filled(self, user_id: int, manual_sell_id: int, filled_qty: Decimal) -> None:
+        """티어 부분체결 누적(ARMED 유지). 장외 재호가를 다 쓰고도 일부만 팔린 경우 등.
+        sell_executor._resolve_sell_qty 가 (티어수량 - filled_qty) 만 다음에 판다.
+        complete_manual_sell 도 filled_qty 를 누적 가산하므로 최종값 = 티어 총 체결수량."""
+        sql = text(
+            "UPDATE trade_worker_manual_sell SET filled_qty = COALESCE(filled_qty, 0) + :qty, "
+            "updated_at = :now WHERE user_id = :uid AND id = :id AND state = 'ARMED'"
+        )
+        with get_session() as s:
+            s.execute(sql, {"qty": str(filled_qty), "now": datetime.now(), "uid": user_id, "id": manual_sell_id})
             s.commit()
 
     def insert_worker_log(self, user_id: int, source: str, level: str, message: str) -> None:
