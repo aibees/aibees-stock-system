@@ -1,5 +1,5 @@
 """
-M3 교대매매 시뮬레이터 단위 검증 (DB / KIS 불필요).
+M2 교대매매 시뮬레이터 단위 검증 (DB / KIS 불필요).
 
 무엇을 검증하나
     1. scoring.tech_score 가 추출 전 StockService._tech_score 와 수치가 동일한가
@@ -16,11 +16,11 @@ M3 교대매매 시뮬레이터 단위 검증 (DB / KIS 불필요).
 KospiStrategy1 자체는 기존 백테스트에서 이미 검증된 영역이라 여기선 다루지 않는다.
 
 실행
-    poetry run python -m app.test.test_m3_alternate_unit
+    poetry run python -m app.test.test_m2_alternate_unit
 """
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from stock_shared.strategy import scoring
-from stock_shared.strategy.m3_alternate import M3AlternateSimulator, ScoreConfig
+from stock_shared.strategy.m2_alternate import M2AlternateSimulator, ScoreConfig
 
 PASS, FAIL = [], []
 
@@ -109,7 +109,7 @@ def test_score_equivalence():
     now = scoring.total_score(tech, fund, liq)
     check('total_score 원본 가중치', abs(legacy - now) < 1e-12, f'{legacy} vs {now}')
 
-    # liq 정규화: 후보 2개면 항상 1.0 / 0.0 (M3 편향 경고의 근거)
+    # liq 정규화: 후보 2개면 항상 1.0 / 0.0 (M2 편향 경고의 근거)
     liqs = scoring.normalize_liquidity([1e10, 1e8])
     check('normalize_liquidity 2종목 → [1.0, 0.0]',
           liqs == [1.0, 0.0], str(liqs))
@@ -185,7 +185,7 @@ def test_align():
     a = _bars([100, 101, 102, 103])
     b = _bars([200, 201, 202, 203])
     del b[1]                                    # B 에서 2번째 봉 누락
-    aa, bb = M3AlternateSimulator.align(a, b)
+    aa, bb = M2AlternateSimulator.align(a, b)
     check('길이 일치', len(aa) == len(bb) == 3, f'{len(aa)} / {len(bb)}')
     check('시각 일치', all(x['datetime'] == y['datetime'] for x, y in zip(aa, bb)))
     check('누락 봉 제외', all(r['datetime'] != a[1]['datetime'] for r in aa))
@@ -200,7 +200,7 @@ def test_confirm_bars():
 
     # A 는 1회만 신호 (idx2), B 는 신호 없음
     sig_once = {dts[2]: True}
-    sim = M3AlternateSimulator(MockStrategy(sig_once), MockStrategy({}),
+    sim = M2AlternateSimulator(MockStrategy(sig_once), MockStrategy({}),
                                confirm_bars=2, fee_rate=0.0)
     res = sim.run('A', 'B', _bars([100] * 8), _bars([200] * 8), _ui())
     check('1회 신호 + confirm=2 → 진입 없음', res['trades'] == 0,
@@ -208,7 +208,7 @@ def test_confirm_bars():
 
     # A 가 2회 연속 (idx2,3)
     sig_twice = {dts[2]: True, dts[3]: True}
-    sim = M3AlternateSimulator(MockStrategy(sig_twice), MockStrategy({}),
+    sim = M2AlternateSimulator(MockStrategy(sig_twice), MockStrategy({}),
                                confirm_bars=2, fee_rate=0.0)
     res = sim.run('A', 'B', _bars([100] * 8), _bars([200] * 8), _ui())
     check('2회 연속 + confirm=2 → 진입', res['trades'] == 1,
@@ -221,14 +221,14 @@ def test_confirm_bars():
 
     # 끊긴 신호(idx2, idx4)는 연속이 아니다
     sig_gap = {dts[2]: True, dts[4]: True}
-    sim = M3AlternateSimulator(MockStrategy(sig_gap), MockStrategy({}),
+    sim = M2AlternateSimulator(MockStrategy(sig_gap), MockStrategy({}),
                                confirm_bars=2, fee_rate=0.0)
     res = sim.run('A', 'B', _bars([100] * 8), _bars([200] * 8), _ui())
     check('끊긴 신호 → 진입 없음 (휩쏘 방어)', res['trades'] == 0,
           f"trades={res['trades']}")
 
     # confirm=1 이면 1회로 진입
-    sim = M3AlternateSimulator(MockStrategy(sig_once), MockStrategy({}),
+    sim = M2AlternateSimulator(MockStrategy(sig_once), MockStrategy({}),
                                confirm_bars=1, fee_rate=0.0)
     res = sim.run('A', 'B', _bars([100] * 8), _bars([200] * 8), _ui())
     check('confirm=1 → 1회 신호로 진입', res['trades'] == 1,
@@ -244,7 +244,7 @@ def test_score_pick_and_flip():
 
     # 둘 다 idx2,3 에 신호. B 의 tech 가 더 높다 → B 선택
     both = {dts[2]: True, dts[3]: True}
-    sim = M3AlternateSimulator(
+    sim = M2AlternateSimulator(
         MockStrategy(both, {dts[2]: 0.3, dts[3]: 0.3}),      # A tech 0.30
         MockStrategy(both, {dts[2]: 0.6, dts[3]: 0.6}),      # B tech 0.50
         confirm_bars=2, fee_rate=0.0)
@@ -254,7 +254,7 @@ def test_score_pick_and_flip():
           res['trade_list'][0]['coin'] if res['trade_list'] else '없음')
 
     # 교대 시나리오: A 먼저 진입(idx1,2) → B 신호(idx5,6) → 교대
-    sim = M3AlternateSimulator(
+    sim = M2AlternateSimulator(
         MockStrategy({dts[1]: True, dts[2]: True}),
         MockStrategy({dts[5]: True, dts[6]: True}),
         confirm_bars=2, fee_rate=0.0)
@@ -274,7 +274,7 @@ def test_score_pick_and_flip():
               tl[1]['exit_reason'])
 
     # 보유 중 '자기 종목' 신호는 무시돼야 한다
-    sim = M3AlternateSimulator(
+    sim = M2AlternateSimulator(
         MockStrategy({dts[1]: True, dts[2]: True,      # 진입
                       dts[5]: True, dts[6]: True,      # 보유 중 자기 신호 (무시 대상)
                       dts[8]: True, dts[9]: True}),
@@ -294,7 +294,7 @@ def test_metrics():
 
     # A: idx1,2 확정 → idx3 시가(=100) 진입, B: idx5,6 확정 → idx7 시가 청산
     pa = [100, 100, 100, 100, 100, 100, 100, 110, 110, 110, 110, 110]
-    sim = M3AlternateSimulator(
+    sim = M2AlternateSimulator(
         MockStrategy({dts[1]: True, dts[2]: True}),
         MockStrategy({dts[5]: True, dts[6]: True}),
         confirm_bars=2, fee_rate=0.0)
@@ -308,7 +308,7 @@ def test_metrics():
           f"{tl[0]['ret_net']:.4f}" if tl else '')
 
     # 수수료 반영: 편도 0.15% → 왕복 0.3%
-    sim = M3AlternateSimulator(
+    sim = M2AlternateSimulator(
         MockStrategy({dts[1]: True, dts[2]: True}),
         MockStrategy({dts[5]: True, dts[6]: True}),
         confirm_bars=2, fee_rate=0.0015)
@@ -319,7 +319,7 @@ def test_metrics():
 
     # MDD: -10% 손실 1건이면 MDD 10%
     pa_loss = [100, 100, 100, 100, 100, 100, 100, 90, 90, 90, 90, 90]
-    sim = M3AlternateSimulator(
+    sim = M2AlternateSimulator(
         MockStrategy({dts[1]: True, dts[2]: True}),
         MockStrategy({dts[5]: True, dts[6]: True}),
         confirm_bars=2, fee_rate=0.0)
@@ -332,7 +332,7 @@ def test_metrics():
     check('bh_b = 0%', abs(res['bh_b']) < 1e-6, f"{res['bh_b']:.4f}")
 
     # 거래 0건일 때 안전하게 떨어지는가
-    sim = M3AlternateSimulator(MockStrategy({}), MockStrategy({}),
+    sim = M2AlternateSimulator(MockStrategy({}), MockStrategy({}),
                                confirm_bars=2, fee_rate=0.0)
     res4 = sim.run('AAA', 'BBB', _bars([100] * 12), _bars([200] * 12), _ui())
     check('거래 0건 → 예외 없이 0 리턴',
@@ -342,7 +342,7 @@ def test_metrics():
 # ══════════════════════════════════════════════════════════════
 def main():
     print('=' * 70)
-    print('M3 교대매매 시뮬레이터 단위 검증')
+    print('M2 교대매매 시뮬레이터 단위 검증')
     print('=' * 70)
     test_score_equivalence()
     test_align()

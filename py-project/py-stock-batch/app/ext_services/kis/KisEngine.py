@@ -270,7 +270,7 @@ class KisEngine:
         return df
 
     # ══════════════════════════════════════════════════════════════════
-    # 30분봉 (M3 전용)
+    # 30분봉 (M2 전용)
     #
     #  왜 별도 구현인가 — pykis 로는 안 되는 두 가지:
     #   1) pykis 의 국내 분봉(stock.chart(period=N)) 은 TR FHKST03010200,
@@ -469,7 +469,7 @@ class KisEngine:
         로 떨어진다. datetime 은 봉의 **시작 시각**.
 
         drop_partial: 마지막 봉이 아직 진행 중이면 버린다.
-            M3 는 확정봉만으로 지표를 계산한다(repainting 방지).
+            M2 는 확정봉만으로 지표를 계산한다(repainting 방지).
             판정 기준은 "봉 시작 + 30분 <= 현재시각".
         """
         if df1m is None or df1m.empty:

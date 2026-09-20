@@ -1,8 +1,8 @@
-"""M3 30분봉을 trade_candle_30m 에 적재하는 배치.
+"""M2 30분봉을 trade_candle_30m 에 적재하는 배치.
 
 대상
-    M3 종목 고정 2개. KODEX 코스피100(237350) / KODEX 인버스(114800).
-    M3 는 이 둘을 정·역으로 교대 매매하므로 항상 양쪽 봉이 다 필요하다.
+    M2 종목 고정 2개. KODEX 코스피100(237350) / KODEX 인버스(114800).
+    M2 는 이 둘을 정·역으로 교대 매매하므로 항상 양쪽 봉이 다 필요하다.
 
 두 가지 모드
     mode='backfill'  (기본, 1회성)
@@ -25,7 +25,7 @@
 
 지표
     적재 전 KisService.compute_indicator_df 를 태워 일봉과 동일한 지표 컬럼을 채운다.
-    → 조회측(M3 executor)이 지표를 다시 계산할 필요가 없다.
+    → 조회측(M2 executor)이 지표를 다시 계산할 필요가 없다.
 
 수동 실행
     POST /api/v1/jobs/once/STOCK_CANDLE_30M_BACKFILL_JOB
@@ -69,8 +69,8 @@ from stock_shared.dto.userOptionMeta import UserOptionMeta
 
 
 class TradeCandle30mBackfillJob(Job):
-    # M3 고정 종목
-    M3_CODES = ["237350", "114800"]
+    # M2 고정 종목
+    M2_CODES = ["237350", "114800"]
 
     # 목표 봉 수. 지표(ema120 등)가 앞구간에서 NaN 이 되지 않는 하한.
     TARGET_BARS = 250
@@ -93,13 +93,13 @@ class TradeCandle30mBackfillJob(Job):
     # ------------------------------------------------------------------
     def run_batch(self, **kwargs):
         mode = kwargs.get('mode', 'backfill')
-        codes = kwargs.get('stock_codes') or self.M3_CODES
+        codes = kwargs.get('stock_codes') or self.M2_CODES
         days = int(kwargs.get('days', self.DEFAULT_DAYS))
         end_date = self._parse_end_date(kwargs.get('end_date'))
         ym = self._parse_ym(kwargs.get('ym'))
 
         # 대상 일자 계획을 미리 확정한다. 종목마다 같은 구간을 돌아야
-        # 두 종목의 봉 구간이 어긋나지 않는다(M3 는 정·역 비교 매매).
+        # 두 종목의 봉 구간이 어긋나지 않는다(M2 는 정·역 비교 매매).
         plan_days, plan_target, plan_label = self._build_day_plan(days, end_date, ym)
 
         engine = KisEngine()

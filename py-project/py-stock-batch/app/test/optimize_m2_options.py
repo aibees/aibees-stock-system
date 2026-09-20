@@ -1,5 +1,5 @@
 """
-M3 교대매매(시나리오 1) 옵션 grid search.
+M2 교대매매(시나리오 1) 옵션 grid search.
 
 trade_candle_30m 30분봉을 고정하고, 매수신호 판정 파라미터
 (KospiStrategy1 필드) + confirm_bars 조합을 바꿔가며 시뮬레이션한다.
@@ -13,13 +13,13 @@ trade_candle_30m 30분봉을 고정하고, 매수신호 판정 파라미터
     표본부족이다. MIN_TRADES 미만은 순위에서 제외한다.
 
 사용
-    poetry run python -m app.test.optimize_m3_options
-    poetry run python -m app.test.optimize_m3_options --quick
-    poetry run python -m app.test.optimize_m3_options --start 2026-06-01 --top 30
-    poetry run python -m app.test.optimize_m3_options --sort return   # 수익률 기준
+    poetry run python -m app.test.optimize_m2_options
+    poetry run python -m app.test.optimize_m2_options --quick
+    poetry run python -m app.test.optimize_m2_options --start 2026-06-01 --top 30
+    poetry run python -m app.test.optimize_m2_options --sort return   # 수익률 기준
 
 캐시
-    sim_m3_alternate._row_cache 가 DB 조회 결과를 들고 있어 조합 간 재사용된다.
+    sim_m2_alternate._row_cache 가 DB 조회 결과를 들고 있어 조합 간 재사용된다.
     조합마다 DB 를 다시 읽으면 수백 쿼리가 나간다.
 """
 import argparse
@@ -27,8 +27,8 @@ import itertools
 import time
 
 from stock_shared.db.database import dbConn
-from app.test import sim_m3_alternate as sim
-from stock_shared.strategy.m3_alternate import ScoreConfig
+from app.test import sim_m2_alternate as sim
+from stock_shared.strategy.m2_alternate import ScoreConfig
 
 # 이보다 적으면 지표가 표본부족으로 왜곡되므로 순위 산정에서 제외
 MIN_TRADES = 5
@@ -167,7 +167,7 @@ SORT_KEYS = {
 
 
 def main():
-    ap = argparse.ArgumentParser(description='M3 교대매매 옵션 grid search')
+    ap = argparse.ArgumentParser(description='M2 교대매매 옵션 grid search')
     ap.add_argument('--quick', action='store_true', help='축소 그리드(스모크 테스트)')
     ap.add_argument('--start', help='시작일 YYYY-MM-DD')
     ap.add_argument('--end', help='종료일 YYYY-MM-DD')
@@ -256,7 +256,7 @@ def main():
         print()
         print('  재현 명령:')
         cb = best['label'].split('_')[0][2:]
-        print(f"    poetry run python -m app.test.sim_m3_alternate "
+        print(f"    poetry run python -m app.test.sim_m2_alternate "
               f"--confirm {cb} --verbose")
     finally:
         session.remove()

@@ -1,5 +1,5 @@
 """
-M3 교대매매 시뮬레이션 — 단순 조건 4개 + 2봉 연속 확정.
+M2 교대매매 시뮬레이션 — 단순 조건 4개 + 2봉 연속 확정.
 
 매수신호 (전부 AND)
     1) MACD  기울기 상승   macd  > 직전봉 macd
@@ -48,20 +48,20 @@ M3 교대매매 시뮬레이션 — 단순 조건 4개 + 2봉 연속 확정.
     30분봉에서는 거의 안 걸린다(실측 30분봉 ATR/종가 0.82%).
     --sweep-stop 으로 손절폭 민감도를 볼 수 있다.
 
-sim_m3_simple_signal.py 가 '신호 지점' 만 찍는다면 이 파일은 그 신호로
+sim_m2_simple_signal.py 가 '신호 지점' 만 찍는다면 이 파일은 그 신호로
 실제 매매를 돌려 수익을 낸다. 신호 정의는 두 파일이 동일하다.
 
 실행
-    poetry run python -m app.test.sim_m3_simple_trade            # 3봉 · RSI<70
-    poetry run python -m app.test.sim_m3_simple_trade --confirm 2 --rsi 65
-    poetry run python -m app.test.sim_m3_simple_trade --start 2026-07-01
-    poetry run python -m app.test.sim_m3_simple_trade --sweep    # confirm/rsi 민감도
+    poetry run python -m app.test.sim_m2_simple_trade            # 3봉 · RSI<70
+    poetry run python -m app.test.sim_m2_simple_trade --confirm 2 --rsi 65
+    poetry run python -m app.test.sim_m2_simple_trade --start 2026-07-01
+    poetry run python -m app.test.sim_m2_simple_trade --sweep    # confirm/rsi 민감도
 """
 import argparse
 
 from stock_shared.db.database import dbConn
-from app.test import sim_m3_alternate as sim
-from stock_shared.strategy.m3_alternate import M3AlternateSimulator, ScoreConfig
+from app.test import sim_m2_alternate as sim
+from stock_shared.strategy.m2_alternate import M2AlternateSimulator, ScoreConfig
 
 
 def _f(v, default=0.0) -> float:
@@ -76,7 +76,7 @@ def _f(v, default=0.0) -> float:
 class SimpleSignalStrategy:
     """조건 4개만 보는 매수 판정기.
 
-    M3AlternateSimulator 는 strategy.get_action_with_prev(...) 만 호출하므로
+    M2AlternateSimulator 는 strategy.get_action_with_prev(...) 만 호출하므로
     KospiStrategy1 전체를 흉내 낼 필요가 없다. 그 메서드 하나와,
     KisBacktester.enrich_rows 가 참조하는 윈도우 속성 몇 개면 충분하다.
 
@@ -157,7 +157,7 @@ def run(session, *, rsi_max: float, confirm: int, fee: float, slippage: float,
         start: str = None, end: str = None, score_original: bool = False,
         verbose: bool = False) -> dict:
     sc = ScoreConfig(w_tech=0.5, w_fund=0.3, w_liq=0.2) if score_original else None
-    m3 = M3AlternateSimulator(
+    m2 = M2AlternateSimulator(
         SimpleSignalStrategy(rsi_max), SimpleSignalStrategy(rsi_max),
         confirm_bars=confirm, fee_rate=fee, slippage=slippage, score_config=sc,
         stop_loss_pct=stop_loss, take_profit_pct=take_profit,
@@ -166,7 +166,7 @@ def run(session, *, rsi_max: float, confirm: int, fee: float, slippage: float,
     )
     rows_a = sim.load_rows(session, sim.CODE_A, start, end)
     rows_b = sim.load_rows(session, sim.CODE_B, start, end)
-    return m3.run(sim.CODE_A, sim.CODE_B, rows_a, rows_b,
+    return m2.run(sim.CODE_A, sim.CODE_B, rows_a, rows_b,
                   sim.user_info(session), verbose=verbose)
 
 
@@ -176,7 +176,7 @@ def print_detail(res: dict, rsi_max: float, confirm: int, fee: float, args=None)
 
     print()
     print('=' * 84)
-    print(f"M3 교대매매 — MACD↑ · OBV↑ · MA20↑ · RSI<{rsi_max:.0f} · {confirm}봉 연속")
+    print(f"M2 교대매매 — MACD↑ · OBV↑ · MA20↑ · RSI<{rsi_max:.0f} · {confirm}봉 연속")
     lines = []
     if args:
         if args.stop_loss:
@@ -319,7 +319,7 @@ def sweep_stop(session, args):
 # ──────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser(
-        description='M3 교대매매 시뮬 (MACD↑·OBV↑·MA20↑·RSI<70, 3봉 연속)')
+        description='M2 교대매매 시뮬 (MACD↑·OBV↑·MA20↑·RSI<70, 3봉 연속)')
     ap.add_argument('--rsi', type=float, default=70, help='RSI 상한 (기본 70)')
     ap.add_argument('--confirm', type=int, default=3, help='연속 확인 봉수 (기본 3)')
     ap.add_argument('--fee', type=float, default=0.0015, help='편도 수수료율')

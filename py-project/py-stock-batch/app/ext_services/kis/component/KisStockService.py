@@ -41,7 +41,7 @@ class KisService:
         data[Literal.EMA_120] = df_close.rolling(window=120).mean()
 
         ####################################################################
-        # 1-1. HMA (Hull Moving Average) — KospiStrategy2 추세 코어
+        # 1-1. HMA (Hull Moving Average)
         #  HMA(n) = WMA( 2*WMA(n/2) - WMA(n), sqrt(n) )
         #  체결강도(chegyul_strength)는 일봉에 없으므로 여기서 계산하지 않고,
         #  매매 잡이 KIS inquire-ccnl(CTTR/STRN) 값을 별도 주입한다.

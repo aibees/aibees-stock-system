@@ -59,37 +59,10 @@
             <section v-if="selectedMode" class="mode-config">
                 <h4>{{ selectedMode.mode_name }} 설정</h4>
 
-                <!-- M0 -->
-                <p v-if="form.mode_code === 'M0'" class="config-none">
+                <!-- M1 : 추천매수 -->
+                <p v-if="form.mode_code === 'M1'" class="config-none">
                     별도 설정이 없습니다. 매일 20시 추천 배치 결과의 1순위 종목을 익일 전량 매수합니다.
                 </p>
-
-                <!-- M1 : 단일 종목 고정 -->
-                <div v-else-if="form.mode_code === 'M1'" class="form-grid">
-                    <div class="form-field full">
-                        <label>고정 종목 <span class="req">*</span></label>
-                        <div class="stock-picker">
-                            <input readonly :value="display(form.config.stock_code, form.config.stock_name)"
-                                placeholder="종목을 선택하세요" />
-                            <button class="btn-pick" @click="openPicker('stock')">종목 선택</button>
-                        </div>
-                    </div>
-                    <div class="form-field">
-                        <label>진입 규칙</label>
-                        <select v-model="form.config.entry_rule">
-                            <option value="SIGNAL">매수 신호 충족 시</option>
-                            <option value="IMMEDIATE">장 시작 즉시 매수</option>
-                        </select>
-                    </div>
-                    <div class="form-field">
-                        <label>투입 비중 (예수금 대비)</label>
-                        <div class="stepper">
-                            <button @click="step('invest_ratio', -0.1, 0.1, 1)">−</button>
-                            <span>{{ Math.round((form.config.invest_ratio ?? 1) * 100) }}%</span>
-                            <button @click="step('invest_ratio', 0.1, 0.1, 1)">＋</button>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- M2 : ETF 교대 -->
                 <div v-else-if="form.mode_code === 'M2'" class="form-grid">
@@ -110,40 +83,33 @@
                         </div>
                     </div>
                     <div class="form-field">
-                        <label>단기 이동평균</label>
+                        <label>진입 연속 확인 (30분봉)</label>
                         <div class="stepper">
-                            <button @click="step('ma_short', -1, 3, 20)">−</button>
-                            <span>{{ form.config.ma_short }}일</span>
-                            <button @click="step('ma_short', 1, 3, 20)">＋</button>
+                            <button @click="step('confirm_bars', -1, 1, 6)">−</button>
+                            <span>{{ form.config.confirm_bars }}봉</span>
+                            <button @click="step('confirm_bars', 1, 1, 6)">＋</button>
                         </div>
                     </div>
                     <div class="form-field">
-                        <label>장기 이동평균</label>
+                        <label>RSI 과매수 차단</label>
                         <div class="stepper">
-                            <button @click="step('ma_long', -5, 10, 120)">−</button>
-                            <span>{{ form.config.ma_long }}일</span>
-                            <button @click="step('ma_long', 5, 10, 120)">＋</button>
+                            <button @click="step('rsi_overbought', -5, 50, 90)">−</button>
+                            <span>{{ form.config.rsi_overbought }}</span>
+                            <button @click="step('rsi_overbought', 5, 50, 90)">＋</button>
                         </div>
                     </div>
                     <div class="form-field">
-                        <label>LONG 진입 점수</label>
+                        <label>손절</label>
                         <div class="stepper">
-                            <button @click="step('threshold_long', -1, 1, 3)">−</button>
-                            <span>{{ form.config.threshold_long }} / 3</span>
-                            <button @click="step('threshold_long', 1, 1, 3)">＋</button>
-                        </div>
-                    </div>
-                    <div class="form-field">
-                        <label>SHORT 진입 점수</label>
-                        <div class="stepper">
-                            <button @click="step('threshold_short', -1, 1, 3)">−</button>
-                            <span>{{ form.config.threshold_short }} / 3</span>
-                            <button @click="step('threshold_short', 1, 1, 3)">＋</button>
+                            <button @click="step('stop_loss_pct', -0.005, 0.005, 0.1)">−</button>
+                            <span>-{{ (form.config.stop_loss_pct * 100).toFixed(1) }}%</span>
+                            <button @click="step('stop_loss_pct', 0.005, 0.005, 0.1)">＋</button>
                         </div>
                     </div>
                     <p class="hint full">
-                        종가&gt;MA{{ form.config.ma_long }}, MA{{ form.config.ma_short }}&gt;MA{{ form.config.ma_long }},
-                        MACD 히스토그램&gt;0 세 가지를 ±1점으로 합산해 방향을 정합니다. 점수 미달이면 현금 대기합니다.
+                        정방향·인버스 ETF 를 각각 독립적으로 운용합니다. MACD↑·OBV↑·MA20↑ 이면서 RSI 가 기준 미만인 상태가
+                        연속 {{ form.config.confirm_bars }}봉 이어지면 진입하고, 신호가 없으면 현금으로 대기합니다.
+                        청산은 손절·익절·트레일링 또는 모멘텀 이탈(MACD↓·OBV↓·RSI↓)입니다.
                     </p>
                 </div>
 
@@ -152,7 +118,7 @@
             <!-- ── 매도 수기 등록 (모드 무관) ──
                  위에서 어떤 방식을 고르든, 보유 종목 하나에 지정가를 걸어두면
                  그 종목만은 이 방식의 자동 매도 판정 대신 지정가로 감시된다.
-                 구 'M4/지정가 감시' 모드는 폐기되고 이 기능만 모드 무관으로 남았다. -->
+                 지정가 감시는 별도 모드가 아니라 모드 무관 기능이다. -->
             <section class="config-link">
                 <p>보유 종목에 <b>지정 매도가</b>를 걸어두면, 선택한 방식과 무관하게 그 종목만 지정가로 매도됩니다.</p>
                 <button class="btn-link" @click="goManualSell">매도 수기 등록 화면으로 이동</button>
@@ -194,13 +160,12 @@ const state = reactive({
 });
 
 const DEFAULT_CONFIG = {
-    M0: () => ({}),
-    M1: () => ({ stock_code: '', stock_name: '', entry_rule: 'SIGNAL', invest_ratio: 1 }),
+    M1: () => ({}),
     M2: () => ({
         long_code: '', long_name: '', short_code: '', short_name: '',
-        ma_short: 5, ma_long: 20, threshold_long: 2, threshold_short: 2, flip_cooldown_bars: 0,
+        confirm_bars: 3, rsi_overbought: 70, stop_loss_pct: 0.02,
     }),
-    // 구 M3(지정가 감시)는 폐기 — 매도 수기 등록으로 대체(모드 무관, 위 config-link 참고).
+    // 지정가 감시는 운용모드가 아니라 매도 수기 등록(모드 무관, 위 config-link 참고).
 };
 
 const form = reactive({ mode_code: '', config: {} });
@@ -214,7 +179,7 @@ const load = async () => {
         if (st) Object.assign(state, st);
 
         // 편집 기준: 예약이 있으면 예약값, 없으면 현재값
-        const baseMode = state.pending_mode ?? state.active_mode ?? 'M0';
+        const baseMode = state.pending_mode ?? state.active_mode ?? 'M1';
         const baseConfig = state.pending_mode ? state.pending_config : state.active_config;
         form.mode_code = baseMode;
         form.config = { ...DEFAULT_CONFIG[baseMode]?.() ?? {}, ...(baseConfig ?? {}) };
@@ -236,9 +201,8 @@ const display = (code, name) => code ? `${name || ''} (${code})` : '';
 
 const configSummary = (code, cfg) => {
     const c = cfg ?? {};
-    if (code === 'M1') return `고정 종목 ${display(c.stock_code, c.stock_name) || '-'}`;
-    if (code === 'M2') return `${c.long_name || c.long_code || '-'} ↔ ${c.short_name || c.short_code || '-'}`;
-    return '추천 1순위 자동매매';
+    if (code === 'M2') return `${c.long_name || c.long_code || '-'} · ${c.short_name || c.short_code || '-'}`;
+    return '추천매수 자동매매';
 };
 
 const activeSummary = computed(() => {
@@ -264,28 +228,21 @@ const picker = reactive({ visible: false, target: '', title: '' });
 const openPicker = (target) => {
     picker.target = target;
     picker.title = target === 'long' ? '정방향 ETF 선택'
-        : target === 'short' ? '인버스 ETF 선택' : '종목 선택';
+        : '인버스 ETF 선택';
     picker.visible = true;
 };
 const onPick = ({ stock_code, stock_name }) => {
-    if (picker.target === 'stock') {
-        form.config.stock_code = stock_code;
-        form.config.stock_name = stock_name;
-    } else {
-        form.config[`${picker.target}_code`] = stock_code;
-        form.config[`${picker.target}_name`] = stock_name;
-    }
+    form.config[`${picker.target}_code`] = stock_code;
+    form.config[`${picker.target}_name`] = stock_name;
     picker.visible = false;
 };
 
 /* ── 검증 ── */
 const validate = () => {
     const c = form.config;
-    if (form.mode_code === 'M1' && !c.stock_code) return '고정 종목을 선택해 주세요.';
     if (form.mode_code === 'M2') {
         if (!c.long_code || !c.short_code) return '정방향/인버스 ETF를 모두 선택해 주세요.';
         if (c.long_code === c.short_code) return '정방향과 인버스 ETF는 서로 달라야 합니다.';
-        if (Number(c.ma_short) >= Number(c.ma_long)) return '단기 이동평균은 장기보다 작아야 합니다.';
     }
     return null;
 };

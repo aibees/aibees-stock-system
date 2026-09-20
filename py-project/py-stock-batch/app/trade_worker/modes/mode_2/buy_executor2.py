@@ -1,5 +1,5 @@
 """
-M2 (단일 종목 고정) 매수 — **미구현 스켈레톤**.
+M2 (ETF 교대) 매수 — **미구현 스켈레톤**.
 
 BaseBuyExecutor 를 상속해 pick_candidates() 만 채우면 된다.
 시세·수량·주문·체결추적·포지션반영은 베이스가 처리하므로 여기서 다시 쓰지 말 것.
@@ -10,10 +10,10 @@ from app.trade_worker.buy_executor import BaseBuyExecutor, BuyCandidate
 
 
 class BuyExecutor2(BaseBuyExecutor):
-    """M2 : 단일 종목 고정."""
+    """M2 : ETF 교대."""
 
     MODE_CODE = "M2"
 
     def pick_candidates(self, premarket: bool) -> list[BuyCandidate]:
-        # TODO: user_option_m2.stock_code 1종목. entry_rule(IMMEDIATE/SIGNAL) 에 따라 진입.
+        # TODO: 추세 판정으로 long_code / short_code 중 한쪽만. 청산 체결 확인 후 반대편 진입.
         raise NotImplementedError("BuyExecutor2.pick_candidates 미구현")

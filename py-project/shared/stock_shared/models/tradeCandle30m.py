@@ -1,5 +1,5 @@
 """
-trade_candle_30m — M3 30분봉 캔들. DB(stock) 스키마 기준 자동 생성 모델.
+trade_candle_30m — M2 30분봉 캔들. DB(stock) 스키마 기준 자동 생성 모델.
 
 trade_candle_data(일봉) 와 컬럼 구성이 100% 동일하다.
   → DDL 이 `CREATE TABLE trade_candle_30m LIKE trade_candle_data` 이기 때문.

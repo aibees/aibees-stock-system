@@ -39,7 +39,7 @@ class BuyCandidate:
     name: str = ""
     nxt: bool = False                       # NXT 대상 → 통합(UN/SOR), 아니면 KRX(J/KRX)
     ref_close: Optional[Decimal] = None     # 프리마켓 지정가 산출용 전일종가
-    limit_price: Optional[Decimal] = None   # 지정가를 모드가 직접 정하는 경우(M4)
+    limit_price: Optional[Decimal] = None   # 지정가를 모드가 직접 정하는 경우
     log_note: str = ""                      # trade_log.note 에 남길 모드별 부가정보
     notify_note: str = ""                   # 체결 알림에 남길 모드별 부가정보
 
@@ -69,7 +69,7 @@ class BaseBuyExecutor(ABC):
 
         exclusive_flag='Y' 는 카운트에서 제외한다. "보유 중이어도 신규 매수를
         막지 않는다"는 뜻일 뿐, 매도 감시에서 빼겠다는 뜻이 아니다.
-        동시 보유가 필요한 모드(M4 등)는 True 고정으로 재정의한다.
+        동시 보유가 필요한 모드는 True 고정으로 재정의한다.
         """
         blocking = self.repo.get_holding_positions(self.cfg.user_id, exclude_exclusive=True)
         if blocking:

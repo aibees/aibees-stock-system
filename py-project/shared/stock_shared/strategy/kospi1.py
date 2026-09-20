@@ -1,10 +1,10 @@
 """
-kospi1.py — M1 (추천 1순위) 전략. **실전 worker 현행 전략.**
+kospi1.py — M1 (추천매수) 전략. **실전 worker 현행 전략.**
 
 운용모드 M1: 20:00 배치가 만든 trade_buy_target_stock 의 1순위를 익일 전량 매수하고,
 손절 > 익절 > 트레일링 > 타임스탑 순으로 매도 판정한다.
 
-M2~M4 와 달리 유일하게 로직이 구현되어 있다. 여기를 고치면 실매매 판정이 즉시 바뀐다.
+M2 와 달리 유일하게 로직이 구현되어 있다. 여기를 고치면 실매매 판정이 즉시 바뀐다.
 (구 kospi0.py / KospiStrategy0 에서 이름만 옮겨온 것 — 로직 변경 없음)
 """
 from stock_shared.vo.userCoinInfo import UserCoinInfo

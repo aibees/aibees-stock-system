@@ -34,7 +34,7 @@ class Literal:
     EMA_120 = 'ema120'
     EMA_120_SLOPE = 'ema120_slope'
 
-    # HMA (Hull Moving Average) — KospiStrategy2 추세 코어
+    # HMA (Hull Moving Average)
     HMA = 'hma'
     HMA_SLOPE = 'hma_slope'  # 당봉 hma - 전봉 hma (양수=상승전환)
 

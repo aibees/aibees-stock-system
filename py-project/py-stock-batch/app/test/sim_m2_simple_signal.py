@@ -1,5 +1,5 @@
 """
-M3 단순 매수신호 테스트 — 조건 4개만으로 각 종목의 매수지점을 찍는다.
+M2 단순 매수신호 테스트 — 조건 4개만으로 각 종목의 매수지점을 찍는다.
 
 조건 (전부 AND)
     1) MACD  기울기 상승   : macd  > 직전봉 macd
@@ -20,15 +20,15 @@ KospiStrategy1 을 쓰지 않고 조건을 직접 계산한다.
     · 연속 3봉 확정(휩쏘 방어) 적용 시 신호 수 비교
 
 실행
-    poetry run python -m app.test.sim_m3_simple_signal              # RSI<70 · 3봉
-    poetry run python -m app.test.sim_m3_simple_signal --rsi 65 --confirm 2
-    poetry run python -m app.test.sim_m3_simple_signal --start 2026-07-01
-    poetry run python -m app.test.sim_m3_simple_signal --all-bars   # 전 봉 상태 출력
+    poetry run python -m app.test.sim_m2_simple_signal              # RSI<70 · 3봉
+    poetry run python -m app.test.sim_m2_simple_signal --rsi 65 --confirm 2
+    poetry run python -m app.test.sim_m2_simple_signal --start 2026-07-01
+    poetry run python -m app.test.sim_m2_simple_signal --all-bars   # 전 봉 상태 출력
 """
 import argparse
 
 from stock_shared.db.database import dbConn
-from app.test import sim_m3_alternate as sim
+from app.test import sim_m2_alternate as sim
 
 CONDS = ('macd_up', 'obv_up', 'ma20_up', 'rsi_ok')
 COND_LABEL = {
@@ -204,7 +204,7 @@ def compare(code_a: str, ev_a: list, code_b: str, ev_b: list):
 # ──────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser(
-        description='M3 단순 매수신호 (MACD↑ · OBV↑ · MA20↑ · RSI<70, 3봉 연속)')
+        description='M2 단순 매수신호 (MACD↑ · OBV↑ · MA20↑ · RSI<70, 3봉 연속)')
     ap.add_argument('--rsi', type=float, default=70, help='RSI 상한 (기본 70)')
     ap.add_argument('--confirm', type=int, default=3, help='연속 확인 봉수 (기본 3)')
     ap.add_argument('--start', help='시작일 YYYY-MM-DD')

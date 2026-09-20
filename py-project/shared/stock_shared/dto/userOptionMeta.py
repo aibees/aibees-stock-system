@@ -152,69 +152,29 @@ class UserOptionMeta:
         self.s1_buy_order               = None
 
         # ── KospiStrategy2 파라미터 (None이면 전략 클래스 기본값 사용) ────────
-        # HMA + MACD + OBV core AND + 체결강도 필터 전략
-        self.s2_stop_loss_pct          = None
-        self.s2_take_profit_pct        = None
-        self.s2_max_hold_bars          = None
-        self.s2_max_hold_bars_hard     = None
-        self.s2_hma_period             = None   # HMA 기간 (기본 20)
-        self.s2_hma_signal_mode        = None   # 'off'|'slope'|'above'
-        self.s2_macd_signal_mode       = None   # 'off'|'golden'|'slope'
-        self.s2_obv_signal_mode        = None   # 'off'|'golden'|'slope'
-        # 컨펌 층: 거래량 실린 양봉 + 종가 상단 마감
-        self.s2_confirm_body_up        = None   # 양봉 요구
-        self.s2_confirm_vol_mult       = None   # 거래량 >= 평균 * 배수 (기본 1.0)
-        self.s2_confirm_clv_min        = None   # 종가 상단마감 CLV 하한 (기본 0.6)
-        self.s2_chegyul_threshold      = None   # 체결강도 하한 (기본 110)
-        # 적응형 추세국면 게이트
-        self.s2_regime_window          = None   # 분류기 봉 길이 (기본 90)
-        self.s2_regime_threshold       = None   # 하락국면 임계 (기본 0.70)
-        self.s2_regime_strict_need_macd = None  # 하락국면 통과에 macd>=signal 요구
-        self.s2_rsi_overbought         = None
-        self.s2_vol_ma_mult            = None
-        self.s2_use_trailing           = None
-        self.s2_trail_activate_pct     = None
-        self.s2_k_trail_atr            = None
-        self.s2_trail_floor_pct        = None
-        self.s2_obv_dead_min_bars      = None
-        # 매수 필터 on/off 스위치
-        self.s2_enable_hma_filter      = None
-        self.s2_enable_macd_filter     = None
-        self.s2_enable_obv_filter      = None
-        self.s2_enable_confirm_candle  = None
-        self.s2_enable_chegyul_filter  = None
-        self.s2_enable_regime_gate     = None
-        self.s2_enable_rsi_filter      = None
-        self.s2_enable_bb_upper_filter = None
-        self.s2_enable_vol_avg_filter  = None
-        # 매도: HMA 청산 사용 여부 + 방식('break'|'inflection'|'off')
-        self.s2_use_hma_exit           = None
-        self.s2_hma_exit_mode          = None
-
-        # ── KospiStrategy3 파라미터 (None이면 전략 클래스 기본값 사용) ────────
-        # M3: KODEX 코스피100 / 인버스를 **각각 독립적으로** 매매. 30분봉 기준.
+        # M2: KODEX 코스피100 / 인버스를 **각각 독립적으로** 매매. 30분봉 기준.
         #   진입 = MACD↑ · OBV↑ · MA20↑ · RSI<x  가 confirm_bars 봉 연속
         #   청산 = 가격라인(손절/익절/트레일링) 또는 모멘텀이탈(MACD↓·OBV↓·RSI↓)
-        self.s3_long_code              = None   # 정방향 ETF (기본 237350)
-        self.s3_short_code             = None   # 인버스 ETF (기본 114800)
+        self.s2_long_code              = None   # 정방향 ETF (기본 237350)
+        self.s2_short_code             = None   # 인버스 ETF (기본 114800)
         # 진입
-        self.s3_confirm_bars           = None   # 연속확인 봉수 (기본 3)
-        self.s3_rsi_overbought         = None   # 진입차단 RSI (기본 70)
-        self.s3_enable_macd_up         = None
-        self.s3_enable_obv_up          = None
-        self.s3_enable_ma20_up         = None
-        self.s3_enable_rsi_filter      = None
+        self.s2_confirm_bars           = None   # 연속확인 봉수 (기본 3)
+        self.s2_rsi_overbought         = None   # 진입차단 RSI (기본 70)
+        self.s2_enable_macd_up         = None
+        self.s2_enable_obv_up          = None
+        self.s2_enable_ma20_up         = None
+        self.s2_enable_rsi_filter      = None
         # 청산 — 모멘텀 이탈
-        self.s3_exit_on_reverse        = None   # 사용 여부 (기본 1)
-        self.s3_exit_macd_down         = None
-        self.s3_exit_obv_down          = None
-        self.s3_exit_rsi_down          = None
+        self.s2_exit_on_reverse        = None   # 사용 여부 (기본 1)
+        self.s2_exit_macd_down         = None
+        self.s2_exit_obv_down          = None
+        self.s2_exit_rsi_down          = None
         # 청산 — 가격 라인 (30분봉 스케일. 일봉용 -5% 는 거의 안 걸린다)
-        self.s3_stop_loss_pct          = None   # 기본 0.02 (-2%)
-        self.s3_take_profit_pct        = None   # 기본 미사용
-        self.s3_use_trailing           = None   # 기본 0
-        self.s3_trail_activate_pct     = None
-        self.s3_trail_drawdown_pct     = None
+        self.s2_stop_loss_pct          = None   # 기본 0.02 (-2%)
+        self.s2_take_profit_pct        = None   # 기본 미사용
+        self.s2_use_trailing           = None   # 기본 0
+        self.s2_trail_activate_pct     = None
+        self.s2_trail_drawdown_pct     = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {k: _to_plain(v) for k, v in self.__dict__.items()}

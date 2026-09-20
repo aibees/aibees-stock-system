@@ -11,21 +11,16 @@ const clone = (o) => JSON.parse(JSON.stringify(o ?? null));
 /* ── 모드 마스터 ── */
 const MODES = [
     {
-        mode_code: 'M0', mode_name: '추천 1순위 자동매매',
+        mode_code: 'M1', mode_name: '추천매수 자동매매',
         mode_desc: '매일 저녁 8시 배치가 뽑은 추천 종목 중 <b>1순위 종목을 익일 전량 매수</b>합니다.<br/>매도는 기존 S1 전략(손절·익절·트레일링·타임스탑)을 따릅니다.',
         need_stock: 'N', need_pair: 'N', need_price: 'N', sort_order: 1, enabled_flag: 'Y',
     },
     {
-        mode_code: 'M1', mode_name: '단일 종목 고정',
-        mode_desc: '지정한 <b>종목 1개만</b> 반복 매매합니다. ETF·개별주 모두 가능.<br/>진입 규칙은 즉시매수 / 신호대기 중 선택합니다.',
-        need_stock: 'Y', need_pair: 'N', need_price: 'N', sort_order: 2, enabled_flag: 'Y',
+        mode_code: 'M2', mode_name: 'ETF 교대',
+        mode_desc: '<b>정방향 ETF</b>와 <b>인버스 ETF</b>를 각자의 매수 신호(MACD·OBV·MA20·RSI, 30분봉)로 독립 운용합니다.<br/>신호가 없으면 현금 대기하며, 청산은 손절·익절·트레일링 또는 모멘텀 이탈입니다.',
+        need_stock: 'N', need_pair: 'Y', need_price: 'N', sort_order: 2, enabled_flag: 'Y',
     },
-    {
-        mode_code: 'M2', mode_name: 'KOSPI100 ETF ↔ 인버스 교대',
-        mode_desc: 'KOSPI 지수 추세를 판단해 <b>정방향 ETF</b> 또는 <b>인버스 ETF</b> 한쪽만 보유합니다.<br/>반대 신호가 나오면 청산 후 반대편으로 전환합니다.',
-        need_stock: 'N', need_pair: 'Y', need_price: 'N', sort_order: 3, enabled_flag: 'Y',
-    },
-    // 구 'M3 지정가 감시 매매'(설계 문서 기준 M4)는 폐기됐다.
+    // 지정가 감시 매매는 운용모드가 아니다.
     // 매도가 도달 시 자동 체결하는 기능 자체는 없어지지 않았고, 모드 선택과
     // 무관하게 '매도 수기 등록' 화면(LimitOrder.vue)으로 옮겨졌다 — 위 모드
     // 중 무엇을 쓰든 보유 종목에 지정가를 걸어두면 그 종목만 자동 rule 대신
@@ -37,7 +32,7 @@ const db = {
     state: {
         enabled_flag: 'Y',
         run_state: 'HOLDING',
-        active_mode: 'M0',
+        active_mode: 'M1',
         active_config: {},
         active_from: '2026-08-04T09:03:00',
         pending_mode: null,
@@ -46,7 +41,7 @@ const db = {
         last_tick_at: '2026-08-11T14:52:10',
         last_message: 'HOLD · 수익률 +3.21% · 트레일링 라인 71,480 미도달 (보유 5봉)',
         position: {
-            stock_code: '005930', stock_name: '삼성전자', trade_mode: 'M0',
+            stock_code: '005930', stock_name: '삼성전자', trade_mode: 'M1',
             entry_price: 71200, qty: 14, profit_pct: '+3.21%',
             stop_price: 67640, target_price: 92560, trail_line: 71480,
             bars_held: 5, sell_reason: null,
@@ -54,8 +49,8 @@ const db = {
     },
     // 매도 수기등록 — 보유 종목 1개에 지정 매도가를 걸어두면, 현재 활성 모드가
     // 무엇이든 그 모드의 자동 매도 rule(손절/익절/트레일링) 대신 이 가격 도달
-    // 여부만으로 worker 가 대신 체결한다. 매수는 관여하지 않는다(기존 M4 처럼
-    // 매수가를 함께 지정하지 않음 — 매수는 항상 활성 모드가 담당).
+    // 여부만으로 worker 가 대신 체결한다. 매수는 관여하지 않는다(매수가를
+    // 함께 지정하지 않음 — 매수는 항상 활성 모드가 담당).
     // 백엔드 대응: app/trade_worker/repository.py get_active_manual_sells 등
     // (trade_worker_manual_sell, sql/08_manual_sell_order_ddl.sql).
     manualSell: {
@@ -65,9 +60,9 @@ const db = {
         filled_price: null, filled_qty: null, filled_at: null,
     },
     history: [
-        { log_id: 3, action_type: 'APPLY_NOW', from_mode: null, to_mode: 'M0', reason: '최초 설정', actor: 'USER', created_at: '2026-08-01T10:12:00' },
-        { log_id: 2, action_type: 'START', from_mode: 'M0', to_mode: 'M0', reason: '자동매매 시작', actor: 'USER', created_at: '2026-08-01T10:12:20' },
-        { log_id: 1, action_type: 'COMMIT', from_mode: 'M0', to_mode: 'M0', reason: '매도 체결 후 재무장', actor: 'WORKER', created_at: '2026-08-04T09:03:00' },
+        { log_id: 3, action_type: 'APPLY_NOW', from_mode: null, to_mode: 'M1', reason: '최초 설정', actor: 'USER', created_at: '2026-08-01T10:12:00' },
+        { log_id: 2, action_type: 'START', from_mode: 'M1', to_mode: 'M1', reason: '자동매매 시작', actor: 'USER', created_at: '2026-08-01T10:12:20' },
+        { log_id: 1, action_type: 'COMMIT', from_mode: 'M1', to_mode: 'M1', reason: '매도 체결 후 재무장', actor: 'WORKER', created_at: '2026-08-04T09:03:00' },
     ],
     seq: 4,
 };

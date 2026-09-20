@@ -64,7 +64,7 @@ export const setPower = async (enabled) => {
     return data.data ?? {};
 };
 
-/* ── 매도 수기등록 (모드 무관, 구 'M4/M3 지정가 감시' 폐기 후 대체)
+/* ── 매도 수기등록 (모드 무관, 지정가 감시는 운용모드가 아님)
  *   보유 종목에 지정 매도가를 걸어두면, 활성 운용모드가 무엇이든 그 모드의
  *   자동 매도 rule 대신 이 가격 도달 여부로 worker 가 대신 체결한다.
  *   백엔드: app/trade_worker (trade_worker_manual_sell, sql/08_manual_sell_order_ddl.sql

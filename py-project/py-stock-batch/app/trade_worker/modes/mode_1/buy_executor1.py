@@ -1,5 +1,5 @@
 """
-M1 (추천 1순위) 매수 — 20:00 배치가 만든 trade_buy_target_stock 의 1순위를 익일 매수.
+M1 (추천매수) 매수 — 20:00 배치가 만든 trade_buy_target_stock 의 1순위를 익일 매수.
 
 BaseBuyExecutor 에서 갈리는 지점은 **후보 선정 하나**뿐이다.
 시세·수량·주문·체결추적·포지션반영은 전부 베이스가 처리한다.
@@ -15,7 +15,7 @@ from app.trade_worker.repository import describe_buy_order
 
 
 class BuyExecutor1(BaseBuyExecutor):
-    """M1 : 추천 1순위 자동매매."""
+    """M1 : 추천매수 자동매매."""
 
     MODE_CODE = "M1"
 

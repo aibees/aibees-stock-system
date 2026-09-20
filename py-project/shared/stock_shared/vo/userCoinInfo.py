@@ -61,7 +61,7 @@ class UserCoinInfo:
         self.ema120 = 0.0
         self.ema120_slope = 0.0
 
-        # HMA (Hull Moving Average) — KospiStrategy2 추세 코어. from_dict 자동매핑.
+        # HMA (Hull Moving Average). from_dict 자동매핑.
         self.hma = 0.0
         self.hma_slope = 0.0
 
@@ -154,7 +154,7 @@ class UserCoinInfo:
 
         DB(trade_candle_data 등)에서 온 값은 SQLAlchemy DECIMAL 컬럼이라
         decimal.Decimal 로 넘어오고, 라이브 경로(pandas)는 float 로 넘어온다.
-        이 둘이 전략 코드(kospi1/kospi3.py) 안에서 섞여 연산되면
+        이 둘이 전략 코드(kospi1/kospi2.py) 안에서 섞여 연산되면
         "unsupported operand type(s) for -: 'decimal.Decimal' and 'float'" 로
         터진다. 여기서 한 번에 float 로 통일해서 호출부 어디서든 안전하게 만든다.
         문자열 플래그(macd_g_cross_n 등)나 dict(entry_gate) 는 그대로 둔다.

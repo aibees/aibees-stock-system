@@ -1,5 +1,5 @@
 """
-trade_candle_30m DAO — M3 30분봉 전용.
+trade_candle_30m DAO — M2 30분봉 전용.
 
 TradeCandleDataDao(일봉) 와 쿼리 형태가 같지만 대상 모델이 다르다.
 중복을 줄이려 상속하지 않는 이유: 부모가 모듈 상수 TradeCandleData 를
@@ -52,7 +52,7 @@ class TradeCandle30mDao(BaseDao):
     def select_latest(self, session, coin: str, limit: int = 250) -> list:
         """최근 N봉을 **시간 오름차순**으로 반환.
 
-        M3 분석의 기본 진입점. 지표 계산은 오름차순 전제이므로
+        M2 분석의 기본 진입점. 지표 계산은 오름차순 전제이므로
         DESC LIMIT 로 뽑은 뒤 뒤집어 준다.
         """
         stmt = (

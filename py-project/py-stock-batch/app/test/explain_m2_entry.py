@@ -16,16 +16,16 @@
         (손절 미설정으로 큰 손실이 난 거래를 진단)
 
 실행
-    poetry run python -m app.test.explain_m3_entry --dt "2026-06-25 15:00:00"
-    poetry run python -m app.test.explain_m3_entry --trade 1
-    poetry run python -m app.test.explain_m3_entry --trade 1 --lookback 20
-    poetry run python -m app.test.explain_m3_entry --list        # 거래 목록만
+    poetry run python -m app.test.explain_m2_entry --dt "2026-06-25 15:00:00"
+    poetry run python -m app.test.explain_m2_entry --trade 1
+    poetry run python -m app.test.explain_m2_entry --trade 1 --lookback 20
+    poetry run python -m app.test.explain_m2_entry --list        # 거래 목록만
 """
 import argparse
 
 from stock_shared.db.database import dbConn
-from app.test import sim_m3_alternate as sim
-from app.test.sim_m3_simple_trade import SimpleSignalStrategy, _f, run
+from app.test import sim_m2_alternate as sim
+from app.test.sim_m2_simple_trade import SimpleSignalStrategy, _f, run
 
 CONDS = [
     ('macd_up', 'MACD', 'macd'),
@@ -181,7 +181,7 @@ def explain(tr_a: list, tr_b: list, trade: dict, confirm: int,
 
 # ──────────────────────────────────────────────────────────────
 def main():
-    ap = argparse.ArgumentParser(description='M3 진입/청산 판정 역추적')
+    ap = argparse.ArgumentParser(description='M2 진입/청산 판정 역추적')
     ap.add_argument('--dt', help='진입 시각 "YYYY-MM-DD HH:MM:SS"')
     ap.add_argument('--trade', type=int, help='거래 번호 (1부터)')
     ap.add_argument('--list', action='store_true', help='거래 목록만 출력')
@@ -236,11 +236,11 @@ def main():
             print(f"\n⚠ 지정한 거래를 찾을 수 없다. --list 로 목록 확인.")
             return
 
-        from stock_shared.strategy.m3_alternate import M3AlternateSimulator
+        from stock_shared.strategy.m2_alternate import M2AlternateSimulator
         rows_a = sim.load_rows(session, sim.CODE_A, args.start, args.end)
         rows_b = sim.load_rows(session, sim.CODE_B, args.start, args.end)
         # 시뮬과 동일하게 교집합 정렬해야 인덱스가 맞는다
-        a, b = M3AlternateSimulator.align(rows_a, rows_b)
+        a, b = M2AlternateSimulator.align(rows_a, rows_b)
 
         explain(trace(a, args.rsi), trace(b, args.rsi),
                 target, args.confirm, args.rsi, args.lookback, args.stop_loss)

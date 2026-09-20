@@ -5,7 +5,7 @@ scoring.py — 매수추천 스코어 계산 (단일 진실원).
 여기로 옮겼다. StockService 는 이제 이 모듈에 위임한다.
 
 옮긴 이유:
-    M3 교대매매 시뮬레이터가 "두 종목 중 score 높은 쪽" 을 골라야 하는데,
+    M2 교대매매 시뮬레이터가 "두 종목 중 score 높은 쪽" 을 골라야 하는데,
     shared 계층에서 py-stock-batch 의 StockService 를 import 할 수는 없다
     (의존 방향이 거꾸로). 복붙하면 가중치가 두 곳에서 갈라진다.
     → 순수 함수라 shared 로 올리는 게 맞다.
@@ -75,7 +75,7 @@ def tech_score(ind: dict, weights: dict = None,
 
     ind: KospiStrategy1.get_action_in_watch 가 돌려주는 result['indicator'] dict.
 
-    weights 를 넘기면 하위 가중치를 바꿀 수 있다(M3 최적화용).
+    weights 를 넘기면 하위 가중치를 바꿀 수 있다(M2 최적화용).
     안 넘기면 운영 기본값(TECH_WEIGHTS).
     """
     w = weights or TECH_WEIGHTS
@@ -106,7 +106,7 @@ def tech_score(ind: dict, weights: dict = None,
 def fund_score(fin: dict) -> float:
     """재무 스코어 0.0~1.0. eps/per/pbr/roe/peg 5항목 평균.
 
-    ※ ETF 는 이 지표들이 없어 전 항목 0점이 된다(M3 는 사실상 미사용).
+    ※ ETF 는 이 지표들이 없어 전 항목 0점이 된다(M2 는 사실상 미사용).
     """
     eps = to_float(fin.get('eps'))
     per = to_float(fin.get('per'))
@@ -165,7 +165,7 @@ def normalize_liquidity(turnovers: list) -> list:
 
     ⚠ 단면(cross-sectional) 연산이다. 후보가 2개뿐이면 항상 한쪽 1.0 / 한쪽 0.0
       이 되어 사실상 '거래대금 큰 쪽에 +가중' 이상의 의미가 없다.
-      M3(2종목 교대)에서는 liq 가중치를 0으로 두는 걸 권장한다.
+      M2(2종목 교대)에서는 liq 가중치를 0으로 두는 걸 권장한다.
     """
     if not turnovers:
         return []

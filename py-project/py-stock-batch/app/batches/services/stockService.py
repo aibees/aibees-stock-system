@@ -63,7 +63,7 @@ class StockService:
     #  - 순위는 그날 후보 전체를 비교하는 단면 연산이므로 배치 루프 종료 후 1회 수행
     # ──────────────────────────────────────────────────────────────────
     # ※ 스코어 계산 본체는 stock_shared.strategy.scoring 으로 이동했다.
-    #   M3 교대매매 시뮬레이터가 같은 로직을 써야 하는데 shared → py-stock-batch
+    #   M2 교대매매 시뮬레이터가 같은 로직을 써야 하는데 shared → py-stock-batch
     #   방향 import 가 불가능해서다. 아래 메서드들은 호환용 위임 래퍼다.
     @staticmethod
     def _to_float(v):

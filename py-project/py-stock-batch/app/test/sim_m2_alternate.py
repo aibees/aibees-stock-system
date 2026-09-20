@@ -1,5 +1,5 @@
 """
-M3 교대매매(시나리오 1) 단일 조합 시뮬레이션 러너.
+M2 교대매매(시나리오 1) 단일 조합 시뮬레이션 러너.
 
 trade_candle_30m 에 백필된 30분봉으로 KODEX 코스피100(237350) ↔
 KODEX 인버스(114800) 교대매매를 재생하고 성과를 출력한다.
@@ -9,12 +9,12 @@ KODEX 인버스(114800) 교대매매를 재생하고 성과를 출력한다.
     (최소 250봉. 부족하면 지표가 NaN 구간에서 시작해 결과가 왜곡된다)
 
 사용
-    poetry run python -m app.test.sim_m3_alternate
-    poetry run python -m app.test.sim_m3_alternate --confirm 3 --verbose
-    poetry run python -m app.test.sim_m3_alternate --start 2026-06-01 --end 2026-08-13
-    poetry run python -m app.test.sim_m3_alternate --macd-mode golden --obv-mode off
+    poetry run python -m app.test.sim_m2_alternate
+    poetry run python -m app.test.sim_m2_alternate --confirm 3 --verbose
+    poetry run python -m app.test.sim_m2_alternate --start 2026-06-01 --end 2026-08-13
+    poetry run python -m app.test.sim_m2_alternate --macd-mode golden --obv-mode off
 
-optimize_m3_options.py 가 이 모듈의 load_rows()/build_strategy()/run_once() 를
+optimize_m2_options.py 가 이 모듈의 load_rows()/build_strategy()/run_once() 를
 그대로 재사용한다(조합마다 DB 를 다시 읽지 않도록 캐시 포함).
 """
 import argparse
@@ -24,7 +24,7 @@ from stock_shared.db.database import dbConn
 from stock_shared.dao.tradeCandle30mDao import TradeCandle30mDao
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from stock_shared.strategy.kospi1 import KospiStrategy1
-from stock_shared.strategy.m3_alternate import M3AlternateSimulator, ScoreConfig
+from stock_shared.strategy.m2_alternate import M2AlternateSimulator, ScoreConfig
 
 CODE_A = '237350'   # KODEX 코스피100 (정방향)
 CODE_B = '114800'   # KODEX 인버스
@@ -97,7 +97,7 @@ def run_once(session, *, strategy_kwargs: dict = None, confirm_bars: int = 2,
              start: str = None, end: str = None, verbose: bool = False) -> dict:
     """단일 조합 시뮬레이션."""
     kw = strategy_kwargs or {}
-    sim = M3AlternateSimulator(
+    sim = M2AlternateSimulator(
         build_strategy(**kw), build_strategy(**kw),
         confirm_bars=confirm_bars, fee_rate=fee_rate,
         slippage=slippage, score_config=score_config,
@@ -111,7 +111,7 @@ def run_once(session, *, strategy_kwargs: dict = None, confirm_bars: int = 2,
 def print_result(res: dict, show_trades: bool = True):
     print()
     print('=' * 78)
-    print(f"M3 교대매매 결과  {res['code_a']} ↔ {res['code_b']}   "
+    print(f"M2 교대매매 결과  {res['code_a']} ↔ {res['code_b']}   "
           f"({res['bars']}봉)")
     print('=' * 78)
     if res.get('note'):
@@ -143,7 +143,7 @@ def print_result(res: dict, show_trades: bool = True):
 
 # ──────────────────────────────────────────────────────────────
 def main():
-    ap = argparse.ArgumentParser(description='M3 교대매매 시뮬레이션 (시나리오 1)')
+    ap = argparse.ArgumentParser(description='M2 교대매매 시뮬레이션 (시나리오 1)')
     ap.add_argument('--confirm', type=int, default=2,
                     help='매수신호 연속 확인 봉수 (기본 2, 휩쏘 방어)')
     ap.add_argument('--fee', type=float, default=0.0015, help='편도 수수료율')

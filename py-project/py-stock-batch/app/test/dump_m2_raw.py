@@ -14,9 +14,9 @@
     [5] DB 대조      — 이미 적재된 값과 지금 재수집한 값이 같은가
 
 실행
-    poetry run python -m app.test.dump_m3_raw                    # 최근 영업일
-    poetry run python -m app.test.dump_m3_raw --ymd 20260805
-    poetry run python -m app.test.dump_m3_raw --code 114800 --raw # 원시 JSON 전량
+    poetry run python -m app.test.dump_m2_raw                    # 최근 영업일
+    poetry run python -m app.test.dump_m2_raw --ymd 20260805
+    poetry run python -m app.test.dump_m2_raw --code 114800 --raw # 원시 JSON 전량
 """
 import argparse
 import json

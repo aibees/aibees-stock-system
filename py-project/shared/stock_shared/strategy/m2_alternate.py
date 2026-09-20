@@ -1,5 +1,5 @@
 """
-m3_alternate.py — M3 정·역 ETF 교대매매 시뮬레이터 (테스트 시나리오 1).
+m2_alternate.py — M2 정·역 ETF 교대매매 시뮬레이터 (테스트 시나리오 1).
 
 시나리오 1 정의
     대상 2종목. KODEX 코스피100(237350) / KODEX 인버스(114800). 30분봉.
@@ -27,7 +27,7 @@ score
     매수추천배치(StockBuyCheckJob → StockService.assign_ranks)와 동일한 계산.
     stock_shared.strategy.scoring 으로 추출해 양쪽이 같은 함수를 쓴다.
 
-    ⚠ M3 에서의 주의점 2가지:
+    ⚠ M2 에서의 주의점 2가지:
       · fund(재무 30%): ETF 는 eps/per/pbr 이 없어 **양쪽 다 0점**. 상대비교에
         기여하지 않으므로 기본 가중치에서 제외한다(w_fund=0).
       · liq(유동성 20%): 후보가 2개뿐이라 min-max 정규화하면 항상 한쪽 1.0 /
@@ -48,7 +48,7 @@ from stock_shared.strategy import scoring
 from stock_shared.strategy.backtester import KisBacktester
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 
-__all__ = ["ScoreConfig", "M3AlternateSimulator"]
+__all__ = ["ScoreConfig", "M2AlternateSimulator"]
 
 # Action enum 의 매수 계열은 전부 'BUY' 로 시작한다
 # (BUY / BUY_BREAKOUT / BUY_DIP / BUY_ALL / BUY_SURGE).
@@ -57,7 +57,7 @@ __all__ = ["ScoreConfig", "M3AlternateSimulator"]
 
 @dataclass
 class ScoreConfig:
-    """score 가중치. 기본값은 M3(ETF 2종목) 에 맞춘 tech 100%.
+    """score 가중치. 기본값은 M2(ETF 2종목) 에 맞춘 tech 100%.
 
     원본 매수추천배치와 동일하게 쓰려면 (0.5, 0.3, 0.2).
     """
@@ -68,7 +68,7 @@ class ScoreConfig:
     tech_weights: dict = field(default=None)
 
 
-class M3AlternateSimulator:
+class M2AlternateSimulator:
     """시나리오 1 교대매매 시뮬레이터.
 
     strategy 는 종목마다 **별도 인스턴스**를 받는다. 두 종목이 같은 파라미터를

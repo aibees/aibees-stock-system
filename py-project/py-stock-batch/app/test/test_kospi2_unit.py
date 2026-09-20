@@ -1,19 +1,19 @@
 """
-KospiStrategy3 단위 검증 (DB / KIS 불필요).
+KospiStrategy2 단위 검증 (DB / KIS 불필요).
 
 무엇을 검증하나
-    1. configure — user_option_m3(s3_*) 값이 실제로 반영되는가, NULL 이면 기본값 유지
+    1. configure — user_option_m2(s2_*) 값이 실제로 반영되는가, NULL 이면 기본값 유지
     2. 진입 4조건 판정 + confirm_bars 연속 확인
     3. buy_streak 가 상태를 안 들고 매번 같은 답을 내는가(재시작 안전성)
     4. 청산 — 손절/익절/트레일링/모멘텀이탈 우선순위
-    5. **sim_m3_single 시뮬레이터와 동일 판정** — 전략을 바꿔 끼워도 결과가 같아야
+    5. **sim_m2_single 시뮬레이터와 동일 판정** — 전략을 바꿔 끼워도 결과가 같아야
        백테스트 수치를 실매매 근거로 쓸 수 있다
 
 실행
-    poetry run python -m app.test.test_kospi3_unit
+    poetry run python -m app.test.test_kospi2_unit
 """
 from stock_shared.dto.userOptionMeta import UserOptionMeta
-from stock_shared.strategy import Action, KospiStrategy3, STRATEGY_BY_MODE
+from stock_shared.strategy import Action, KospiStrategy2, STRATEGY_BY_MODE
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 
 PASS, FAIL = [], []
@@ -68,30 +68,30 @@ def ui(**kw):
 # ══════════════════════════════════════════════════════════════
 def test_registry():
     print('\n[0] 등록 확인')
-    check('STRATEGY_BY_MODE["M3"] == KospiStrategy3',
-          STRATEGY_BY_MODE.get('M3') is KospiStrategy3)
+    check('STRATEGY_BY_MODE["M2"] == KospiStrategy2',
+          STRATEGY_BY_MODE.get('M2') is KospiStrategy2)
     check('Action.SELL_TREND 존재', hasattr(Action, 'SELL_TREND'),
           f'value={getattr(Action, "SELL_TREND", None)}')
-    s = KospiStrategy3()
+    s = KospiStrategy2()
     check('기본 confirm_bars=3', s.confirm_bars == 3)
     check('기본 손절 -2% (일봉용 -5% 아님)', s.stop_loss_pct == 0.02,
           str(s.stop_loss_pct))
 
 
 def test_configure():
-    print('\n[1] configure — s3_* 주입')
-    s = KospiStrategy3()
+    print('\n[1] configure — s2_* 주입')
+    s = KospiStrategy2()
     s.configure(ui())                       # 전부 None
     check('전 항목 NULL → 기본값 유지',
           s.confirm_bars == 3 and s.rsi_overbought == 70
           and s.stop_loss_pct == 0.02 and s.exit_on_reverse is True)
 
-    s2 = KospiStrategy3()
-    s2.configure(ui(s3_confirm_bars=2, s3_rsi_overbought=65,
-                    s3_stop_loss_pct='0.0150', s3_exit_on_reverse=0,
-                    s3_enable_ma20_up='N', s3_use_trailing=1,
-                    s3_trail_drawdown_pct=0.01, s3_trail_activate_pct=0,
-                    s3_long_code='069500'))
+    s2 = KospiStrategy2()
+    s2.configure(ui(s2_confirm_bars=2, s2_rsi_overbought=65,
+                    s2_stop_loss_pct='0.0150', s2_exit_on_reverse=0,
+                    s2_enable_ma20_up='N', s2_use_trailing=1,
+                    s2_trail_drawdown_pct=0.01, s2_trail_activate_pct=0,
+                    s2_long_code='069500'))
     check('confirm_bars 2', s2.confirm_bars == 2, str(s2.confirm_bars))
     check('rsi_overbought 65', s2.rsi_overbought == 65)
     check('stop_loss 문자열 Decimal 파싱', abs(s2.stop_loss_pct - 0.015) < 1e-9,
@@ -103,14 +103,14 @@ def test_configure():
           s2.trail_activate_pct == 0.0, str(s2.trail_activate_pct))
     check('long_code 덮어쓰기', s2.long_code == '069500')
 
-    s3 = KospiStrategy3()
-    s3.configure(ui(s3_confirm_bars=0))
+    s3 = KospiStrategy2()
+    s3.configure(ui(s2_confirm_bars=0))
     check('confirm_bars 0 → 1 로 보정', s3.confirm_bars == 1)
 
 
 def test_entry():
     print('\n[2] 진입 — 4조건 + confirm_bars')
-    s = KospiStrategy3()
+    s = KospiStrategy2()
     s.configure(ui())                        # confirm 3
 
     # 봉1,2,3 연속 충족
@@ -140,14 +140,14 @@ def test_entry():
           and 'note' in r4['indicator'], r4['indicator'].get('note', ''))
 
     # confirm=1 이면 1봉으로 진입
-    s1 = KospiStrategy3()
-    s1.configure(ui(s3_confirm_bars=1))
+    s1 = KospiStrategy2()
+    s1.configure(ui(s2_confirm_bars=1))
     r5 = s1.get_result_with_action(seq([(0, 0, 100, 50), (1, 10, 101, 50)]), ui())
     check('confirm=1 → 1봉으로 BUY', r5['action_type'] == 'BUY')
 
     # 조건 off 스위치
-    s6 = KospiStrategy3()
-    s6.configure(ui(s3_confirm_bars=1, s3_enable_obv_up=0))
+    s6 = KospiStrategy2()
+    s6.configure(ui(s2_confirm_bars=1, s2_enable_obv_up=0))
     r6 = s6.get_result_with_action(
         seq([(0, 50, 100, 50), (1, 10, 101, 50)]), ui())   # obv 하락
     check('enable_obv_up=0 → OBV 무시하고 BUY', r6['action_type'] == 'BUY')
@@ -155,13 +155,13 @@ def test_entry():
 
 def test_streak_stateless():
     print('\n[3] buy_streak — 무상태(재시작 안전)')
-    s = KospiStrategy3()
+    s = KospiStrategy2()
     s.configure(ui())
     rows = seq([(0, 0, 100, 50), (1, 10, 101, 50),
                 (2, 20, 102, 50), (3, 30, 103, 50)])
     a = s.buy_streak(rows)
     b = s.buy_streak(rows)
-    fresh = KospiStrategy3()
+    fresh = KospiStrategy2()
     fresh.configure(ui())
     c = fresh.buy_streak(rows)
     check('같은 입력 → 같은 결과 (반복 호출)', a == b == 3, f'{a}/{b}')
@@ -174,7 +174,7 @@ def test_streak_stateless():
 
 def test_exit():
     print('\n[4] 청산 — 우선순위')
-    s = KospiStrategy3()
+    s = KospiStrategy2()
     s.configure(ui())                        # 손절 -2%, 이탈 ON
 
     prev = UserCoinInfo.from_dict(bar('t0', macd=3, obv=30, ema20=103, rsi=60))
@@ -205,40 +205,40 @@ def test_exit():
     check('손절+이탈 동시 → 손절 우선', r4['action_type'] == 'SELL_STOP_LOSS')
 
     # 익절
-    s5 = KospiStrategy3()
-    s5.configure(ui(s3_take_profit_pct=0.05))
+    s5 = KospiStrategy2()
+    s5.configure(ui(s2_take_profit_pct=0.05))
     cur5 = UserCoinInfo.from_dict(bar('t1', c=106, macd=4, obv=40, ema20=104, rsi=65))
     r5 = s5.get_action_in_active(prev, cur5, ui(entry_price=100.0, peak_high=106.0))
     check('종가 106 → SELL_PROFIT', r5['action_type'] == 'SELL_PROFIT')
 
     # 트레일링
-    s6 = KospiStrategy3()
-    s6.configure(ui(s3_use_trailing=1, s3_trail_drawdown_pct=0.02,
-                    s3_trail_activate_pct=0.03, s3_stop_loss_pct=0.20))
+    s6 = KospiStrategy2()
+    s6.configure(ui(s2_use_trailing=1, s2_trail_drawdown_pct=0.02,
+                    s2_trail_activate_pct=0.03, s2_stop_loss_pct=0.20))
     cur6 = UserCoinInfo.from_dict(bar('t1', c=107, macd=4, obv=40, ema20=104, rsi=65))
     r6 = s6.get_action_in_active(prev, cur6, ui(entry_price=100.0, peak_high=110.0))
     check('고점110 대비 -2% 라인(107.8) 하회 → SELL_TRAIL',
           r6['action_type'] == 'SELL_TRAIL', str(r6['sell_ctx']['trail_line']))
 
     # 트레일링 미활성 (고점수익 < activate)
-    s7 = KospiStrategy3()
-    s7.configure(ui(s3_use_trailing=1, s3_trail_drawdown_pct=0.02,
-                    s3_trail_activate_pct=0.15, s3_stop_loss_pct=0.20))
+    s7 = KospiStrategy2()
+    s7.configure(ui(s2_use_trailing=1, s2_trail_drawdown_pct=0.02,
+                    s2_trail_activate_pct=0.15, s2_stop_loss_pct=0.20))
     r7 = s7.get_action_in_active(prev, cur6, ui(entry_price=100.0, peak_high=110.0))
     check('고점수익 10% < 활성15% → 트레일링 미발동',
           r7['action_type'] != 'SELL_TRAIL',
           f"trail_on={r7['indicator']['trail_on']}")
 
     # 이탈 OFF
-    s8 = KospiStrategy3()
-    s8.configure(ui(s3_exit_on_reverse=0))
+    s8 = KospiStrategy2()
+    s8.configure(ui(s2_exit_on_reverse=0))
     r8 = s8.get_action_in_active(prev, cur2, ui(entry_price=100.0, peak_high=100.0))
     check('exit_on_reverse=0 → HOLD', r8['action_type'] == 'HOLD')
 
 
 def test_matches_simulator():
-    print('\n[5] 시뮬레이터(sim_m3_single)와 동일 판정')
-    # sim_m3_single.SingleSim 의 조건식을 그대로 재현해 비교한다.
+    print('\n[5] 시뮬레이터(sim_m2_single)와 동일 판정')
+    # sim_m2_single.SingleSim 의 조건식을 그대로 재현해 비교한다.
     # 두 곳이 갈리면 백테스트 수치를 실매매 근거로 쓸 수 없다.
     def _f(v, d=0.0):
         try:
@@ -254,7 +254,7 @@ def test_matches_simulator():
         return (_f(c['macd']) < _f(p['macd']) and _f(c['obv']) < _f(p['obv'])
                 and _f(c['rsi']) < _f(p['rsi']))
 
-    s = KospiStrategy3()
+    s = KospiStrategy2()
     s.configure(ui())
 
     import random
@@ -297,7 +297,7 @@ def test_matches_simulator():
 
 def main():
     print('=' * 70)
-    print('KospiStrategy3 단위 검증')
+    print('KospiStrategy2 단위 검증')
     print('=' * 70)
     test_registry()
     test_configure()

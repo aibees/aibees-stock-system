@@ -1,5 +1,5 @@
 """
-M3 사전검증: python-kis(pykis 2.1.6)로 30분봉 250개 이상 확보 가능한가?
+M2 사전검증: python-kis(pykis 2.1.6)로 30분봉 250개 이상 확보 가능한가?
 
 대상: KODEX 코스피100(237350), KODEX 인버스(114800)
 
@@ -9,7 +9,7 @@ M3 사전검증: python-kis(pykis 2.1.6)로 30분봉 250개 이상 확보 가능
   C. 1분봉 → 30분봉 resample 로 250개 누적 가능 여부
 
 실행:
-  poetry run python -m app.test.probe_m3_30m_chart
+  poetry run python -m app.test.probe_m2_30m_chart
 """
 from __future__ import annotations
 

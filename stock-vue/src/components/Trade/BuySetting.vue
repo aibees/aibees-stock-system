@@ -32,8 +32,8 @@
                 </button>
             </nav>
 
-            <!-- ══════════ M0 : 현행 설정 ══════════ -->
-            <template v-if="activeMode === 'M0'">
+            <!-- ══════════ M1 : 현행 설정 ══════════ -->
+            <template v-if="activeMode === 'M1'">
 
             <!-- ── 범위 안내 ── -->
             <section class="scope-bar">
@@ -282,7 +282,7 @@
             </form>
             </template>
 
-            <!-- ══════════ M1 ~ M3 : 준비중 ══════════ -->
+            <!-- ══════════ M2 : 준비중 ══════════ -->
             <section v-else class="mode-empty">
                 <span class="me-code">{{ activeMode }}</span>
                 <h3>{{ currentModeName }}</h3>
@@ -302,15 +302,13 @@ const title = ref('매수 설정');
 const userSession = assUserSession();
 
 /* ═══════════════════════════════════════════════════════════
- * 운용 모드 탭 (M0 만 현행 설정, M1~M3 은 준비중)
+ * 운용 모드 탭 (M1 만 현행 설정, M2 는 준비중)
  * ═══════════════════════════════════════════════════════════ */
 const MODE_TABS = [
-    { code: 'M0', name: '추천 1순위' },
-    { code: 'M1', name: '단일 종목 고정' },
+    { code: 'M1', name: '추천매수' },
     { code: 'M2', name: 'ETF 교대' },
-    { code: 'M3', name: '지정가 감시' },
 ];
-const activeMode = ref('M0');
+const activeMode = ref('M1');
 const currentModeName = computed(
     () => MODE_TABS.find(m => m.code === activeMode.value)?.name ?? ''
 );

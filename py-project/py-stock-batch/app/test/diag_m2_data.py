@@ -15,14 +15,14 @@ trade_candle_30m 데이터 건전성 진단.
     F. 신호 재현 — KospiStrategy1 을 실제로 돌려 봉별 매수신호 발생 횟수 집계
 
 실행
-    poetry run python -m app.test.diag_m3_data
-    poetry run python -m app.test.diag_m3_data --start 2026-06-01
+    poetry run python -m app.test.diag_m2_data
+    poetry run python -m app.test.diag_m2_data --start 2026-06-01
 """
 import argparse
 from collections import Counter, defaultdict
 
 from stock_shared.db.database import dbConn
-from app.test import sim_m3_alternate as sim
+from app.test import sim_m2_alternate as sim
 from stock_shared.strategy.backtester import KisBacktester
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 

@@ -119,7 +119,7 @@ class KisBacktester:
         hma · chegyul_strength 컬럼이 없다. 라이브 경로는 compute_indicator_df 가
         채우지만, DB 재생 경로(백테스트/시뮬레이션)는 여기서 직접 만들어야 한다.
 
-        run_one 이 호출하며, M3 교대 시뮬레이터처럼 run_one 을 안 쓰는 경로도
+        run_one 이 호출하며, M2 교대 시뮬레이터처럼 run_one 을 안 쓰는 경로도
         같은 전처리를 재사용할 수 있도록 분리해 뒀다.
         rows 는 datetime 오름차순 정렬 전제.
         """

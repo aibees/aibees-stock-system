@@ -33,7 +33,7 @@
 09_manual_sell_multi_ddl.sql):
   trade_worker_manual_sell 에 ARMED 행이 있는 종목은 위 두 판정 경로(on_price 의
   hit_line, refresh_positions 의 strategy.evaluate) 를 **둘 다** 건너뛰고
-  sell_price 도달 여부만 본다 — 활성 운용모드가 M1/M2/M3 무엇이든 동일하다
+  sell_price 도달 여부만 본다 — 활성 운용모드가 M1/M2 무엇이든 동일하다
   (reload_manual_sells 참고). 사용자가 "이 종목은 자동 rule 대신 이 가격에
   팔아달라"고 등록해두면 모드 전략보다 우선한다는 뜻. 등록 자체는 계좌 실보유
   (user_holdings)만 있으면 worker 자기매수 여부와 무관하게 할 수 있다
@@ -111,7 +111,7 @@ class BaseSellExecutor(ABC):
     def reload_manual_sells(self):
         """trade_worker_manual_sell(ARMED) 재적재.
 
-        등록된 종목은 **현재 활성 운용모드가 무엇이든**(M1/M2/M3) 그 모드의
+        등록된 종목은 **현재 활성 운용모드가 무엇이든**(M1/M2) 그 모드의
         자동 매도 rule(hit_line/일봉 신호)을 보지 않고 여기 담긴 sell_price
         도달 여부만으로 매도한다 — on_price/refresh_positions 에서 모드 판정보다
         먼저(선제) 확인한다. apply_settings_change() 폴링 주기(기본 60초)에

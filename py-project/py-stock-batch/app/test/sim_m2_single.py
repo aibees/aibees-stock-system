@@ -1,7 +1,7 @@
 """
-M3 종목별 단독 매매 — 교대 없이 각자 사고팔면 얼마까지 나오나.
+M2 종목별 단독 매매 — 교대 없이 각자 사고팔면 얼마까지 나오나.
 
-sim_m3_simple_trade.py 는 두 종목을 **교대**로 운용한다(둘 중 하나만 보유).
+sim_m2_simple_trade.py 는 두 종목을 **교대**로 운용한다(둘 중 하나만 보유).
 이 파일은 237350 / 114800 을 **완전히 독립적으로** 돌린다.
     · 각 종목이 자기 신호로만 진입/청산한다
     · 포지션이 없으면 현금. 상대 종목은 쳐다보지 않는다
@@ -18,24 +18,24 @@ sim_m3_simple_trade.py 는 두 종목을 **교대**로 운용한다(둘 중 하�
     → 달성률 = ② / ④.  이 값이 낮으면 규칙이 놓치는 구간이 많다는 뜻이고,
       ③ / ④ 가 낮으면 **이 지표 조합 자체의 한계**다(파라미터 문제가 아님).
 
-매매 규칙 (sim_m3_simple_trade 와 동일)
+매매 규칙 (sim_m2_simple_trade 와 동일)
     진입: MACD↑ · OBV↑ · MA20↑ · RSI<70  이 confirm 봉 연속 → 다음 봉 시가
     청산: ① 손절/익절/트레일링 (장중 터치)
           ② MACD↓ · OBV↓ · RSI↓ (REVERSE) → 다음 봉 시가
     청산 후 현금 대기, 새로 confirm 을 채우면 재진입.
 
 실행
-    poetry run python -m app.test.sim_m3_single
-    poetry run python -m app.test.sim_m3_single --sweep          # 파라미터 탐색
-    poetry run python -m app.test.sim_m3_single --code 114800 --trades
-    poetry run python -m app.test.sim_m3_single --start 2026-07-01
+    poetry run python -m app.test.sim_m2_single
+    poetry run python -m app.test.sim_m2_single --sweep          # 파라미터 탐색
+    poetry run python -m app.test.sim_m2_single --code 114800 --trades
+    poetry run python -m app.test.sim_m2_single --start 2026-07-01
 """
 import argparse
 import itertools
 
 from stock_shared.db.database import dbConn
-from app.test import sim_m3_alternate as sim
-from app.test.sim_m3_simple_trade import _f
+from app.test import sim_m2_alternate as sim
+from app.test.sim_m2_simple_trade import _f
 from stock_shared.strategy.backtester import KisBacktester
 
 
@@ -45,7 +45,7 @@ from stock_shared.strategy.backtester import KisBacktester
 class SingleSim:
     """한 종목만 사고파는 시뮬레이터.
 
-    M3AlternateSimulator 를 쓰지 않는 이유: 그건 두 종목 상태를 함께 들고
+    M2AlternateSimulator 를 쓰지 않는 이유: 그건 두 종목 상태를 함께 들고
     도는 구조라 '한 종목만' 을 표현하려면 더미 종목을 끼워 넣어야 한다.
     상태 전이가 단순해서 직접 도는 쪽이 읽기 쉽다.
     """
@@ -385,9 +385,9 @@ def report(code: str, rows: list, args):
 
 
 def print_settings(summary: list):
-    """스윕 최적값을 user_option_m3 설정으로 옮기는 방법을 출력한다.
+    """스윕 최적값을 user_option_m2 설정으로 옮기는 방법을 출력한다.
 
-    ⚠ 종목마다 최적이 다르게 나올 수 있는데 user_option_m3 는 **유저당 1행**이다.
+    ⚠ 종목마다 최적이 다르게 나올 수 있는데 user_option_m2 는 **유저당 1행**이다.
       두 종목에 같은 파라미터가 적용된다는 뜻. 최적이 갈리면 둘 중 하나를 고르거나
       (보통 정방향 기준), 종목별 파라미터로 스키마를 확장해야 한다.
     """
@@ -396,7 +396,7 @@ def print_settings(summary: list):
         return
     print()
     print('=' * 96)
-    print('설정 반영 (user_option_m3)')
+    print('설정 반영 (user_option_m2)')
     print('=' * 96)
     for code, b in rows:
         cb, rsi, sl, rev = b['_params']
@@ -408,14 +408,14 @@ def print_settings(summary: list):
     if len(params) == 2 and len(set(params.values())) > 1:
         print()
         print('  ⚠ 두 종목의 최적 조합이 다르다.')
-        print('    user_option_m3 는 유저당 1행이라 두 종목에 같은 값이 적용된다.')
+        print('    user_option_m2 는 유저당 1행이라 두 종목에 같은 값이 적용된다.')
         print('    → 한쪽 기준으로 정하거나, 종목별 파라미터로 스키마를 확장해야 한다.')
 
     cb, rsi, sl, rev = rows[0][1]['_params']
     print()
     print(f'  {rows[0][0]} 기준 UPDATE 문:')
     print(f"""
-    INSERT INTO user_option_m3 (user_id, confirm_bars, rsi_overbought,
+    INSERT INTO user_option_m2 (user_id, confirm_bars, rsi_overbought,
                                 stop_loss_pct, exit_on_reverse)
     VALUES (1, {cb}, {rsi}, {'NULL' if sl is None else f'{sl:.4f}'}, {int(rev)})
     ON DUPLICATE KEY UPDATE
@@ -423,7 +423,7 @@ def print_settings(summary: list):
         rsi_overbought  = VALUES(rsi_overbought),
         stop_loss_pct   = VALUES(stop_loss_pct),
         exit_on_reverse = VALUES(exit_on_reverse);""")
-    print('\n  ※ NULL 로 두면 KospiStrategy3 클래스 기본값'
+    print('\n  ※ NULL 로 두면 KospiStrategy2 클래스 기본값'
           '(CB3 · RSI<70 · 손절 -2% · 이탈 ON)이 쓰인다.')
 
 
@@ -434,7 +434,7 @@ def om_fmt(v):
 # ══════════════════════════════════════════════════════════════
 def main():
     ap = argparse.ArgumentParser(
-        description='M3 종목별 단독 매매 — 교대 없이 각자 사고팔 때의 수익 한계')
+        description='M2 종목별 단독 매매 — 교대 없이 각자 사고팔 때의 수익 한계')
     ap.add_argument('--code', help='한 종목만 (기본: 둘 다)')
     ap.add_argument('--confirm', type=int, default=3)
     ap.add_argument('--rsi', type=float, default=70)
@@ -485,7 +485,7 @@ def main():
                   f"{(a['buy_hold'] + b['buy_hold']) / 2:+.2%}")
             print(f"  이론 상한 합산 : {(oa['ret'] + ob['ret']) / 2:+.2%}")
             print()
-            print('  ※ 교대매매(sim_m3_simple_trade)와 직접 비교하려면 이 합산값을 본다.')
+            print('  ※ 교대매매(sim_m2_simple_trade)와 직접 비교하려면 이 합산값을 본다.')
             print('    교대는 자본 100%를 한쪽에 몰지만 여기선 50:50 으로 나눈 셈이다.')
     finally:
         session.remove()
