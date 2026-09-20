@@ -451,6 +451,13 @@ class Broker:
             complete=(eq >= w.qty), rejected=rejected, reason=f["reason"],
         )
 
+    def fill_snapshot(self, order_no: Optional[str]):
+        """체결통보 누적 (exec_qty, avg_price, rejected, reason) 공개 조회. 없으면 None.
+        취소 직후 '취소 전까지 실제로 체결된 수량'을 확정할 때 쓴다(sell_executor 재호가)."""
+        if not order_no:
+            return None
+        return self._fill_snapshot(order_no)
+
     def _fill_snapshot(self, order_no: str):
         with self._lock:
             f = self._fills.get(order_no)

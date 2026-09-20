@@ -98,6 +98,63 @@ def _absorb_untracked_holdings(repo, user_id, sell_executor, holdings):
             log.warning("[편입] reload_positions 실패: %s", e)
 
 
+def _sync_tracked_qty(repo, user_id, sell_executor, holdings):
+    """이미 편입된(trade_worker_position HOLDING) 종목의 수량을 계좌 실보유로 보정한다.
+
+    _absorb_untracked_holdings 는 **새 종목 편입만** 하므로, 편입 이후 타채널(HTS/MTS)
+    추가매수·부분매도가 있으면 DB 포지션 수량이 실보유와 어긋난 채로 남았다
+    (부팅 대조 _reconcile_positions 에서만 보정됐음). 그 결과 매도 수기등록 수량이
+    min(DB수량, 실보유) 로 잘려 덜 팔리고 티어가 DONE 처리되는 사고가 났다
+    (2026-08-27 091590: 184주 등록 → 11주만 매도).
+
+    - 보정 대상: 계좌에 있고 DB 에도 HOLDING 인 종목 중 수량이 다른 것.
+    - 계좌에 없는 종목(청산 추정)은 여기서 닫지 않는다 — 잔고 조회가 일시적으로
+      불완전할 수 있어 오판 청산 위험이 있다. 매도 시점 _do_sell 의 실보유 0 체크와
+      부팅 대조가 처리한다.
+    - 매도 주문 진행중(_inflight) 종목은 건너뛴다 — 체결 반영(reduce_position)과
+      경합해 수량을 되돌려 쓰는 것을 피한다. 혹시 경합이 나도 다음 폴링에서 다시 맞춰진다.
+    """
+    if not holdings or sell_executor is None:
+        return
+    try:
+        rows = repo.get_holding_positions(user_id)
+    except Exception as e:  # noqa: BLE001
+        log.warning("[수량보정] worker 포지션 조회 실패 → skip: %s", e)
+        return
+    held = {h.get("symbol"): Decimal(str(h.get("qty") or 0)) for h in holdings if h.get("symbol")}
+    inflight = set(getattr(sell_executor, "_inflight", ()) or ())
+    for p in rows:
+        code = p.get("stock_code")
+        if code not in held or code in inflight:
+            continue
+        real = held[code]
+        db_qty = Decimal(str(p.get("hold_qty") or 0))
+        if real <= 0 or real == db_qty:
+            continue
+        try:
+            repo.update_position_qty(user_id, code, real)
+        except Exception as e:  # noqa: BLE001
+            log.warning("[수량보정] %s DB 갱신 실패: %s", code, e)
+            continue
+        lock = getattr(sell_executor, "_lock", None)
+        positions = getattr(sell_executor, "positions", None)
+        if positions is not None:
+            if lock is not None:
+                with lock:
+                    if code in positions:
+                        positions[code]["hold_qty"] = real
+            elif code in positions:
+                positions[code]["hold_qty"] = real
+        msg = "[수량보정] %s 포지션 %s → %s주 (계좌 실보유 기준)"
+        log.info(msg, code, db_qty, real)
+        wlog = getattr(sell_executor, "wlog", None)
+        if wlog is not None:
+            try:
+                wlog.info(msg, code, db_qty, real)
+            except Exception:  # noqa: BLE001
+                pass
+
+
 def reconcile_wallet(broker, repo, user_id: int,
                      computed: Optional[Decimal] = None,
                      sync: bool = True, tag: str = "",
@@ -110,7 +167,8 @@ def reconcile_wallet(broker, repo, user_id: int,
       3) 둘 다 없으면 DB 현재값
     보유주식평가/총자산: 실제 보유종목 조회로 함께 갱신(조회 실패 시 예수금만).
 
-    sell_executor 를 넘기면 계좌 실보유 중 worker 미추적 종목을 trade_worker_position
+    sell_executor 를 넘기면 이미 편입된 종목의 수량을 실보유로 보정하고
+    (_sync_tracked_qty), 계좌 실보유 중 worker 미추적 종목을 trade_worker_position
     으로 편입한다(_absorb_untracked_holdings 참고 — ⚠ 모드 자동매도 대상이 됨).
     """
     actual = broker.account_cash()
@@ -127,6 +185,7 @@ def reconcile_wallet(broker, repo, user_id: int,
     log.info("[%s] user_wallet ← 예수금 %s · 보유평가 %s · 총자산 %s (실제조회=%s,sync=%s)",
              tag, cash, stock_amount, total, actual, sync)
 
+    _sync_tracked_qty(repo, user_id, sell_executor, holdings)   # 기존 편입 종목 수량 보정
     _absorb_untracked_holdings(repo, user_id, sell_executor, holdings)
 
     return cash

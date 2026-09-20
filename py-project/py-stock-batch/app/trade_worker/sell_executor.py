@@ -500,6 +500,8 @@ class BaseSellExecutor(ABC):
         base_qty = _toDecimal(manual.get("base_qty"))
         if base_qty is not None and base_qty > 0:
             qty = (base_qty * ratio).quantize(Decimal("1"), rounding=ROUND_DOWN)
+            # 이 티어에서 이미 부분체결된 수량(재호가 소진 등)은 빼고 남은 만큼만 판다.
+            qty -= (_toDecimal(manual.get("filled_qty")) or Decimal(0))
             qty = min(qty, base)   # 실제/DB 보유수량 상한 — 초과 매도 방지
         else:
             qty = (base * ratio).quantize(Decimal("1"), rounding=ROUND_DOWN)
@@ -621,50 +623,54 @@ class BaseSellExecutor(ABC):
                 self.wlog.info("[매도] %s %s → 주문 보류(실패로 세지 않음)", symbol, sess.name)
                 return
 
-            # 지정가 세션(NXT 프리/애프터마켓, KRX애프터마켓)은 시장가가 없다.
-            # 손절/익절은 체결 속도가 생명이므로 체결가보다 한 틱 아래로 걸어 즉시 체결을 유도한다.
-            order_px = price
-            if sess.limit_only:
-                order_px = self.broker.align_price(
-                    price * (1 - Decimal(str(self.cfg.sell_limit_slip_pct)) / 100))
-                if order_px <= 0:
-                    self._register_fail(symbol, f"지정가 산출 실패(price={price})")
+            # 주문 → 체결대기. 지정가 세션(NXT 프리/애프터, KRX애프터)은 시장가가 없어서
+            # 미체결(PENDING/PARTIAL)이면 취소 후 할인폭을 키워 재호가한다(_order_with_reprice).
+            outcome = self._order_with_reprice(symbol, pos, qty, price, sess)
+            if outcome is None:
+                return   # 주문 예외/지정가 산출 실패 — 이미 _register_fail 처리됨
+            res, filled_total, fill_px = outcome
+
+            if filled_total <= 0 and res.status == "EXHAUSTED":
+                # 호가 공백 등으로 재호가까지 전부 미체결 — 실패가 아니다(자동 비활성 카운트 X).
+                self._cooldown[symbol] = time.time() + self.cfg.sell_retry_cooldown_sec
+                self.wlog.info("[매도] %s 지정가 전부 미체결·취소 → %ds 후 재시도", symbol,
+                               self.cfg.sell_retry_cooldown_sec)
+                return
+            if filled_total <= 0:
+                if res.status == "REJECTED":
+                    self.broker.unregister_watch(res.order_no)
+                    self._register_fail(symbol, f"status={res.status} reason={res.reason}")
                     return
-                self.wlog.info("[매도] %s %s 지정가=%s (체결가=%s -%s%%)",
-                               symbol, sess.name, order_px, price, self.cfg.sell_limit_slip_pct)
-            try:
-                order = self.broker.order_in_session("SELL", symbol, qty, order_px, sess)
-            except Exception as e:  # noqa: BLE001  (KIS API 오류·수량초과·rate limit 등)
-                self._register_fail(symbol, f"주문 예외: {e}")
+                # 미체결 주문이 거래소에 살아있다(재호가 소진/취소 실패). 예전엔 여기서 추적을
+                # 끊고 실패로 셌다 → 살아있는 주문 때문에 재주문이 '주문가능수량 초과'로 거부되고
+                # 연속 실패로 자동 비활성까지 갔다. 이제는 추적을 유지하고 체결을 기다린다.
+                if self.broker.arm_watch(res):
+                    self._pending_reason[res.order_no] = reason
+                    if manual is not None:
+                        self._pending_manual_id[res.order_no] = manual.get("id")
+                    self._cooldown[symbol] = time.time() + self.cfg.sell_retry_cooldown_sec
+                    self.wlog.info("[매도] %s 미체결 주문 %s주 유지 · 체결 대기(이벤트 추적) · %ds 재주문 보류",
+                                   symbol, res.qty, self.cfg.sell_retry_cooldown_sec)
+                else:
+                    self._register_fail(symbol, f"status={res.status} reason={res.reason}")
                 return
 
-            # 주문 즉시 추적 등록(아직 armed=False → 아래 동기 처리와 이중 계상 안 됨)
-            self.broker.register_watch(order, self._on_late_fill)
-            res = self.broker.wait_fill(order)
-
-            # 체결 실패/미체결/거부 → 쿨다운(폭주 방지), 보유 유지
-            if res.status == "REJECTED" or res.filled_qty <= 0:
-                self.broker.unregister_watch(res.order_no)
-                self._register_fail(symbol, f"status={res.status} reason={res.reason}")
-                return
-
-            fill_px = res.avg_price or price
-            proceeds = fill_px * res.filled_qty
+            proceeds = fill_px * filled_total
             computed_balance = self.repo.get_wallet_balance(self.cfg.user_id) + proceeds
 
             # 부분체결이면 체결분만 차감하고 **보유·감시를 유지**한다.
             # (이전에는 1주만 체결돼도 close_position + unsubscribe 로 전량 청산 처리해서
             #  잔여 보유분이 감시에서 이탈했다. reduce_position 이 잔량을 돌려준다.)
             remain = self.repo.reduce_position(self.cfg.user_id, symbol, fill_px,
-                                               res.filled_qty, reason)
+                                               filled_total, reason)
             final_balance = reconcile_wallet(self.broker, self.repo, self.cfg.user_id,
                                              computed=computed_balance,
                                              sync=self.cfg.sync_wallet_on_trade, tag="매도")
-            self.repo.insert_trade_log(self.cfg.user_id, symbol, "SELL", fill_px, res.filled_qty,
+            self.repo.insert_trade_log(self.cfg.user_id, symbol, "SELL", fill_px, filled_total,
                                        final_balance, note=f"{reason}/{res.status}")
             if self.notifier:
                 self.notifier.trade("SELL", pos.get("stock_name") or "", symbol,
-                                    res.filled_qty, fill_px, final_balance,
+                                    filled_total, fill_px, final_balance,
                                     note=f"{reason} · {res.status}"
                                          + (f" · 잔량 {remain}주" if remain > 0 else ""))
 
@@ -680,13 +686,13 @@ class BaseSellExecutor(ABC):
                     if p is not None:
                         p["hold_qty"] = remain
                 self.wlog.info("[매도] 부분체결 %s qty=%s @~%s 잔량=%s주 → 감시 유지 (%s/%s)",
-                               symbol, res.filled_qty, fill_px, remain, reason, res.status)
+                               symbol, filled_total, fill_px, remain, reason, res.status)
             else:
                 self.positions.pop(symbol, None)
                 self._unsubscribe(symbol)   # 전량 청산 → 실시간 감시 비활성
                 self._sold.add(symbol)
                 self.wlog.info("[매도] 완료 %s qty=%s @~%s 잔고=%s (%s/%s)",
-                               symbol, res.filled_qty, fill_px, final_balance, reason, res.status)
+                               symbol, filled_total, fill_px, final_balance, reason, res.status)
 
             self._fail_count.pop(symbol, None)
             self._cooldown.pop(symbol, None)
@@ -694,10 +700,17 @@ class BaseSellExecutor(ABC):
             # 동기 처리 완료 → 추적 개시. 미체결 잔여 **주문**이 있으면 늦은 체결이 콜백으로 온다.
             # arm_watch 가 False 를 반환하면 이 주문은 이미 동기 창 안에서 전량 체결됐다는
             # 뜻 — 그 즉시 이 티어를 완료 처리한다(종목 전체 remain 과 무관).
-            if self.broker.arm_watch(res):
+            if res.status == "EXHAUSTED":
+                # 재호가 소진으로 일부만 팔림 — 남은 주문 없음. 수기 티어는 DONE 이 아니라
+                # 부분체결 누적 후 ARMED 유지 → 다음 트리거에 (티어수량 - 누적체결) 만 판다.
+                self._record_manual_partial(symbol, manual, filled_total)
+                self._cooldown[symbol] = time.time() + self.cfg.sell_retry_cooldown_sec
+            elif self.broker.arm_watch(res):
                 self._pending_reason[res.order_no] = reason
                 if manual is not None:
                     self._pending_manual_id[res.order_no] = manual.get("id")
+                    # 동기 창 체결분 기록 — late fill 완료 시 delta 가 누적 가산된다.
+                    self._record_manual_partial(symbol, manual, filled_total)
                 # 잔여 주문이 아직 살아있는데 다음 틱에서 또 팔면 '주문가능수량 초과'가 난다.
                 # (계좌 보유수량은 매도 주문을 걸어둬도 줄지 않지만 주문가능수량은 줄어든다)
                 # 쿨다운을 걸어 살아있는 주문이 체결될 시간을 준다.
@@ -705,12 +718,129 @@ class BaseSellExecutor(ABC):
                 self.wlog.info("[매도] %s 미체결 주문 %s주 체결 대기(이벤트 추적) · %ds 재주문 보류",
                                symbol, res.qty - res.filled_qty, self.cfg.sell_retry_cooldown_sec)
             else:
-                self._complete_manual_if_needed(symbol, reason, fill_px, res.filled_qty,
+                self._complete_manual_if_needed(symbol, reason, fill_px, filled_total,
                                                 manual_id=(manual or {}).get("id"))
         except Exception as e:  # noqa: BLE001  (예상 밖 오류도 폭주 없이 쿨다운)
             self._register_fail(symbol, f"예외: {e}")
         finally:
             self._inflight.discard(symbol)
+
+    def _record_manual_partial(self, symbol: str, manual: dict | None, filled_qty: Decimal):
+        """수기 티어 부분체결 누적(ARMED 유지). DB + 메모리 둘 다 반영
+        (메모리는 다음 reload_manual_sells 전까지 쓰이므로 같이 올린다)."""
+        if manual is None or filled_qty <= 0:
+            return
+        try:
+            self.repo.add_manual_sell_filled(self.cfg.user_id, manual.get("id"), filled_qty)
+        except Exception as e:  # noqa: BLE001
+            self.wlog.warn("[매도] %s(id=%s) 부분체결 기록 실패: %s", symbol, manual.get("id"), e)
+            return
+        with self._lock:
+            for t in self._manual_sells.get(symbol, []):
+                if t.get("id") == manual.get("id"):
+                    t["filled_qty"] = (_toDecimal(t.get("filled_qty")) or Decimal(0)) + filled_qty
+        self.wlog.info("[매도] %s 수기 티어(id=%s) 부분체결 %s주 누적 → ARMED 유지",
+                       symbol, manual.get("id"), filled_qty)
+
+    # ── 지정가 세션 재호가 ───────────────────────────────────────────
+    def _order_with_reprice(self, symbol: str, pos: dict, qty: Decimal, price: Decimal, sess):
+        """주문 → 체결대기. 지정가 세션에서 타임아웃(PENDING/PARTIAL)이면
+        취소 → 취소 전 체결분 확정 → 남은 수량을 더 낮은 지정가로 재주문한다.
+
+        할인폭 = SELL_LIMIT_SLIP_PCT + 재호가회차 × SELL_LIMIT_REPRICE_STEP_PCT
+        (기본 -1% → -2% → -3%). 기준가는 트리거 체결가와 재조회 현재가 중 낮은 값.
+        재호가 횟수를 다 쓴 마지막 주문도 취소하고 status='EXHAUSTED' 로 반환한다
+        (거래소에 살아있는 주문을 남기지 않음 → 쿨다운 후 다음 트리거에서 다시 시도).
+        취소가 실패하면(이미 체결됐거나 API 오류) 재주문하지 않는다 — 초과매도 방지.
+
+        반환: (마지막 주문 res, 누적 체결수량, 누적 평균체결가) / 주문 실패 시 None.
+        정규장(시장가)은 재호가 없이 1회 주문 결과를 그대로 반환한다.
+        """
+        steps = max(0, int(getattr(self.cfg, "sell_limit_reprice_steps", 0) or 0)) if sess.limit_only else 0
+        step_pct = Decimal(str(getattr(self.cfg, "sell_limit_reprice_step_pct", 1.0)))
+        base_slip = Decimal(str(self.cfg.sell_limit_slip_pct))
+        remaining = qty
+        ref_px = price
+        filled_total = Decimal(0)
+        amount_total = Decimal(0)
+        attempt = 0
+        last_res = None      # 아직 살아있는(취소 안 된) 마지막 주문
+        cancelled_res = None # 직전에 취소 확정된 주문(체결분은 이미 filled_total 에 합산됨)
+        while True:
+            order_px = ref_px
+            if sess.limit_only:
+                slip = base_slip + step_pct * attempt
+                order_px = self.broker.align_price(ref_px * (1 - slip / 100))
+                if order_px <= 0:
+                    if filled_total > 0:
+                        break
+                    self._register_fail(symbol, f"지정가 산출 실패(price={ref_px})")
+                    return None
+                self.wlog.info("[매도] %s %s 지정가=%s (기준가=%s -%s%%%s) qty=%s",
+                               symbol, sess.name, order_px, ref_px, slip,
+                               f" · 재호가 {attempt}회차" if attempt else "", remaining)
+            try:
+                order = self.broker.order_in_session("SELL", symbol, remaining, order_px, sess)
+            except Exception as e:  # noqa: BLE001  (KIS API 오류·수량초과·rate limit 등)
+                if filled_total > 0:
+                    self.wlog.warn("[매도] %s 재호가 주문 예외(앞선 체결 %s주는 반영): %s",
+                                   symbol, filled_total, e)
+                    break
+                self._register_fail(symbol, f"주문 예외: {e}")
+                return None
+            # 주문 즉시 추적 등록(아직 armed=False → 아래 동기 처리와 이중 계상 안 됨)
+            self.broker.register_watch(order, self._on_late_fill)
+            res = self.broker.wait_fill(order)
+            last_res = res
+
+            done = res.status in ("FILLED", "REJECTED") or res.filled_qty >= res.qty
+            if done or not sess.limit_only or steps <= 0:
+                break
+            exhausted = attempt >= steps
+
+            # 타임아웃 → 취소 시도. 실패하면 주문을 살려둔 채 추적으로 넘긴다.
+            # 재호가 횟수를 다 쓴 마지막 주문도 취소한다 — 체결 안 된 주문을 거래소에 남겨두면
+            # 세션 종료까지 주문가능수량을 묶고, 다음 트리거의 재주문이 '수량초과'로 거부된다.
+            if not self.broker.cancel(res):
+                self.wlog.warn("[매도] %s 미체결 주문 취소 실패 → 재호가 중단, 기존 주문 유지(추적)", symbol)
+                break
+            time.sleep(1.0)   # 취소 확정 전 도착하는 체결통보 반영 여유
+            snap = self.broker.fill_snapshot(res.order_no)
+            if snap:
+                eq, avg, _rej, _reason = snap
+                if eq > res.filled_qty:
+                    res.filled_qty, res.avg_price = eq, (avg or res.avg_price)
+            self.broker.unregister_watch(res.order_no)   # 취소 완료된 주문 — 추적 종료
+            last_res, cancelled_res = None, res
+            if res.filled_qty > 0:
+                filled_total += res.filled_qty
+                amount_total += (res.avg_price or order_px) * res.filled_qty
+            remaining = qty - filled_total
+            if remaining <= 0:
+                res.status = "FILLED"
+                return res, filled_total, (amount_total / filled_total)
+            if exhausted:
+                res.status = "EXHAUSTED"   # 재호가 소진·전부 취소됨(살아있는 주문 없음)
+                self.wlog.warn("[매도] %s 재호가 %d회 소진 → 미체결분 취소 (누적체결 %s주, 미매도 %s주) · 다음 트리거에 재시도",
+                               symbol, steps, filled_total, remaining)
+                break
+            attempt += 1
+            try:
+                cur = self.broker.current_price(symbol, nxt=(pos.get("nxt_flag") == "Y"))
+                if cur and Decimal(str(cur)) > 0:
+                    ref_px = min(ref_px, Decimal(str(cur)))
+            except Exception:  # noqa: BLE001
+                pass
+            self.wlog.info("[매도] %s 지정가 미체결(%s) → 취소 후 재호가 %d/%d (누적체결 %s주, 잔여 %s주)",
+                           symbol, res.status, attempt, steps, filled_total, remaining)
+
+        # 마지막 주문(취소 안 됨)의 체결분 합산. 재호가 도중 주문 예외 등으로 빠져나온
+        # 경우(last_res=None)는 직전 취소 주문의 체결분이 이미 합산돼 있으므로 더하지 않는다.
+        if last_res is not None and last_res.filled_qty > 0:
+            filled_total += last_res.filled_qty
+            amount_total += (last_res.avg_price or ref_px) * last_res.filled_qty
+        fill_px = (amount_total / filled_total) if filled_total > 0 else price
+        return (last_res or cancelled_res), filled_total, fill_px
 
     # ── 동기 창 밖 체결(잔여 매도주문) 반영 ──────────────────────────
     def _on_late_fill(self, ev):
@@ -754,6 +884,9 @@ class BaseSellExecutor(ABC):
                 self._cooldown.pop(symbol, None)
                 self.wlog.info("[매도] %s 잔량체결로 전량 청산 완료 @%s 잔고=%s",
                                symbol, ev.last_price, balance)
+            if manual_id is not None and not ev.complete:
+                # 아직 주문이 다 안 끝난 중간 체결분 — 티어 누적 체결수량에 반영(ARMED 유지)
+                self._record_manual_partial(symbol, {"id": manual_id}, ev.delta_qty)
             if ev.complete:
                 self._pending_reason.pop(ev.order_no, None)
                 self._pending_manual_id.pop(ev.order_no, None)

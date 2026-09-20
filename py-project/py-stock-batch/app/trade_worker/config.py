@@ -16,6 +16,8 @@ worker 는 유저 1명당 1 프로세스(상시 daemon)로 뜬다. KIS_USER_ID �
 | NXT_BUY_TIME  | 08:00  | NXT 프리마켓 매수 시각 (프리마켓 08:00~08:50) |
 | NXT_LIMIT_SLIP_PCT | 2.0 | 프리마켓 매수 지정가 = 전일종가 × (1+이 비율%) 후 호가단위 내림 |
 | SELL_LIMIT_SLIP_PCT | 1.0 | NXT 장외(프리/애프터) 매도 지정가 = 체결가 × (1-이 비율%). 즉시 체결 유도 |
+| SELL_LIMIT_REPRICE_STEPS | 2 | 장외 지정가 매도가 체결대기 타임아웃(미체결/부분)이면 취소 후 재호가하는 최대 횟수. 0=재호가 안 함(주문 유지·추적) |
+| SELL_LIMIT_REPRICE_STEP_PCT | 1.0 | 재호가 1회마다 할인폭에 더하는 %p (1.0 → -1% → -2% → -3%) |
 | MARKET        | KR     | 시장 코드 |
 | BUY_BUDGET_RATIO | 0.98 | 매수 시 현금의 사용 비율 (수수료/호가 여유) |
 | SYNC_WALLET_ON_BOOT | true | 부팅 시 실제 예수금으로 user_wallet 동기화 |
@@ -65,6 +67,9 @@ class WorkerConfig:
     settings_poll_sec: int
     # 2026-09-14 KRX 애프터마켓(16:00~20:00) 매도 세션 사용 여부. 매수 경로에는 영향 없음.
     krx_aftermarket_enabled: bool
+    # 장외 지정가 매도 미체결 → 취소 후 할인폭을 키워 재호가(2026-09-20). 기본값이 있어 기존 호출부 영향 없음.
+    sell_limit_reprice_steps: int = 2
+    sell_limit_reprice_step_pct: float = 1.0
 
 
 def load() -> WorkerConfig:
@@ -87,6 +92,8 @@ def load() -> WorkerConfig:
         nxt_buy_minute=int(nmm),
         nxt_limit_slip_pct=float(os.getenv("NXT_LIMIT_SLIP_PCT", "2.0")),
         sell_limit_slip_pct=float(os.getenv("SELL_LIMIT_SLIP_PCT", "1.0")),
+        sell_limit_reprice_steps=int(os.getenv("SELL_LIMIT_REPRICE_STEPS", "2")),
+        sell_limit_reprice_step_pct=float(os.getenv("SELL_LIMIT_REPRICE_STEP_PCT", "1.0")),
         market=os.getenv("MARKET", "KR"),
         buy_budget_ratio=float(os.getenv("BUY_BUDGET_RATIO", "0.98")),
         sync_wallet_on_boot=_bool(os.getenv("SYNC_WALLET_ON_BOOT"), True),
