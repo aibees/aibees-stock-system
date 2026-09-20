@@ -107,7 +107,7 @@
                     </section> -->
 
                     <!-- ③ 추천 성과 추적 (최근 1달 이내 추천된 경우) -->
-                    <section class="rec-section" v-if="recommendationData">
+                    <section class="rec-section" v-if="recommendationData?.rec_record && recommendationData?.now_record && recommendationData?.max_record">
                         <div class="section-header">
                             <span class="section-title">추천 성과 추적</span>
                             <span class="rec-date-badge">추천일 {{ recommendationData.rec_record.ymd }}</span>
@@ -230,7 +230,7 @@ const quarterlyResults = ref([
 ]);
 
 // 최근 1달 이내 추천 데이터 (mock, null이면 섹션 미노출)
-const recommendationData = ref({});
+const recommendationData = ref(null);   // {} 는 truthy 라 v-if 를 통과해 .rec_record.ymd 에서 터졌다
 
 onMounted(() => {
     const code = route.query.stock_code;
@@ -356,9 +356,11 @@ const refreshTheme = async () => {
 
 const getRecommandResult = async (code) => {
     try {
+        recommendationData.value = null;   // 종목 전환 시 이전 종목 데이터 잔존 방지
         const { data } = await aibeesApi.get(`/api/v1/stocks/rec-record?stock_code=${code}`);
-        recommendationData.value = data.data;
+        recommendationData.value = data?.data ?? null;
     } catch (e) {
+        recommendationData.value = null;
         console.error(e);
     }
 }

@@ -41,8 +41,10 @@ class StockService:
             date_to = (today - timedelta(days=1)).strftime("%Y-%m-%d")
 
             ohlcv = self.kis.getOHLCV(stock_code, date_from, date_to)
-            if ohlcv is None:
-                raise Exception("DF is NONE")
+            if ohlcv is None or ohlcv.empty:
+                # 거래정지(master_stock.market_stop) 등으로 시세가 없으면 400 대신 '데이터 없음'.
+                # (예전엔 예외 → 400 → 화면이 빈 객체로 렌더돼 TypeError)
+                return None
 
             last_row = ohlcv.iloc[0]
             max_row = ohlcv.loc[ohlcv[Literal.CLOSE].idxmax(), [Literal.YMD, Literal.CLOSE]]
@@ -74,6 +76,8 @@ class StockService:
             date_to = datetime.now().strftime("%Y-%m-%d")
 
             ohlcv:pd.DataFrame = self.kis.getOHLCV(stock_code, date_from, date_to)
+            if ohlcv is None or ohlcv.empty or not rec_close:
+                return None
             max_row = ohlcv.loc[ohlcv['close'].idxmax(), ['ymd', 'close']]
             today_row = ohlcv.iloc[-1]
 
@@ -86,12 +90,12 @@ class StockService:
                 'max_record': {
                     Literal.YMD: max_row[Literal.YMD][:10],
                     Literal.CLOSE: int(max_row[Literal.CLOSE]),
-                    'rate': round((int(max_row[Literal.CLOSE]) - int(rec_close)) / int(max_row[Literal.CLOSE]) * 100, 2)
+                    'rate': round((int(max_row[Literal.CLOSE]) - int(rec_close)) / int(rec_close) * 100, 2)
                 },
                 'now_record': {
                     Literal.YMD: today_row[Literal.YMD][:10],
                     Literal.CLOSE: int(today_row[Literal.CLOSE]),
-                    'rate': round((int(today_row[Literal.CLOSE]) - int(rec_close)) / int(max_row[Literal.CLOSE]) * 100, 2)
+                    'rate': round((int(today_row[Literal.CLOSE]) - int(rec_close)) / int(rec_close) * 100, 2)
                 }
             }
 

@@ -115,5 +115,22 @@ export const setRouterToApp = async () => {
         }
     });
 
+    // ── 배포 후 구버전 chunk 로드 실패 대응 ──
+    //   재배포로 assets 해시가 바뀌면, 이미 열려있던 탭(구 index.js)이 없는 chunk 를 요청하고
+    //   서버는 SPA fallback 으로 index.html(text/html) 을 돌려줘 dynamic import 가 실패한다.
+    //   이동하려던 경로로 1회 전체 새로고침해 새 index.html/asset 을 받게 한다
+    //   (sessionStorage 플래그로 무한 새로고침 방지 — 새로고침 후에도 실패하면 진짜 오류).
+    const CHUNK_RELOAD_KEY = 'chunk-reload-at';
+    const isChunkLoadError = (err) => /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i
+        .test(String(err?.message || err));
+    router.onError((err, to) => {
+        if (!isChunkLoadError(err)) return;
+        let last = 0;
+        try { last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0); } catch (_) { /* ignore */ }
+        if (Date.now() - last < 10_000) return;   // 직전에 이미 새로고침함 → 루프 방지
+        try { sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now())); } catch (_) { /* ignore */ }
+        window.location.assign(to?.fullPath || window.location.href);
+    });
+
     return router;
 }
