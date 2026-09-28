@@ -6,6 +6,7 @@ from stock_shared.dao.devicePushTokenDao import DevicePushTokenDao
 from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
 from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
+from stock_shared.dao.tradeShapeTrainDailyDao import TradeShapeTrainDailyDao
 from stock_shared.dao.userMasterDao import UserMasterDao
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "MasterStockDao",
     "TradeBuyTargetStockDao",
     "TradeCandleDataDao",
+    "TradeShapeTrainDailyDao",
     "UserMasterDao",
 ]

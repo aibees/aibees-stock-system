@@ -16,6 +16,7 @@ from app.ext_services.kis.keyLoader import list_kis_user_ids
 from app.ext_services.kis.component.KisStockService import KisService
 from stock_shared.strategy.kospi1 import KospiStrategy1
 from stock_shared.dto.userOptionMeta import UserOptionMeta
+from stock_shared.dao.tradeShapeTrainDailyDao import TradeShapeTrainDailyDao
 from stock_shared.ml.shape_features import SHAPE_FEATURE_COLUMNS
 from stock_shared.ml.shape_model import score as shape_score
 
@@ -52,6 +53,9 @@ class StockBuyCheckJob(Job):
         self.job_name = 'StockBuyCheckJob'
         self.stockServiceImpl = StockService()
         self.userServiceImpl = UserService()
+        # shape 재학습 학습셋 적재용(16_shape_train_daily_ddl.sql).
+        # 전종목 피처는 이미 매일 계산되고 버려지던 값이라 추가 API 호출이 없다.
+        self.shapeTrainDaoImpl = TradeShapeTrainDailyDao()
         # KIS 엔진/서비스는 run_batch 에서 유저별(스레드별)로 생성한다.
         # (여기서 미리 만들지 않음 — 병렬 워커가 각자 고유 appkey 엔진을 사용)
 
@@ -143,6 +147,7 @@ class StockBuyCheckJob(Job):
         # ── 스레드는 KIS 조회+지표계산만 수행(무 DB). 결과(비-HOLD)만 리턴 ──
         result_list = []
         composite_pool = []
+        train_rows = []
         with ThreadPoolExecutor(max_workers=n) as ex:
             futures = []
             for (uid, engine), chunk in zip(engines, chunks):
@@ -155,11 +160,24 @@ class StockBuyCheckJob(Job):
                 ))
             for f in futures:
                 try:
-                    chunk_results, chunk_composite = f.result()
+                    chunk_results, chunk_composite, chunk_train = f.result()
                     result_list.extend(chunk_results)
                     composite_pool.extend(chunk_composite)
+                    train_rows.extend(chunk_train)
                 except Exception as e:
                     print(f"[run_batch] 워커 실패: {e}", flush=True)
+
+        # ── shape 재학습 학습셋 적재 (전종목, append-only) ──────────────────
+        #   라벨(net_edge_fwd)은 향후 5봉이 필요하므로 여기서는 비워두고
+        #   ShapeLabelJob 이 나중에 채운다(엠바고 5봉).
+        #   실패해도 매수추천 본류를 막지 않는다 — 학습셋은 부가 산출물이다.
+        try:
+            saved = self.shapeTrainDaoImpl.upsert_daily_bulk(self.session, train_rows)
+            self.session.commit()
+            print(f"학습셋 적재 완료: {saved}행 (trade_shape_train_daily)", flush=True)
+        except Exception as e:
+            self.session.rollback()
+            print(f"[학습셋 적재 실패 — 매수추천은 계속 진행] {e}", flush=True)
 
         # ── 2단계(top10→모멘텀 재정렬) — watch 게이트와 병행 저장 ──────────
         #   watch 게이트를 안 거친 종목이어도 trade_buy_target_stock 행은 OHLCV/지표가
@@ -288,6 +306,32 @@ class StockBuyCheckJob(Job):
         ]
 
     @staticmethod
+    def _build_train_row(stock_code: str, row_raw) -> dict | None:
+        """재학습 학습셋 1행. **fillna(0.0) 이전** raw 행에서 떠야 한다.
+
+        결측을 0 으로 채워 쌓으면 "lookback 부족"이 "관측값 0"으로 학습된다
+        (16_shape_train_daily_ddl.sql 설계 포인트 1 참고). NaN 은 None 으로 넘긴다.
+        """
+        dt = row_raw.get('datetime')
+        if dt is None or pd.isna(dt):
+            return None
+        dt = str(pd.Timestamp(dt).date())
+
+        def _v(col):
+            v = row_raw.get(col)
+            if v is None or pd.isna(v):
+                return None
+            return float(v)
+
+        out = {'coin': stock_code, 'datetime': dt}
+        for c in SHAPE_FEATURE_COLUMNS:
+            out[c] = _v(c)
+        out['shape_ret_1d_today'] = _v('shape_ret_1d_today')
+        for c in ('open', 'high', 'low', 'close', 'volume'):
+            out[c] = _v(c)
+        return out
+
+    @staticmethod
     def _composite_eligible(computed: pd.DataFrame, stock: dict) -> bool:
         """2단계(top10→모멘텀 재정렬) 후보 안정성 필터. watch 게이트와 무관하게 별도 평가한다."""
         if str(stock.get('admin_issue') or 'N').upper() == 'Y':
@@ -339,6 +383,7 @@ class StockBuyCheckJob(Job):
         strategy = self._make_strategy(strategy_param)
         results = []
         composite_pool = []
+        train_rows = []          # 재학습 학습셋(전종목, 게이트 통과 무관)
         idx = 0
 
         while idx < len(chunk):
@@ -372,6 +417,8 @@ class StockBuyCheckJob(Job):
                 computed = kis_service.compute_indicator_df(ohlcv, user_info=stock_option_meta)
                 # 2단계 소진게이트 판정은 fillna(0.0) 전에(0으로 뭉개지면 오탐 발생) 미리 해둔다.
                 last_row_raw = computed.iloc[-1]
+                # ── 재학습 학습셋 스냅샷: 아래 fillna(0.0) 을 타기 **전에** 뜬다 ──
+                train_row = self._build_train_row(stock_code, last_row_raw)
                 is_exh = bool(
                     (last_row_raw.get('shape_bars_since_min', 0) or 0) >= 13
                     and (last_row_raw.get('shape_total_ret_14', 0) or 0) >= 0.25
@@ -401,7 +448,18 @@ class StockBuyCheckJob(Job):
                     pprint.pprint(result)
                     results.append(result)
 
-                if shape_proba is not None and self._composite_eligible(computed, stock):
+                # 2단계 후보 적격 여부 — 학습셋 컬럼에도 그대로 기록한다.
+                #   (trade_shape_scan_stock 에 ema120 이 없어 오프라인에서 재현 못 했던
+                #    "low > sma120" 필터 결과가 여기 보존된다)
+                is_eligible = self._composite_eligible(computed, stock)
+
+                if train_row is not None:
+                    train_row['shape_proba_at_scan'] = shape_proba
+                    train_row['composite_eligible'] = 'Y' if is_eligible else 'N'
+                    train_row['action_type'] = result.get('action_type')
+                    train_rows.append(train_row)
+
+                if shape_proba is not None and is_eligible:
                     # watch 게이트 통과 여부와 무관하게, trade_buy_target_stock 에 들어갈
                     # 행은 항상 OHLCV/지표가 채워져 있어야 한다 — result['todayStock']/
                     # ['indicator'] 는 이미 매 종목 계산돼 있으니(위 get_result_with_action)
@@ -438,8 +496,9 @@ class StockBuyCheckJob(Job):
                 idx += 1
                 continue
 
-        print(f"[{tag}] 청크 완료: watch게이트 후보 {len(results)}건 / 2단계 pool {len(composite_pool)}건", flush=True)
-        return results, composite_pool
+        print(f"[{tag}] 청크 완료: watch게이트 후보 {len(results)}건 / 2단계 pool {len(composite_pool)}건 "
+              f"/ 학습셋 {len(train_rows)}건", flush=True)
+        return results, composite_pool, train_rows
 
 
     # smtpUtils.py 파일에서 emailUtils 객체를 임포트한다고 가정합니다.

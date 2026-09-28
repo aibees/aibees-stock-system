@@ -93,44 +93,56 @@ class BaseBuyExecutor(ABC):
         tag = "NXT프리마켓" if premarket else "정규장"
         self.wlog.info("[매수] 시작 user_id=%s (%s)", uid, tag)
 
-        if premarket and not self.supports_premarket():
-            self.wlog.info("[매수] %s 는 프리마켓 라운드를 쓰지 않음 → skip", type(self).__name__)
-            return
+        # try/finally 로 감싸 아래 어느 지점에서 return 하든(매수 skip/실패/성공 무관)
+        # _finalize_round 가 정확히 한 번 불리게 한다 — 최우선타겟 1회성 소비(mode 1)처럼
+        # "이번 라운드가 끝났다"는 사실 자체에 반응해야 하는 모드별 뒷정리용 훅이다.
+        try:
+            if premarket and not self.supports_premarket():
+                self.wlog.info("[매수] %s 는 프리마켓 라운드를 쓰지 않음 → skip", type(self).__name__)
+                return
 
-        # 1) 매수 가능 여부(모드별 포지션 정책)
-        if not self.allow_buy():
-            return
+            # 1) 매수 가능 여부(모드별 포지션 정책)
+            if not self.allow_buy():
+                return
 
-        # 2) 현금 확인
-        balance = self.repo.get_wallet_balance(uid)
-        if balance <= 0:
-            self.wlog.info("[매수] 잔고 %s → 매수 불가", balance)
-            return
+            # 2) 현금 확인
+            balance = self.repo.get_wallet_balance(uid)
+            if balance <= 0:
+                self.wlog.info("[매수] 잔고 %s → 매수 불가", balance)
+                return
 
-        # 3) 후보 선정 (모드별)
-        candidates = self.pick_candidates(premarket)
-        if not candidates:
-            self.wlog.info("[매수] 후보 없음")
-            return
+            # 3) 후보 선정 (모드별)
+            candidates = self.pick_candidates(premarket)
+            if not candidates:
+                self.wlog.info("[매수] 후보 없음")
+                return
 
-        # 4) 시세 조회 가능한 첫 종목에 매수
-        ratio = self.budget_ratio()
-        budget = Decimal(balance) * ratio
-        for cand in candidates:
-            price = self._resolve_price(cand, premarket)
-            if price is None:
-                continue
-            if price <= 0:
-                continue
+            # 4) 시세 조회 가능한 첫 종목에 매수
+            ratio = self.budget_ratio()
+            budget = Decimal(balance) * ratio
+            for cand in candidates:
+                price = self._resolve_price(cand, premarket)
+                if price is None:
+                    continue
+                if price <= 0:
+                    continue
 
-            qty = self._resolve_qty(cand, price, budget, ratio, premarket)
-            if qty < 1:
-                continue
+                qty = self._resolve_qty(cand, price, budget, ratio, premarket)
+                if qty < 1:
+                    continue
 
-            if self._place_and_settle(cand, price, qty, balance, premarket, tag):
-                return   # 체결 완료 → 이번 라운드 종료
+                if self._place_and_settle(cand, price, qty, balance, premarket, tag):
+                    return   # 체결 완료 → 이번 라운드 종료
 
-        self.wlog.info("[매수] 체결 가능한 후보 없음 (후보=%d)", len(candidates))
+            self.wlog.info("[매수] 체결 가능한 후보 없음 (후보=%d)", len(candidates))
+        finally:
+            self._finalize_round(premarket)
+
+    def _finalize_round(self, premarket: bool):
+        """라운드 종료 후 훅(기본 no-op). run() 이 어느 지점에서 끝나든(성공/스킵/거부
+        무관) 정확히 한 번 불린다. 모드별 1회성 상태 정리(예: BuyExecutor1 의
+        최우선타겟 소비)에 재정의해서 쓴다."""
+        pass
 
     # ── 공통 단계 ────────────────────────────────────────────────────
     def _resolve_price(self, cand: BuyCandidate, premarket: bool) -> Optional[Decimal]:

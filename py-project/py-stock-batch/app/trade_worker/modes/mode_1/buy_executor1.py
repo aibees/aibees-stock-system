@@ -82,6 +82,7 @@ class BuyExecutor1(BaseBuyExecutor):
         # (오타·미지원 필드는 repo 가 조용히 걸러내고 기본값으로 되돌리기 때문).
         order_spec = self._buy_order_spec()
         targets = self.repo.get_buy_targets(ymd, order_spec=order_spec)
+        targets = self._promote_priority(targets)
         self.wlog.info("[매수] 타겟 %d건 (ymd=%s · 정렬=%s)",
                        len(targets), ymd, describe_buy_order(order_spec))
 
@@ -97,6 +98,41 @@ class BuyExecutor1(BaseBuyExecutor):
             targets = [top]
 
         return [self._to_candidate(t, ymd) for t in targets]
+
+    def _promote_priority(self, targets: list[dict]) -> list[dict]:
+        """Home.vue "최우선타겟" select 로 사용자가 지정한 종목이 오늘 매수타겟
+        목록에 있으면 1순위로 승격시킨다(그 외 순서는 그대로 유지).
+
+        여기서는 순서만 바꾸고 상태는 건드리지 않는다 — 프리마켓(08:00)·정규장(09:00)
+        두 라운드가 같은 지정값을 봐야 하기 때문. 실제 소비(1회성 null화)는 정규장
+        라운드가 끝날 때 _finalize_round 에서 한 번만 한다.
+        """
+        priority_code = self.repo.get_priority_target(self.cfg.user_id)
+        if not priority_code:
+            return targets
+
+        idx = next((i for i, t in enumerate(targets) if t["stock_code"] == priority_code), None)
+        if idx is None:
+            self.wlog.info("[매수] 최우선타겟 %s 가 오늘 매수타겟 목록에 없음 → 무시", priority_code)
+            return targets
+
+        promoted = targets[idx]
+        self.wlog.info("[매수] 최우선타겟 %s(%s) 을 1순위로 승격",
+                       promoted.get("stock_name"), priority_code)
+        return [promoted] + targets[:idx] + targets[idx + 1:]
+
+    def _finalize_round(self, premarket: bool):
+        """정규장 라운드가 끝나면(체결 성공/후보 없음/전량 스킵 등 무관) 최우선타겟을
+        1회성으로 소비(null화)한다. 프리마켓 라운드는 'NXT 대상이면 일찍 잡는' 보너스
+        라운드일 뿐 최종 판정이 아니므로 여기서 소비하지 않는다 — 09:00 정규장에서
+        다시 한 번 같은 지정값을 볼 수 있어야 한다."""
+        if premarket:
+            return
+        try:
+            if self.repo.clear_priority_target(self.cfg.user_id):
+                self.wlog.info("[매수] 최우선타겟 1회성 소비 완료 → 초기화")
+        except Exception as e:  # noqa: BLE001
+            self.wlog.warn("[매수] 최우선타겟 초기화 실패: %s", e)
 
     @staticmethod
     def _to_candidate(tgt: dict, ymd: str) -> BuyCandidate:

@@ -74,6 +74,17 @@ class TradeBuyTargetStockDao(BaseDao):
         )
         return [dict(r) for r in session.execute(stmt).mappings().all()]
 
+    def exists_stock_on_ymd(self, session, ymd: str, stock_code: str) -> dict | None:
+        """해당 ymd 매수타겟 목록에 그 종목이 있는지. 있으면 {stock_code, stock_name}, 없으면 None.
+        "최우선타겟" 지정 시 유효성 검증(엉뚱한 종목코드 저장 방지)에 쓴다."""
+        stmt = select(
+            TradeBuyTargetStock.stock_code, TradeBuyTargetStock.stock_name
+        ).where(
+            TradeBuyTargetStock.ymd == ymd, TradeBuyTargetStock.stock_code == stock_code
+        )
+        row = session.execute(stmt).mappings().first()
+        return dict(row) if row else None
+
     def select_recent_codes(self, session, from_ymd: str, to_ymd: str) -> set:
         """[from_ymd, to_ymd](양쪽 포함) 구간에 매수추천에 등장한 종목코드 집합.
 
