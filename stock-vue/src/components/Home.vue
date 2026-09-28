@@ -11,17 +11,21 @@
                 </div>
 
                 <div class="head-actions">
-                    <div class="date-picker-trigger" @click="openDatePicker">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                        <span class="date-value">{{ formattedDisplayDate }}</span>
-                        <input type="date" ref="dateInput" class="hidden-input" v-model="selectedDate"
-                            @change="handleDateChange" />
+                    <div class="date-nav">
+                        <button type="button" class="date-arrow" title="이전 영업일" @click="stepSelectedDate(-1)">‹</button>
+                        <div class="date-picker-trigger" @click="openDatePicker">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                            <span class="date-value">{{ formattedDisplayDate }}</span>
+                            <input type="date" ref="dateInput" class="hidden-input" v-model="selectedDate"
+                                @change="handleDateChange" />
+                        </div>
+                        <button type="button" class="date-arrow" title="다음 영업일" @click="stepSelectedDate(1)">›</button>
                     </div>
                     <button type="button" class="btn-detail" @click="goToBuyTargetDetail">상세보기 ›</button>
                 </div>
@@ -44,16 +48,35 @@
                 </button>
                 </div>
 
+                <!-- ── 최우선타겟 선택: 추천 항목 중 사용자가 직접 하나를 지정 ── -->
+                <div v-if="!isLoading && resultData.length > 0" class="priority-bar">
+                <span class="priority-label">최우선타겟</span>
+                <select class="priority-select" v-model="priorityTarget" @change="onPriorityChange">
+                    <option :value="null">선택 안 함</option>
+                    <!-- 저장된 최우선타겟이 지금 보고 있는 날짜 목록에 없으면(다른 날짜에서
+                         지정한 값) 그래도 선택 상태가 보이도록 임시 옵션을 하나 얹는다. -->
+                    <option v-if="priorityTarget && !sortedData.some(i => i.stock_code === priorityTarget)"
+                        :value="priorityTarget">
+                        {{ priorityTargetName || priorityTarget }} (다른 날짜)
+                    </option>
+                    <option v-for="item in sortedData" :key="item.stock_code" :value="item.stock_code">
+                        {{ item.stock_name }} ({{ item.stock_code }})
+                    </option>
+                </select>
+                </div>
+
                 <div class="buy-target">
-                <div v-if="!isLoading && top3Data.length > 0" class="signal-grid">
-                    <div v-for="(item, index) in top3Data" :key="item.stock_code ?? index" class="signal-card">
+                <div v-if="!isLoading && pagedData.length > 0" class="signal-grid">
+                    <div v-for="(item, index) in pagedData" :key="item.stock_code ?? index" class="signal-card"
+                        :class="{ 'is-priority': item.stock_code === priorityTarget }">
 
                         <!-- 헤더: 순위 + 종목명/코드 + 액션 버튼 + 금일 변동률 -->
                         <div class="card-head">
-                            <div class="rank-num">{{ String(index + 1).padStart(2, '0') }}</div>
+                            <div class="rank-num">{{ String(currentPage * PAGE_SIZE + index + 1).padStart(2, '0') }}</div>
                             <div class="head-main">
                                 <h3 class="name">{{ item.stock_name }}</h3>
                                 <div class="code">{{ item.stock_code }}</div>
+                                <span v-if="item.stock_code === priorityTarget" class="priority-badge">최우선타겟</span>
                             </div>
                             <div class="actions-row">
                                 <button class="action-btn ai-btn" @click="goToStockInfo(item.stock_code, item.stock_name)">AI 분석</button>
@@ -159,6 +182,13 @@
                 <div v-else class="empty-box">
                     <p>분석된 데이터가 없습니다. 날짜를 변경해 보세요.</p>
                 </div>
+
+                <!-- ── 페이지네이션: 3개씩 보여주는 디자인은 유지하되 다음 항목도 탐색 가능 ── -->
+                <div v-if="!isLoading && sortedData.length > PAGE_SIZE" class="pagination-bar">
+                    <button type="button" class="page-btn" :disabled="currentPage === 0" @click="prevPage">‹ 이전</button>
+                    <span class="page-info">{{ currentPage + 1 }} / {{ totalPages }}</span>
+                    <button type="button" class="page-btn" :disabled="currentPage >= totalPages - 1" @click="nextPage">다음 ›</button>
+                </div>
                 </div>
             </section>
         </div>
@@ -262,6 +292,17 @@ const getStockMainData = async () => {
 const handleDateChange = () => getStockMainData();
 const openDatePicker = () => dateInput.value?.showPicker();
 
+/* ── 날짜 ±1 이동 (주말은 건너뛴다: 금요일에서 +1 → 바로 월요일, 월요일에서 -1 → 바로 금요일) ── */
+const stepSelectedDate = (deltaDays) => {
+    const [y, m, d] = selectedDate.value.split('-').map(Number);
+    let next = shiftDate(y, m, d, deltaDays);
+    while (next.weekday === 0 || next.weekday === 6) {
+        next = shiftDate(next.year, next.month, next.day, deltaDays > 0 ? 1 : -1);
+    }
+    selectedDate.value = toYmdString(next.year, next.month, next.day);
+    getStockMainData();
+};
+
 /* ══════════════ 매수타겟 정렬 (TOP 3 미리보기 — home 은 height 축소가 목적이라
  * 정렬만 바꿀 수 있고 순위번호 역순 표기는 안 씀. 전체 목록/역순은 /stock/buy-target 참고) ══
  */
@@ -308,8 +349,66 @@ const sortedData = computed(() => {
     });
 });
 
-// home 화면은 높이를 줄이는 게 목적이라 TOP 3만 보여준다. 전체 목록은 "상세보기" → /stock/buy-target.
-const top3Data = computed(() => sortedData.value.slice(0, 3));
+// home 화면은 높이를 줄이는 게 목적이라 한 번에 3개만 보여준다. 대신 페이지네이션으로
+// 다음 항목을 넘겨볼 수 있다. 전체 목록/역순은 "상세보기" → /stock/buy-target 참고.
+const PAGE_SIZE = 3;
+const currentPage = ref(0);
+const totalPages = computed(() => Math.max(1, Math.ceil(sortedData.value.length / PAGE_SIZE)));
+const pagedData = computed(() =>
+    sortedData.value.slice(currentPage.value * PAGE_SIZE, currentPage.value * PAGE_SIZE + PAGE_SIZE));
+
+const prevPage = () => { if (currentPage.value > 0) currentPage.value -= 1; };
+const nextPage = () => { if (currentPage.value < totalPages.value - 1) currentPage.value += 1; };
+
+// 정렬 기준이 바뀌면 첫 페이지로 리셋한다. 날짜 이동은 리셋하지 않는다 — 최우선타겟은
+// 서버(전역 1건)에 저장되는 값이라 날짜를 넘나들어도 선택 상태가 유지돼야 한다.
+watch([sortKey, sortDir], () => { currentPage.value = 0; });
+
+/* ── 최우선타겟: 사용자가 매수추천 항목 중 하나를 직접 지정 ──
+ * 서버(trade_buy_target_priority, 유저당 1건·날짜 무관 전역값)에 저장된다.
+ * 다음 영업일 09:00 정규장 매수 라운드에서 worker(BuyExecutor1)가 이 값을 읽어
+ * 그 날 매수타겟 1순위로 승격시키고, 라운드가 끝나면(매수 성공·스킵 무관) 1회성으로
+ * 초기화한다 — 그래서 프론트도 "선택 즉시 서버에 반영"만 하고 별도 유효기간은 두지 않는다.
+ */
+const priorityTarget = ref(null);     // 현재 지정된 stock_code (없으면 null)
+const priorityTargetName = ref('');   // 위 종목명 — 다른 날짜에서 지정된 경우 select 표시용
+
+const loadPriorityTarget = async () => {
+    try {
+        const { data } = await aibeesApi.get('/api/v1/stocks/buy-target/priority');
+        priorityTarget.value = data?.data?.stock_code ?? null;
+        priorityTargetName.value = data?.data?.stock_name ?? '';
+    } catch (e) {
+        // 비로그인 등으로 조회가 안 돼도 화면 자체는 정상 동작해야 하므로 조용히 무시.
+        priorityTarget.value = null;
+        priorityTargetName.value = '';
+    }
+};
+onMounted(loadPriorityTarget);
+
+const onPriorityChange = async () => {
+    const code = priorityTarget.value;
+    const restorePage = currentPage.value;
+    try {
+        if (!code) {
+            await aibeesApi.delete('/api/v1/stocks/buy-target/priority');
+            priorityTargetName.value = '';
+            return;
+        }
+        // 서버가 "그 ymd 매수타겟 목록에 실제 존재하는 종목인지"를 검증하므로
+        // 지금 화면에 표시 중인 기준일(selectedDate)을 함께 보낸다.
+        const ymd = selectedDate.value.replaceAll('-', '');
+        const { data } = await aibeesApi.put('/api/v1/stocks/buy-target/priority', { ymd, stock_code: code });
+        priorityTargetName.value = data?.data?.stock_name ?? '';
+        // 선택한 종목이 몇 번째 페이지에 있는지 찾아 바로 보여준다.
+        const idx = sortedData.value.findIndex(i => i.stock_code === code);
+        if (idx >= 0) currentPage.value = Math.floor(idx / PAGE_SIZE);
+    } catch (e) {
+        alert(e?.response?.data?.error?.message || '최우선타겟 저장에 실패했습니다.');
+        priorityTarget.value = null;   // 실패했으니 선택 상태를 되돌린다
+        currentPage.value = restorePage;
+    }
+};
 
 /* ── 카드 상세(근거·조건) 펼치기 ── */
 const expandedCard = ref(null);
@@ -667,6 +766,32 @@ $bronze:  #3d3d3d;
 }
 
 /* ── Date Picker ── */
+.date-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.date-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border: 1px solid $gray-200;
+    background: $white;
+    color: $gray-700;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color .15s, color .15s;
+
+    &:hover { border-color: $blue; color: $blue; }
+}
+
 .date-picker-trigger {
     position: relative;
     display: inline-flex;
@@ -693,6 +818,76 @@ $bronze:  #3d3d3d;
     }
 }
 
+/* ── 최우선타겟 선택 ── */
+.priority-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid $gray-100;
+
+    .priority-label {
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: $gray-400;
+        white-space: nowrap;
+    }
+
+    .priority-select {
+        flex: 1;
+        min-width: 160px;
+        max-width: 320px;
+        padding: 6px 10px;
+        border: 1px solid $gray-200;
+        background: $white;
+        color: $gray-900;
+        font-size: 0.8rem;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+
+        &:hover { border-color: $gray-900; }
+    }
+}
+
+/* ── 페이지네이션 ── */
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 4px;
+
+    .page-btn {
+        padding: 6px 14px;
+        border: 1px solid $gray-200;
+        background: $white;
+        color: $gray-700;
+        font-size: 0.78rem;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+        white-space: nowrap;
+        transition: border-color .15s, color .15s;
+
+        &:hover:not(:disabled) { border-color: $blue; color: $blue; }
+
+        &:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+    }
+
+    .page-info {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: $gray-500;
+        font-variant-numeric: tabular-nums;
+    }
+}
+
 /* ── Grid ── */
 .signal-grid {
 }
@@ -707,6 +902,11 @@ $bronze:  #3d3d3d;
 
     &:hover {
         border-color: $gray-900;
+    }
+
+    // 사용자가 최우선타겟으로 지정한 종목 — 굵은 테두리로 구분
+    &.is-priority {
+        border: 2px solid $gray-900;
     }
 
     /* ── 헤더: 순위 · 종목명/코드 · 액션 버튼 · 금일 변동률 ── */
@@ -746,6 +946,16 @@ $bronze:  #3d3d3d;
                 font-size: 0.72rem;
                 color: $gray-500;
                 text-align: start;
+                white-space: nowrap;
+            }
+
+            .priority-badge {
+                flex-shrink: 0;
+                padding: 2px 7px;
+                background: $gray-900;
+                color: $white;
+                font-size: 0.62rem;
+                font-weight: 700;
                 white-space: nowrap;
             }
         }

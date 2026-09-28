@@ -6,6 +6,7 @@ from stock_shared.models.masterStock import MasterStock
 from stock_shared.models.nStockBatchLog import NStockBatchLog
 from stock_shared.models.tradeBuyTargetStock import TradeBuyTargetStock
 from stock_shared.models.tradeCandleData import TradeCandleData
+from stock_shared.models.tradeShapeTrainDaily import TradeShapeTrainDaily
 from stock_shared.models.userDetail import UserDetail
 from stock_shared.models.userInterestGroups import UserInterestGroups
 from stock_shared.models.userInterestStocks import UserInterestStocks
@@ -23,6 +24,7 @@ __all__ = [
     "NStockBatchLog",
     "TradeBuyTargetStock",
     "TradeCandleData",
+    "TradeShapeTrainDaily",
     "UserDetail",
     "UserInterestGroups",
     "UserInterestStocks",

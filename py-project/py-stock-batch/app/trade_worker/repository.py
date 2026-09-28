@@ -99,6 +99,34 @@ class Repository:
         rows.sort(key=make_buy_order_key(order_spec))
         return rows
 
+    # ── 최우선타겟(trade_buy_target_priority) — Home.vue select 로 사용자가 지정.
+    #   유저당 1행(전역, 날짜 무관). BuyExecutor1 이 정규장 라운드에서 읽고,
+    #   라운드가 끝나면(성공/스킵 무관) clear_priority_target 으로 1회성 소비한다.
+    #   API 서버 쪽(조회/설정/해제)은 stock_shared.dao.tradeBuyTargetPriorityDao 를
+    #   ORM 으로 쓴다 — worker 는 이 파일의 기존 관례(raw SQL)를 그대로 따른다.
+    def get_priority_target(self, user_id: int) -> str | None:
+        """대기 중인 최우선타겟 종목코드. 없으면 None."""
+        sql = text(
+            "SELECT stock_code FROM trade_buy_target_priority "
+            " WHERE user_id = :uid AND stock_code IS NOT NULL"
+        )
+        with get_session() as s:
+            row = s.execute(sql, {"uid": user_id}).mappings().first()
+        return row["stock_code"] if row else None
+
+    def clear_priority_target(self, user_id: int) -> bool:
+        """1회성 소비 처리(stock_code/stock_name → NULL). 대기 중이던 값이
+        있었으면 True(로그용) — 없었으면(애초에 지정 안 됨) False."""
+        sql = text(
+            "UPDATE trade_buy_target_priority "
+            "   SET stock_code = NULL, stock_name = NULL "
+            " WHERE user_id = :uid AND stock_code IS NOT NULL"
+        )
+        with get_session() as s:
+            result = s.execute(sql, {"uid": user_id})
+            s.commit()
+            return result.rowcount > 0
+
     # ── worker 전용 포지션 테이블(trade_worker_position) ─────────────
     #   trade_sell_target_stock 와 무관. worker 가 직접 매수한 HOLDING 만 다룬다.
     def get_holding_positions(self, user_id: int, exclude_exclusive: bool = False) -> list[dict]:
