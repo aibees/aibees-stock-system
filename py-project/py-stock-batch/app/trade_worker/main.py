@@ -77,19 +77,24 @@ def _handle_signal(signum, frame):
 
 def _boot_balance_check(cfg, broker, repo):
     """부팅 시 실제 KIS 계좌를 조회해:
-      1) 예수금(현금)을 DB user_wallet 과 대조/동기화
+      1) 매수가능금액을 DB user_wallet 과 대조/동기화 (예수금은 표시용으로 함께 적재)
       2) 보유 종목(있으면)을 조회해 표시 + 총자산 계산
       3) (선택) 보유 종목을 active 포지션으로 반영
+
+    ⚠ user_balance 는 매수가능금액(nrcvb_buy_amt), deposit 은 예수금(ord_psbl_cash).
+      증거금징수율·미체결 주문 때문에 두 값은 다르다(broker.AccountCash 참고).
     """
-    # ── 1) 예수금(현금) ──────────────────────────────────────────────
-    actual = broker.account_cash()
+    # ── 1) 계좌 현금(매수가능금액 + 예수금) ──────────────────────────
+    acc = broker.account_cash()             # AccountCash | None
+    actual = acc.buyable if acc is not None else None
+    deposit = acc.deposit if acc is not None else None
     db_bal = repo.get_wallet_balance(cfg.user_id)
     if actual is None:
-        log.warning("[부팅] 실제 예수금 조회 실패 → DB user_wallet(%s) 그대로 사용", db_bal)
+        log.warning("[부팅] 실제 계좌 현금 조회 실패 → DB user_wallet(%s) 그대로 사용", db_bal)
     else:
-        log.info("[부팅] 실제 예수금=%s · DB user_wallet=%s", actual, db_bal)
+        log.info("[부팅] 실제 매수가능=%s · 예수금=%s · DB user_wallet=%s", actual, deposit, db_bal)
         if actual != db_bal and not cfg.sync_wallet_on_boot:
-            log.warning("[부팅] 잔고 불일치(실제 %s ≠ DB %s), SYNC_WALLET_ON_BOOT=false → 예수금 미동기화",
+            log.warning("[부팅] 잔고 불일치(실제 %s ≠ DB %s), SYNC_WALLET_ON_BOOT=false → 미동기화",
                         actual, db_bal)
 
     cash = actual if actual is not None else db_bal
@@ -103,34 +108,40 @@ def _boot_balance_check(cfg, broker, repo):
             repo.replace_holdings(cfg.user_id, holdings)  # 종목별 내역 user_holdings 갱신
         except Exception as e:  # noqa: BLE001
             log.warning("[부팅] user_holdings 갱신 실패: %s", e)
+    # 총자산은 '예수금 + 주식평가'. 예수금 조회 실패 시에만 매수가능금액으로 대체한다.
+    asset_cash = deposit if deposit is not None else (cash or Decimal(0))
     if holdings:
         stock_amount = sum((h["eval_amount"] for h in holdings), Decimal(0))
-        total_asset = (cash or Decimal(0)) + stock_amount
+        total_asset = asset_cash + stock_amount
         log.info("[부팅] 보유 종목 %d개 · 평가합계=%s", len(holdings), stock_amount)
         for h in holdings:
             log.info("        · %s(%s) %s주 · 평단=%s 현재=%s 평가=%s 손익=%s",
                      h["name"], h["symbol"], h["qty"], h["avg_price"],
                      h["cur_price"], h["eval_amount"], h["profit"])
-        log.info("[부팅] 총자산 ≈ 예수금 %s + 보유평가 %s = %s", cash, stock_amount, total_asset)
+        log.info("[부팅] 총자산 ≈ 예수금 %s + 보유평가 %s = %s", asset_cash, stock_amount, total_asset)
     elif holdings is not None:
         stock_amount = Decimal(0)
-        total_asset = cash or Decimal(0)
-        log.info("[부팅] 보유 종목 없음 (예수금만: %s)", cash)
+        total_asset = asset_cash
+        log.info("[부팅] 보유 종목 없음 (예수금만: %s)", asset_cash)
 
-    # ── 3) user_wallet 스냅샷 갱신(예수금+보유주식평가+총자산) ─────────
-    #   예수금은 sync_wallet_on_boot 일 때만 실제값으로 덮어씀.
+    # ── 3) user_wallet 스냅샷 갱신(매수가능+예수금+보유주식평가+총자산) ──
+    #   매수가능금액은 sync_wallet_on_boot 일 때만 실제값으로 덮어씀.
+    #   예수금(deposit)은 표시 전용이라 매매 판단에 영향이 없어 항상 최신값을 적는다.
     cash_to_write = actual if (actual is not None and cfg.sync_wallet_on_boot) else None
-    if cash_to_write is not None or stock_amount is not None:
+    if cash_to_write is not None or deposit is not None or stock_amount is not None:
         try:
             repo.set_wallet_snapshot(cfg.user_id, cash=cash_to_write,
-                                     stock_amount=stock_amount, total_asset=total_asset)
-            log.info("[부팅] user_wallet 스냅샷 갱신(예수금=%s 보유평가=%s 총자산=%s)",
-                     cash_to_write if cash_to_write is not None else "(유지)", stock_amount, total_asset)
+                                     stock_amount=stock_amount, total_asset=total_asset,
+                                     deposit=deposit)
+            log.info("[부팅] user_wallet 스냅샷 갱신(매수가능=%s 예수금=%s 보유평가=%s 총자산=%s)",
+                     cash_to_write if cash_to_write is not None else "(유지)",
+                     deposit, stock_amount, total_asset)
         except Exception as e:  # noqa: BLE001
             log.warning("[부팅] user_wallet 스냅샷 갱신 실패: %s", e)
         try:
             repo.insert_worker_log(cfg.user_id, "boot", "INFO",
-                                   f"예수금={cash} 보유평가={stock_amount} 총자산={total_asset}")
+                                   f"매수가능={cash} 예수금={deposit} "
+                                   f"보유평가={stock_amount} 총자산={total_asset}")
         except Exception:  # noqa: BLE001
             pass
 

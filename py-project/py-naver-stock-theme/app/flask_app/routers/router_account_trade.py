@@ -135,8 +135,8 @@ def get_portfolio(user_id):
         for r in rows:
             if r.get("row_type") == "STOCK":
                 d = _row(r)
-                for k in ("row_type", "cash", "total_asset"):
-                    d.pop(k, None)  # 종목 항목엔 노출하지 않음
+                for k in ("row_type", "cash", "buyable", "total_asset"):
+                    d.pop(k, None)  # 종목 항목엔 노출하지 않음(계좌 단위 값)
                 holdings.append(d)
 
         total_row = next((r for r in rows if r.get("row_type") == "TOTAL"), None)

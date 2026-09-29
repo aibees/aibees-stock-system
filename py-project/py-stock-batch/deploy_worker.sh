@@ -55,4 +55,4 @@ $DC -f "$COMPOSE" ps
 docker image prune -f >/dev/null 2>&1 || true
 
 echo -e "\n\033[1;34m배포 완료. 로그 확인: docker logs -f kis-user1\033[0m"
-echo -e "\033[1;34m부팅 로그에 '[부팅] 실제 예수금=... · DB user_wallet=...' 이 뜨면 정상\033[0m"
+echo -e "\033[1;34m부팅 로그에 '[부팅] 실제 매수가능=... · 예수금=... · DB user_wallet=...' 이 뜨면 정상\033[0m"
