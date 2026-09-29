@@ -63,6 +63,20 @@ class MarketSession:
 
 
 @dataclass
+class AccountCash:
+    """계좌 현금 스냅샷 — 매수가능조회(inquire-psbl-order) 응답 한 번에서 함께 나온다.
+
+    두 값은 증거금징수율·미체결 주문 때문에 **서로 다르다**.
+      deposit : ord_psbl_cash(주문가능현금)    — 화면 '예수금'
+      buyable : nrcvb_buy_amt(미수없는매수금액) — 화면 '주문가능금액'. 실제 주문 판단은 이 값.
+    둘 다 종목과 무관한 계좌 단위 값임을 실계좌 대조로 확인했다
+    (app/test/probe_account_cash.py). 그래서 CASH_REF_SYMBOL 프록시 조회가 성립한다.
+    """
+    deposit: Decimal
+    buyable: Decimal
+
+
+@dataclass
 class OrderResult:
     symbol: str
     side: str                       # 'BUY' | 'SELL'
@@ -215,6 +229,17 @@ class Broker:
             ord_dvsn='00' + 실제 지정가(price)를 넘겨 그 가격 기준 수량을 받는다.
         pykis 의 orderable_amount() 는 amount=ord_psbl_cash / qty=max_buy_qty(미수 사용) 로
         매핑돼 있어 직접 REST 를 호출한다."""
+        o = self._inquire_psbl(symbol, price, ord_dvsn)
+        if o is None:
+            return None, None
+        amount = Decimal(str(o.get("nrcvb_buy_amt") or 0))   # 미수없는매수금액
+        qty = int(Decimal(str(o.get("nrcvb_buy_qty") or 0)))  # 미수없는매수수량
+        return qty, amount
+
+    def _inquire_psbl(self, symbol: str, price: Optional[Decimal] = None,
+                      ord_dvsn: str = "01") -> Optional[dict]:
+        """매수가능조회(inquire-psbl-order, TTTC8908R) 원본 output. 실패 시 None.
+        orderable(주문 수량 산정)과 account_cash(계좌 현금) 가 같은 응답을 쓰도록 분리해 둔다."""
         try:
             account = self.kis.primary  # KisAccountNumber (CANO/ACNT_PRDT_CD)
             resp = self.kis.request(
@@ -236,27 +261,33 @@ class Broker:
             if j.get("rt_cd") != "0":
                 log.warning("매수가능조회 실패 %s: rt_cd=%s msg=%s",
                             symbol, j.get("rt_cd"), j.get("msg1"))
-                return None, None
-            o = j.get("output") or {}
-            amount = Decimal(str(o.get("nrcvb_buy_amt") or 0))   # 미수없는매수금액
-            qty = int(Decimal(str(o.get("nrcvb_buy_qty") or 0)))  # 미수없는매수수량
-            return qty, amount
+                return None
+            return j.get("output") or {}
         except Exception as e:  # noqa: BLE001
             log.warning("매수가능조회 실패 %s: %s", symbol, e)
-            return None, None
+            return None
 
-    # ── 실제 매수가능금액 조회 ──────────────────────────────────────
-    # 매수가능조회 레퍼런스 종목. 매수가능금액(nrcvb_buy_amt)은 계좌 단위 값이라
-    # 종목과 무관하지만 API 는 PDNO 가 필수 → 고정 대형주(삼성전자)로 조회한다.
+    # ── 계좌 현금 조회(예수금 + 매수가능금액) ───────────────────────
+    # 매수가능조회 레퍼런스 종목. 예수금(ord_psbl_cash)·매수가능금액(nrcvb_buy_amt)
+    # 모두 계좌 단위 값이라 종목과 무관하지만 API 는 PDNO 가 필수
+    # → 고정 대형주(삼성전자)로 조회한다. (실계좌 대조로 종목 무관 확인)
     CASH_REF_SYMBOL = "005930"
 
-    def account_cash(self) -> Optional[Decimal]:
-        """실제 '매수가능금액'(nrcvb_buy_amt, 미수없는매수금액) 조회. 실패 시 None.
-        예수금총액(dnca_tot_amt)·주문가능현금(ord_psbl_cash)이 아니라
-        증거금율까지 반영된 지금 실제로 주문 가능한 금액이다.
-        (currency 인자는 하위호환용; 국내 KRW 계좌만 지원)"""
-        _, amount = self.orderable(self.CASH_REF_SYMBOL)
-        return amount
+    def account_cash(self) -> Optional[AccountCash]:
+        """계좌 현금 스냅샷(예수금·매수가능금액) 조회. 실패 시 None.
+
+        한 번의 매수가능조회로 두 값을 함께 받는다(추가 호출 없음).
+          deposit = ord_psbl_cash  주문가능현금      → 화면 '예수금'
+          buyable = nrcvb_buy_amt  미수없는매수금액  → 화면 '주문가능금액'
+        증거금징수율·미체결 주문 때문에 둘은 다르다. 매수 판단은 buyable 을 쓴다.
+        (국내 KRW 계좌만 지원)"""
+        o = self._inquire_psbl(self.CASH_REF_SYMBOL)
+        if o is None:
+            return None
+        return AccountCash(
+            deposit=Decimal(str(o.get("ord_psbl_cash") or 0)),
+            buyable=Decimal(str(o.get("nrcvb_buy_amt") or 0)),
+        )
 
     # ── 실제 보유 종목 조회 ──────────────────────────────────────────
     def account_holdings(self) -> Optional[list]:

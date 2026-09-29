@@ -34,6 +34,17 @@
                 <div class="s-card" :class="{ skeleton: loadingAccount }">
                     <template v-if="!loadingAccount">
                         <div class="s-label">예수금</div>
+                        <div class="s-amount sub">{{ fmtWon(account?.deposit) }}<span class="won">원</span></div>
+                    </template>
+                </div>
+                <!-- 주문가능금액(=미수없는매수금액). 예수금과 다른 값이다 —
+                     증거금징수율이 반영되고, 미체결 주문에 묶인 금액이 빠져 있다. -->
+                <div class="s-card" :class="{ skeleton: loadingAccount }">
+                    <template v-if="!loadingAccount">
+                        <div class="s-label">
+                            주문가능금액
+                            <span class="s-help" :title="buyableHelp">?</span>
+                        </div>
                         <div class="s-amount sub">{{ fmtWon(account?.user_balance) }}<span class="won">원</span></div>
                     </template>
                 </div>
@@ -44,6 +55,11 @@
                     </template>
                 </div>
             </section>
+
+            <!-- 예수금 ≠ 주문가능금액 인 이유를 한 줄로. 차이가 없으면 굳이 띄우지 않는다. -->
+            <p v-if="!loadingAccount && cashGap > 0" class="cash-gap-note">
+                예수금보다 주문가능금액이 {{ fmtWon(cashGap) }}원 적습니다 — 증거금징수율과 미체결 주문에 묶인 금액입니다.
+            </p>
 
             <!-- ── 탭 ── -->
             <nav class="tab-nav">
@@ -95,6 +111,7 @@
                                 <td class="tr num" :class="pnlClass(portfolioTotals.profitPct)">{{ fmtPct(portfolioTotals.profitPct) }}</td>
                             </tr>
                             <tr class="total-row sub">
+                                <!-- summary.cash = v_user_portfolio TOTAL 행의 예수금(user_wallet.deposit) -->
                                 <td class="tl" colspan="5">합계(예수금 포함)</td>
                                 <td class="tr num" colspan="3">
                                     {{ fmtWon(summary.stock_amount) }}원
@@ -316,6 +333,22 @@ const portfolioTotals = computed(() => {
     };
 });
 
+/* ── 예수금 vs 주문가능금액 ──
+   같은 계좌의 서로 다른 값이다.
+     deposit      = ord_psbl_cash  주문가능현금
+     user_balance = nrcvb_buy_amt  미수없는매수금액 (실제 주문 판단 기준)
+   차이는 종목별 증거금징수율과 미체결 주문에 묶인 금액에서 온다. */
+const buyableHelp =
+    '증거금징수율이 반영되고 미체결 주문에 묶인 금액이 빠진, 지금 실제로 주문 가능한 금액입니다. '
+    + '예수금과 다를 수 있습니다.';
+
+const cashGap = computed(() => {
+    const d = toNum(account.value?.deposit);
+    const b = toNum(account.value?.user_balance);
+    if (d === null || b === null || Number.isNaN(d) || Number.isNaN(b)) return 0;
+    return d - b;
+});
+
 /* ── 헬퍼 ── */
 const toNum = (v) => (v === null || v === undefined || v === '') ? null : Number(v);
 
@@ -416,11 +449,38 @@ $green: #141414;
 /* Summary cards */
 .summary-cards {
     display: grid;
-    grid-template-columns: 1.3fr 1fr 1fr;
+    grid-template-columns: 1.3fr 1fr 1fr 1fr;
     gap: 12px;
-    margin-bottom: 22px;
+    margin-bottom: 12px;
 
+    @media (max-width: 960px) { grid-template-columns: 1fr 1fr; }
     @media (max-width: 600px) { grid-template-columns: 1fr; }
+}
+
+/* 예수금 ≠ 주문가능금액 각주 */
+.cash-gap-note {
+    font-size: 0.78rem;
+    color: $gray-500;
+    line-height: 1.5;
+    margin: 0 0 22px;
+}
+
+/* 라벨 옆 도움말 배지 (title 속성으로 설명) */
+.s-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-left: 4px;
+    border: 1px solid $gray-300;
+    border-radius: 50%;
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: $gray-500;
+    cursor: help;
+    vertical-align: middle;
+    text-transform: none;
 }
 
 .s-card {

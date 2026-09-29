@@ -9,6 +9,7 @@ trade_worker DB 접근 계층 (메인 DAO 와 독립, raw SQL).
 쓰기:
   - open_position / open_position_if_absent / update_position_state / close_position : trade_worker_position
   - set_wallet_balance / set_wallet_snapshot / replace_holdings : user_wallet / user_holdings
+    (user_balance=매수가능금액, deposit=예수금 — 서로 다른 값이다)
   - insert_trade_log / insert_worker_log             : trade_log / trade_worker_log
 
 매도 수기등록(모드 무관, sql/08_manual_sell_order_ddl.sql + 09_manual_sell_multi_ddl.sql):
@@ -259,13 +260,22 @@ class Repository:
             s.execute(sql, {"bal": str(balance), "now": datetime.now(), "uid": user_id})
             s.commit()
 
-    def set_wallet_snapshot(self, user_id: int, cash=None, stock_amount=None, total_asset=None) -> None:
-        """user_wallet 스냅샷 갱신(예수금/보유주식평가/총자산). None 인 항목은 건드리지 않음."""
+    def set_wallet_snapshot(self, user_id: int, cash=None, stock_amount=None, total_asset=None,
+                            deposit=None) -> None:
+        """user_wallet 스냅샷 갱신. None 인 항목은 건드리지 않음.
+
+        cash    → user_balance : 매수가능금액(nrcvb_buy_amt). 매수 판단/예산 산정 기준.
+        deposit → deposit      : 예수금(ord_psbl_cash). 표시 전용 — 매수 로직에 쓰지 말 것.
+        증거금징수율·미체결 주문 때문에 두 값은 서로 다르다(broker.AccountCash 참고).
+        """
         sets = ["updated_at = :now"]
         params = {"uid": user_id, "now": datetime.now()}
         if cash is not None:
             sets.append("user_balance = :cash")
             params["cash"] = str(cash)
+        if deposit is not None:
+            sets.append("deposit = :deposit")
+            params["deposit"] = str(deposit)
         if stock_amount is not None:
             sets.append("stock_amount = :st")
             params["st"] = str(stock_amount)

@@ -64,8 +64,15 @@ class AccountTradeDao:
     # ① 계좌 요약 — user_wallet 단건
     # ==================================================================
     def get_wallet(self, session, user_id: int):
+        """계좌 요약 단건.
+
+        user_balance 와 deposit 은 서로 다른 값이다(증거금징수율·미체결 주문).
+          user_balance : 매수가능금액(nrcvb_buy_amt) — 화면 '주문가능금액'
+          deposit      : 예수금(ord_psbl_cash)       — 화면 '예수금'
+        컬럼명 user_balance 는 프론트와 물려 있어 유지한다(sql/18_user_wallet_deposit_ddl.sql).
+        """
         stmt = text("""
-            SELECT user_id, user_balance, stock_amount, total_asset, updated_at
+            SELECT user_id, user_balance, deposit, stock_amount, total_asset, updated_at
             FROM   user_wallet
             WHERE  user_id = :uid
         """)

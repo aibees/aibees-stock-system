@@ -36,7 +36,10 @@
                             <span class="d-unit">원</span>
                         </div>
                         <dl class="d-rows">
-                            <div class="d-row"><dt>예수금</dt><dd>{{ fmtWon(account.user_balance) }}원</dd></div>
+                            <!-- deposit=예수금(ord_psbl_cash) / user_balance=주문가능금액(nrcvb_buy_amt).
+                                 증거금징수율·미체결 주문 때문에 서로 다른 값이다. -->
+                            <div class="d-row"><dt>예수금</dt><dd>{{ fmtWon(account.deposit) }}원</dd></div>
+                            <div class="d-row"><dt>주문가능금액</dt><dd>{{ fmtWon(account.user_balance) }}원</dd></div>
                             <div class="d-row"><dt>주식평가액</dt><dd>{{ fmtWon(account.stock_amount) }}원</dd></div>
                         </dl>
                     </div>

@@ -159,31 +159,40 @@ def reconcile_wallet(broker, repo, user_id: int,
                      computed: Optional[Decimal] = None,
                      sync: bool = True, tag: str = "",
                      sell_executor=None) -> Decimal:
-    """실제 계좌 기준으로 user_wallet 스냅샷(예수금·보유주식평가·총자산)을 갱신하고 예수금을 반환.
+    """실제 계좌 기준으로 user_wallet 스냅샷을 갱신하고 **매수가능금액**을 반환.
 
-    예수금:
-      1) 실제 예수금 조회 성공 & sync=True → 실제값(정본)
+    ⚠ 반환값과 user_balance 는 예수금이 아니라 매수가능금액(nrcvb_buy_amt)이다.
+      예수금(ord_psbl_cash)은 deposit 컬럼에 따로 적재한다 — 표시 전용.
+      증거금징수율·미체결 주문 때문에 두 값은 서로 다르다(broker.AccountCash 참고).
+
+    매수가능금액:
+      1) 실제 조회 성공 & sync=True → 실제값(정본)
       2) 아니면 computed 값(수수료/세금 미반영 근사)
       3) 둘 다 없으면 DB 현재값
-    보유주식평가/총자산: 실제 보유종목 조회로 함께 갱신(조회 실패 시 예수금만).
+    보유주식평가/총자산: 실제 보유종목 조회로 함께 갱신(조회 실패 시 현금만).
 
     sell_executor 를 넘기면 이미 편입된 종목의 수량을 실보유로 보정하고
     (_sync_tracked_qty), 계좌 실보유 중 worker 미추적 종목을 trade_worker_position
     으로 편입한다(_absorb_untracked_holdings 참고 — ⚠ 모드 자동매도 대상이 됨).
     """
-    actual = broker.account_cash()
+    actual = broker.account_cash()          # AccountCash | None
+    deposit = actual.deposit if actual is not None else None
     if actual is not None and sync:
-        cash = Decimal(actual)
+        cash = Decimal(actual.buyable)
     elif computed is not None:
         cash = Decimal(computed)
     else:
         return repo.get_wallet_balance(user_id)
 
     stock_amount, holdings = _stock_snapshot(broker, repo, user_id)
-    total = (cash + stock_amount) if stock_amount is not None else None
-    repo.set_wallet_snapshot(user_id, cash=cash, stock_amount=stock_amount, total_asset=total)
-    log.info("[%s] user_wallet ← 예수금 %s · 보유평가 %s · 총자산 %s (실제조회=%s,sync=%s)",
-             tag, cash, stock_amount, total, actual, sync)
+    # 총자산은 '예수금 + 주식평가' 다. 매수가능금액(cash)으로 잡으면 화면에서
+    # 예수금 + 주식평가 ≠ 총자산 이 되어 어긋난다. 예수금 조회 실패 시에만 cash 로 대체.
+    asset_cash = deposit if deposit is not None else cash
+    total = (asset_cash + stock_amount) if stock_amount is not None else None
+    repo.set_wallet_snapshot(user_id, cash=cash, stock_amount=stock_amount, total_asset=total,
+                             deposit=deposit)
+    log.info("[%s] user_wallet ← 매수가능 %s · 예수금 %s · 보유평가 %s · 총자산 %s (실제조회=%s,sync=%s)",
+             tag, cash, deposit, stock_amount, total, actual is not None, sync)
 
     _sync_tracked_qty(repo, user_id, sell_executor, holdings)   # 기존 편입 종목 수량 보정
     _absorb_untracked_holdings(repo, user_id, sell_executor, holdings)
