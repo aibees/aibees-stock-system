@@ -28,6 +28,9 @@ worker 는 유저 1명당 1 프로세스(상시 daemon)로 뜬다. KIS_USER_ID �
 | BUY_FILL_WAIT_RETRIES | 3 | 매수 미체결(PENDING) 시 즉시 취소 전 추가 체결대기 재확인 횟수 |
 | BUY_FILL_WAIT_SEC | 10 | 매수 체결대기 재확인 1회당 대기 시간(초) |
 | WALLET_POLL_SEC | 10 | 계좌 예수금·보유종목 주기 갱신 간격(초). 0 이하면 폴링 비활성 |
+| POSITION_VANISH_MISS | 3 | HOLDING 포지션이 계좌 실보유에서 **연속 이 횟수** 안 보이면 외부청산으로
+    간주하고 SOLD 처리한다(wallet_sync._close_vanished_positions). WALLET_POLL_SEC=30 이면 3회 ≈ 90초.
+    1 로 낮추면 잔고 조회가 한 번만 불완전해도 오판 청산할 수 있으니 2 이상을 권한다. |
 | KRX_AFTERMARKET_ENABLED | true | 2026-09-14 KRX 애프터마켓(16:00~20:00) 매도 세션 사용 여부. KRX 전용 종목도
     이 시간까지 청산 가능해진다(ORD_DVSN=41 KRX애프터마켓지정가). **매수에는 영향 없음** —
     매수는 지금처럼 BUY_TIME/NXT_BUY_TIME cron 에서만 실행되고, 오후에는 매수를 트리거하는
@@ -70,6 +73,9 @@ class WorkerConfig:
     # 장외 지정가 매도 미체결 → 취소 후 할인폭을 키워 재호가(2026-09-20). 기본값이 있어 기존 호출부 영향 없음.
     sell_limit_reprice_steps: int = 2
     sell_limit_reprice_step_pct: float = 1.0
+    # HOLDING 인데 계좌 실보유에 없는 포지션을 외부청산으로 닫기까지 필요한 연속 미발견 횟수
+    # (2026-10-01). 1회 관측으로 닫으면 잔고 조회가 일시적으로 불완전할 때 오판 청산한다.
+    position_vanish_miss: int = 3
 
 
 def load() -> WorkerConfig:
@@ -104,6 +110,7 @@ def load() -> WorkerConfig:
         buy_fill_wait_retries=int(os.getenv("BUY_FILL_WAIT_RETRIES", "5")),
         buy_fill_wait_sec=int(os.getenv("BUY_FILL_WAIT_SEC", "10")),
         wallet_poll_sec=int(os.getenv("WALLET_POLL_SEC", "30")),
+        position_vanish_miss=max(1, int(os.getenv("POSITION_VANISH_MISS", "3"))),
         settings_poll_sec=int(os.getenv("SETTINGS_POLL_SEC", "60")),
         krx_aftermarket_enabled=_bool(os.getenv("KRX_AFTERMARKET_ENABLED"), True),
     )

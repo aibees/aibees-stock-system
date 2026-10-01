@@ -147,7 +147,12 @@ def _boot_balance_check(cfg, broker, repo):
 
 
 def _reconcile_positions(cfg, broker, repo):
-    """부팅 시 **worker 가 직접 매수한 포지션**(trade_worker_position)만 계좌와 대조한다.
+    """**worker 가 직접 매수한 포지션**(trade_worker_position)만 계좌와 대조한다.
+
+    호출 시점 2곳 (2026-10-01 에 개장 루틴 추가):
+      - 부팅 직후(main)
+      - 매 개장 루틴 시작(_open_routine) — 재기동 없이 며칠 돌아도 좀비 포지션이
+        남지 않게. 장중 상시 대조는 wallet_sync._close_vanished_positions 가 맡는다.
 
       - 테이블 HOLDING인데 실제 미보유 → 외부청산으로 종료(SOLD)   ← 안전장치
       - 수량 불일치 → 실제 수량으로 갱신
@@ -160,7 +165,7 @@ def _reconcile_positions(cfg, broker, repo):
     """
     holdings = broker.account_holdings()
     if holdings is None:
-        log.warning("[부팅] 보유종목 조회 실패 → 포지션 대조 skip")
+        log.warning("[대조] 보유종목 조회 실패 → 포지션 대조 skip")
         return
     held = {h["symbol"]: h for h in holdings}
     rows = repo.get_holding_positions(cfg.user_id)
@@ -173,19 +178,27 @@ def _reconcile_positions(cfg, broker, repo):
             continue
         if Decimal(str(p.get("hold_qty") or 0)) != Decimal(str(h["qty"])):
             repo.update_position_qty(cfg.user_id, code, Decimal(str(h["qty"])))
-            log.info("[부팅] %s 수량 보정 → %s", code, h["qty"])
+            log.info("[대조] %s 수량 보정 → %s", code, h["qty"])
 
     # 2) 테이블 HOLDING인데 실제 미보유 → 외부청산 종료
     #    (worker 가 산 종목을 사용자가 HTS 로 먼저 판 경우. 정리하지 않으면
     #     이미 판 종목에 매도 주문을 반복해 연속 실패 → 자동 비활성으로 이어진다)
     for code in holding.keys() - held.keys():
         repo.close_position(cfg.user_id, code, Decimal(0), Decimal(0), "EXTERNAL_CLOSED")
-        log.warning("[부팅] %s 실제 미보유 → 포지션 종료(외부청산)", code)
+        log.warning("[대조] %s 실제 미보유 → 포지션 종료(외부청산)", code)
+        # worker 로그(DB)에도 남긴다 — 운영자가 보는 곳은 trade_worker_log 다.
+        # 여기 안 남기면 "왜 포지션이 사라졌나"를 컨테이너 stdout 에서만 찾아야 한다.
+        try:
+            repo.insert_worker_log(
+                cfg.user_id, "sell", "WARN",
+                f"[대조] {code} 계좌 실보유 없음 → 포지션 종료(EXTERNAL_CLOSED) · 타채널 수기매도 추정")
+        except Exception:  # noqa: BLE001
+            pass
 
     # 3) 흡수하지 않은 계좌 보유(수동매수) 는 감시 대상이 아님을 명시적으로 남긴다
     untracked = held.keys() - holding.keys()
     if untracked:
-        log.info("[부팅] 감시 제외(수동보유) %d종목: %s",
+        log.info("[대조] 감시 제외(수동보유) %d종목: %s",
                  len(untracked), ", ".join(sorted(untracked)))
 
 
@@ -292,6 +305,13 @@ def main():
             #   (2026-08-07 실제 사고: 08:00:00 매수가 기본 정렬로 나가고
             #    08:00:35 에야 설정이 로드돼 유저의 s1_buy_order 가 반영되지 않았다)
             sell.apply_settings_change()
+            # 개장 직후는 잔고 조회가 가장 신선한 시점이다 — 여기서 계좌와 한 번 대조해
+            # 계좌에 없는 좀비 HOLDING 을 닫는다. 예전엔 이 대조가 **부팅 때만** 돌아서,
+            # 재기동 없이 하루가 넘어가면 사용자가 HTS 로 수기매도한 종목이 HOLDING 으로
+            # 남아 allow_buy() 의 1포지션 카운트를 먹고 신규매수를 막았다
+            # (2026-09-29 user_id=3 032580 / 2026-10-01 user_id=1 018000).
+            # reload_positions 보다 **먼저** 불러야 닫힌 행이 감시 대상으로 안 들어온다.
+            _reconcile_positions(cfg, broker, repo)
             sell.reload_positions()      # HOLDING 포지션 재적재(감시 대상 갱신)
             sell.refresh_positions()     # 모드 전략으로 라인/액션 재계산 + SELL이면 즉시 매도
             buy.run()                    # 매수

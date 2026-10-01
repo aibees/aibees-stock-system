@@ -70,13 +70,58 @@ class BaseBuyExecutor(ABC):
         exclusive_flag='Y' 는 카운트에서 제외한다. "보유 중이어도 신규 매수를
         막지 않는다"는 뜻일 뿐, 매도 감시에서 빼겠다는 뜻이 아니다.
         동시 보유가 필요한 모드는 True 고정으로 재정의한다.
+
+        계좌 교차검증 (2026-10-01): 예전엔 trade_worker_position 만 보고 막았다.
+        사용자가 HTS/MTS 로 수기 전량매도하면 계좌엔 없는데 DB 는 HOLDING 으로 남아
+        (닫아주는 경로가 매도 트리거/재기동에만 있었다) 신규매수가 며칠씩 조용히
+        멈췄다 — user_id=3 032580 은 4라운드 연속, user_id=1 018000 도 동일.
+        그래서 막기 직전에 계좌 실보유와 한 번 대조하고, 계좌에 없는 좀비 포지션은
+        여기서 외부청산으로 닫은 뒤 카운트에서 뺀다.
+          · 잔고 조회 실패(None)면 아무것도 닫지 않고 **기존처럼 보수적으로 막는다** —
+            조회가 안 되는 상태에서 닫으면 실제 보유분을 무방비로 두고 2중 매수까지 난다.
+          · 조회가 성공했으면 부팅 대조(main._reconcile_positions)와 같은 기준으로
+            1회 관측만으로 닫는다(개장/프리마켓 직전의 신선한 조회라 신뢰도가 높다).
+            장중 폴링은 더 보수적으로 연속 N회를 요구한다(wallet_sync 참고).
         """
         blocking = self.repo.get_holding_positions(self.cfg.user_id, exclude_exclusive=True)
+        if not blocking:
+            return True
+
+        blocking = self._drop_vanished(blocking)
         if blocking:
             self.wlog.info("[매수] 보유 종목 존재 → 매수 skip (1포지션): %s",
                            ", ".join(p["stock_code"] for p in blocking))
             return False
         return True
+
+    def _drop_vanished(self, blocking: list[dict]) -> list[dict]:
+        """blocking 중 계좌 실보유에 없는 포지션을 외부청산 종료하고 목록에서 제거."""
+        try:
+            holdings = self.broker.account_holdings()
+        except Exception as e:  # noqa: BLE001
+            self.wlog.warn("[매수] 계좌 보유 조회 실패 → 1포지션 판정은 DB 기준 유지: %s", e)
+            return blocking
+        if holdings is None:
+            self.wlog.warn("[매수] 계좌 보유 조회 실패(None) → 1포지션 판정은 DB 기준 유지")
+            return blocking
+
+        held = {h.get("symbol") for h in holdings if h.get("symbol")}
+        alive = []
+        for p in blocking:
+            code = p.get("stock_code")
+            if code in held:
+                alive.append(p)
+                continue
+            try:
+                self.repo.close_position(self.cfg.user_id, code, Decimal(0), Decimal(0),
+                                         "EXTERNAL_CLOSED")
+            except Exception as e:  # noqa: BLE001
+                self.wlog.warn("[매수] %s 좀비 포지션 종료 실패 → 매수 차단 유지: %s", code, e)
+                alive.append(p)
+                continue
+            self.wlog.warn("[매수] %s 계좌 실보유 없음 → 좀비 포지션 종료(EXTERNAL_CLOSED) "
+                           "· 타채널 수기매도 추정 · 1포지션 차단 해제", code)
+        return alive
 
     def budget_ratio(self) -> Decimal:
         """예수금 대비 투입 비율. 기본은 env(BUY_BUDGET_RATIO)."""

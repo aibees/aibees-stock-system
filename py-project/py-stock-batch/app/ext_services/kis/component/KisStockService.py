@@ -22,11 +22,32 @@ class KisService:
         self.__name__ = 'KisService'
         self.userMasterDaoImpl = UserMasterDao()
 
+    @staticmethod
+    def __window(v, default: int) -> int:
+        """rolling(window=) 에 넣기 전 방어. None/빈값/0 이하면 default.
+
+        user_options 의 macd_recent_day / bb_over_recent_day 는 화면에서 비워둘 수 있어
+        NULL 로 내려오는 유저가 있다. 그 None 이 그대로 rolling 에 들어가면
+        ValueError: window must be an integer 0 or greater 로 **지표 계산 전체**가
+        죽고, 그걸 쓰는 매수 필터·초기 손절선·일별 평가가 모두 실패한다
+        (2026-09-29 user_id=3: 포지션에 손절선이 없어 수기매도 후에도 SOLD 처리 안 됨).
+        userService.extractor 에서도 기본값을 채우지만, 이 함수는 다른 호출부도 있어
+        마지막 방어선을 여기 한 번 더 둔다.
+        """
+        try:
+            n = int(v)
+        except (TypeError, ValueError):
+            return default
+        return n if n > 0 else default
+
     def compute_indicator_df(self, data: pd.DataFrame, user_info: UserOptionMeta) -> pd.DataFrame:
 
         ####################################################################
         # Constants
         ####################################################################
+        bb_over_win = self.__window(getattr(user_info, 'bb_over_recent_day', None), 5)
+        macd_recent_win = self.__window(getattr(user_info, 'macd_recent_day', None), 5)
+        delay_date = self.__window(getattr(user_info, 'delay_date', None), 3)
         df_open = data[Literal.OPEN].astype(float)
         df_close = data[Literal.CLOSE].astype(float)
         df_high = data[Literal.HIGH].astype(float)
@@ -62,9 +83,9 @@ class KisService:
         data[Literal.BB_MID] = ma
         data[Literal.BB_UPPER]  = ma + 2 * std
         data[Literal.BB_LOWER]  = ma - 2 * std
-        data[Literal.BB_UPPER_CHK] = self.__check_than_bb(Literal.BB_UPPER, df_high, data[Literal.BB_UPPER], window=user_info.bb_over_recent_day)
-        data[Literal.BB_LOWER_CHK] = self.__check_than_bb(Literal.BB_LOWER, df_low, data[Literal.BB_LOWER], window=user_info.bb_over_recent_day)
-        data[Literal.BB_MID_BREAKOUT] = self.__bb_mid_check(df_open, df_close, data[Literal.BB_MID], user_info.delay_date)
+        data[Literal.BB_UPPER_CHK] = self.__check_than_bb(Literal.BB_UPPER, df_high, data[Literal.BB_UPPER], window=bb_over_win)
+        data[Literal.BB_LOWER_CHK] = self.__check_than_bb(Literal.BB_LOWER, df_low, data[Literal.BB_LOWER], window=bb_over_win)
+        data[Literal.BB_MID_BREAKOUT] = self.__bb_mid_check(df_open, df_close, data[Literal.BB_MID], delay_date)
 
         ####################################################################
         # 3. MACD (12,26,9)
@@ -74,11 +95,11 @@ class KisService:
         data[Literal.MACD_LOWER_MEAN] = self.__n_day_avg(data[Literal.MACD],'lower')
         data[Literal.MACD_UPPER_MEAN] = self.__n_day_avg(data[Literal.MACD],'upper')
 
-        data[Literal.MACD_RECENT_MIN] = data[Literal.MACD].rolling(window=user_info.macd_recent_day, min_periods=user_info.macd_recent_day).min()
-        data[Literal.MACD_RECENT_MAX] = data[Literal.MACD].rolling(window=user_info.macd_recent_day, min_periods=user_info.macd_recent_day).max()
+        data[Literal.MACD_RECENT_MIN] = data[Literal.MACD].rolling(window=macd_recent_win, min_periods=macd_recent_win).min()
+        data[Literal.MACD_RECENT_MAX] = data[Literal.MACD].rolling(window=macd_recent_win, min_periods=macd_recent_win).max()
 
-        data[Literal.MACD_G_CROSS_N] = self.__n_day_cross_check('G', data[Literal.MACD], data[Literal.MACD_S], user_info.delay_date)
-        data[Literal.MACD_D_CROSS_N] = self.__n_day_cross_check('D', data[Literal.MACD], data[Literal.MACD_S], user_info.delay_date)
+        data[Literal.MACD_G_CROSS_N] = self.__n_day_cross_check('G', data[Literal.MACD], data[Literal.MACD_S], delay_date)
+        data[Literal.MACD_D_CROSS_N] = self.__n_day_cross_check('D', data[Literal.MACD], data[Literal.MACD_S], delay_date)
 
 
         ####################################################################
@@ -87,16 +108,16 @@ class KisService:
         data[Literal.OBV] = (np.sign(df_close.diff()) * data[Literal.VOLUME]).fillna(0).cumsum()
         data[Literal.OBV_SIGNAL] = data[Literal.OBV].rolling(window=9).mean()
 
-        data[Literal.OBV_G_CROSS_N] = self.__n_day_cross_check('G', data[Literal.OBV], data[Literal.OBV_SIGNAL], user_info.delay_date)
-        data[Literal.OBV_D_CROSS_N]=  self.__n_day_cross_check('D', data[Literal.OBV], data[Literal.OBV_SIGNAL], user_info.delay_date)
+        data[Literal.OBV_G_CROSS_N] = self.__n_day_cross_check('G', data[Literal.OBV], data[Literal.OBV_SIGNAL], delay_date)
+        data[Literal.OBV_D_CROSS_N]=  self.__n_day_cross_check('D', data[Literal.OBV], data[Literal.OBV_SIGNAL], delay_date)
 
 
         ####################################################################
         # VOLUME
         ####################################################################
         prev_vol = df_volume.shift(1)
-        is_surge_today = (df_volume >= prev_vol * float(user_info.vol_surge)) & (prev_vol > 0)
-        data[Literal.VOL_SURGE_N] = is_surge_today.rolling(window=user_info.delay_date).max() == 1
+        is_surge_today = (df_volume >= prev_vol * float(user_info.vol_surge or 3.0)) & (prev_vol > 0)
+        data[Literal.VOL_SURGE_N] = is_surge_today.rolling(window=delay_date).max() == 1
         # 20일 평균 거래량 (상대 거래량 필터용)
         data[Literal.VOL_AVG] = df_volume.rolling(window=20).mean()
 
