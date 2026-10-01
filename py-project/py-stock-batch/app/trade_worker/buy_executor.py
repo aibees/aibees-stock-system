@@ -40,6 +40,7 @@ class BuyCandidate:
     nxt: bool = False                       # NXT 대상 → 통합(UN/SOR), 아니면 KRX(J/KRX)
     ref_close: Optional[Decimal] = None     # 프리마켓 지정가 산출용 전일종가
     limit_price: Optional[Decimal] = None   # 지정가를 모드가 직접 정하는 경우
+    priority: bool = False                  # 사용자가 직접 지정한 후보(필터 완화 대상)
     log_note: str = ""                      # trade_log.note 에 남길 모드별 부가정보
     notify_note: str = ""                   # 체결 알림에 남길 모드별 부가정보
 
