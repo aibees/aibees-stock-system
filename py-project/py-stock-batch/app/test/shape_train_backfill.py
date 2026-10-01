@@ -19,6 +19,14 @@
     → 백필 후 반드시:  POST /api/v1/jobs/once/SHAPE_LABEL_JOB
                        {"since": "<START_SAVE_FROM>", "lookback_days": 9999}
 
+유니버스 필터 (일별 적재와 일치시킴)
+    StockBuyCheckJob 은 거래량(user_options.vol_limit)·종가(1,000원) 필터를 학습셋
+    적재보다 **앞단**에서 적용한다. 그래서 일별로 쌓이는 학습셋은 '전종목'이 아니라
+    '통과분'이고(2026-10-01 실측 11.6%), 라이브 추론도 같은 루프 안이라 통과분에만
+    계산된다. 백필도 같은 기준을 써야 학습분포와 추론분포가 일치한다.
+    적용 단위는 **봉별**이다 — 그 날 라이브였다면 포함됐는지를 날짜별로 재현한다.
+    단 피처 계산은 필터 적용 전 전체 시계열로 한다(lookback 에 구멍이 생기면 안 된다).
+
 채우지 않는 컬럼과 그 이유
     shape_proba_at_scan  "그날 라이브 모델이 실제로 낸 값"이라는 정의라서, 오늘의
                          모델로 소급 채점하면 의미가 정반대가 된다(드리프트 감시용
@@ -55,6 +63,7 @@ from stock_shared.ml.shape_features import SHAPE_FEATURE_COLUMNS
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.kis.component.KisStockService import KisService
 from app.batches.services.stockService import StockService
+from app.batches.services.userService import UserService
 
 # KIS 호출 간격. shape_full_universe_scan 과 동일 값(그 스크립트가 rate limit 없이 완주함).
 SLEEP_SEC = 1.5
@@ -65,23 +74,55 @@ FETCH_START = '2025-06-01'
 
 OHLCV_COLS = ('open', 'high', 'low', 'close', 'volume')
 
+# ── 일별 적재와 동일한 유니버스 필터 ────────────────────────────────────────
+#   StockBuyCheckJob 은 이 두 필터를 **학습셋 적재(_build_train_row)보다 앞단**에서
+#   적용하고 미달 종목은 continue 로 건너뛴다(StockBuyCheckJob.py 406~416행).
+#   그래서 일별로 쌓이는 학습셋은 '전종목'이 아니라 '거래량·가격 통과분'이다
+#   (2026-10-01 실측: 2,756종목 중 320행 = 11.6%, 적재분 MIN(volume)=500,281).
+#
+#   백필이 이 필터를 적용하지 않으면 백필분(전종목)과 일별분(통과분)의 분포가
+#   어긋난다. 라이브 추론(shape_score)도 같은 루프 안에서 통과분에만 계산되므로
+#   **추론 대상 = 통과분**이고, 학습셋도 통과분으로 맞추는 게 분포 일치상 맞다.
+#
+#   적용 단위가 다르다는 점에 주의: 라이브는 '마지막 봉' 하나로 종목 전체를 넣거나
+#   빼지만, 백필은 종목당 수십 행을 저장하므로 **봉마다 그 봉의 close/volume 으로**
+#   판정한다. 그게 "그 날 라이브였다면 포함됐는가"를 날짜별로 재현하는 방식이다.
+PENNY_PRICE_MIN = 1000      # StockBuyCheckJob.COMPOSITE_PENNY_PRICE_MIN 과 동일
 
-def _build_rows(code: str, data: pd.DataFrame, save_from: str) -> list[dict]:
-    """지표 계산이 끝난 DataFrame → trade_shape_train_daily upsert 행 리스트.
+
+def _passes_universe(close, volume, vol_limit: float, min_close: float) -> bool:
+    """그 봉이 일별 적재 유니버스에 들었는지. 라이브와 **같은 부등호**를 쓴다.
+
+    라이브: `if last_close < MIN: continue` / `if last_volume < vol_limit: continue`
+    결측(None/NaN)은 판정 불가이므로 제외한다 — 라이브도 그 종목을 처리하지 못한다.
+    """
+    if close is None or volume is None:
+        return False
+    return not (close < min_close or volume < vol_limit)
+
+
+def _build_rows(code: str, data: pd.DataFrame, save_from: str,
+                vol_limit: float, min_close: float) -> tuple[list[dict], int]:
+    """지표 계산이 끝난 DataFrame → (upsert 행 리스트, 유니버스 미달로 제외한 봉수).
 
     **fillna 하지 않는다.** 결측은 None 으로 내려보내 DB 에 NULL 로 들어가야 한다
     (16_shape_train_daily_ddl.sql 설계 포인트 1). 0 으로 채우면 "lookback 부족"이
     "관측값 0"으로 학습되고, ShapeTrainJob 이 완전행을 골라내는 것도 불가능해진다.
+
+    피처는 **필터 적용 전 전체 시계열**로 계산한다. 거래량 미달인 날이 중간에 끼어도
+    그 날 봉은 lookback 에 그대로 쓰여야 한다 — 저장만 건너뛸 뿐 계산에서 빼지 않는다.
+    (여기서 걸러내면 14봉 윈도우에 구멍이 생겨 라이브와 다른 피처가 나온다)
     """
     df = data.copy()
     df['datetime'] = pd.to_datetime(df['datetime'])
     df = df[df['datetime'] >= pd.Timestamp(save_from)]
     if df.empty:
-        return []
+        return [], 0
 
     df = df.replace([np.inf, -np.inf], np.nan)
 
     rows = []
+    filtered = 0
     for rec in df.to_dict(orient='records'):
         dt = rec.get('datetime')
         if dt is None or pd.isna(dt):
@@ -92,6 +133,11 @@ def _build_rows(code: str, data: pd.DataFrame, save_from: str) -> list[dict]:
             if v is None or pd.isna(v):
                 return None
             return float(v)
+
+        # 유니버스 필터는 저장 직전에 그 봉 자신의 close/volume 으로 판정한다.
+        if not _passes_universe(_v('close'), _v('volume'), vol_limit, min_close):
+            filtered += 1
+            continue
 
         row = {'coin': code, 'datetime': str(pd.Timestamp(dt).date())}
         for c in SHAPE_FEATURE_COLUMNS:
@@ -104,7 +150,7 @@ def _build_rows(code: str, data: pd.DataFrame, save_from: str) -> list[dict]:
         row['composite_eligible'] = None
         row['action_type'] = None
         rows.append(row)
-    return rows
+    return rows, filtered
 
 
 def _already_loaded(session, save_from: str) -> set:
@@ -129,10 +175,27 @@ def main():
                     help='이미 적재된 종목은 건너뜀(중단 후 재실행)')
     ap.add_argument('--dry-run', action='store_true',
                     help='DB 에 쓰지 않고 계산 결과만 출력')
+    ap.add_argument('--vol-limit', type=float, default=None,
+                    help='거래량 하한. 기본은 운영과 동일하게 user_options 에서 읽음')
+    ap.add_argument('--min-close', type=float, default=PENNY_PRICE_MIN,
+                    help=f'종가 하한(기본 {PENNY_PRICE_MIN})')
     args = ap.parse_args()
 
     session = dbConn.get_session()
     train_dao = TradeShapeTrainDailyDao()
+
+    # 거래량 하한은 **운영과 같은 경로**로 읽는다 — StockBuyCheckJob 도
+    # UserService().get_user_options(session)(기본 user_id=1)로 vol_limit 을 얻는다.
+    # 상수로 박아두면 운영에서 값을 바꿨을 때 백필분과 일별분이 조용히 갈린다.
+    if args.vol_limit is not None:
+        vol_limit = args.vol_limit
+        vol_src = 'CLI'
+    else:
+        vol_limit = float(UserService().get_user_options(session).vol_limit or 0)
+        vol_src = 'user_options'
+    if vol_limit <= 0:
+        print(f"[경고] vol_limit={vol_limit} (출처={vol_src}) → 거래량 필터가 사실상 비활성이다. "
+              f"일별 적재분과 분포가 어긋날 수 있으니 값을 확인하라.", flush=True)
 
     stock_service = StockService()
     targets = stock_service.get_stock_master_list(session, 'batches')
@@ -145,6 +208,9 @@ def main():
 
     print(f"[대상] {len(targets)}종목 / 저장시작 {args.save_from} / "
           f"조회하한 {FETCH_START} / dry_run={args.dry_run}", flush=True)
+    print(f"[유니버스 필터] 거래량 >= {vol_limit:,.0f}(출처={vol_src}) · "
+          f"종가 >= {args.min_close:,.0f} — 일별 적재(StockBuyCheckJob)와 동일 기준",
+          flush=True)
 
     kis_service = KisService()
     kis_engine = KisEngine()
@@ -159,7 +225,7 @@ def main():
     dummy_ui.macd_recent_day = 20
     dummy_ui.bb_over_recent_day = 7
 
-    ok = fail = skip = total_rows = 0
+    ok = fail = skip = total_rows = total_filtered = 0
     t0 = time.time()
 
     for idx, stock in enumerate(targets):
@@ -177,8 +243,11 @@ def main():
                 continue
 
             data = kis_service.compute_indicator_df(ohlcv, user_info=dummy_ui)
-            rows = _build_rows(code, data, args.save_from)
+            rows, filtered = _build_rows(code, data, args.save_from,
+                                         vol_limit, args.min_close)
+            total_filtered += filtered
             if not rows:
+                # 저장할 봉이 하나도 없다 — 유니버스 미달(거래량·가격)이 대부분이다.
                 skip += 1
                 continue
 
@@ -188,7 +257,7 @@ def main():
                     if all(r[c] is not None for c in SHAPE_FEATURE_COLUMNS)
                 )
                 print(f"[dry-run][{idx+1}/{len(targets)}] {name}({code}) "
-                      f"{len(rows)}행 (완전행 {complete}) "
+                      f"{len(rows)}행 (완전행 {complete} · 유니버스미달 {filtered}) "
                       f"{rows[0]['datetime']}~{rows[-1]['datetime']}", flush=True)
                 ok += 1
                 total_rows += len(rows)
@@ -211,8 +280,11 @@ def main():
             print(f"[{idx+1}/{len(targets)}] {name}({code}) 실패: {e}", flush=True)
             continue
 
+    kept_pct = (total_rows / (total_rows + total_filtered) * 100) if (total_rows + total_filtered) else 0
     print(f"\n[완료] 성공 {ok} / 스킵 {skip} / 실패 {fail} / 총 {total_rows}행 "
           f"(소요 {(time.time()-t0)/60:.1f}분)", flush=True)
+    print(f"[유니버스] 저장 {total_rows}행 / 미달 제외 {total_filtered}행 "
+          f"→ 통과율 {kept_pct:.1f}% (일별 적재 실측 11.6% 와 비슷해야 정상)", flush=True)
     if not args.dry_run and ok:
         print(f"\n다음 단계 — 라벨 확정(이 스크립트는 net_edge_fwd 를 채우지 않는다):\n"
               f"  POST /api/v1/jobs/once/SHAPE_LABEL_JOB\n"
