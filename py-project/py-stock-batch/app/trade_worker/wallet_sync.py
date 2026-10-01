@@ -21,6 +21,20 @@ user_wallet 잔고 동기화 헬퍼.
   "1포지션 원칙" 카운트에서는 빠진다 — 계좌에 있던 종목이 편입됐다고 worker
   자신의 09:00 자동매수까지 멈추면 안 되기 때문이다(매도 감시는 exclusive_flag
   와 무관하게 그대로 적용됨). repository.open_position_if_absent 참고.
+
+계좌에서 사라진 포지션 정리 (2026-10-01, _close_vanished_positions):
+  위 편입이 "계좌 → DB" 한 방향만 맞추고 있었다. 반대 방향(사용자가 HTS/MTS 로
+  수기 전량매도해서 계좌에서 사라진 종목을 DB 에서 SOLD 로 닫는 것)은 두 경로만
+  담당했다 — ① sell_executor._do_sell 의 '실제 보유 0' 체크, ② 부팅 대조
+  (main._reconcile_positions). 그런데 ①은 **매도 트리거(hit_line) 가 먼저 걸려야**
+  도달하는 코드다. 라인(stop/target/trail)이 전부 NULL 인 포지션은 hit_line 이
+  영원히 None 을 반환하므로(sell_executor1.hit_line 의 `if stop and ...`) ①에
+  도달할 방법이 없고, ②는 재기동 전까지 돌지 않는다.
+  결과: 좀비 HOLDING 이 남아 allow_buy() 의 1포지션 카운트를 먹고 신규매수가
+  며칠씩 멈췄다(2026-09-29 user_id=3 032580, 2026-10-01 user_id=1 018000).
+  → 이제 이 폴링이 직접 닫는다. 단 "잔고 조회가 일시적으로 불완전할 수 있다"는
+  기존 우려(_sync_tracked_qty 주석)를 그대로 존중해서, 한 번 안 보인다고 닫지
+  않고 **연속 cfg.position_vanish_miss 회**(기본 3회 ≈ 90초) 안 보일 때만 닫는다.
 """
 import logging
 from decimal import Decimal
@@ -155,6 +169,94 @@ def _sync_tracked_qty(repo, user_id, sell_executor, holdings):
                 pass
 
 
+def _close_vanished_positions(repo, user_id, sell_executor, holdings):
+    """trade_worker_position(HOLDING) 인데 계좌 실보유에 없는 종목을 외부청산으로 닫는다.
+
+    왜 폴링이 직접 닫아야 하는지는 모듈 docstring 참고(기존 두 경로가 라인 유무와
+    재기동에 종속돼 있어 좀비 포지션이 남았다).
+
+    오판 청산 방지 가드:
+      - holdings 가 None(조회 실패)이면 호출되지 않는다(_stock_snapshot 반환값).
+      - 종목별 연속 미발견 횟수가 cfg.position_vanish_miss 에 도달해야 닫는다.
+        한 번이라도 계좌에서 보이면 카운터를 리셋한다.
+      - 매도 주문 진행중(_inflight)은 건너뛴다 — 체결 반영(reduce_position)과
+        경합해 방금 체결된 포지션을 EXTERNAL_CLOSED 로 덮어쓰는 것을 피한다.
+      - 카운터는 sell_executor 인스턴스에 들고 있다(프로세스 생명주기). 재기동하면
+        0 부터 다시 세는데, 재기동 시점엔 부팅 대조가 같은 일을 하므로 문제없다.
+    """
+    if holdings is None or sell_executor is None:
+        return
+    try:
+        rows = repo.get_holding_positions(user_id)
+    except Exception as e:  # noqa: BLE001
+        log.warning("[외부청산] worker 포지션 조회 실패 → skip: %s", e)
+        return
+    if not rows:
+        return
+
+    held = {h.get("symbol") for h in holdings if h.get("symbol")}
+    inflight = set(getattr(sell_executor, "_inflight", ()) or ())
+    misses = getattr(sell_executor, "_acct_miss", None)
+    if misses is None:
+        misses = {}
+        sell_executor._acct_miss = misses
+    threshold = max(1, int(getattr(getattr(sell_executor, "cfg", None), "position_vanish_miss", 3)))
+    wlog = getattr(sell_executor, "wlog", None)
+
+    tracked = set()
+    for p in rows:
+        code = p.get("stock_code")
+        if not code:
+            continue
+        tracked.add(code)
+        if code in inflight:
+            continue
+        if code in held:
+            misses.pop(code, None)
+            continue
+
+        n = misses.get(code, 0) + 1
+        misses[code] = n
+        if n < threshold:
+            log.info("[외부청산] %s 계좌 미보유 %d/%d회 → 관망(오판 방지)", code, n, threshold)
+            continue
+
+        try:
+            repo.close_position(user_id, code, Decimal(0), Decimal(0), "EXTERNAL_CLOSED")
+        except Exception as e:  # noqa: BLE001
+            log.warning("[외부청산] %s 포지션 종료 실패: %s", code, e)
+            continue
+        misses.pop(code, None)
+
+        # DB 를 닫았으면 메모리/구독도 같이 정리해야 한다 — 안 하면 다음 틱마다
+        # 이미 없는 포지션을 계속 평가하고, 라인에 닿으면 실주문까지 나간다.
+        try:
+            sell_executor.discard_position(code)
+        except Exception as e:  # noqa: BLE001
+            log.warning("[외부청산] %s 감시 해제 실패: %s", code, e)
+
+        msg = "[외부청산] %s 계좌 실보유 없음 %d회 연속 → 포지션 종료(SOLD) · 타채널 수기매도 추정"
+        log.warning(msg, code, threshold)
+        if wlog is not None:
+            try:
+                wlog.warn(msg, code, threshold)
+            except Exception:  # noqa: BLE001
+                pass
+        notifier = getattr(sell_executor, "notifier", None)
+        if notifier is not None:
+            try:
+                notifier.send("[외부청산] 포지션 자동 종료",
+                              f"{code} 가 계좌 실보유에서 {threshold}회 연속 사라져 "
+                              f"trade_worker_position 을 SOLD 로 닫았습니다"
+                              f"(타채널 수기매도 추정). 신규매수 차단이 해제됩니다.")
+            except Exception:  # noqa: BLE001
+                pass
+
+    # 더 이상 HOLDING 이 아닌 종목의 카운터는 흘려보낸다(메모리 누수 방지).
+    for code in [c for c in misses if c not in tracked]:
+        misses.pop(code, None)
+
+
 def reconcile_wallet(broker, repo, user_id: int,
                      computed: Optional[Decimal] = None,
                      sync: bool = True, tag: str = "",
@@ -171,9 +273,14 @@ def reconcile_wallet(broker, repo, user_id: int,
       3) 둘 다 없으면 DB 현재값
     보유주식평가/총자산: 실제 보유종목 조회로 함께 갱신(조회 실패 시 현금만).
 
-    sell_executor 를 넘기면 이미 편입된 종목의 수량을 실보유로 보정하고
-    (_sync_tracked_qty), 계좌 실보유 중 worker 미추적 종목을 trade_worker_position
-    으로 편입한다(_absorb_untracked_holdings 참고 — ⚠ 모드 자동매도 대상이 됨).
+    sell_executor 를 넘기면 포지션 3종 대조를 함께 수행한다:
+      1) _sync_tracked_qty          : 이미 편입된 종목의 수량을 실보유로 보정
+      2) _close_vanished_positions  : 계좌에서 사라진 HOLDING 을 외부청산 종료
+                                      (연속 cfg.position_vanish_miss 회 미발견 시)
+      3) _absorb_untracked_holdings : 계좌 실보유 중 worker 미추적 종목 편입
+                                      (⚠ 모드 자동매도 대상이 됨)
+    2)를 3) 앞에 두는 이유: 같은 폴링에서 닫은 종목을 다시 편입하지 않도록 —
+    애초에 계좌에 없어서 닫은 것이므로 3) 의 편입 대상에도 들어오지 않는다.
     """
     actual = broker.account_cash()          # AccountCash | None
     deposit = actual.deposit if actual is not None else None
@@ -194,7 +301,8 @@ def reconcile_wallet(broker, repo, user_id: int,
     log.info("[%s] user_wallet ← 매수가능 %s · 예수금 %s · 보유평가 %s · 총자산 %s (실제조회=%s,sync=%s)",
              tag, cash, deposit, stock_amount, total, actual is not None, sync)
 
-    _sync_tracked_qty(repo, user_id, sell_executor, holdings)   # 기존 편입 종목 수량 보정
+    _sync_tracked_qty(repo, user_id, sell_executor, holdings)        # 기존 편입 종목 수량 보정
+    _close_vanished_positions(repo, user_id, sell_executor, holdings)  # 계좌에서 사라진 포지션 종료
     _absorb_untracked_holdings(repo, user_id, sell_executor, holdings)
 
     return cash

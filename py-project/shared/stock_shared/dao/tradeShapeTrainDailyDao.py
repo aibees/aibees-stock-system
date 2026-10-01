@@ -123,6 +123,33 @@ class TradeShapeTrainDailyDao:
         return len(rows)
 
     # ------------------------------------------------------------------
+    # 학습 (ShapeTrainJob)
+    # ------------------------------------------------------------------
+    def select_training_rows(self, session, since: str | None = None,
+                             until: str | None = None) -> list[dict]:
+        """라벨이 확정된 학습용 행을 날짜 오름차순으로 조회한다.
+
+        피처 14종 + datetime/coin + 라벨만 뜬다(OHLCV/평가필드는 학습에 안 쓴다 —
+        수십만 행 규모라 불필요한 컬럼을 끌면 메모리만 먹는다).
+
+        정렬은 **datetime 우선**이다. ShapeTrainJob 의 시간분할이 날짜 기준이라
+        종목 우선 정렬이면 분할 경계에서 종목별로 뒤섞여 디버깅이 어렵다.
+        """
+        cols = [TradeShapeTrainDaily.coin, TradeShapeTrainDaily.datetime] + [
+            getattr(TradeShapeTrainDaily, c) for c in SHAPE_FEATURE_COLUMNS
+        ] + [TradeShapeTrainDaily.net_edge_fwd]
+
+        stmt = select(*cols).where(TradeShapeTrainDaily.net_edge_fwd.isnot(None))
+        if since:
+            stmt = stmt.where(TradeShapeTrainDaily.datetime >= since)
+        if until:
+            stmt = stmt.where(TradeShapeTrainDaily.datetime <= until)
+        stmt = stmt.order_by(TradeShapeTrainDaily.datetime, TradeShapeTrainDaily.coin)
+
+        keys = ["coin", "datetime"] + list(SHAPE_FEATURE_COLUMNS) + ["net_edge_fwd"]
+        return [dict(zip(keys, r)) for r in session.execute(stmt).all()]
+
+    # ------------------------------------------------------------------
     # 모니터링
     # ------------------------------------------------------------------
     def count_summary(self, session) -> dict:

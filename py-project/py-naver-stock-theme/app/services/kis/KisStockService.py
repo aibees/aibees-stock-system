@@ -13,7 +13,26 @@ from stock_shared.dto.userOptionMeta import UserOptionMeta
 
 class KisStockService:
 
+    @staticmethod
+    def __window(v, default: int) -> int:
+        """rolling(window=) 에 넣기 전 방어. None/빈값/0 이하면 default.
+
+        user_options 의 macd_recent_day / bb_over_recent_day 는 화면에서 비워둘 수 있어
+        NULL 로 내려오는 유저가 있다(user 2/3/4/6). None 이 그대로 rolling 에 들어가면
+        ValueError: window must be an integer 0 or greater 로 지표 계산 전체가 죽는다.
+        배치(py-stock-batch)의 동일 함수와 같은 방어선이다(2026-10-01).
+        """
+        try:
+            n = int(v)
+        except (TypeError, ValueError):
+            return default
+        return n if n > 0 else default
+
     def compute_indicator_df(self, data: pd.DataFrame, user_info: UserOptionMeta) -> pd.DataFrame:
+
+        bb_over_win     = self.__window(getattr(user_info, 'bb_over_recent_day', None), 5)
+        macd_recent_win = self.__window(getattr(user_info, 'macd_recent_day', None), 5)
+        delay_date      = self.__window(getattr(user_info, 'delay_date', None), 3)
 
         df_open   = data['open'].astype(float)
         df_close  = data['close'].astype(float)
@@ -32,9 +51,9 @@ class KisStockService:
         data['bb_mid']   = ma
         data['bb_upper'] = ma + 2 * std
         data['bb_lower'] = ma - 2 * std
-        data['bb_upper_chk'] = self.__check_than_bb('bb_upper', df_high,  data['bb_upper'], window=user_info.bb_over_recent_day)
-        data['bb_lower_chk'] = self.__check_than_bb('bb_lower', df_low,   data['bb_lower'], window=user_info.bb_over_recent_day)
-        data['bb_mid_breakout'] = self.__bb_mid_check(df_open, df_close, data['bb_mid'], user_info.delay_date)
+        data['bb_upper_chk'] = self.__check_than_bb('bb_upper', df_high,  data['bb_upper'], window=bb_over_win)
+        data['bb_lower_chk'] = self.__check_than_bb('bb_lower', df_low,   data['bb_lower'], window=bb_over_win)
+        data['bb_mid_breakout'] = self.__bb_mid_check(df_open, df_close, data['bb_mid'], delay_date)
         data['bb_width']     = data['bb_upper'] - data['bb_lower']
         data['bb_width_avg'] = data['bb_width'].rolling(window=20).mean()
 
@@ -46,21 +65,21 @@ class KisStockService:
         data['macd_s'] = data['macd'].ewm(span=9, adjust=False).mean()
         data['macd_lower_mean'] = self.__n_day_avg(data['macd'], 'lower')
         data['macd_upper_mean'] = self.__n_day_avg(data['macd'], 'upper')
-        data['macd_recent_min'] = data['macd'].rolling(window=user_info.macd_recent_day, min_periods=user_info.macd_recent_day).min()
-        data['macd_recent_max'] = data['macd'].rolling(window=user_info.macd_recent_day, min_periods=user_info.macd_recent_day).max()
-        data['macd_g_cross_n']  = self.__n_day_cross_check('G', data['macd'], data['macd_s'], user_info.delay_date)
-        data['macd_d_cross_n']  = self.__n_day_cross_check('D', data['macd'], data['macd_s'], user_info.delay_date)
+        data['macd_recent_min'] = data['macd'].rolling(window=macd_recent_win, min_periods=macd_recent_win).min()
+        data['macd_recent_max'] = data['macd'].rolling(window=macd_recent_win, min_periods=macd_recent_win).max()
+        data['macd_g_cross_n']  = self.__n_day_cross_check('G', data['macd'], data['macd_s'], delay_date)
+        data['macd_d_cross_n']  = self.__n_day_cross_check('D', data['macd'], data['macd_s'], delay_date)
 
         # 4. OBV
         data['obv']        = (np.sign(df_close.diff()) * df_volume).fillna(0).cumsum()
         data['obv_signal'] = data['obv'].rolling(window=9).mean()
-        data['obv_g_cross_n'] = self.__n_day_cross_check('G', data['obv'], data['obv_signal'], user_info.delay_date)
-        data['obv_d_cross_n'] = self.__n_day_cross_check('D', data['obv'], data['obv_signal'], user_info.delay_date)
+        data['obv_g_cross_n'] = self.__n_day_cross_check('G', data['obv'], data['obv_signal'], delay_date)
+        data['obv_d_cross_n'] = self.__n_day_cross_check('D', data['obv'], data['obv_signal'], delay_date)
 
         # 5. Volume
         prev_vol        = df_volume.shift(1)
-        is_surge_today  = (df_volume >= prev_vol * float(user_info.vol_surge)) & (prev_vol > 0)
-        data['vol_surge_n'] = is_surge_today.rolling(window=user_info.delay_date).max() == 1
+        is_surge_today  = (df_volume >= prev_vol * float(user_info.vol_surge or 3.0)) & (prev_vol > 0)
+        data['vol_surge_n'] = is_surge_today.rolling(window=delay_date).max() == 1
         data['vol_avg']     = df_volume.rolling(window=20).mean()
 
         # 6. RSI (14, Wilder — ewm com=13)

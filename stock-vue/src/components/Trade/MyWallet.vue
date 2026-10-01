@@ -56,9 +56,16 @@
                 </div>
             </section>
 
-            <!-- 예수금 ≠ 주문가능금액 인 이유를 한 줄로. 차이가 없으면 굳이 띄우지 않는다. -->
-            <p v-if="!loadingAccount && cashGap > 0" class="cash-gap-note">
-                예수금보다 주문가능금액이 {{ fmtWon(cashGap) }}원 적습니다 — 증거금징수율과 미체결 주문에 묶인 금액입니다.
+            <!-- 예수금 ≠ 주문가능금액 인 이유를 한 줄로. 차이가 없으면 띄우지 않는다.
+                 방향은 계좌마다 다르다 — 미체결·증거금으로 줄기도 하고,
+                 재사용가능금액·대용증권으로 예수금보다 늘기도 한다. -->
+            <p v-if="!loadingAccount && cashGap !== 0" class="cash-gap-note">
+                <template v-if="cashGap > 0">
+                    주문가능금액이 예수금보다 {{ fmtWon(cashGap) }}원 적습니다 — 종목별 증거금징수율과 미체결 주문에 묶인 금액입니다.
+                </template>
+                <template v-else>
+                    주문가능금액이 예수금보다 {{ fmtWon(-cashGap) }}원 많습니다 — 재사용가능금액·대용증권이 반영된 금액입니다.
+                </template>
             </p>
 
             <!-- ── 탭 ── -->

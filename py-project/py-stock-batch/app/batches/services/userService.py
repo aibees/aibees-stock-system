@@ -6,15 +6,34 @@ from stock_shared.dao.userOptionM2Dao import UserOptionM2Dao
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 
 
+# user_options 의 레거시 지표 컬럼 기본값.
+#   이 값들은 화면에서 비워둘 수 있어 NULL 로 들어오는 유저가 있는데(user 2/3/4/6),
+#   예전엔 `x['macd_recent_day']` 로 직접 대입해 UserOptionMeta 의 기본값을 None 으로
+#   덮어썼다. 그 None 이 KisStockService.compute_indicator_df 의
+#   rolling(window=None) 까지 흘러가 "window must be an integer 0 or greater" 로 터지고,
+#   일봉 지표 전체 → 초기 라인/일별 평가가 전부 실패했다(2026-09-29 user_id=3).
+#   UserOptionMeta 쪽 기본값(0)은 rolling 에 넣으면 전부 NaN 이라 쓸모가 없어서,
+#   실제로 동작 중인 유저(1/5)와 같은 값을 여기서 명시한다.
+_DEFAULT_MACD_RECENT_DAY = 5
+_DEFAULT_BB_OVER_RECENT_DAY = 5
+_DEFAULT_VOL_LIMIT = 500000
+_DEFAULT_VOL_SURGE = 3.0
+
+
+def _or_default(v, default):
+    """NULL(None) 이면 기본값. 0/빈값은 사용자가 의도한 값일 수 있어 그대로 둔다."""
+    return default if v is None else v
+
+
 def extractor(x) -> UserOptionMeta:
     user_meta = UserOptionMeta()
     user_meta.email        = x['email']
     user_meta.user_name    = x['user_name']
     user_meta.user_id      = x['user_id']
-    user_meta.macd_recent_day    = x['macd_recent_day']
-    user_meta.bb_over_recent_day = x['bb_over_recent_day']
-    user_meta.vol_limit    = x['vol_limit']
-    user_meta.vol_surge    = x['vol_surge']
+    user_meta.macd_recent_day    = _or_default(x['macd_recent_day'], _DEFAULT_MACD_RECENT_DAY)
+    user_meta.bb_over_recent_day = _or_default(x['bb_over_recent_day'], _DEFAULT_BB_OVER_RECENT_DAY)
+    user_meta.vol_limit    = _or_default(x['vol_limit'], _DEFAULT_VOL_LIMIT)
+    user_meta.vol_surge    = _or_default(x['vol_surge'], _DEFAULT_VOL_SURGE)
     # 메신저 설정
     user_meta.tele_bot_id          = x.get('tele_bot_id', '')
     user_meta.tele_chat_id         = x.get('tele_chat_id', '')

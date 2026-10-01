@@ -229,9 +229,25 @@ class SellStrategy:
 
     # ── 매수 직후 초기 라인(즉시 손절/익절 보호) ──────────────────────
     def initial_lines(self, code: str, entry_price: float):
-        """진입 즉시 stop/target + entry_atr 산출. 진입일엔 매도판정 안 함(spec §3.3)."""
-        rows = self._indicators(code)
-        atr = _f(rows[-1].get("atr")) if rows else 0.0
+        """진입 즉시 stop/target + entry_atr 산출. 진입일엔 매도판정 안 함(spec §3.3).
+
+        ⚠ 지표 조회가 실패해도 **예외를 올리지 않는다**(2026-10-01).
+        stop/target 은 entry_price × 비율이라 지표가 전혀 필요 없고, ATR 만 못 구한다.
+        예전엔 _indicators 예외가 그대로 올라가 호출측(buy_executor/wallet_sync)이
+        "초기 라인 계산 실패" 로그만 남기고 라인 없이 포지션을 열었다. 그러면
+        hit_line 이 `if stop and ...` 에서 전부 falsy 로 빠져 손절·익절은 물론
+        '실제 보유 0' 외부청산 감지(_do_sell 내부)까지 영구히 불가능해진다
+        (2026-09-29 user_id=3 032580: user_options 의 rolling window 컬럼이 NULL →
+        매일 평가 실패 → 라인 NULL 고착 → 수기매도 후에도 SOLD 처리 안 됨).
+        ATR 0 이면 ATR 기반 트레일링만 비활성이고 stop/target 보호는 살아 있다.
+        """
+        atr = 0.0
+        try:
+            rows = self._indicators(code)
+            if rows:
+                atr = _f(rows[-1].get("atr"))
+        except Exception as e:  # noqa: BLE001
+            log.warning("%s 초기 ATR 산출 실패 → atr=0 으로 두고 stop/target 만 세운다: %s", code, e)
         stop = entry_price * (1 - self.strategy.stop_loss_pct)
         target = entry_price * (1 + self.strategy.take_profit_pct)
         return {"entry_atr": atr, "stop_price": round(stop, 2), "target_price": round(target, 2)}

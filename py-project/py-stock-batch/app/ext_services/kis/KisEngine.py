@@ -103,7 +103,32 @@ class KisEngine:
                 return o
         return None
 
-    # 수집 결과의 마지막 영업일이 요청 종료일보다 이만큼 뒤처지면 '최신 데이터 누락'으로 간주.
+    # ──────────────────────────────────────────────────────────────────
+    # 타임프레임(FID_PERIOD_DIV_CODE)별 조회 파라미터.
+    #   이 API 는 1회 100행 제한이라, 윈도우 폭을 '봉 100개 이내'가 되는
+    #   캘린더일로 잡아야 한다. 봉 1개가 덮는 기간이 D/W/M 마다 달라서 상수도 갈린다.
+    #
+    #   window_days    : 1회 조회 윈도우 폭(캘린더일). 봉 ~100개에 해당.
+    #   stale_gap_days : 마지막 수집봉이 요청 종료일보다 이만큼 뒤처지면 '최신 누락' 의심.
+    #                    주봉은 금요일 종료봉이라 최대 6일, 월봉은 월말봉이라 최대 30일
+    #                    뒤처지는 게 정상이므로 일봉 기준(10일)을 그대로 쓰면 오경보가 난다.
+    #   floor_mult     : min_rows 봉을 확보하려면 캘린더일이 몇 배 필요한지(여유 포함).
+    #                    일봉 1봉≈1.45일 / 주봉 1봉=7일 / 월봉 1봉≈30.5일.
+    # ──────────────────────────────────────────────────────────────────
+    _PERIOD_SPEC = {
+        "D": {"window_days": 130,  "stale_gap_days": 10, "floor_mult": 2},
+        "W": {"window_days": 690,  "stale_gap_days": 14, "floor_mult": 10},
+        "M": {"window_days": 3050, "stale_gap_days": 45, "floor_mult": 40},
+    }
+
+    @classmethod
+    def _spec(cls, period: str) -> dict:
+        try:
+            return cls._PERIOD_SPEC[period]
+        except KeyError:
+            raise ValueError(f"지원하지 않는 period: {period!r} (D/W/M 만 가능)") from None
+
+    # 하위호환용 별칭(일봉 기준). 신규 코드는 _spec(period)['stale_gap_days'] 를 쓴다.
     _STALE_GAP_DAYS = 10
 
     def _latest_gap(self, seen: dict, end_ymd: str) -> int:
@@ -126,23 +151,25 @@ class KisEngine:
     #   반환: {영업일자(YYYYMMDD) -> output2 row} (중복 제거). getOHLCV / get_daily_ohlcv 공용.
     # ──────────────────────────────────────────────────────────────────
     def _fetch_daily(self, code: str, floor_ymd: str, end_ymd: str,
-                     adj_price: bool = True, min_rows: int = 0) -> dict:
+                     adj_price: bool = True, min_rows: int = 0,
+                     period: str = "D") -> dict:
+        stale_gap = self._spec(period)["stale_gap_days"]
         # UN(통합) 우선.
-        seen = self._fetch_daily_mkt(code, floor_ymd, end_ymd, "UN", adj_price, min_rows)
+        seen = self._fetch_daily_mkt(code, floor_ymd, end_ymd, "UN", adj_price, min_rows, period)
         gap = self._latest_gap(seen, end_ymd)
 
-        # fallback 사유: 무데이터(KRX전용) / 거래일 부족(NXT 편입 늦음) / 최신 데이터 누락
+        # fallback 사유: 무데이터(KRX전용) / 봉 부족(NXT 편입 늦음) / 최신 데이터 누락
         if not seen:
             reason = "무데이터"
         elif len(seen) < min_rows:
             reason = f"거래일 부족({len(seen)}행)"
-        elif gap > self._STALE_GAP_DAYS:
+        elif gap > stale_gap:
             reason = f"최신 누락(마지막={max(seen)} {gap}일 차)"
         else:
             reason = None
 
         if reason:
-            seen_j = self._fetch_daily_mkt(code, floor_ymd, end_ymd, "J", adj_price, min_rows)
+            seen_j = self._fetch_daily_mkt(code, floor_ymd, end_ymd, "J", adj_price, min_rows, period)
             if not seen:
                 # UN 이 아예 없으면 J 로 전량 대체
                 if seen_j:
@@ -160,17 +187,19 @@ class KisEngine:
             gap = self._latest_gap(seen, end_ymd)
 
         # fallback 이후에도 최신 구간이 비면 경고
-        if seen and gap > self._STALE_GAP_DAYS:
+        if seen and gap > stale_gap:
             print(f"[_fetch_daily] {code} 최신 데이터 누락 의심: 마지막={max(seen)} "
                   f"요청종료={end_ymd} ({gap}일 차)", flush=True)
         return seen
 
     # 1회 호출 한도(100건) 이내가 되도록 조회 윈도우를 캘린더일로 제한한다.
-    # 130 캘린더일 ≒ 90 거래일 < 100건. (공휴일/연휴 편차를 감안한 여유값)
+    # 폭은 _PERIOD_SPEC[period]['window_days'] 에서 온다(일봉 130 / 주봉 690 / 월봉 3050).
+    # 하위호환 별칭(일봉 기준).
     _WINDOW_DAYS = 130
 
     def _fetch_daily_mkt(self, code: str, floor_ymd: str, end_ymd: str, mkt: str,
-                         adj_price: bool = True, min_rows: int = 0) -> dict:
+                         adj_price: bool = True, min_rows: int = 0,
+                         period: str = "D") -> dict:
         """[start, end] 를 100건 이하 윈도우로 잘라 최신→과거 방향으로 수집.
         ※ 이 API 는 1회 최대 100건이라, DATE_1 을 먼 과거로 고정한 채 DATE_2 만 옮기면
           서버가 어느 쪽 100건을 잘라주는지에 따라 최신 구간이 통째로 누락될 수 있다.
@@ -178,6 +207,7 @@ class KisEngine:
         PATH = "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"
         TR_ID = "FHKST03010100"
 
+        window_days = self._spec(period)["window_days"]
         floor_dt = datetime.strptime(floor_ymd, "%Y%m%d")
         cur_end = end_ymd
         seen: dict[str, dict] = {}
@@ -185,7 +215,7 @@ class KisEngine:
         while cur_end >= floor_ymd and guard < 30:
             guard += 1
             cur_end_dt = datetime.strptime(cur_end, "%Y%m%d")
-            win_start_dt = max(floor_dt, cur_end_dt - timedelta(days=self._WINDOW_DAYS))
+            win_start_dt = max(floor_dt, cur_end_dt - timedelta(days=window_days))
             win_start = win_start_dt.strftime("%Y%m%d")
 
             params = {
@@ -193,7 +223,7 @@ class KisEngine:
                 "FID_INPUT_ISCD": code,
                 "FID_INPUT_DATE_1": win_start,           # 윈도우 시작(100건 이내)
                 "FID_INPUT_DATE_2": cur_end,             # 윈도우 종료
-                "FID_PERIOD_DIV_CODE": "D",              # D:일 W:주 M:월 Y:년
+                "FID_PERIOD_DIV_CODE": period,           # D:일 W:주 M:월 (Y:년 미사용)
                 "FID_ORG_ADJ_PRC": "0" if adj_price else "1",  # 0:수정주가 1:원주가
             }
             try:
@@ -234,29 +264,40 @@ class KisEngine:
     #   ※ 이 API 는 1회 최대 100행 → 날짜 윈도우 페이지네이션으로 start_date 까지 수집.
     # ──────────────────────────────────────────────────────────────────
     def get_daily_ohlcv(self, code: str, start_date: str, end_date: str,
-                        adj_price: bool = True, min_days: int = 250):
-        """일봉 OHLCV 조회. 최소 min_days(기본 250) '거래일'을 보장한다.
-        - start_date 는 하한 힌트. 그 구간이 min_days 미만이면 그 이전까지 더 조회해 최근 min_days 보장.
-        - KIS API 1회 100행 제한 → 날짜 윈도우 페이지네이션."""
+                        adj_price: bool = True, min_days: int = 250,
+                        period: str = "D"):
+        """기간별 OHLCV 조회. 최소 min_days 개의 '봉'을 보장한다.
+
+        period="D"(기본) 이면 일봉 — 기존 호출부 동작은 그대로다.
+        period="W"/"M" 이면 주봉/월봉이고, 이때 min_days 는 '주봉 개수'/'월봉 개수'로 읽힌다
+        (이름은 하위호환 때문에 유지. 의미는 봉 개수다).
+
+        - start_date 는 하한 힌트. 그 구간이 min_days 봉 미만이면 그 이전까지 더 조회한다.
+        - KIS API 1회 100행 제한 → 날짜 윈도우 페이지네이션(_PERIOD_SPEC 참고).
+        """
+        spec = self._spec(period)
         start_ymd = start_date.replace("-", "")
         end_dt = datetime.strptime(end_date.replace("-", ""), "%Y%m%d")
-        # 조회 하한: start_date 와 (min_days 거래일 확보용 여유 캘린더일=min_days*2) 중 더 이른 날
-        floor_dt = min(datetime.strptime(start_ymd, "%Y%m%d"), end_dt - timedelta(days=min_days * 2))
+        # 조회 하한: start_date 와 (min_days 봉 확보용 여유 캘린더일) 중 더 이른 날.
+        # 봉 1개가 덮는 캘린더일이 D/W/M 마다 달라 floor_mult 로 스케일한다.
+        floor_dt = min(datetime.strptime(start_ymd, "%Y%m%d"),
+                       end_dt - timedelta(days=min_days * spec["floor_mult"]))
         floor_ymd = floor_dt.strftime("%Y%m%d")
 
         seen = self._fetch_daily(code, floor_ymd, end_dt.strftime("%Y%m%d"),
-                                 adj_price=adj_price, min_rows=min_days)
+                                 adj_price=adj_price, min_rows=min_days, period=period)
         if not seen:
             return None
 
         all_dates = sorted(seen)                                   # 오름차순
         in_range = [d for d in all_dates if d >= start_ymd]
-        # 요청 구간이 min_days 이상이면 그대로, 미만이면 최근 min_days 거래일 사용
+        # 요청 구간이 min_days 봉 이상이면 그대로, 미만이면 최근 min_days 봉 사용
         keep = in_range if len(in_range) >= min_days else all_dates[-min_days:]
         recs = [seen[d] for d in keep]
-        # UN→J fallback 후에도 거래일 부족이면 실패로 간주(None)
+        # UN→J fallback 후에도 봉 부족이면 실패로 간주(None)
         if len(recs) < min_days:
-            print(f"[get_daily_ohlcv] {code} 거래일 부족: {len(recs)}일 (요청 최소 {min_days}일) → 실패 처리", flush=True)
+            print(f"[get_daily_ohlcv] {code}({period}) 봉 부족: {len(recs)}개 "
+                  f"(요청 최소 {min_days}개) → 실패 처리", flush=True)
             return None
 
         df = pd.DataFrame({

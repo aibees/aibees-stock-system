@@ -99,6 +99,7 @@ class BaseSellExecutor(ABC):
         # 주문이 나갈 수 있다. symbol 키였다면 나중 주문이 먼저 것의 pending 정보를
         # 덮어써 late-fill 이 엉뚱한 티어를 완료 처리하는 사고가 난다.
         self._manual_sells: dict[str, list[dict]] = {}  # symbol -> 매도 수기등록(ARMED) 티어 리스트(가격 오름차순). 있으면 모드 rule 무시
+        self._acct_miss: dict[str, int] = {}   # symbol -> 계좌 실보유에서 연속 미발견 횟수(wallet_sync._close_vanished_positions)
         self._lock = threading.Lock()
 
     # ── 구독 시작 ────────────────────────────────────────────────────
@@ -222,6 +223,30 @@ class BaseSellExecutor(ABC):
                 ticket.unsubscribe()
             except Exception as e:  # noqa: BLE001
                 self.wlog.warn("[매도] %s 구독 해제 실패: %s", symbol, e)
+
+    def discard_position(self, symbol: str):
+        """이 종목을 감시 대상에서 완전히 내린다 — **DB 를 이미 닫은 뒤** 호출한다.
+
+        호출측(wallet_sync._close_vanished_positions) 이 trade_worker_position 을
+        SOLD 로 닫았어도 메모리/구독이 남아 있으면, 다음 틱마다 없는 포지션을 계속
+        평가하고 라인에 닿는 순간 실주문까지 나간다. _do_sell 이 전량 청산 후에 하는
+        정리(positions.pop → _unsubscribe → _sold.add)와 같은 일을 한곳에 모아둔 것이다.
+
+        ⚠ _do_sell 과 달리 _sold 에는 넣지 않는다. _sold 는 당일 reload 때만 초기화되는데
+        (premarket 라운드의 reload_positions(reset_sold=False) 는 유지한다), 여기 넣으면
+        같은 종목을 나중에 **정상 매수**했을 때 on_price 가 그 신규 포지션을 계속 무시해
+        손절이 안 도는 사각지대가 생긴다. positions 에서 빼고 구독을 끊으면 on_price 는
+        pos=None 으로 즉시 return 하므로 재주문 방지 목적은 이미 충족된다. 또 이 종목은
+        '계좌에 없어서' 닫은 것이라 _absorb_untracked_holdings 의 편입 대상도 아니다.
+        """
+        with self._lock:
+            self.positions.pop(symbol, None)
+            self._peak_dirty.discard(symbol)
+        self._unsubscribe(symbol)
+        self._inflight.discard(symbol)
+        self._cooldown.pop(symbol, None)
+        self._fail_count.pop(symbol, None)
+        self._disabled.discard(symbol)
 
     # ── 세션 가드 ────────────────────────────────────────────────────
     def _session(self, pos: dict):
@@ -507,6 +532,40 @@ class BaseSellExecutor(ABC):
             qty = (base * ratio).quantize(Decimal("1"), rounding=ROUND_DOWN)
         return qty
 
+    def _fallback_lines(self, code: str, pos: dict):
+        """일봉 평가가 불가능할 때의 최소 보호막 — stop/target/trail 만 세운다.
+
+        strategy.recalc_lines 는 KIS 조회·일봉 지표를 전혀 쓰지 않고 entry_price /
+        peak_high / last_atr 만으로 3개 라인을 만든다. 지표 계산이 깨진 유저
+        (user_options 의 window 컬럼 NULL 등)도 이 경로로는 손절선을 가질 수 있다.
+
+        action_type/bars_held/last_check_ymd 는 건드리지 않는다 — 일봉 신호를
+        판정한 게 아니므로 "오늘 평가했다"고 기록하면 안 된다.
+        """
+        try:
+            lines = self.strategy.recalc_lines(pos)
+        except Exception as e:  # noqa: BLE001
+            self.wlog.warn("[매도] %s 라인 재계산도 실패 → 라인 없이 보유: %s", code, e)
+            return
+        if not lines:
+            return
+        try:
+            self.repo.update_position_state(self.cfg.user_id, code, lines)
+        except Exception as e:  # noqa: BLE001
+            self.wlog.warn("[매도] %s 라인 DB 갱신 실패: %s", code, e)
+            return
+        with self._lock:
+            p = self.positions.get(code)
+            if p is not None:
+                p.update({
+                    "stop_price": lines.get("stop_price"),
+                    "target_price": lines.get("target_price"),
+                    "trail_line": lines.get("trail_line"),
+                })
+        self.wlog.info("[매도] %s 라인 보정(지표 미사용) stop=%s target=%s trail=%s",
+                       code, lines.get("stop_price"), lines.get("target_price"),
+                       lines.get("trail_line"))
+
     # ── 일별 전략 평가 (모드 전략) ───────────────────────
     def refresh_positions(self):
         """HOLDING 포지션마다 모드 전략으로 라인/액션 재계산 → DB 갱신.
@@ -527,10 +586,19 @@ class BaseSellExecutor(ABC):
             try:
                 result, state = self.strategy.evaluate(pos)
             except Exception as e:  # noqa: BLE001
-                self.wlog.warn("[매도] %s 전략 평가 실패: %s", code, e)
+                # 일봉 지표 계산이 깨지면(예: user_options 의 rolling window 가 NULL)
+                # 이 포지션은 그날 평가를 못 한다. 예전엔 그냥 continue 했는데, 그러면
+                # 매수 직후 initial_lines 도 같은 이유로 실패한 포지션은 stop/target 이
+                # 영구히 NULL 로 남는다 → hit_line 이 항상 None → 손절도, 외부청산 감지도
+                # 영원히 못 한다(2026-09-29 user_id=3 032580).
+                # 지표가 필요 없는 recalc_lines(entry_price/peak/atr 만 사용)로 최소한
+                # stop/target 은 세워 두고 넘어간다.
+                self.wlog.warn("[매도] %s 전략 평가 실패: %s → 라인만 재계산(지표 미사용)", code, e)
+                self._fallback_lines(code, pos)
                 continue
             if state is None:
-                self.wlog.warn("[매도] %s 데이터 부족 → 평가 skip", code)
+                self.wlog.warn("[매도] %s 데이터 부족 → 평가 skip(라인만 재계산)", code)
+                self._fallback_lines(code, pos)
                 continue
             # DB 라인/상태 갱신 + 메모리 포지션 갱신(realtime 감시에 반영)
             self.repo.update_position_state(self.cfg.user_id, code, state)

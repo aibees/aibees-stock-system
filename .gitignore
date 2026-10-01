@@ -25,3 +25,8 @@ npm-debug.log*
 *.key
 GoogleService-Info.plist
 google-services.json
+# Firebase Admin SDK 서비스 어카운트 키 — 서버 권한 전체를 가진 비밀키다.
+# (google-services.json 은 클라이언트 설정이라 성격이 다르다 — 이건 유출되면 끝)
+# 예: stock-system-822d0-firebase-adminsdk-fbsvc-34f02c1f16.json
+*-firebase-adminsdk-*.json
+serviceAccountKey.json

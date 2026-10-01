@@ -45,6 +45,25 @@ def _load():
                     type(e).__name__, e)
 
 
+def artifact_path() -> str:
+    """라이브 아티팩트의 절대경로. 승격(shape_artifact.promote)이 이 파일을 교체한다."""
+    return _ARTIFACT_PATH
+
+
+def reload() -> bool:
+    """아티팩트를 다시 읽는다. 승격 직후 같은 프로세스에서 새 모델을 쓰려면 필요하다.
+
+    배치는 매 실행이 별도 프로세스라 보통은 불필요하지만, ShapeTrainJob 이 승격 후
+    같은 프로세스에서 검증 채점을 하므로 캐시를 비울 수단이 있어야 한다.
+    """
+    global _model, _load_attempted, _load_error
+    _model = None
+    _load_attempted = False
+    _load_error = None
+    _load()
+    return _model is not None
+
+
 def is_available() -> bool:
     _load()
     return _model is not None
