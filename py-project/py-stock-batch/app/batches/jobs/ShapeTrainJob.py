@@ -20,6 +20,10 @@
     **라이브 아티팩트는 승격 단계에 도달하기 전까지 절대 건드리지 않는다** — 중간에
     죽어도 라이브는 직전 모델 그대로다.
 
+    선행조건(테이블·sklearn·아티팩트 쓰기권한)은 학습 전에 _preflight 가 확인하고
+    하나라도 어긋나면 **FAIL 로 즉시 중단**한다. 데이터 부족(정상 대기)은 SUCCESS
+    스킵이지만 선행조건 미비는 운영 설정 실수라 그날 바로 알려야 한다.
+
 수동 실행
     POST /api/v1/jobs/once/SHAPE_TRAIN_JOB
     body:
@@ -28,13 +32,21 @@
       {"holdout_days": 45}     holdout 구간을 넓혀 판정(기본 30)
 """
 import json
+import os
 from datetime import datetime
+
+from sqlalchemy import text
 
 from app.batches.jobs.job import Job
 from stock_shared.dao.tradeShapeModelHistDao import TradeShapeModelHistDao
 from stock_shared.dao.tradeShapeTrainDailyDao import TradeShapeTrainDailyDao
-from stock_shared.ml import shape_artifact, shape_train
+from stock_shared.ml import shape_artifact, shape_model, shape_train
 from stock_shared.ml.shape_features import SHAPE_FEATURE_COLUMNS
+from stock_shared.models.tradeShapeModelHist import TradeShapeModelHist
+
+# pre-flight 로 존재를 확인하는 테이블. sql/ 마이그레이션은 수동 적용이라
+# "코드는 배포됐는데 DDL 만 안 돌린" 상태가 실제로 발생한다.
+REQUIRED_TABLES = ('trade_shape_train_daily', 'trade_shape_model_hist')
 
 
 class ShapeTrainJob(Job):
@@ -47,12 +59,87 @@ class ShapeTrainJob(Job):
     def get_name(self):
         return self.job_name
 
+    # ── pre-flight ───────────────────────────────────────────────────
+    def _table_exists(self, table: str) -> bool:
+        return bool(self.session.execute(
+            text("SELECT COUNT(*) FROM information_schema.tables "
+                 " WHERE table_schema = DATABASE() AND table_name = :t"),
+            {"t": table},
+        ).scalar())
+
+    def _missing_hist_columns(self) -> list[str]:
+        """ORM 모델에는 있는데 실제 테이블에 없는 컬럼. 있으면 INSERT 가 터진다."""
+        have = {r[0] for r in self.session.execute(
+            text("SELECT COLUMN_NAME FROM information_schema.columns "
+                 " WHERE table_schema = DATABASE() "
+                 "   AND table_name = 'trade_shape_model_hist'")).all()}
+        need = {c.name for c in TradeShapeModelHist.__table__.columns}
+        return sorted(need - have)
+
+    def _preflight(self) -> list[str]:
+        """학습을 시작하기 **전에** 선행조건을 확인한다. 반환: 문제 목록(빈 리스트=통과).
+
+        왜 앞에서 막아야 하는가
+            run_batch 는 '후보 저장 → 승격 → 이력 기록' 순이다. 이력 테이블이나 컬럼이
+            없으면 **라이브 아티팩트를 교체한 뒤** 마지막 INSERT 에서 터진다 —
+            배치 로그는 FAIL 인데 모델은 이미 바뀐, 가장 추적하기 어려운 상태가 된다.
+            (2026-10-02 실제로 sql/20 만 적용되고 19 가 빠진 채 토요일 배치가 등록돼 있었다)
+
+        왜 SUCCESS 스킵이 아니라 FAIL 인가
+            데이터 부족은 정상적인 대기 상태라 SUCCESS 로 스킵한다. 반면 선행조건 미비는
+            전부 **운영 설정 실수**다. 조용히 SUCCESS 로 끝내면 몇 주 뒤에야 알게 된다.
+            FAIL 로 두면 batch_log 와 푸시 알림이 그날 바로 알려준다.
+        """
+        problems = []
+
+        for table in REQUIRED_TABLES:
+            if not self._table_exists(table):
+                problems.append(f"{table} 테이블 없음(sql/ 마이그레이션 미적용)")
+
+        # 테이블이 있어도 스키마가 어긋나면 같은 사고가 난다.
+        if self._table_exists('trade_shape_model_hist'):
+            missing = self._missing_hist_columns()
+            if missing:
+                problems.append("trade_shape_model_hist 컬럼 누락: " + ", ".join(missing))
+
+        # 학습 배치에 sklearn 은 선택 의존성이 아니라 필수다(추론부와 다르다).
+        try:
+            import sklearn  # noqa: F401
+        except Exception as e:  # noqa: BLE001
+            problems.append(f"scikit-learn 사용 불가({type(e).__name__}: {e})")
+
+        # 후보 저장·승격이 전부 파일 쓰기다. 학습을 다 돌린 뒤 쓰기에서 실패하면
+        # 그 계산이 통째로 버려지므로 미리 실제로 써보고 지운다.
+        try:
+            os.makedirs(shape_artifact.CANDIDATES_DIR, exist_ok=True)
+            probe = os.path.join(shape_artifact.CANDIDATES_DIR, f'.preflight_{os.getpid()}')
+            with open(probe, 'w') as f:
+                f.write('ok')
+            os.remove(probe)
+        except Exception as e:  # noqa: BLE001
+            problems.append(f"후보 디렉터리 쓰기 불가({shape_artifact.CANDIDATES_DIR}): {e}")
+
+        # 승격은 라이브 파일을 같은 디렉터리의 임시파일로 쓴 뒤 os.replace 한다.
+        live_dir = os.path.dirname(shape_model.artifact_path())
+        if not os.path.isdir(live_dir) or not os.access(live_dir, os.W_OK):
+            problems.append(f"라이브 아티팩트 디렉터리 쓰기 불가({live_dir})")
+
+        return problems
+
     def run_batch(self, **kwargs):
         dry_run = bool(kwargs.get('dry_run', False))
         since = kwargs.get('since')
         holdout_days = int(kwargs.get('holdout_days', shape_train.HOLDOUT_DAYS))
         run_id = datetime.now().strftime('%Y%m%d_%H%M%S')
         run_ymd = datetime.now().strftime('%Y-%m-%d')
+
+        # ── 0) pre-flight — 학습·승격 전에 선행조건 확인 ────────────────────
+        problems = self._preflight()
+        if problems:
+            desc = "선행조건 미비로 중단 — " + " / ".join(problems)
+            print(f"[ShapeTrainJob] {desc}", flush=True)
+            return {'status': 'FAIL', 'batch_cnt': 0, 'desc': desc[:255]}
+        print("[ShapeTrainJob] pre-flight 통과 (테이블·sklearn·아티팩트 쓰기)", flush=True)
 
         # ── 1) 학습셋 로드 ──────────────────────────────────────────────────
         rows = self.trainDaoImpl.select_training_rows(self.session, since=since)
