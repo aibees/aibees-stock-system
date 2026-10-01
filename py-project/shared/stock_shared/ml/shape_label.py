@@ -4,6 +4,9 @@
 상태가 된다(app/test/shape_full_universe_scan.py 의 compute_net_edge_fwd 가
 원본이고, ShapeLabelJob / eval_shape_proba / 향후 학습 스크립트가 같은 걸 써야 한다).
 
+타임프레임: 이 식 자체는 봉 단위와 무관하다(주봉/월봉에 그대로 쓴다).
+forward 봉수만 LABEL_TIMEFRAME_SPEC 에서 골라 window 로 넘기면 된다.
+
 라벨 정의(shape_model.py docstring 과 동일):
     base = 당일 종가
     향후 LABEL_FORWARD_BARS 거래일의
@@ -32,6 +35,40 @@ LABEL_WIN_THRESHOLD_PCT = 15.0
 #   훨씬 먼 미래가 된다. 그 경우 라벨이 조용히 틀려지므로 아예 건너뛴다.
 #   5거래일 = 보통 7캘린더일, 연휴를 넉넉히 감안해 15일.
 LABEL_MAX_SPAN_DAYS = 15
+
+
+# ============================================================================
+# 타임프레임별 라벨 지평 (일/주/월 shape_proba 앙상블용)
+#
+# 왜 forward 봉수가 타임프레임마다 다른가
+#   일봉 모델은 forward 5봉 = 5거래일이다. 주봉/월봉에 같은 5봉을 쓰면 각각
+#   5주 / 5개월 예측이 되어, 실제 보유기간(s1_max_hold_bars≈30거래일)과 어긋난다.
+#   앙상블로 합산하려면 세 모델이 '비슷한 미래'를 봐야 하므로 지평을 맞춘다:
+#
+#     D: forward 5봉  = 5거래일
+#     W: forward 1봉  = 1주   = 5거래일    ← 일봉과 사실상 동일 지평
+#     M: forward 1봉  = 1개월 ≈ 21거래일   ← 보유기간 상한에 근접
+#
+#   주봉 1봉의 high/low 는 그 주 5거래일의 high/low 와 같으므로, 주봉 라벨은
+#   일봉 5봉 라벨과 거의 같은 타깃이 된다 — 같은 타깃을 다른 피처 시각(14주 구조)
+#   으로 예측하는 구조라 앙상블 다양성 확보에 이상적이다.
+#
+# max_span_days 는 "봉 사이가 이보다 벌어지면 적재 누락으로 보고 건너뛴다" 가드다.
+#   주봉 1봉=7일, 월봉 1봉≈31일이라 일봉 기준 15일을 그대로 쓰면 전부 버려진다.
+# ============================================================================
+LABEL_TIMEFRAME_SPEC = {
+    "D": {"forward_bars": 5, "max_span_days": 15},
+    "W": {"forward_bars": 1, "max_span_days": 14},
+    "M": {"forward_bars": 1, "max_span_days": 45},
+}
+
+
+def timeframe_spec(period: str) -> dict:
+    """타임프레임별 라벨 파라미터. 미지원 period 는 ValueError."""
+    try:
+        return LABEL_TIMEFRAME_SPEC[period]
+    except KeyError:
+        raise ValueError(f"지원하지 않는 period: {period!r} (D/W/M 만 가능)") from None
 
 
 def compute_net_edge_fwd(close, high, low, window: int = LABEL_FORWARD_BARS) -> np.ndarray:
