@@ -76,6 +76,31 @@ class AccountCash:
     buyable: Decimal
 
 
+# ── KIS 국내주식 주문 TR ID ──────────────────────────────────────────────────
+#   공식문서(apiportal: 주식주문(현금) v1_국내주식-001 / 주식주문(정정취소) v1_국내주식-003)에
+#   **"구TR 은 사전고지 없이 막힐 수 있으므로 반드시 신TR 로 변경이용"** 이라고 명시돼 있다.
+#
+#   2026-10-02 실제로 그 일이 났다. 구 TTTC0802U 로 NXT 프리마켓 지정가 매수를 내자
+#   KIS 가 (RT_CD:7, MSG_CD:APBK0918) "장운영시간이 아닙니다.(주문불가)" 로 거부했다 —
+#   구TR 은 KRX 정규장 세션 전용으로 동작해 body 의 EXCG_ID_DVSN_CD=NXT 를 실질적으로
+#   무시한다. 거부 메시지가 신TR(TTC0012U)을 가리키고 있었다.
+#
+#   정규장(KRX/SOR)은 구TR 로도 아직 통과하지만 같은 이유로 언제든 막힌다.
+#   그래서 매수·매도·취소를 **전부** 신TR 로 옮긴다(2026-10-02 결정).
+#
+#   ※ 모의투자는 EXCG_ID_DVSN_CD 가 KRX 만 지원된다 → NXT 경로는 모의로 검증 불가.
+_ORDER_TR = {               # (side, virtual): tr_id — 주식주문(현금) order-cash
+    ("BUY", False): "TTTC0012U",    # 구 TTTC0802U
+    ("SELL", False): "TTTC0011U",   # 구 TTTC0801U
+    ("BUY", True): "VTTC0012U",     # 구 VTTC0802U
+    ("SELL", True): "VTTC0011U",    # 구 VTTC0801U
+}
+_CANCEL_TR = {              # virtual: tr_id — 주식주문(정정취소) order-rvsecncl
+    False: "TTTC0013U",             # 구 TTTC0803U
+    True: "VTTC0013U",
+}
+
+
 @dataclass
 class OrderResult:
     symbol: str
@@ -88,6 +113,13 @@ class OrderResult:
     status: str = "PENDING"         # FILLED|PARTIAL|REJECTED|PENDING
     reason: str = ""
     raw: object = None              # pykis KisOrder (취소용)
+    # ── 정정취소(order-rvsecncl)에 원주문 값을 그대로 돌려줘야 해서 보관한다 ──
+    #   KIS 는 취소 요청에 KRX_FWDG_ORD_ORGNO / ORGN_ODNO / ORD_DVSN 을 요구하고,
+    #   거래소(EXCG_ID_DVSN_CD)도 원주문과 같아야 한다. raw 객체에만 두면 pykis
+    #   응답 스키마가 바뀔 때 취소가 조용히 깨지므로 값으로 꺼내 둔다.
+    branch: Optional[str] = None    # KRX_FWDG_ORD_ORGNO (주문 응답의 계좌관리점코드)
+    ord_dvsn: str = "01"            # 원주문의 주문구분
+    exchange: str = "KRX"           # 원주문의 EXCG_ID_DVSN_CD
 
 
 @dataclass
@@ -585,7 +617,9 @@ class Broker:
                  order_no, sess.exchange, sess.name)
         return OrderResult(symbol, side, qty,
                            px if sess.limit_only else Decimal(ref_price),
-                           order_no, raw=order)
+                           order_no, raw=order,
+                           branch=getattr(order, "branch", None),
+                           ord_dvsn=sess.ord_dvsn, exchange=sess.exchange)
 
     def buy_limit_nxt(self, symbol: str, qty: Decimal, limit_price: Decimal) -> OrderResult:
         """NXT 프리마켓(08:00~08:50) 전용 지정가 매수. order_in_session 의 얇은 래퍼."""
@@ -601,7 +635,9 @@ class Broker:
         order_no = _ono(getattr(order, "order_number", None) or order)
         log.info("[LIVE] %s 주문 접수 %s qty=%s order=%s exch=%s",
                  side, symbol, qty, order_no, exchange)
-        return OrderResult(symbol, side, qty, Decimal(ref_price), order_no, raw=order)
+        return OrderResult(symbol, side, qty, Decimal(ref_price), order_no, raw=order,
+                           branch=getattr(order, "branch", None),
+                           ord_dvsn="01", exchange=exchange)
 
     def _order_rest(self, side: str, symbol: str, qty: Decimal, exchange: str,
                     ord_dvsn: str = "01", ord_unpr: Decimal | int = 0):
@@ -609,11 +645,13 @@ class Broker:
         pykis 의 인증/토큰/hashkey/도메인 파이프라인(kis.fetch)을 그대로 재사용하고,
         body 에 거래소 구분만 추가한다.
         기본 시장가(ORD_DVSN='01', ORD_UNPR='0'), 지정가는 '00' + 실제 가격."""
-        from pykis.api.account.order import KisDomesticOrder, DOMESTIC_ORDER_API_CODES
+        from pykis.api.account.order import KisDomesticOrder
         account = self.kis.primary  # KisAccountNumber (CANO/ACNT_PRDT_CD)
+        # TR 은 pykis 상수(DOMESTIC_ORDER_API_CODES)를 쓰지 않는다 — 그 상수는 구TR
+        # (TTTC0802U/0801U)로 고정돼 있고, 구TR 은 장외 세션에서 KIS 가 막는다(_ORDER_TR 주석).
         return self.kis.fetch(
             "/uapi/domestic-stock/v1/trading/order-cash",
-            api=DOMESTIC_ORDER_API_CODES[(True, side.lower())],  # 실전 TTTC0802U/0801U
+            api=_ORDER_TR[(side.upper(), bool(getattr(self.kis, "virtual", False)))],
             body={
                 "PDNO": symbol,
                 "ORD_DVSN": ord_dvsn,          # 01=시장가 / 00=지정가
@@ -626,13 +664,69 @@ class Broker:
             method="POST",
         )
 
+    @staticmethod
+    def _rt(res) -> tuple[str, str]:
+        """응답에서 (rt_cd, msg1) 을 꺼낸다. 형태가 pykis 버전마다 달라 방어적으로 읽는다."""
+        def g(key: str, default: str = "") -> str:
+            v = getattr(res, key, None)
+            if v is None and isinstance(res, dict):
+                v = res.get(key)
+            return str(v).strip() if v is not None else default
+        return g("rt_cd", "?"), g("msg1")
+
     def cancel(self, result: OrderResult) -> bool:
-        """미체결 주문 취소(best-effort). 성공 True."""
-        if result.raw is None:
+        """미체결 주문 **잔량 전부** 취소(best-effort). 성공 True.
+
+        공식 정정취소 API(order-rvsecncl, 신TR)를 직접 호출한다. 예전엔 pykis 의
+        account().cancel() 을 썼는데 그쪽은 구TR(TTTC0803U) 이라 주문 API 와 똑같은
+        이유로 장외 세션에서 막힌다 — 미체결 주문을 취소하지 못하면 주문가능현금이
+        계속 묶여 다음 라운드 매수가 수량 0 으로 떨어진다.
+
+        KIS 는 원주문의 KRX_FWDG_ORD_ORGNO / ORGN_ODNO / ORD_DVSN 을 요구하고 거래소도
+        원주문과 같아야 한다. QTY_ALL_ORD_YN='Y' 면 잔량 전부가 대상이라 ORD_QTY 는
+        무시되지만 필수 필드이므로 남은 수량을 넣어준다.
+
+        ※ 응답 스키마 검증(response_type)을 걸지 않는다 — 정정취소 응답 필드 표기가
+          주문 응답과 달라 타입 변환에서 터지면 "취소는 됐는데 실패로 보이는" 상태가
+          된다. 대신 rt_cd 를 직접 확인한다.
+        """
+        if not result.order_no:
             return False
+
+        branch = result.branch or getattr(result.raw, "branch", None)
+        if not branch:
+            log.warning("주문 취소 불가 %s order=%s: KRX_FWDG_ORD_ORGNO 없음",
+                        result.symbol, result.order_no)
+            return False
+
+        remain = result.qty - result.filled_qty
+        if remain <= 0:
+            remain = result.qty
+
         try:
-            self.kis.account().cancel(order=result.raw)
-            log.info("주문 취소 요청 %s order=%s", result.symbol, result.order_no)
+            res = self.kis.fetch(
+                "/uapi/domestic-stock/v1/trading/order-rvsecncl",
+                api=_CANCEL_TR[bool(getattr(self.kis, "virtual", False))],
+                body={
+                    "KRX_FWDG_ORD_ORGNO": str(branch),
+                    "ORGN_ODNO": str(result.order_no),
+                    "ORD_DVSN": result.ord_dvsn,
+                    "RVSE_CNCL_DVSN_CD": "02",       # 01=정정 / 02=취소
+                    "ORD_QTY": str(int(remain)),
+                    "ORD_UNPR": "0",
+                    "QTY_ALL_ORD_YN": "Y",           # 잔량 전부 취소
+                    "EXCG_ID_DVSN_CD": result.exchange,
+                },
+                form=[self.kis.primary],
+                method="POST",
+            )
+            rt, msg = self._rt(res)
+            if rt != "0":
+                log.warning("주문 취소 거부 %s order=%s rt_cd=%s msg=%s",
+                            result.symbol, result.order_no, rt, msg)
+                return False
+            log.info("주문 취소 완료 %s order=%s qty=%s exch=%s",
+                     result.symbol, result.order_no, remain, result.exchange)
             return True
         except Exception as e:  # noqa: BLE001
             log.warning("주문 취소 실패 %s order=%s: %s", result.symbol, result.order_no, e)
