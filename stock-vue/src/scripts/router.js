@@ -56,20 +56,40 @@ const getRouteList = async () => {
 
     let saRouter = [];
 
+    // [수정] 메뉴 1건의 컴포넌트 해석 실패가 **전체 라우트**를 날려버리던 문제.
+    //   loadComponent() 는 번들에 해당 .vue 가 없으면 throw 한다. 예전에는 그 예외가
+    //   forEach 를 타고 아래 catch 까지 올라가 return [] 이 되어, 멀쩡한 메뉴까지
+    //   전부 라우트 미등록 상태가 됐다. setMenuList() 는 그 전에 이미 끝나므로
+    //   "메뉴는 보이는데 누르면 NotFound" 라는 진단하기 어려운 증상이 된다.
+    //   실제로 master_menu 에 행을 넣고 프런트를 아직 재배포하지 않은 동안
+    //   앱 전체 메뉴가 죽었다(2026-10-03, TradeProfit).
+    //   DB 메뉴 등록과 프런트 배포는 원래 시점이 어긋날 수 있으므로, 못 찾은
+    //   메뉴만 건너뛰고 나머지는 정상 등록한다.
+    const safeComponent = (m) => {
+        try {
+            return loadComponent(m);
+        } catch (e) {
+            console.error(`[router] 컴포넌트 없음 → 메뉴 건너뜀: ${m.menu_code}/${m.menu_component}`, e);
+            return null;
+        }
+    };
+
     routerResult.forEach(r => {
         let tmp = {}
         tmp.path = r.menu_path;
         tmp.name = r.menu_name;
-        tmp.component = loadComponent(r);
-        
+        tmp.component = safeComponent(r);
+
         let child = []
         if ('children' in r) {
-            r.children.forEach(c => {                
+            r.children.forEach(c => {
+                const childComponent = safeComponent(c);
+                if (!childComponent) return;   // 이 자식만 건너뛴다
                 let childTmp = {}
                 let meta = {}
                 childTmp.path = c.menu_path;
                 childTmp.name = c.menu_name;
-                childTmp.component = loadComponent(c)
+                childTmp.component = childComponent;
                 meta.title = c.menu_title;
                 // set meta
                 childTmp.meta = meta;
@@ -77,6 +97,11 @@ const getRouteList = async () => {
             });
         }
         tmp.children = child;
+        // 부모 컴포넌트를 못 찾으면 자식까지 띄울 수 없다(router-view 가 없음) → 통째로 skip.
+        if (!tmp.component) {
+            console.error(`[router] 부모 컴포넌트 없음 → 하위 메뉴까지 건너뜀: ${r.menu_code}`);
+            return;
+        }
         saRouter.push(tmp);
     });
 
