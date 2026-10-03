@@ -101,14 +101,34 @@ class TradeShapeTrainDailyDao:
         ]
 
     def update_labels_bulk(self, session, rows: list[dict]) -> int:
-        """확정된 라벨 일괄 UPDATE. rows = [{coin, datetime, net_edge_fwd}, ...]"""
+        """확정된 라벨 일괄 UPDATE. rows = [{coin, datetime, net_edge_fwd}, ...]
+
+        **ORM 클래스가 아니라 Core 테이블로 UPDATE 한다.** SQLAlchemy 2.0 에서
+        update(ORM클래스) + executemany 는 ORM bulk-update 경로로 들어가는데,
+        그 경로는 커스텀 bindparam 기반 WHERE 와 맞지 않아 두 단계로 터진다:
+          1) 그냥 두면 — "bulk synchronize of persistent objects not supported when
+             using bulk update with additional WHERE criteria"
+             (2026-10-02 21:40 ShapeLabelJob 실제 실패)
+          2) synchronize_session=None 을 주면 — "per-row ORM Bulk UPDATE by Primary
+             Key requires that records contain primary key values"
+             (파라미터 키가 b_coin/b_datetime 이라 PK 로 인식되지 않는다)
+        update(테이블) 은 Core 문장이라 ORM 기계장치를 타지 않고 의도한 대로
+        단일 UPDATE 를 executemany 로 보낸다. 이 DAO 는 select() 결과를 dict 로만
+        들고 영속 객체를 보유하지 않으므로 ORM 동기화가 애초에 불필요하다.
+        labeled_at 은 func.now() 로 **DB 시각**을 쓴다(앱 시각을 넣으면 다른
+        타임스탬프 컬럼과 기준이 어긋난다).
+
+        ※ 백필 전까지는 갱신할 행이 0건이어서 아래 `if not rows` 에 걸려
+          이 버그가 드러나지 않았다.
+        """
         if not rows:
             return 0
+        tbl = TradeShapeTrainDaily.__table__
         stmt = (
-            update(TradeShapeTrainDaily)
+            update(tbl)
             .where(
-                TradeShapeTrainDaily.coin == bindparam("b_coin"),
-                TradeShapeTrainDaily.datetime == bindparam("b_datetime"),
+                tbl.c.coin == bindparam("b_coin"),
+                tbl.c.datetime == bindparam("b_datetime"),
             )
             .values(net_edge_fwd=bindparam("b_net_edge_fwd"), labeled_at=func.now())
         )
