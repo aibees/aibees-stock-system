@@ -26,6 +26,7 @@ trade_worker DB 접근 계층 (메인 DAO 와 독립, raw SQL).
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Optional
 
 from pytz import timezone
 from sqlalchemy import text
@@ -497,21 +498,40 @@ class Repository:
             s.commit()
             return remain
 
-    def close_position(self, user_id: int, stock_code: str, exit_price: Decimal,
-                       filled_qty: Decimal, reason: str) -> None:
-        """매도 체결 → status=SOLD + 청산정보/실현손익 기록(이력으로 남김)."""
+    def close_position(self, user_id: int, stock_code: str, exit_price: Optional[Decimal],
+                       filled_qty: Optional[Decimal], reason: str) -> None:
+        """매도 체결 → status=SOLD + 청산정보/실현손익 기록(이력으로 남김).
+
+        exit_price=None  청산가를 모르는 경우. exit_price/pnl 을 **NULL 로 남긴다.**
+            0 을 넣으면 "0원에 팔아 전액 손실" 로 읽히고, pnl=0 은 "손익 없음" 과
+            구분되지 않아 수익률 집계가 조용히 왜곡된다. 모르면 모른다고 남긴다.
+        filled_qty=None  포지션에 기록된 보유수량(qty)을 그대로 쓴다.
+            외부청산(EXTERNAL_CLOSED)처럼 "얼마나 팔렸는지" 를 호출부가 모르는 경우,
+            전량 청산된 것이므로 포지션 수량이 곧 청산 수량이다.
+            예전엔 이 자리에 Decimal(0) 을 넘겨서 pnl=(x-entry)*0=0 이 되어
+            외부청산 33건의 손익이 통째로 버려지고 있었다(2026-10-03 발견).
+
+        ※ EXTERNAL_CLOSED 의 청산가는 "탐지 시점의 현재가" 라 실제 체결가가 아니다.
+          exit_reason 으로 구분되므로, 정확한 실현손익만 필요한 집계에서는
+          exit_reason <> 'EXTERNAL_CLOSED' 로 걸러 쓰면 된다.
+        """
         sql = text(
             """
             UPDATE trade_worker_position
             SET status = 'SOLD', exit_at = :now, exit_price = :xprice, exit_reason = :reason,
-                pnl = (:xprice - entry_price) * :fqty, updated_at = :now
+                pnl = CASE WHEN :xprice IS NULL THEN NULL
+                           ELSE (:xprice - entry_price) * COALESCE(:fqty, qty) END,
+                updated_at = :now
             WHERE user_id = :uid AND stock_code = :code AND status = 'HOLDING'
             """
         )
         with get_session() as s:
             s.execute(sql, {
-                "now": datetime.now(), "xprice": str(exit_price), "reason": (reason or "")[:45],
-                "fqty": str(filled_qty), "uid": user_id, "code": stock_code,
+                "now": datetime.now(),
+                "xprice": None if exit_price is None else str(exit_price),
+                "reason": (reason or "")[:45],
+                "fqty": None if filled_qty is None else str(filled_qty),
+                "uid": user_id, "code": stock_code,
             })
             s.commit()
 

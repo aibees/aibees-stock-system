@@ -169,7 +169,23 @@ def _sync_tracked_qty(repo, user_id, sell_executor, holdings):
                 pass
 
 
-def _close_vanished_positions(repo, user_id, sell_executor, holdings):
+def _vanished_exit_price(broker, code):
+    """외부청산 추정 청산가. 실패하면 None → pnl 을 NULL 로 남긴다.
+
+    실제 체결가는 알 수 없다(사용자가 타채널에서 이미 팔았다). 0 을 넣으면
+    "0원에 팔아 전액 손실" 로 기록되므로, 모르면 NULL 로 두는 편이 정확하다.
+    """
+    if broker is None:
+        return None
+    try:
+        px = broker.current_price(code)
+        return px if px and px > 0 else None
+    except Exception as e:  # noqa: BLE001
+        log.warning("[외부청산] %s 추정가 조회 실패 → pnl 미기록: %s", code, e)
+        return None
+
+
+def _close_vanished_positions(repo, user_id, sell_executor, holdings, broker=None):
     """trade_worker_position(HOLDING) 인데 계좌 실보유에 없는 종목을 외부청산으로 닫는다.
 
     왜 폴링이 직접 닫아야 하는지는 모듈 docstring 참고(기존 두 경로가 라인 유무와
@@ -222,7 +238,9 @@ def _close_vanished_positions(repo, user_id, sell_executor, holdings):
             continue
 
         try:
-            repo.close_position(user_id, code, Decimal(0), Decimal(0), "EXTERNAL_CLOSED")
+            # 수량 None → 포지션 보유수량(전량)을 쓴다. 가격은 추정치(없으면 NULL).
+            repo.close_position(user_id, code, _vanished_exit_price(broker, code), None,
+                                "EXTERNAL_CLOSED")
         except Exception as e:  # noqa: BLE001
             log.warning("[외부청산] %s 포지션 종료 실패: %s", code, e)
             continue
@@ -310,7 +328,7 @@ def reconcile_wallet(broker, repo, user_id: int,
              tag, cash, deposit, stock_amount, total, actual is not None, sync)
 
     _sync_tracked_qty(repo, user_id, sell_executor, holdings)        # 기존 편입 종목 수량 보정
-    _close_vanished_positions(repo, user_id, sell_executor, holdings)  # 계좌에서 사라진 포지션 종료
+    _close_vanished_positions(repo, user_id, sell_executor, holdings, broker)  # 계좌에서 사라진 포지션 종료
     _absorb_untracked_holdings(repo, user_id, sell_executor, holdings)
 
     return cash

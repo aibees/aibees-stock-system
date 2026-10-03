@@ -95,6 +95,19 @@ class BaseBuyExecutor(ABC):
             return False
         return True
 
+    def _last_price_or_none(self, code: str) -> Optional[Decimal]:
+        """외부청산 추정 청산가. 시세 조회가 실패하면 None(= pnl 을 NULL 로 남김).
+
+        여기서 0 을 반환하면 "0원에 팔았다" 로 기록돼 손익이 전액 손실로 잡힌다.
+        모르는 값은 0 이 아니라 NULL 이어야 한다.
+        """
+        try:
+            px = self.broker.current_price(code)
+            return px if px and px > 0 else None
+        except Exception as e:  # noqa: BLE001
+            self.wlog.warn("[매수] %s 외부청산 추정가 조회 실패 → pnl 미기록: %s", code, e)
+            return None
+
     def _drop_vanished(self, blocking: list[dict]) -> list[dict]:
         """blocking 중 계좌 실보유에 없는 포지션을 외부청산 종료하고 목록에서 제거."""
         try:
@@ -114,7 +127,12 @@ class BaseBuyExecutor(ABC):
                 alive.append(p)
                 continue
             try:
-                self.repo.close_position(self.cfg.user_id, code, Decimal(0), Decimal(0),
+                # 청산가는 알 수 없다(사용자가 타채널에서 이미 팔았다). 탐지 시점의
+                # 현재가를 추정치로 남긴다 — 조회 실패면 None 으로 둬 pnl 을 NULL 로
+                # 남기고, 0 을 넣어 "0원에 전량 손실" 로 왜곡되는 것을 피한다.
+                # 수량은 None → 포지션에 기록된 보유수량을 그대로 쓴다(전량 청산).
+                self.repo.close_position(self.cfg.user_id, code,
+                                         self._last_price_or_none(code), None,
                                          "EXTERNAL_CLOSED")
             except Exception as e:  # noqa: BLE001
                 self.wlog.warn("[매수] %s 좀비 포지션 종료 실패 → 매수 차단 유지: %s", code, e)

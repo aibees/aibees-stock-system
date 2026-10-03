@@ -673,7 +673,10 @@ class BaseSellExecutor(ABC):
             actual = self._actual_qty(symbol)
             if actual is not None and actual <= 0:
                 # 실제 보유 없음 = 이미 청산됨 → 포지션 종료(정리)
-                self.repo.close_position(self.cfg.user_id, symbol, price, Decimal(0), "EXTERNAL_CLOSED")
+                # price 는 이 콜백이 받은 실시간 체결가다 — 추정 청산가로 그대로 쓴다.
+                # 수량은 None → 포지션 보유수량(전량)을 쓴다. 예전엔 Decimal(0) 이라
+                # 가격을 알고도 pnl 이 0 으로 기록됐다.
+                self.repo.close_position(self.cfg.user_id, symbol, price, None, "EXTERNAL_CLOSED")
                 self.positions.pop(symbol, None)
                 self._sold.add(symbol)
                 self._unsubscribe(symbol)   # 보유 종료 → 실시간 감시 비활성

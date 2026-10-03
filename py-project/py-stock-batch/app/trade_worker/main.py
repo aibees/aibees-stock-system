@@ -184,7 +184,16 @@ def _reconcile_positions(cfg, broker, repo):
     #    (worker 가 산 종목을 사용자가 HTS 로 먼저 판 경우. 정리하지 않으면
     #     이미 판 종목에 매도 주문을 반복해 연속 실패 → 자동 비활성으로 이어진다)
     for code in holding.keys() - held.keys():
-        repo.close_position(cfg.user_id, code, Decimal(0), Decimal(0), "EXTERNAL_CLOSED")
+        # 청산가는 알 수 없으므로(타채널 매도) 현재가를 추정치로 남긴다. 조회 실패면
+        # None → pnl 을 NULL 로 둔다. 0 을 넣으면 "0원에 전량 손실" 로 왜곡된다.
+        # 수량 None → 포지션 보유수량(전량)을 쓴다.
+        try:
+            est_px = broker.current_price(code)
+            est_px = est_px if est_px and est_px > 0 else None
+        except Exception as e:  # noqa: BLE001
+            log.warning("[대조] %s 외부청산 추정가 조회 실패 → pnl 미기록: %s", code, e)
+            est_px = None
+        repo.close_position(cfg.user_id, code, est_px, None, "EXTERNAL_CLOSED")
         log.warning("[대조] %s 실제 미보유 → 포지션 종료(외부청산)", code)
         # worker 로그(DB)에도 남긴다 — 운영자가 보는 곳은 trade_worker_log 다.
         # 여기 안 남기면 "왜 포지션이 사라졌나"를 컨테이너 stdout 에서만 찾아야 한다.
