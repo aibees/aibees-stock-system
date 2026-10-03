@@ -140,7 +140,12 @@ $red:      #141414;
 .common-menu {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    /* height:100% 는 조상 체인에 확정 높이가 있어야 먹는다. #app~body 가 그렇지
+     * 않아 높이가 붕괴되고, 그러면 .menu-list 의 flex:1 + overflow-y:auto 가
+     * 동작하지 않아 목록 끝(추천성과 등)이 고정 탭바 뒤로 숨는다.
+     * dvh 로 뷰포트 높이를 직접 잡고, 미지원 브라우저용으로 vh 를 앞에 둔다. */
+    min-height: 100vh;
+    min-height: 100dvh;
     background: $white;
     font-family: 'Pretendard', -apple-system, sans-serif;
     color: $gray-900;

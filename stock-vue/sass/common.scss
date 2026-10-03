@@ -31,6 +31,9 @@ select {
     }
 }
 
+/* ※ iOS 입력 자동확대(16px 미만) 대응은 이 파일이 아니라 App.vue 의 전역 스타일에
+ *   있다 — 이 파일은 4개 컴포넌트의 scoped 블록에서만 @use 되어 전역이 아니다. */
+
 .d-flex {
     display: flex;
     gap: 1rem;

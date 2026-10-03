@@ -292,13 +292,20 @@ console.log(userSession.getRole);
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 3.5rem;
+    /* index.html 이 viewport-fit=cover 라 웹뷰가 홈 인디케이터 아래까지 깔린다.
+     * 높이를 3.5rem 으로 고정하면 바의 아래쪽이 인디케이터에 먹혀 "고정이 안 되고
+     * 일부 잘린" 것처럼 보인다. 인디케이터 높이를 더해 그리고, 그만큼을
+     * padding-bottom 으로 비워 아이콘은 항상 3.5rem 안에 있게 한다.
+     * 높이값은 App.vue 의 --lnb-height/--lnb-total 과 같은 출처를 쓴다. */
+    height: var(--lnb-total);
+    box-sizing: border-box;
     // [수정] 헤더와 통일 — 검정 배경 대신 앱 배경(흰색)에 상단 border로 구분.
     // fixed 라서 스크롤되는 컨텐츠가 밑에서 올라올 수 있어 완전 투명은 피하고
     // 불투명한 흰색으로 뒀음(헤더는 relative라 투명해도 안전, 여긴 다름).
     background-color: $dc-white;
     border-top: 1px solid $dc-gray-900;
-    padding: 0;
+    // 좌우/상단은 0, 하단만 홈 인디케이터만큼 비운다(아이콘이 인디케이터에 겹치지 않게).
+    padding: 0 0 env(safe-area-inset-bottom, 0px);
     display: flex;
     align-items: stretch;
     z-index: 1000;

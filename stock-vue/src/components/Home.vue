@@ -663,6 +663,12 @@ $bronze:  #3d3d3d;
     .sort-chips {
         display: flex;
         gap: 4px;
+        /* 칩이 늘어나면 한 줄에 다 안 들어간다. 부모(.sort-bar)는 flex-wrap 이지만
+         * .sort-chips 는 그 안의 flex item 하나라 통째로만 줄바꿈된다 — 안에서
+         * 줄바꿈이 안 되면 내재 너비가 화면을 넘겨 버튼이 밖으로 삐져나간다.
+         * flex item 기본값인 min-width:auto 때문에 줄어들지도 않으므로 0 으로 푼다. */
+        flex-wrap: wrap;
+        min-width: 0;
     }
 
     .sort-chip {
