@@ -1,36 +1,31 @@
 <template>
     <div class="common-menu">
 
-        <!-- ── 헤더 버튼 ── -->
+        <!-- ── 상단바: 사용자 + 홈/로그아웃 ──
+             사용자 이름을 별도 카드로 크게 띄우던 것을 여기로 합쳤다. 메뉴 화면의
+             주인공은 메뉴 목록이지 사용자 정보가 아니다 — 아바타+이름을 한 줄로
+             줄여 목록이 더 위에서 시작하게 한다. -->
         <div class="menu-header-btns">
-            <button class="icon-btn" @click="goTo('/home')" title="홈으로">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                    <polyline points="9 22 9 12 15 12 15 22"/>
-                </svg>
-                홈
-            </button>
-            <button class="icon-btn logout-btn" @click="handleLogout" title="로그아웃">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                    <polyline points="16 17 21 12 16 7"/>
-                    <line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-                로그아웃
-            </button>
-        </div>
-
-        <!-- ── 유저 정보 ── -->
-        <div class="menu-user">
-            <div class="user-avatar">{{ userInitial }}</div>
-            <div class="user-info">
-                <p class="user-name">{{ userName }}</p>
-                <!-- <p class="user-id">{{ userId }}</p> -->
+            <div class="header-user">
+                <span class="user-avatar">{{ userInitial }}</span>
+                <span class="user-name">{{ userName }}</span>
             </div>
-            <div class="role-badges">
-                <span v-for="r in userRoles" :key="r" class="role-badge">{{ r }}</span>
+            <div class="header-actions">
+                <button class="icon-btn" @click="goTo('/home')" title="홈으로">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                </button>
+                <button class="icon-btn logout-btn" @click="handleLogout" title="로그아웃">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                </button>
             </div>
         </div>
 
@@ -46,13 +41,15 @@
         <!-- ── 메뉴 목록 ── -->
         <div class="menu-list">
             <ul class="main-ul">
+                <!-- 상위/하위 모두 menu_title(한글)을 쓴다. menu_name 은 영문 슬러그라
+                     병기하면 목록이 두 배로 길어지고 스캔이 느려진다. 문구를 바꾸고
+                     싶으면 코드가 아니라 master_menu.menu_title 을 고치면 된다. -->
                 <li v-for="m in filteredMenuList" :key="m.menu_code" class="main-li">
-                    <div class="main-name">{{ m.menu_name }}</div>
+                    <div class="main-name">{{ m.menu_title || m.menu_name }}</div>
                     <ul class="sub-ul">
                         <li v-for="sm in m.children" :key="sm.menu_code" class="sub-li">
                             <div class="menu-link" @click="goTo(m.menu_path + '/' + sm.menu_path)">
-                                <span class="link-title">{{ sm.menu_title }}</span>
-                                <span class="link-sub">{{ sm.menu_name }}</span>
+                                <span class="link-title">{{ sm.menu_title || sm.menu_name }}</span>
                             </div>
                         </li>
                     </ul>
@@ -73,7 +70,8 @@
     /* ── 유저 정보 ── */
     const userName  = computed(() => userStore.getUserInfo || 'Anonymous');
     const userId    = computed(() => userStore.user.loginInfo.user_id || '');
-    const userRoles = computed(() => userStore.getRole || []);
+    // userRoles 는 role 배지와 함께 제거했다(유저 카드 → 상단바 통합).
+    // 관리자 판정은 아래 isAdmin 이 userStore.getRole 을 직접 본다.
     const userInitial = computed(() => (userName.value?.[0] ?? '?').toUpperCase());
 
     /* ── 관리자 여부 ── */
@@ -157,14 +155,51 @@ $red:      #141414;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 16px 12px;
+    gap: 12px;
+    padding: 12px 16px;
     border-bottom: 1px solid $gray-100;
+
+    /* 사용자 표시를 상단바에 녹인다 — 아바타 24px + 이름 한 줄. */
+    .header-user {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;          // 긴 이름이 버튼을 밀어내지 않게
+
+        .user-avatar {
+            width: 24px;
+            height: 24px;
+            background: $navy;
+            color: $white;
+            font-size: 0.72rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .user-name {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: $gray-900;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+    }
 
     .icon-btn {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 6px 12px;
+        padding: 6px 10px;
         border: 1px solid $gray-200;
         border-radius: 0;
         background: $white;
@@ -187,70 +222,7 @@ $red:      #141414;
     }
 }
 
-/* ── 유저 카드 ── */
-.menu-user {
-    margin: 16px;
-    padding: 14px 16px;
-    background: $gray-50;
-    border: 1px solid $gray-200;
-    border-radius: 0;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-
-    .user-avatar {
-        width: 38px;
-        height: 38px;
-        border-radius: 0;
-        background: $navy;
-        color: $white;
-        font-size: 1rem;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-    }
-
-    .user-info {
-        flex: 1;
-        min-width: 0;
-
-        .user-name {
-            margin: 0 0 2px;
-            font-size: 0.92rem;
-            font-weight: 700;
-            color: $gray-900;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .user-id {
-            margin: 0;
-            font-size: 0.75rem;
-            color: $gray-500;
-        }
-    }
-
-    .role-badges {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-
-        .role-badge {
-            font-size: 0.68rem;
-            font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 0;
-            background: #efefef;
-            color: $navy;
-            border: 1px solid #c4c4c4;
-            text-transform: uppercase;
-        }
-    }
-}
+/* 유저 카드(.menu-user)는 상단바(.header-user)로 합치면서 제거했다. */
 
 /* ── 검색 ── */
 .menu-search-input {
@@ -300,15 +272,19 @@ $red:      #141414;
         margin-bottom: 4px;
     }
 
+    /* 상위 항목(주식정보/차트메뉴/트레이드…)은 하위보다 크고 진해야 묶음이 보인다.
+     * 이전엔 0.7rem·회색·uppercase 라 하위(0.88rem·진한색)보다 작고 흐려서
+     * 위계가 뒤집혀 있었다. uppercase 도 뺀다 — 한글에는 효과가 없고 영문
+     * 폴백에서만 모양을 바꿔 들쭉날쭉해진다. */
     .main-name {
         padding: 6px 10px;
-        font-size: 0.7rem;
+        font-size: 1rem;
         font-weight: 700;
-        color: $gray-400;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        border-bottom: 1px solid $gray-100;
-        margin: 8px 2px 2px;
+        color: $gray-900;
+        letter-spacing: -0.01em;
+        text-align: left;
+        border-bottom: 1px solid $gray-200;
+        margin: 14px 2px 4px;
     }
 
     .sub-ul {
@@ -322,10 +298,15 @@ $red:      #141414;
         overflow: hidden;
     }
 
+    /* 왼쪽 정렬. App.vue 의 #app { text-align: center } 가 전역으로 상속되어
+     * 메뉴 텍스트까지 가운데 정렬돼 있었다 — 목록은 왼쪽 정렬이라야 눈이
+     * 한 줄로 훑어진다. */
     .menu-link {
         display: flex;
         flex-direction: column;
-        padding: 9px 12px;
+        align-items: flex-start;
+        text-align: left;
+        padding: 10px 12px;
         cursor: pointer;
         border-radius: 0;
         transition: background .12s;
@@ -338,16 +319,11 @@ $red:      #141414;
             background: #efefef;
         }
 
+        /* 하위 항목은 상위(1rem/700)보다 작고 덜 진하게 — 위계가 보이도록. */
         .link-title {
             font-size: 0.88rem;
-            font-weight: 600;
-            color: $gray-900;
-        }
-
-        .link-sub {
-            font-size: 0.75rem;
-            color: $gray-400;
-            margin-top: 1px;
+            font-weight: 500;
+            color: $gray-700;
         }
     }
 }

@@ -23,37 +23,58 @@
                 </div>
             </section>
 
-            <!-- ── 계좌 요약 카드 ── -->
-            <section class="summary-cards">
-                <div class="s-card total" :class="{ skeleton: loadingAccount }">
-                    <template v-if="!loadingAccount">
-                        <div class="s-label">총자산</div>
-                        <div class="s-amount">{{ fmtWon(account?.total_asset) }}<span class="won">원</span></div>
-                    </template>
-                </div>
-                <div class="s-card" :class="{ skeleton: loadingAccount }">
-                    <template v-if="!loadingAccount">
-                        <div class="s-label">예수금</div>
-                        <div class="s-amount sub">{{ fmtWon(account?.deposit) }}<span class="won">원</span></div>
-                    </template>
-                </div>
-                <!-- 주문가능금액(=미수없는매수금액). 예수금과 다른 값이다 —
-                     증거금징수율이 반영되고, 미체결 주문에 묶인 금액이 빠져 있다. -->
-                <div class="s-card" :class="{ skeleton: loadingAccount }">
-                    <template v-if="!loadingAccount">
-                        <div class="s-label">
-                            주문가능금액
-                            <span class="s-help" :title="buyableHelp">?</span>
+            <!-- ── 계좌 요약 ──
+                 증권사 앱(총 자산 화면) 구조를 따른다: 총자산을 한 번만 크게 보여주고
+                 평가손익·수익률을 바로 아래 붙인 뒤, 세부 금액은 라벨-값 목록으로
+                 내린다. 이전의 4-카드 그리드는 네 값이 같은 비중으로 보여서
+                 "내 자산이 얼마인가"가 한눈에 안 들어왔다. -->
+            <section class="account-panel" :class="{ skeleton: loadingAccount }">
+                <template v-if="!loadingAccount">
+                    <div class="ap-total">
+                        <div class="ap-total-label">총자산</div>
+                        <div class="ap-total-amount">
+                            {{ fmtWon(account?.total_asset) }}<span class="won">원</span>
                         </div>
-                        <div class="s-amount sub">{{ fmtWon(account?.user_balance) }}<span class="won">원</span></div>
-                    </template>
-                </div>
-                <div class="s-card" :class="{ skeleton: loadingAccount }">
-                    <template v-if="!loadingAccount">
-                        <div class="s-label">주식평가액</div>
-                        <div class="s-amount sub">{{ fmtWon(account?.stock_amount) }}<span class="won">원</span></div>
-                    </template>
-                </div>
+                        <!-- 평가손익/수익률. 분모는 매입금액이다(portfolioTotals.costBasis 주석 참고).
+                             보유종목이 없으면 계산할 게 없으므로 숨긴다. -->
+                        <div v-if="portfolioTotals.profitPct !== null" class="ap-pnl"
+                             :class="pnlClass(portfolioTotals.profitSum)">
+                            <span class="ap-pnl-arrow">{{ portfolioTotals.profitSum >= 0 ? '▲' : '▼' }}</span>
+                            <span>{{ fmtWon(Math.abs(portfolioTotals.profitSum)) }}원</span>
+                            <span class="ap-pnl-sep">|</span>
+                            <span>{{ fmtPct(portfolioTotals.profitPct) }}</span>
+                        </div>
+                    </div>
+
+                    <dl class="ap-rows">
+                        <div class="ap-row">
+                            <dt>예수금</dt>
+                            <dd>{{ fmtWon(account?.deposit) }}원</dd>
+                        </div>
+                        <div class="ap-row">
+                            <dt>매입금액</dt>
+                            <dd>{{ fmtWon(portfolioTotals.costBasis) }}원</dd>
+                        </div>
+                        <div class="ap-row">
+                            <dt>평가금액</dt>
+                            <dd>{{ fmtWon(account?.stock_amount) }}원</dd>
+                        </div>
+                        <!-- 주문가능금액(=미수없는매수금액). 예수금과 다른 값이다 —
+                             증거금징수율이 반영되고, 미체결 주문에 묶인 금액이 빠져 있다. -->
+                        <div class="ap-row">
+                            <dt>
+                                주문가능금액
+                                <!-- title 속성은 데스크톱 hover 에서만 뜨고 터치에서는
+                                     아무 일도 일어나지 않는다 → 클릭 토글로 바꿨다. -->
+                                <button type="button" class="ap-help" :aria-expanded="showBuyableHelp"
+                                        aria-label="주문가능금액 설명"
+                                        @click="showBuyableHelp = !showBuyableHelp">?</button>
+                            </dt>
+                            <dd>{{ fmtWon(account?.user_balance) }}원</dd>
+                        </div>
+                        <div v-if="showBuyableHelp" class="ap-help-box">{{ buyableHelp }}</div>
+                    </dl>
+                </template>
             </section>
 
             <!-- 예수금 ≠ 주문가능금액 인 이유를 한 줄로. 차이가 없으면 띄우지 않는다.
@@ -336,6 +357,10 @@ const portfolioTotals = computed(() => {
     return {
         evalAmount,
         profitSum,
+        // 매입금액. 계좌 요약(API)에는 없는 값이라 보유종목에서 합산해 만든다.
+        // 수익률의 분모이기도 하다 — 총자산으로 나누면 예수금까지 분모에 들어가
+        // 실제 투자 성과가 희석된다(증권사 앱도 매입금액 기준으로 표시한다).
+        costBasis,
         profitPct: costBasis > 0 ? (profitSum / costBasis) * 100 : null,
     };
 });
@@ -345,6 +370,10 @@ const portfolioTotals = computed(() => {
      deposit      = ord_psbl_cash  주문가능현금
      user_balance = nrcvb_buy_amt  미수없는매수금액 (실제 주문 판단 기준)
    차이는 종목별 증거금징수율과 미체결 주문에 묶인 금액에서 온다. */
+// '?' 는 클릭 토글이다. 네이티브 title 속성은 터치 기기에서 뜨지 않아 모바일에서
+// 아무 반응이 없었다(사용테스트 피드백).
+const showBuyableHelp = ref(false);
+
 const buyableHelp =
     '증거금징수율이 반영되고 미체결 주문에 묶인 금액이 빠진, 지금 실제로 주문 가능한 금액입니다. '
     + '예수금과 다를 수 있습니다.';
@@ -454,17 +483,118 @@ $green: #141414;
 }
 
 /* Summary cards */
-.summary-cards {
-    display: grid;
-    grid-template-columns: 1.3fr 1fr 1fr 1fr;
-    gap: 12px;
+/* ── 계좌 요약 패널 ──
+ * 증권사 앱 구조: 총자산 1개를 크게 + 손익/수익률, 세부는 라벨-값 목록.
+ * 이전 4-카드 그리드(.summary-cards)는 네 값이 같은 비중이라 총자산이 묻혔다. */
+.account-panel {
+    background: $white;
+    border: 1px solid $gray-200;
     margin-bottom: 12px;
 
-    @media (max-width: 960px) { grid-template-columns: 1fr 1fr; }
-    @media (max-width: 600px) { grid-template-columns: 1fr; }
+    &.skeleton { min-height: 220px; }
+
+    .ap-total {
+        padding: 20px 18px 16px;
+        border-bottom: 1px solid $gray-100;
+        text-align: left;
+
+        .ap-total-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: $gray-500;
+            margin-bottom: 6px;
+        }
+
+        .ap-total-amount {
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: $gray-900;
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+
+            .won { font-size: 1.1rem; font-weight: 600; margin-left: 2px; }
+        }
+
+        .ap-pnl {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: $gray-500;
+
+            .ap-pnl-arrow { font-size: 0.78rem; }
+            .ap-pnl-sep { color: $gray-300; font-weight: 400; }
+
+            /* 상승/하락 색은 기존 .up/.down 과 같은 출처를 쓴다(pnlClass). */
+            &.up { color: $red; }
+            &.down { color: $blue; }
+        }
+    }
+
+    .ap-rows {
+        margin: 0;
+        padding: 6px 18px 14px;
+
+        .ap-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 9px 0;
+
+            dt {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 0.86rem;
+                color: $gray-500;
+            }
+
+            dd {
+                margin: 0;
+                font-size: 0.92rem;
+                font-weight: 600;
+                color: $gray-900;
+                font-variant-numeric: tabular-nums;
+            }
+        }
+
+        /* 클릭 토글 도움말. title 속성은 터치에서 안 떠서 버튼으로 바꿨다. */
+        .ap-help {
+            width: 16px;
+            height: 16px;
+            padding: 0;
+            border: 1px solid $gray-300;
+            border-radius: 50%;
+            background: $white;
+            color: $gray-500;
+            font-size: 0.68rem;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+
+            &[aria-expanded="true"] {
+                background: $gray-900;
+                border-color: $gray-900;
+                color: $white;
+            }
+        }
+
+        .ap-help-box {
+            margin: 2px 0 6px;
+            padding: 10px 12px;
+            background: $gray-50;
+            border: 1px solid $gray-200;
+            font-size: 0.8rem;
+            line-height: 1.55;
+            color: $gray-700;
+            text-align: left;
+        }
+    }
 }
 
-/* 예수금 ≠ 주문가능금액 각주 */
 .cash-gap-note {
     font-size: 0.78rem;
     color: $gray-500;
@@ -472,49 +602,7 @@ $green: #141414;
     margin: 0 0 22px;
 }
 
-/* 라벨 옆 도움말 배지 (title 속성으로 설명) */
-.s-help {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 14px;
-    height: 14px;
-    margin-left: 4px;
-    border: 1px solid $gray-300;
-    border-radius: 50%;
-    font-size: 0.62rem;
-    font-weight: 700;
-    color: $gray-500;
-    cursor: help;
-    vertical-align: middle;
-    text-transform: none;
-}
-
-.s-card {
-    background: $white;
-    border: 1px solid $gray-200;
-    padding: 18px 20px;
-    min-height: 92px;
-
-    &.total { background: $navy; border-color: $navy; }
-    &.total .s-label { color: rgba(255,255,255,.7); }
-    &.total .s-amount { color: $white; }
-    &.total .won { color: rgba(255,255,255,.7); }
-
-    &.skeleton { background: $gray-100; border: none; animation: pulse 1.6s infinite ease-in-out; }
-}
-
-.s-label {
-    font-size: 0.74rem; font-weight: 700; color: $gray-500;
-    letter-spacing: .04em; text-transform: uppercase; margin-bottom: 10px;
-}
-
-.s-amount {
-    font-size: 1.8rem; font-weight: 800; color: $navy;
-    font-variant-numeric: tabular-nums; line-height: 1.1;
-    &.sub { font-size: 1.35rem; color: $gray-900; }
-    .won { font-size: 0.9rem; font-weight: 600; color: $gray-500; margin-left: 4px; }
-}
+/* 옛 4-카드 요약(.s-card/.s-label/.s-amount/.s-help)은 .account-panel 로 교체하며 제거했다. */
 
 /* Tabs */
 .tab-nav {
