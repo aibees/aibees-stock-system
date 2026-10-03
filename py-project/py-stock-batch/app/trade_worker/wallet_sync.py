@@ -245,10 +245,18 @@ def _close_vanished_positions(repo, user_id, sell_executor, holdings):
         notifier = getattr(sell_executor, "notifier", None)
         if notifier is not None:
             try:
-                notifier.send("[외부청산] 포지션 자동 종료",
-                              f"{code} 가 계좌 실보유에서 {threshold}회 연속 사라져 "
-                              f"trade_worker_position 을 SOLD 로 닫았습니다"
-                              f"(타채널 수기매도 추정). 신규매수 차단이 해제됩니다.")
+                # alert(= send + push). 포지션이 worker 모르게 사라진 건 보유현황이
+                # 바뀌는 일이라 앱에서도 바로 알아야 하므로 텔레그램/이메일만으로
+                # 끝내지 않는다. push 본문은 배너 한 줄로 잘리므로 따로 넘긴다.
+                notifier.alert(
+                    "[외부청산] 포지션 자동 종료",
+                    f"{code} 가 계좌 실보유에서 {threshold}회 연속 사라져 "
+                    f"trade_worker_position 을 SOLD 로 닫았습니다"
+                    f"(타채널 수기매도 추정). 신규매수 차단이 해제됩니다.",
+                    push_body=f"{code} 포지션을 자동 종료했습니다 · 타채널 수기매도 추정",
+                    data={"event": "POSITION_CLOSED", "reason": "EXTERNAL",
+                          "stock_code": code},
+                )
             except Exception:  # noqa: BLE001
                 pass
 

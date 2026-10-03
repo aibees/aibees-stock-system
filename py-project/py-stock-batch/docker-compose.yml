@@ -13,8 +13,10 @@ services:
         ports:
           - "5557:5557"
         environment:
-            # 배치 시작/종료 broadcast push (job.py) 발송용 — FCM 서비스 계정 키 경로.
+            # 배치 시작/종료 push (job.py) 발송용 — FCM 서비스 계정 키 경로.
             - FCM_CREDENTIALS_PATH=/workdir/firebase-service-account.json
+            # 배치 시작/종료 등 공통 운영 알림 수신자. 미설정이면 1.
+            - COMMON_NOTIFY_USER_ID=1
         volumes:
             # 실제 키 파일은 aes.key/smtp.key 와 같은 위치(py-stock-batch/)에 두고
             # git 에는 올리지 않는다(.gitignore 참고).
