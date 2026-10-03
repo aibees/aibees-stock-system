@@ -27,7 +27,12 @@ import mariaToast from './mariaToast';
 import { assUserSession } from './stores/user-stores';
 
 let initialized = false;
-let lastSentToken = null;
+// 플러그인이 마지막으로 넘겨준 FCM 토큰. 로그인/로그아웃 때 이 토큰으로 소유자만
+// 바꿔 재등록하려면(syncPushRegistration) 들고 있어야 한다.
+let currentToken = null;
+// 마지막으로 서버에 올린 "토큰|user_id". 토큰만 비교하면 안 되는 이유는
+// registerTokenToServer 주석 참고.
+let lastSentKey = null;
 
 export async function initPushNotifications() {
     console.log("[initPushNotifications] INIT : " + initialized);
@@ -96,12 +101,34 @@ export async function initPushNotifications() {
     }
 }
 
-async function registerTokenToServer(deviceToken) {
-    if (!deviceToken || deviceToken === lastSentToken) {
-        return; // 같은 토큰 중복 전송 방지(tokenReceived + getToken() 둘 다 올 수 있음)
+/**
+ * 이 기기의 push 소유자(user_id)를 서버에 다시 올린다 — 로그인/로그아웃 직후
+ * user-stores 의 loginUser/logoutUser 에서 호출한다.
+ *
+ * 왜 필요한가: 등록(initPushNotifications)은 앱 mount 때 딱 한 번만 돌고,
+ * FCM 토큰은 앱을 재설치하지 않으면 계속 같은 값이다. 그래서 "로그아웃 상태로
+ * 앱을 켠 뒤 그 세션에서 로그인" 하면 토큰 행의 user_id 가 null 로 굳은 채
+ * 남았다. 지금은 발송되는 push 가 전부 user 스코프라(배치 시작/종료=운영자
+ * 1명, 체결/경보=worker 소유자) user_id 가 비어 있으면 알림이 아예 안 간다.
+ *
+ * 토큰이 아직 없으면(권한 거부/비네이티브/토큰 수신 전) 아무 것도 하지 않는다 —
+ * 이후 tokenReceived 가 오면 그때의 로그인 상태로 등록된다.
+ */
+export function syncPushRegistration() {
+    if (!Capacitor.isNativePlatform() || !currentToken) {
+        return;
     }
-    lastSentToken = deviceToken;
+    registerTokenToServer(currentToken);
+}
 
+async function registerTokenToServer(deviceToken) {
+    if (!deviceToken) {
+        return;
+    }
+    currentToken = deviceToken;
+
+    // 호출부(이벤트 리스너 / syncPushRegistration)는 await 하지 않으므로 이 함수는
+    // 절대 reject 되면 안 된다 — 세션 조회까지 전부 try 안에 둔다.
     try {
         const userSession = assUserSession();
         const platform = Capacitor.getPlatform(); // 'ios' | 'android'
@@ -109,6 +136,15 @@ async function registerTokenToServer(deviceToken) {
             ? (userSession.user.loginInfo.user_id || null)
             : null;
         const roles = userSession.getRole ?? [];
+
+        // 중복 전송 방지 키에 user_id 를 포함한다. 토큰만 비교하면(기존 동작) 같은
+        // 기기에서 로그인/로그아웃으로 소유자가 바뀌어도 재등록이 막혀서 서버의
+        // user_id 가 과거 값으로 굳는다 — syncPushRegistration 주석 참고.
+        const sendKey = deviceToken + '|' + (userId ?? '');
+        if (sendKey === lastSentKey) {
+            return; // 같은 토큰+같은 소유자 = 이미 올림(tokenReceived + getToken() 둘 다 올 수 있음)
+        }
+        lastSentKey = sendKey;
 
         console.log('[push] 서버 등록 요청 → /api/v1/notify/register platform=' + platform
             + ' user_id=' + userId + ' baseURL=' + (batchApi.defaults?.baseURL ?? '(none)'));
@@ -122,6 +158,9 @@ async function registerTokenToServer(deviceToken) {
 
         console.log('[push] 서버 등록 성공', JSON.stringify(resp.data));
     } catch (e) {
+        // 실패했으면 "올렸다" 표시를 되돌린다 — 안 그러면 네트워크가 돌아와도
+        // 같은 키라서 영구히 재시도되지 않는다(다음 tokenReceived / 로그인 때 재시도).
+        lastSentKey = null;
         // [디버깅] 여기 안 뜨고 tokenReceived 로그만 있으면 → nginx 라우팅/CORS/네트워크 문제.
         console.error('[push] 서버 등록 실패', e?.response?.status, e?.message, JSON.stringify(e?.response?.data ?? ''));
     }

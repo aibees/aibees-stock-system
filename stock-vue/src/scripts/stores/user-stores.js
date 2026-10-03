@@ -35,6 +35,18 @@ const loadAutoLogin = () => {
 
 const clearAutoLogin = () => localStorage.removeItem('userSession');
 
+// [추가] 로그인/로그아웃으로 이 기기의 push 소유자가 바뀌면 FCM 토큰 행의 user_id 를
+// 다시 올린다. 호출 위치를 loginUser/logoutUser 안으로 둔 이유는 로그아웃 경로가
+// 여러 곳(Headers/Menu + aibeesApi 의 refresh 실패 강제 로그아웃)이라 호출부마다
+// 챙기면 반드시 하나가 누락되기 때문.
+// 동적 import 인 이유: usePushNotifications 가 이 스토어를 import 하므로 정적
+// import 로는 순환참조가 된다. 웹(비네이티브)에서는 내부에서 즉시 return 한다.
+const syncPushOwner = () => {
+    import('../usePushNotifications')
+        .then(({ syncPushRegistration }) => syncPushRegistration())
+        .catch(() => {}); // push 재등록 실패가 로그인/로그아웃을 막아선 안 된다
+};
+
 export const assUserSession = defineStore('user', () => {
 
     const user = reactive({
@@ -134,6 +146,8 @@ export const assUserSession = defineStore('user', () => {
         } else {
             clearAutoLogin();
         }
+
+        syncPushOwner(); // [추가] 이 기기 push 를 방금 로그인한 user_id 로 재등록
     };
 
     // ──────────────────────────────────────────────
@@ -175,6 +189,10 @@ export const assUserSession = defineStore('user', () => {
         sessionStorage.removeItem('userSession');
         sessionStorage.removeItem('menuList');
         clearAutoLogin(); // 자동로그인 해제
+
+        // [추가] 이 기기 push 소유자를 비운다(user_id=null) — 안 그러면 로그아웃
+        // 후에도 이전 유저의 체결/경보 알림이 이 기기로 계속 온다.
+        syncPushOwner();
     };
 
     // ──────────────────────────────────────────────

@@ -1,10 +1,11 @@
 """
-푸시 알림 발송 서비스 — broadcast / user / role 세 스코프를 지원한다.
-(요청: "전체 broadcast + 권한과 worker 소유자에 따라 달라지는 것도 포함")
+푸시 알림 발송 서비스 — common / user / role / broadcast 네 스코프를 지원한다.
 
-- broadcast(...) : 전체 활성 디바이스
+- to_common(...) : 배치 시작/종료처럼 "특정 유저의 일이 아닌" 공통 운영 알림.
+                   COMMON_NOTIFY_USER_ID(기본 1) 한 명에게만 보낸다.
 - to_user(...)   : 특정 user_id (예: trade_worker 소유자 1명에게만)
 - to_role(...)   : 특정 role(auth_id) 을 가진 유저 전체
+- broadcast(...) : 전체 활성 디바이스 (현재는 /notify/test-send 수동 검증용)
 
 세션은 이 서비스가 새로 만들지 않고 호출부가 넘긴 세션을 그대로 쓴다 —
 job.py 훅에서 배치 자체가 이미 열어둔 세션 안에서 호출되기 때문(새 세션을
@@ -14,6 +15,7 @@ job.py 훅에서 배치 자체가 이미 열어둔 세션 안에서 호출되기
 실패했다고 배치(job.py의 process())가 FAIL 로 떨어지면 안 되기 때문이다.
 """
 import logging
+import os
 
 from stock_shared.dao.devicePushTokenDao import DevicePushTokenDao
 
@@ -26,8 +28,31 @@ log.setLevel(logging.INFO)
 
 _dao = DevicePushTokenDao()
 
+# 배치 시작/종료 같은 공통 운영 알림의 수신자. 전체 broadcast 로 보내면 자동매매와
+# 무관한 일반 유저(및 비로그인 디바이스)에게까지 "배치 시작/종료" 가 쏟아지므로
+# 운영자 1명(user_id=1)에게만 보낸다. 운영자 계정이 바뀌면 환경변수로 덮는다.
+_DEFAULT_COMMON_NOTIFY_USER_ID = 1
+
+
+def _common_notify_user_id() -> int:
+    """COMMON_NOTIFY_USER_ID 환경변수(미설정/비정상이면 1). 값이 바뀌면 컨테이너
+    재시작이 필요하다 — 이 프로젝트의 다른 환경변수와 동일한 제약."""
+    raw = os.getenv("COMMON_NOTIFY_USER_ID")
+    if not raw:
+        return _DEFAULT_COMMON_NOTIFY_USER_ID
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        log.warning("COMMON_NOTIFY_USER_ID 값이 정수가 아님(%r) → 기본값 %s 사용",
+                    raw, _DEFAULT_COMMON_NOTIFY_USER_ID)
+        return _DEFAULT_COMMON_NOTIFY_USER_ID
+
 
 class NotifyService:
+    def to_common(self, session, title: str, body: str, data: dict | None = None):
+        """공통 운영 알림(배치 시작/종료/실패 등) — 운영자 1명에게만."""
+        self.to_user(session, _common_notify_user_id(), title, body, data)
+
     def broadcast(self, session, title: str, body: str, data: dict | None = None):
         try:
             tokens = _dao.select_broadcast_tokens(session)

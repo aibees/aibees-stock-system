@@ -6,8 +6,10 @@
   이 Flask 앱에는 JWT 디코드/사용자 식별 미들웨어가 전혀 없다. user_id/roles 는
   프런트가 로그인 세션에서 그대로 실어보낸다 — 이 앱의 기존 보안 수준(무인증
   내부망 batch-admin 서비스)을 그대로 따른다. 비로그인 상태(user_id=null)로도
-  등록할 수 있게 허용한 이유는 "전체 broadcast" 요구사항 때문 — 로그인 여부와
-  무관하게 배치 시작/종료 알림 정도는 받을 수 있어야 한다.
+  등록 자체는 허용하지만, 지금 실제로 발송되는 알림은 모두 user 스코프다
+  (배치 시작/종료=운영자 1명 to_common, 체결=worker 소유자 to_user). 따라서
+  user_id=null 로 등록된 디바이스는 아래 /test-send scope=broadcast 로 수동
+  발송할 때만 대상이 된다 — 로그인 후 재등록(upsert)되면 user_id 가 채워진다.
 """
 from flask import Blueprint, request
 

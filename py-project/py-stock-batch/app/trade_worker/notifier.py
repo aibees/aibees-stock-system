@@ -6,17 +6,31 @@
   worker 컨테이너에서 이메일 fallback 을 쓰려면 smtp.key 를 마운트해야 한다(compose 참고).
 
 전송 우선순위: ① 텔레그램 성공 → 끝. ② 텔레그램 실패/미설정 → 이메일. ③ 둘 다 안 되면 로그만.
+
+push(FCM)는 위 우선순위와 **별개로 항상** 나가는 별도 채널이다(텔레그램이 성공해도 보냄).
+  - trade(...) : 매수/매도 체결
+  - alert(...) : 운영 경보(외부청산 등) — send() 만 쓰는 호출부는 push 가 안 나간다.
+둘 다 worker 소유자(user_id) 1명 스코프다.
 """
 import logging
+import re
 
 from app.common.utils.telegramUtils import telegramUtils
-# [추가] 체결 push — worker 소유자(user_id) 1명에게만 보낸다(broadcast 아님).
+# 체결/경보 push — worker 소유자(user_id) 1명에게만 보낸다.
 # get_session()은 job.py 가 쓰는 것과 같은 dbConn(stock_shared.db.database)을 감싼
 # contextmanager 라 커넥션 풀을 새로 만들지 않는다.
 from stock_shared.db.contextManager import get_session
 from app.batches.services.notifyService import notifyService
 
 log = logging.getLogger("trade_worker.notify")
+
+# 텔레그램 본문은 parse_mode=HTML 이라 <b> 등이 섞여 있다. push 는 OS 배너에 평문으로
+# 뜨므로 태그가 그대로 보이면 안 된다 — push 본문을 따로 주지 않은 경우에만 쓴다.
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _strip_tags(text: str) -> str:
+    return _TAG_RE.sub("", text or "")
 
 
 class Notifier:
@@ -62,10 +76,34 @@ class Notifier:
 
         return None
 
+    def _push(self, title: str, body: str, data: dict | None = None) -> None:
+        """worker 소유자(user_id) 1명에게 push. 실패해도 매매/대조 흐름을 절대
+        막으면 안 되므로 통째로 감싼다(notifyService.to_user 내부에서도 이미
+        예외를 삼키지만 이중 방어)."""
+        if not self.user_id:
+            return
+        try:
+            with get_session() as s:
+                notifyService.to_user(s, self.user_id, title, body, data)
+        except Exception as e:  # noqa: BLE001
+            log.warning("push 실패(%s): %s", title, e)
+
+    def alert(self, subject: str, text: str, push_body: str | None = None,
+              data: dict | None = None) -> str | None:
+        """운영 경보 — send(텔레그램/이메일) + worker 소유자 push.
+
+        체결(trade)과 달리 포맷이 자유로운 경보용이다. push 본문을 text 로
+        그대로 쓰지 않고 push_body 를 따로 받는 이유는, 텔레그램 본문은 여러 줄
+        + HTML 태그 + 조치 안내까지 길게 쓰는데 push 는 OS 배너 한두 줄로
+        잘리기 때문. 생략하면 text 에서 태그만 떼어 쓴다."""
+        channel = self.send(subject, text)
+        self._push(subject, push_body or _strip_tags(text), data)
+        return channel
+
     def trade(self, kind: str, name: str, code: str, qty, price, balance, note: str = "") -> str | None:
         """체결 알림 포맷 후 전송. kind='BUY'|'SELL'.
         텔레그램/이메일(send)과 별개로, worker 소유자에게 push 도 보낸다
-        (전체 broadcast 인 배치 시작/종료 push 와 달리 이건 user 스코프)."""
+        (운영자 1명에게 가는 배치 시작/종료 push 와 달리 이건 worker 소유자 스코프)."""
         icon = "🟢" if kind == "BUY" else "🔴"
         label = "매수" if kind == "BUY" else "매도"
         subject = f"[{label} 체결] {name}({code})"
@@ -74,18 +112,7 @@ class Notifier:
                 f"잔고 {balance}"
                 + (f"\n{note}" if note else ""))
         channel = self.send(subject, text)
-
-        # [추가] 체결 push — 실패해도 매매 흐름을 절대 막으면 안 되므로 통째로 감싼다.
-        # (notifyService.to_user 내부에서도 이미 예외를 삼키지만 이중 방어)
-        if self.user_id:
-            try:
-                push_body = f"{name}({code}) {qty}주 @{price} · 잔고 {balance}"
-                with get_session() as s:
-                    notifyService.to_user(
-                        s, self.user_id, f"{label} 체결", push_body,
-                        {"event": "TRADE", "kind": kind, "stock_code": code},
-                    )
-            except Exception as e:  # noqa: BLE001
-                log.warning("체결 push 실패: %s", e)
-
+        self._push(f"{label} 체결",
+                   f"{name}({code}) {qty}주 @{price} · 잔고 {balance}",
+                   {"event": "TRADE", "kind": kind, "stock_code": code})
         return channel
