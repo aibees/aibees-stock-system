@@ -20,6 +20,7 @@
                         align="center"
                         v-model:code="searchParam.code"
                         v-model:name="searchParam.name"
+                        hide-search-btn
                     />
                 </div>
                 <div class="date-row">
@@ -33,7 +34,7 @@
                     </div>
                     <div class="date-field">
                         <span class="date-label">기준일자</span>
-                        <input class="date-input" type="date" v-model="searchParam.to" />
+                        <input class="date-input" type="date" aria-label="기준일자" v-model="searchParam.to" />
                     </div>
                     <button class="search-btn" @click="fetchChart">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
@@ -100,9 +101,10 @@ const periods = [
     // { label: '5',     value: '5'     },
     // { label: '30',    value: '30'    },
     // { label: '60',    value: '60'    },
-    { label: 'Day',   value: 'day'   },
-    { label: 'Week',  value: 'week'  },
-    { label: 'Month', value: 'month' },
+    // label 은 화면 표기, value 는 API 파라미터(/api/v1/charts/stock 의 period)라 바꾸지 않는다.
+    { label: '일', value: 'day'   },
+    { label: '주', value: 'week'  },
+    { label: '월', value: 'month' },
 ];
 
 const searchParam = reactive({
@@ -291,7 +293,7 @@ $navy:     #141414;
         background: $white;
         border: 1.5px solid $gray-200;
         border-radius: 0;
-        padding: 6px 6px 6px 12px;
+        padding: 6px 12px;   // 우측 버튼(분석하기)이 없어 좌우 대칭
         box-shadow: none;
         transition: border-color .15s;
 
@@ -308,19 +310,6 @@ $navy:     #141414;
         font-size: 0.92rem;
         background: transparent;
         &::placeholder { color: $gray-400; }
-    }
-
-    :deep(.search-bar .search-btn) {
-        background: $navy;
-        color: $white;
-        border-radius: 0;
-        padding: 8px 16px;
-        font-size: 0.85rem;
-        font-weight: 700;
-        font-family: inherit;
-        white-space: nowrap;
-        &:hover  { background: $blue; }
-        &:active { transform: scale(0.97); }
     }
 
     :deep(.suggestion-div) {
@@ -603,12 +592,24 @@ $navy:     #141414;
 @media (max-width: 480px) {
     .contents { padding: 12px 8px 72px; }
 
-    .date-row    { flex-direction: column; align-items: stretch; gap: 8px; }
-    .period-group { justify-content: space-between; }
-    .period-btn  { flex: 1; text-align: center; padding: 8px 6px; }
-    .date-field  { min-width: unset; }
-    .date-input  { font-size: 0.8rem; padding: 8px; }
-    .search-btn  { width: 100%; justify-content: center; }
+    /* [일|주|월] [기준일자 ____] [조회] 를 한 줄에 — 세로로 3단 쌓이던 것을 편다.
+     * 한 줄에 들어가야 하므로 nowrap 으로 두고, 가변 폭은 날짜 칸 하나만 맡긴다.
+     * (기간 버튼과 조회 버튼은 flex:none 으로 제 크기를 지킨다) */
+    .date-row     { flex-wrap: nowrap; align-items: center; gap: 4px; }
+    .period-group { flex: none; flex-wrap: nowrap; gap: 2px; }
+    .period-btn   { flex: none; padding: 6px 9px; font-size: 0.74rem; }
+
+    /* min-width:0 이 핵심 — flex item 은 기본값(auto)이면 내용물 폭 밑으로 못 줄어서
+     * date input 의 내재 폭이 행을 화면 밖으로 밀어낸다. */
+    .date-field   { flex: 1 1 0; min-width: 0; gap: 4px; }
+    /* 날짜 칸이 필요로 하는 자연 폭은 약 153px(16px 폰트 + 달력 아이콘)이다. 라벨('기준일자' ≈47px)을
+     * 두면 375px 에서 138px, 320px 에서 114px 로 날짜 끝이 잘린다. 라벨을 빼면 모든 폭에서 충분하다.
+     * 일/주/월 · 조회 사이의 날짜 칸이라 의미는 남고, 접근성 이름은 input 의 aria-label 이 맡는다. */
+    .date-label   { display: none; }
+    .date-input   { flex: 1 1 0; min-width: 0; width: 100%; padding: 6px 4px; }
+
+    .search-btn   { flex: none; width: auto; padding: 6px 10px; font-size: 0.78rem; }
+    .search-btn svg { display: none; }   // 한 줄 확보를 위해 돋보기 아이콘은 모바일에서 생략
 
     .chart-header {
         flex-direction: column;

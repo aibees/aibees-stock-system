@@ -243,7 +243,7 @@ onMounted(() => {
 });
 
 const goToChart = () => {
-    router.push({ path: '/charts/stock', query: { code: inputCode.value } });
+    router.push({ path: '/stock/chart', query: { code: inputCode.value } });
 };
 
 const stockSearchHandler = (code) => {

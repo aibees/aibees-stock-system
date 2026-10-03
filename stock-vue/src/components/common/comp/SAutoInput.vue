@@ -18,7 +18,10 @@
                 :style="`text-align: ${setAlign()}`" />
             
 
-            <button @click="$emit('search', typedCode)" class="search-btn">분석하기</button>
+            <!-- hideSearchBtn: 자체 조회 버튼이 따로 있는 화면(개별차트)에서는 이 버튼이
+                 아무것도 연결돼 있지 않은 죽은 버튼이라 숨긴다. 기본값 false 라
+                 StockInfo/StockStrategy 등 @search 를 쓰는 기존 화면은 그대로다. -->
+            <button v-if="!props.hideSearchBtn" @click="$emit('search', typedCode)" class="search-btn">분석하기</button>
         </div>
 
         <div class="suggestion-div" v-show="!hiddenFlag">
@@ -50,7 +53,8 @@ const props = defineProps({
     size: String,
     width: String,
     align: String,
-    autoSearch: Boolean
+    autoSearch: Boolean,
+    hideSearchBtn: { type: Boolean, default: false }
 });
 
 // Vue 3.4 이상에서 사용되는 defineModel

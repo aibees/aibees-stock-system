@@ -172,7 +172,7 @@ const goToStockInfo = (stock_code, stock_name) => {
     router.push({ path: '/stock/info', query: { stock_code, stock_name } });
 };
 const goToChart = (stock_code) => {
-    router.push({ path: '/charts/stock', query: { code: stock_code } });
+    router.push({ path: '/stock/chart', query: { code: stock_code } });
 };
 const resultData = ref([]);
 const isLoading = ref(true);

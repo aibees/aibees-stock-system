@@ -31,16 +31,17 @@
                 </div>
                 </div>
 
-                <!-- ── 정렬 옵션 ── -->
+                <!-- ── 정렬 옵션 ──
+                     칩 나열에서 select 로 바꿨다. 옵션이 5개라 폰 폭에서는 한 줄에
+                     들어갈 수 없어 넘치거나 두 줄로 접혔고, 바로 아래 최우선타겟이
+                     이미 select 라 두 줄의 생김새도 따로 놀았다.
+                     방향 토글은 버튼으로 남긴다 — 이진 선택이라 한 번 탭이 가장 빠르고,
+                     select 에 합치면 옵션이 10개(5×2)로 늘어난다. -->
                 <div v-if="!isLoading && resultData.length > 0" class="sort-bar">
                 <span class="sort-label">정렬</span>
-                <div class="sort-chips">
-                    <button v-for="o in SORT_OPTIONS" :key="o.key" type="button"
-                        :class="['sort-chip', { on: sortKey === o.key }]"
-                        @click="setSortKey(o.key)">
-                        {{ o.label }}
-                    </button>
-                </div>
+                <select class="sort-select" v-model="sortKey" @change="onSortKeyChange">
+                    <option v-for="o in SORT_OPTIONS" :key="o.key" :value="o.key">{{ o.label }}</option>
+                </select>
                 <button type="button" class="sort-dir" @click="toggleSortDir"
                     :title="sortDir === 'desc' ? '내림차순' : '오름차순'">
                     <span class="dir-arrow">{{ sortDir === 'desc' ? '↓' : '↑' }}</span>
@@ -206,7 +207,7 @@ const goToStockInfo = (stock_code, stock_name) => {
     router.push({ path: '/stock/info', query: { stock_code, stock_name } });
 };
 const goToChart = (stock_code) => {
-    router.push({ path: '/charts/stock', query: { code: stock_code } });
+    router.push({ path: '/stock/chart', query: { code: stock_code } });
 };
 const goToBuyTargetDetail = () => {
     router.push({ path: '/stock/buy-target' });
@@ -322,10 +323,12 @@ const sortDir = ref('asc');
 const currentSort = computed(
     () => SORT_OPTIONS.find(o => o.key === sortKey.value) ?? SORT_OPTIONS[0]);
 
-const setSortKey = (key) => {
-    if (sortKey.value === key) return;
-    sortKey.value = key;
-    sortDir.value = SORT_OPTIONS.find(o => o.key === key)?.dir ?? 'desc';
+// select 의 v-model 이 sortKey 를 이미 바꿔 놓은 뒤에 불린다. 해야 할 일은 하나 —
+// 정렬 기준이 바뀌면 방향을 그 기준의 기본값으로 되돌린다(예: 점수는 높은 순,
+// 순위는 낮은 번호 먼저). 이걸 빼먹으면 "점수 ↑ 오름차순" 상태가 다른 기준으로
+// 넘어가 의도와 반대로 정렬된다. 칩 시절 setSortKey 가 하던 일을 그대로 이어받는다.
+const onSortKeyChange = () => {
+    sortDir.value = SORT_OPTIONS.find(o => o.key === sortKey.value)?.dir ?? 'desc';
 };
 const toggleSortDir = () => { sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc'; };
 
@@ -660,35 +663,24 @@ $bronze:  #3d3d3d;
         white-space: nowrap;
     }
 
-    .sort-chips {
-        display: flex;
-        gap: 4px;
-        /* 칩이 늘어나면 한 줄에 다 안 들어간다. 부모(.sort-bar)는 flex-wrap 이지만
-         * .sort-chips 는 그 안의 flex item 하나라 통째로만 줄바꿈된다 — 안에서
-         * 줄바꿈이 안 되면 내재 너비가 화면을 넘겨 버튼이 밖으로 삐져나간다.
-         * flex item 기본값인 min-width:auto 때문에 줄어들지도 않으므로 0 으로 푼다. */
-        flex-wrap: wrap;
+    /* priority-select 와 같은 모양으로 맞춘다(둘이 위아래로 붙어 있다).
+     * 칩 나열은 옵션 5개가 폰 폭에 안 들어가 넘치던 원인이었다 — select 는 폭이
+     * 옵션 개수와 무관하게 일정해서 구조적으로 넘칠 수 없다.
+     * min-width:0 은 flex item 이 내용물 폭 밑으로 못 줄어드는 기본값을 푼다. */
+    .sort-select {
+        flex: 1;
         min-width: 0;
-    }
-
-    .sort-chip {
-        padding: 5px 12px;
+        max-width: 200px;
+        padding: 6px 10px;
         border: 1px solid $gray-200;
         background: $white;
-        color: $gray-500;
-        font-size: 0.76rem;
+        color: $gray-900;
+        font-size: 0.8rem;
         font-weight: 600;
+        font-family: inherit;
         cursor: pointer;
-        white-space: nowrap;
-        transition: border-color .15s, background .15s, color .15s;
 
-        &:hover { border-color: $gray-900; color: $gray-900; }
-
-        &.on {
-            border-color: $gray-900;
-            background: $gray-900;
-            color: $white;
-        }
+        &:hover { border-color: $gray-900; }
     }
 
     .sort-dir {
