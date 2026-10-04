@@ -11,6 +11,7 @@
 stock_shared/
 ├── base.py          공용 declarative Base (모든 모델이 이것 하나만 상속)
 ├── db/              DB 커넥션(Database, dbConn) / 세션 contextmanager(get_session)
+├── kis/             KIS 자격증명 해석(credentials) / PyKis 생성(client) — 업무 메서드(KisEngine)는 아직 앱별
 ├── models/          ORM 모델 15개
 ├── dao/             공용 DAO 7개 (BaseDao + 6)
 └── vo/              UserCoinInfo (DAO 시그니처에 필요)

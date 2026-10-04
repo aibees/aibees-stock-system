@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 
 import pandas as pd
-from pykis import PyKis
 
 
 def _safe_int(v, default=0):
@@ -11,6 +10,7 @@ def _safe_int(v, default=0):
         return default
 
 from app.ext_services.kis.keyLoader import resolve_kis_creds
+from stock_shared.kis.client import create_pykis
 
 
 class KisEngine:
@@ -29,12 +29,11 @@ class KisEngine:
         # 3. PyKis (실전). keep_token=True → ~/.pykis/cache 에 토큰 캐시.
         #    컨테이너 내 모든 프로세스(스케줄러 자식 포함)가 같은 캐시를 공유해
         #    토큰은 1회 발급 후 24h 재사용된다(EGW00133 1분1회 제한 회피).
-        self.kis = PyKis(
+        self.kis = create_pykis(
             id=self.id,
             account=self.account,
-            appkey=keys.get("app_key"),
-            secretkey=keys.get("sec_key"),
-            keep_token=True,
+            app_key=keys.get("app_key"),
+            sec_key=keys.get("sec_key"),
         )
 
     def getOHLCV(self, code: str, start_date: str, end_date: str):

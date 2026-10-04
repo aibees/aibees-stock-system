@@ -3,16 +3,14 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 import pykis
-from pykis import KisAuth, PyKis, KisStock
+from pykis import KisStock
 from pykis.api.stock.chart import KisChart
-
-import json
 
 from pykis.api.stock.quote import KisQuoteResponse
 
-from stock_shared.db.database import dbConn
-from app.domains.dao.userDetailDao import UserDetailDao
 from app.utils.constants.Literal import Literal
+from stock_shared.kis.client import create_pykis
+from stock_shared.kis.credentials import load_creds_from_db, load_creds_from_file
 
 # 실투자 KIS 인증정보를 조회할 기본 user_detail.user_id.
 # user_id 를 명시하지 않은 기존 호출부(KisEngine(virtual=False)) 는 계속 이 계정을 쓴다.
@@ -51,30 +49,32 @@ class KisEngine:
 
         if virtual:
             # 모의투자: 기존 파일(kis.key) 방식 유지
-            keys = self._load_keys_from_file(key_path)
+            keys = load_creds_from_file(key_path)
             self.id = keys.get("id")
             self.account = keys.get("virtual_account")
-            self.kis = PyKis(
+            self.kis = create_pykis(
                 id=self.id,
                 account=self.account,
-                appkey=keys.get("app_key"),
-                secretkey=keys.get("sec_key"),
+                app_key=keys.get("app_key"),
+                sec_key=keys.get("sec_key"),
                 virtual_id=keys.get("virtual_id"),
-                virtual_appkey=keys.get("vir_app_key"),
-                virtual_secretkey=keys.get("vir_sec_key"),
-                keep_token=True
+                virtual_app_key=keys.get("vir_app_key"),
+                virtual_sec_key=keys.get("vir_sec_key"),
             )
         else:
             # 실투자: DB(user_detail) 에서 이 인스턴스 계정의 인증정보 조회
-            keys = self._load_keys_from_db(self.user_id)
+            # strict=True + 파일 폴백 없음 — 키가 없는 유저가 다른 계좌를 보게 되는 경로가
+            # 애초에 없어야 하는 앱이다(router_profit 이 이 예외를 400 으로 바꾼다).
+            # legacy_fallback: 사용자 설정 화면이 아직 kis_access_key/kis_secret_key 에 쓰므로
+            # 화면에서 등록한 키를 계속 읽는다(credentials 모듈 docstring 참고). 임시 옵션이다.
+            keys = load_creds_from_db(self.user_id, strict=True, legacy_fallback=True)
             self.id = keys.get("id")
             self.account = keys.get("account")
-            self.kis = PyKis(
+            self.kis = create_pykis(
                 id=self.id,
                 account=self.account,
-                appkey=keys.get("app_key"),
-                secretkey=keys.get("sec_key"),
-                keep_token=True
+                app_key=keys.get("app_key"),
+                sec_key=keys.get("sec_key"),
             )
 
         self._initialized = True
@@ -84,35 +84,6 @@ class KisEngine:
     def _resolve_market(code: str) -> str:
         """6자리 숫자 → 'KR', 그 외(영문 등) → 'US'"""
         return "KR" if (len(code) == 6 and code.isdigit()) else "US"
-
-    # ── 인증정보 로더 ────────────────────────────────────────
-    @staticmethod
-    def _load_keys_from_file(key_path: str) -> dict:
-        """모의투자용 kis.key 파일에서 설정값을 읽어옵니다."""
-        try:
-            with open(key_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"{key_path} 파일을 찾을 수 없습니다. 경로를 확인해주세요.")
-        except json.JSONDecodeError:
-            raise ValueError(f"{key_path} 파일의 JSON 형식이 올바르지 않습니다.")
-
-    @staticmethod
-    def _load_keys_from_db(user_id: int) -> dict:
-        """실투자용 인증정보를 user_detail 에서 조회합니다."""
-        session = dbConn.get_session()
-        try:
-            keys = UserDetailDao().select_kis_credentials(session, user_id)
-        finally:
-            session.remove()
-
-        if keys is None:
-            raise ValueError(f"user_detail(user_id={user_id}) 레코드를 찾을 수 없습니다.")
-        if not keys.get("app_key") or not keys.get("sec_key"):
-            raise ValueError(f"user_detail(user_id={user_id})에 KIS 인증키가 설정되지 않았습니다.")
-        if not keys.get("id") or not keys.get("account"):
-            raise ValueError(f"user_detail(user_id={user_id})에 kis_id/kis_account가 설정되지 않았습니다.")
-        return keys
 
     # 봉 단위별 '캔들 1개당 대략 캘린더 일수' 배수.
     # period(원하는 캔들 개수)에 곱해 조회 윈도우(timedelta)를 산출한다.

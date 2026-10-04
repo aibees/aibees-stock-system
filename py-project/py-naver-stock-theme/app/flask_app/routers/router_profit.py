@@ -170,8 +170,8 @@ def get_trade_profit():
     if sort_dvsn not in ("00", "01", "02"):
         sort_dvsn = "00"
 
-    # 키 미등록/계좌번호 형식 오류는 KisEngine._load_keys_from_db 가 ValueError 로
-    # 올린다. 이 앱에는 py-stock-batch 같은 kis.key 파일 fallback 이 없어서
+    # 키 미등록/계좌번호 형식 오류는 stock_shared.kis.credentials.load_creds_from_db 가
+    # KisCredentialError(= ValueError 하위) 로 올린다. 이 앱에는 py-stock-batch 같은 kis.key 파일 fallback 이 없어서
     # "키 없는 유저가 다른 계좌를 보게 되는" 경로는 애초에 없다 — 그대로 거절한다.
     try:
         engine = _get_engine(user_id)
