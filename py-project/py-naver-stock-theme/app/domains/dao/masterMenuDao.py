@@ -97,7 +97,9 @@ class MasterInfosDao:
             sort=data.get('sort', 0),
             enabled_flag=data.get('enabled_flag', 'Y'),
             display_flag=data.get('display_flag', 'Y'),
-            admin_only=data.get('admin_only', 'N')
+            admin_only=data.get('admin_only', 'N'),
+            common_flag=data.get('common_flag', 'N'),
+            public_flag=data.get('public_flag', 'N')
         )
 
         session.execute(insert_stmt)
@@ -105,11 +107,7 @@ class MasterInfosDao:
     # update
     # ================================================================
     def update_master_key(self, session, data):
-        stmt = update(
-            MasterMenu
-        ).where(
-            MasterMenu.menu_code == data['menu_code']
-        ).values(
+        values = dict(
             menu_parents=data['menu_parents'],
             menu_name=data['menu_name'],
             menu_path=data['menu_path'],
@@ -120,4 +118,13 @@ class MasterInfosDao:
             display_flag=data.get('display_flag', 'Y'),
             admin_only=data.get('admin_only', 'N')
         )
+        # 구버전 화면이 common_flag 없이 PUT 해도 공통 지정이 N 으로 초기화되지 않게 한다.
+        for flag in ('common_flag', 'public_flag'):
+            if flag in data:
+                values[flag] = data[flag]
+        stmt = update(
+            MasterMenu
+        ).where(
+            MasterMenu.menu_code == data['menu_code']
+        ).values(**values)
         session.execute(stmt)

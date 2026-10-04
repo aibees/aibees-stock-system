@@ -61,29 +61,22 @@ const userSession = assUserSession();
 
 const isUser = ref(false);
 const userName = ref('');
-const allMenu = ref([]);
+// 권한 반영본 메뉴(스토어). 로그인/로그아웃으로 바뀌면 자동 반영되도록 computed 로 읽는다.
+const allMenu = computed(() => userSession.user.menuList ?? []);
 const openCode = ref('');
 
-const isAdmin = computed(() => {
-    const roles = userSession.getRole ?? [];
-    return roles.some(r => r.toUpperCase() === 'ADMIN' || r === '시스템 관리자');
-});
-
-console.log("is Admin : " + isAdmin.value)
-
+// 메뉴 권한은 서버(/master/menus/my → role_menu)가 걸러서 내려준 menuList 를 그대로 쓴다.
 
 /* ── 노출 가능한 최상위 메뉴 (표시/사용/권한 필터 + 정렬) ── */
 const topMenus = computed(() => {
     return (allMenu.value ?? [])
         .filter(m => m.display_flag !== 'N' && m.enabled_flag !== 'N')
-        .filter(m => m.admin_only !== 'Y' || isAdmin.value)
         .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
 });
 
 const visibleChildren = (m) => {
     return (m.children ?? [])
         .filter(c => c.display_flag !== 'N' && c.enabled_flag !== 'N')
-        .filter(c => c.admin_only !== 'Y' || isAdmin.value)
         .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
 };
 
@@ -119,9 +112,6 @@ const onTopClick = (m) => {
 onMounted(() => {
     isUser.value = userSession.isUserSession();
     userName.value = userSession.getUserInfo;
-    allMenu.value = userSession.loadMenuList() ?? [];
-    console.log(allMenu.value);
-console.log(userSession.getRole);
 });
 </script>
 

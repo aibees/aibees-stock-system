@@ -10,7 +10,7 @@
     {
       "name": "api",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd /Users/user/Documents/workspace3/aibees-stock-system/py-project/py-naver-stock-theme && .venv/bin/python3 app/main.py"],
+      "runtimeArgs": ["-c", "cd /Users/user/Documents/workspace3/aibees-stock-system/py-project/py-naver-stock-theme && .venv/bin/python3 -m app.main"],
       "port": 5556
     }
   ]

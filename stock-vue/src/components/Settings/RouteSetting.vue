@@ -191,6 +191,32 @@
                                     </div>
                                 </div>
 
+                                <!-- 공통 메뉴 (권한 매핑 없이 로그인 사용자 전체 허용) -->
+                                <div class="form-field">
+                                    <label>공통 메뉴 <span class="req">*</span></label>
+                                    <div class="radio-group">
+                                        <label class="radio-label">
+                                            <input type="radio" v-model="form.common_flag" value="Y" /> 공통
+                                        </label>
+                                        <label class="radio-label">
+                                            <input type="radio" v-model="form.common_flag" value="N" /> 권한별
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- 공개 메뉴 (비로그인도 접근 가능) -->
+                                <div class="form-field">
+                                    <label>공개 메뉴 <span class="req">*</span></label>
+                                    <div class="radio-group">
+                                        <label class="radio-label">
+                                            <input type="radio" v-model="form.public_flag" value="Y" /> 비로그인 허용
+                                        </label>
+                                        <label class="radio-label">
+                                            <input type="radio" v-model="form.public_flag" value="N" /> 로그인 필요
+                                        </label>
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
 
@@ -268,6 +294,8 @@ const defaultForm = () => ({
     menu_title: '',
     sort: 0,
     admin_only: 'N',
+    common_flag: 'N',
+    public_flag: 'N',
 });
 
 const popup = reactive({ visible: false, isEdit: false });

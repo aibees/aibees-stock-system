@@ -50,7 +50,7 @@
                 </div>
 
                 <!-- ── 최우선타겟 선택: 추천 항목 중 사용자가 직접 하나를 지정 ── -->
-                <div v-if="!isLoading && resultData.length > 0" class="priority-bar">
+                <div v-if="isLoggedIn && !isLoading && resultData.length > 0" class="priority-bar">
                 <span class="priority-label">최우선타겟</span>
                 <select class="priority-select" v-model="priorityTarget" @change="onPriorityChange">
                     <option :value="null">선택 안 함</option>
@@ -65,6 +65,9 @@
                     </option>
                 </select>
                 </div>
+
+                <!-- 모바일 전용 광고(매수추천 카드 위). 데스크톱은 사이드 배너, AD_FREE 는 안 보임. -->
+                <AdBanner />
 
                 <div class="buy-target">
                 <div v-if="!isLoading && pagedData.length > 0" class="signal-grid">
@@ -198,9 +201,14 @@
 
 <script setup>
 import CandlestickChart from './common/comp/CandlestickChart.vue';
+import AdBanner from './common/AdBanner.vue';
 import aibeesApi from '@scripts/aibeesApi.js';
+import { assUserSession } from '@scripts/stores/user-stores.js';
 
 const router = useRouter();
+const userSession = assUserSession();
+// 홈은 비로그인도 열린다. 최우선타겟처럼 계정에 묶인 기능은 로그인했을 때만 쓴다.
+const isLoggedIn = computed(() => !!userSession.user.accessToken);
 const title = ref('AIbees Trading');
 
 const goToStockInfo = (stock_code, stock_name) => {
@@ -377,6 +385,7 @@ const priorityTarget = ref(null);     // 현재 지정된 stock_code (없으면 
 const priorityTargetName = ref('');   // 위 종목명 — 다른 날짜에서 지정된 경우 select 표시용
 
 const loadPriorityTarget = async () => {
+    if (!isLoggedIn.value) return;   // 게스트는 로그인 전용 API 를 부르지 않는다
     try {
         const { data } = await aibeesApi.get('/api/v1/stocks/buy-target/priority');
         priorityTarget.value = data?.data?.stock_code ?? null;

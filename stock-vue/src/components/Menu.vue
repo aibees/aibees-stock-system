@@ -61,7 +61,7 @@
 </template>
 
 <script setup>
-    import aibeesApi from '@scripts/aibeesApi.js';
+    import { ensureAccess } from '@scripts/useAccess.js';
     import { assUserSession } from '@scripts/stores/user-stores.js';
 
     const router    = useRouter();
@@ -70,48 +70,35 @@
     /* ── 유저 정보 ── */
     const userName  = computed(() => userStore.getUserInfo || 'Anonymous');
     const userId    = computed(() => userStore.user.loginInfo.user_id || '');
-    // userRoles 는 role 배지와 함께 제거했다(유저 카드 → 상단바 통합).
-    // 관리자 판정은 아래 isAdmin 이 userStore.getRole 을 직접 본다.
     const userInitial = computed(() => (userName.value?.[0] ?? '?').toUpperCase());
 
-    /* ── 관리자 여부 ── */
-    const isAdmin = computed(() => {
-        const roles = userStore.getRole ?? [];
-        return roles.some(r => {
-            const v = String(r ?? '').trim();
-            return v.toUpperCase() === 'ADMIN' || v.replace(/\s/g, '') === '시스템관리자';
-        });
-    });
-
-    /* ── 메뉴 ── */
-    const menuList    = ref([]);
+    /* ── 메뉴 ──
+     * 권한(role_menu)이 반영된 트리를 쓴다. 서버(/master/menus/my)가 접근 가능한 메뉴만
+     * 내려주므로 여기서 admin_only/isAdmin 으로 다시 거르지 않는다. */
     const searchQuery = ref('');
+
+    const menuList = computed(() =>
+        (userStore.user.menuList ?? [])
+            .filter(m => m.display_flag === 'Y')
+            .map(m => ({ ...m, children: (m.children ?? []).filter(sm => sm.display_flag === 'Y') }))
+    );
 
     const filteredMenuList = computed(() => {
         const q = searchQuery.value.trim().toLowerCase();
 
         return menuList.value
-            // 1) admin_only 필터
-            .filter(m => m.admin_only !== 'Y' || isAdmin.value)
             .map(m => ({
                 ...m,
-                children: (m.children || [])
-                    .filter(sm => sm.admin_only !== 'Y' || isAdmin.value)
-                    .filter(sm => !q ||
-                        sm.menu_title?.toLowerCase().includes(q) ||
-                        sm.menu_name?.toLowerCase().includes(q)
-                    )
+                children: m.children.filter(sm => !q ||
+                    sm.menu_title?.toLowerCase().includes(q) ||
+                    sm.menu_name?.toLowerCase().includes(q)
+                )
             }))
-            // 2) 검색어 있을 때 자식 없는 부모 제거
+            // 검색어 있을 때 자식 없는 부모 제거
             .filter(m => !q || m.children.length > 0 || m.menu_name?.toLowerCase().includes(q));
     });
 
-    onMounted(async () => {
-        const { data } = await aibeesApi.get('/api/v1/master/menus', {
-            params: { display_flag: 'Y', enabled_flag: 'Y' }
-        });
-        menuList.value = data.data;
-    });
+    onMounted(() => ensureAccess());
 
     const goTo = (path) => router.push({ path });
 

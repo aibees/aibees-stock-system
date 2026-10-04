@@ -126,10 +126,6 @@ const userSession = assUserSession();
 const title = '트레이딩 대시보드';
 
 const userId = computed(() => userSession.user?.loginInfo?.user_id);
-const isAdmin = computed(() => {
-    const roles = userSession.getRole ?? [];
-    return roles.some(r => r.toUpperCase() === 'ADMIN' || r === '시스템 관리자');
-});
 
 const goPath = (path) => router.push({ path });
 
@@ -147,7 +143,6 @@ const tradeChildren = computed(() => {
     if (!m) return [];
     return (m.children ?? [])
         .filter(c => c.display_flag !== 'N' && c.enabled_flag !== 'N')
-        .filter(c => c.admin_only !== 'Y' || isAdmin.value)
         .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
 });
 

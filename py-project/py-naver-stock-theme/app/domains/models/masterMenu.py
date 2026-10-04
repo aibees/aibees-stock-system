@@ -15,6 +15,8 @@ class MasterMenu(Base):
     menu_title   = Column(String(200), nullable=True)
     sort         = Column(Integer, nullable=False)
     admin_only   = Column(String(1), nullable=False)
+    common_flag  = Column(String(1), nullable=False, default='N')  # Y: 로그인 사용자 전체 허용(role_menu 매핑 불필요)
+    public_flag  = Column(String(1), nullable=False, default='N')  # Y: 비로그인(게스트)도 접근 가능
     
     def to_dict(self):
         return {
@@ -28,4 +30,6 @@ class MasterMenu(Base):
             'menu_title': self.menu_title,
             'sort': self.sort,
             'admin_only': self.admin_only,
+            'common_flag': self.common_flag,
+            'public_flag': self.public_flag,
         }

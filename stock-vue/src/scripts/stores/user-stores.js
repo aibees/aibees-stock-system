@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { reactive, computed } from "vue";
+import { reactive, computed, ref } from "vue";
 
 // [수정] 자동로그인 저장소를 cookie → localStorage 로 변경.
 // 원인: Capacitor iOS WebView는 커스텀 스킴(capacitor://localhost) 위에서
@@ -60,6 +60,23 @@ export const assUserSession = defineStore('user', () => {
         refreshToken: '',   // [추가] refresh token 필드
         menuList: []
     });
+
+    // 접근 권한(/master/menus/my 결과). user 에 넣지 않는 이유: loginUser/updateTokens 가
+    // user 전체를 JSON 으로 sessionStorage/localStorage 에 저장하는데, 권한은 매 페이지
+    // 로드마다 서버에서 다시 받아야 하므로(권한 변경 즉시 반영) 영속시키지 않는다.
+    const access = reactive({
+        loaded: false,
+        asGuest: true,  // 이 권한을 받을 때 토큰이 없었는가(게스트 권한인가)
+        paths: [],      // 이동 허용 경로(부모 + 리프, 선행 '/' 포함)
+        features: []    // AD_FREE 등
+    });
+
+    const resetAccess = () => {
+        access.loaded = false;
+        access.asGuest = true;
+        access.paths = [];
+        access.features = [];
+    };
 
     const getUserInfo = computed(() => user.loginInfo.user_name);
     const getRole    = computed(() => user.loginInfo.role);
@@ -133,6 +150,7 @@ export const assUserSession = defineStore('user', () => {
         user.loginInfo    = { ...info.loginInfo };
         user.accessToken  = info.accessToken;
         user.refreshToken = info.refreshToken ?? '';
+        resetAccess(); // 계정이 바뀌면 이전 계정의 권한을 버리고 다시 받는다
 
         const decoded = decodeJwt(info.accessToken);
         user.expireTime = decoded?.exp
@@ -185,6 +203,7 @@ export const assUserSession = defineStore('user', () => {
         user.refreshToken = '';  // [추가]
         user.expireTime   = null; // [수정] accessTime → expireTime
         user.menuList     = [];
+        resetAccess();
 
         sessionStorage.removeItem('userSession');
         sessionStorage.removeItem('menuList');
@@ -217,6 +236,7 @@ export const assUserSession = defineStore('user', () => {
 
     return {
         user,                  // [추가] accessToken/refreshToken 접근용으로 노출
+        access,
         getUserInfo, getRole,
         loginUser, logoutUser, isUserSession,
         updateTokens, isTokenExpiringSoon, // [추가]

@@ -2,6 +2,10 @@ import { createWebHistory, createRouter } from 'vue-router'
 import { loadComponent } from './utils/componentLoader.js'
 import aibeesApi from './aibeesApi.js'
 import { assUserSession } from "./stores/user-stores";
+import { ensureAccess } from "./useAccess.js";
+import { hasAdPass } from "./useAdGate.js";
+import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
+import AdGate from '@/components/AdGate.vue';
 
 // ----- import components -----
 import Home from '@/components/Home.vue'
@@ -36,6 +40,12 @@ const routes = [
         component: Login
     },
     {
+        // 광고 게이트. 로그인 필요(PUBLIC_PATHS 아님). 가드가 AD_FREE 없는 사용자를 여기로 보낸다.
+        path: "/ad-gate",
+        name: "ad-gate",
+        component: AdGate
+    },
+    {
         path: "/group",
         name: "group",
         component: Group
@@ -47,12 +57,31 @@ const routes = [
     }
 ]
 
+// 라우트로 등록된 전체 메뉴 경로(로그인 전 전체 목록 기준). 이 중 사용자 권한에 없는
+// 경로는 가드가 막는다. 목록에 없는 경로(정적 라우트, 404 등)는 권한 대상이 아니다.
+let restrictedPaths = new Set();
+// 광고 게이트 대상 경로(AD_GATE_MENU_CODES 의 메뉴). AD_FREE 가 없으면 진입 전에 광고를 본다.
+let adGatedPaths = new Set();
+
+const normPath = (p) => '/' + String(p ?? '').replace(/^\/+/, '').replace(/\/+$/, '');
+
 const getRouteList = async () => {
   try {
     const { data } = await aibeesApi.get('/api/v1/master/menus', { params: { enabled_flag: 'Y' } });
     const routerResult = data.data;
     const userSession = assUserSession();
     userSession.setMenuList(routerResult);
+
+    restrictedPaths = new Set();
+    adGatedPaths = new Set();
+    routerResult.forEach(r => {
+        restrictedPaths.add(normPath(r.menu_path));
+        (r.children ?? []).forEach(c => {
+            const full = normPath(r.menu_path) + normPath(c.menu_path);
+            restrictedPaths.add(full);
+            if (AD_GATE_MENU_CODES.includes(c.menu_code)) adGatedPaths.add(full);
+        });
+    });
 
     let saRouter = [];
 
@@ -114,7 +143,8 @@ const getRouteList = async () => {
 }
 
 // 로그인 없이 접근 가능한 화이트리스트
-const PUBLIC_PATHS = ['/login', '/', '/home'];
+// /ad-gate: 비로그인도 광고 게이트를 거쳐 공개 메뉴로 갈 수 있어야 한다(이동 대상의 접근 가능 여부는 다시 검사된다).
+const PUBLIC_PATHS = ['/login', '/', '/home', '/ad-gate'];
 
 export const setRouterToApp = async () => {
     const dynamicRoutes = await getRouteList();
@@ -130,13 +160,38 @@ export const setRouterToApp = async () => {
     });
 
     // ── 전역 네비게이션 가드 ──
-    router.beforeEach((to) => {
+    router.beforeEach(async (to) => {
         const userSession = assUserSession();
+        const loggedIn = userSession.isUserSession();
         const isPublic = PUBLIC_PATHS.includes(to.path);
+        const target = normPath(to.path);
 
-        if (!isPublic && !userSession.isUserSession()) {
-            alert("로그인 이후 이용 가능합니다.");
-            return { path: '/login' };
+        // 권한(메뉴/기능)을 먼저 받는다. 비로그인이어도 받는다 — 서버가 게스트에게는 공개 메뉴
+        // (master_menu.public_flag)만 내려주므로, 이 목록이 "로그인 없이 열 수 있는 경로"의 정본이다.
+        // Lnb 가 sessionStorage 의 menuList 를 읽는데 그 값이 권한 반영본이어야 하기도 하다.
+        // 받아 둔 권한이 로그인 상태와 어긋나면(예: 세션이 끊겼는데 이전 사용자의 권한이 남음) 다시 받는다.
+        const stale = userSession.access.loaded && userSession.access.asGuest === loggedIn;
+        const access = to.path === '/login' ? null : await ensureAccess(stale);
+        const allowed = !!access && access.paths.includes(target);
+        const isMenuPath = restrictedPaths.has(target);
+
+        if (!isPublic) {
+            // 로그인 안 했고, 공개 메뉴도 아니면 로그인 화면으로.
+            if (!loggedIn && !(isMenuPath && allowed)) {
+                alert("로그인 이후 이용 가능합니다.");
+                return { path: '/login' };
+            }
+            // 로그인했지만 권한(role_menu)에 없는 메뉴.
+            if (loggedIn && isMenuPath && !allowed) {
+                alert("접근 권한이 없는 메뉴입니다.");
+                return { path: '/home' };
+            }
+        }
+
+        // 광고 게이트: 접근이 허용된 게이트 대상 메뉴에만(비로그인 포함). AD_FREE 보유자는 건너뛴다.
+        if (AD_ENABLED && access?.loaded && allowed && adGatedPaths.has(target)
+            && !access.features.includes('AD_FREE') && !hasAdPass()) {
+            return { path: '/ad-gate', query: { next: to.fullPath } };
         }
     });
 

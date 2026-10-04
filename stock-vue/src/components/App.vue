@@ -1,5 +1,7 @@
 <script setup>
 import Lnb from './common/Lnb.vue';
+import AdSideBanners from './common/AdSideBanners.vue';
+import AdBottomBanner from './common/AdBottomBanner.vue';
 </script>
 
 <template>
@@ -7,6 +9,8 @@ import Lnb from './common/Lnb.vue';
        Lnb 가 렌더하는 탭바 자체는 position:fixed 라 이 여백 대상이 아니다. -->
   <div class="app-shell">
     <Lnb />
+    <AdSideBanners />
+    <AdBottomBanner />
     <router-view />
   </div>
 </template>
@@ -20,6 +24,24 @@ import Lnb from './common/Lnb.vue';
    * 홈 인디케이터(safe-area-inset-bottom)를 더해야 기기별로 맞는다. */
   --lnb-height: 3.5rem;
   --lnb-total: calc(var(--lnb-height) + env(safe-area-inset-bottom, 0px));
+  --ad-bottom-h: 0px;
+  --ad-bottom-total: 0px;
+}
+
+/* 모바일 하단 배너(AdBottomBanner)가 떠 있는 동안.
+ * 배너가 맨 아래(홈 인디케이터 포함)를 차지하고 탭바는 그 위에 얹힌다.
+ *   - --lnb-total 을 "탭바 + 배너"로 재정의 → 이 값을 쓰는 하단 여백이 자동으로 늘어난다.
+ *   - 탭바 자신은 높이를 --lnb-height 로 줄이고 safe-area 패딩을 버린다(배너가 대신 받는다).
+ * 배너 높이는 adConfig.MOBILE_BOTTOM_BANNER_HEIGHT(50)와 같아야 한다. */
+html.has-bottom-ad {
+  --ad-bottom-h: 50px;
+  --ad-bottom-total: calc(50px + env(safe-area-inset-bottom, 0px));
+  --lnb-total: calc(var(--lnb-height) + var(--ad-bottom-total));
+}
+html.has-bottom-ad #comm-lnb {
+  bottom: var(--ad-bottom-total);
+  height: var(--lnb-height);
+  padding-bottom: 0;
 }
 
 html,
@@ -82,9 +104,10 @@ body {
  * 3.5rem 이 고정 탭바에 가려진다 — 메뉴 목록 맨 아래 항목이 잘려 보이던 원인.
  *
  * 탭바(#comm-lnb)와 웹 상단바(#comm-lnb-web)는 app-shell 의 직계 자식이지만
- * 여백 대상이 아니라 제외한다. 나머지 직계 자식이 곧 router-view 가 그린 화면이다. */
+ * 여백 대상이 아니라 제외한다. 광고 배너(.ad-bottom/.ad-side)도 fixed 라 제외한다 — 빠뜨리면
+ * 배너 컨테이너가 여백만큼 커져 탭바를 덮는다. 나머지 직계 자식이 곧 router-view 가 그린 화면이다. */
 @media screen and (max-width: 639px) {
-  .app-shell > :not(#comm-lnb):not(#comm-lnb-web) {
+  .app-shell > :not(#comm-lnb):not(#comm-lnb-web):not(.ad-bottom):not(.ad-side) {
     padding-bottom: var(--lnb-total);
   }
 }

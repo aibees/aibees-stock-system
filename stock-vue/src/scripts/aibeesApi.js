@@ -86,6 +86,13 @@ const attachAuthResponseInterceptor = (apiInstance) => {
 
             if (error.response?.status === 401 && !originalRequest._retry) {
 
+                // 토큰 없이 보낸 요청(비로그인 게스트)의 401 은 "세션 만료"가 아니다.
+                // 로그아웃/로그인 화면 이동 없이 호출부가 처리하게 둔다 — 안 그러면
+                // 로그인 없이 열리는 화면(홈 등)이 로그인 전용 API 하나 때문에 튕겨 나간다.
+                if (!originalRequest.headers?.['Authorization']) {
+                    return Promise.reject(error);
+                }
+
                 // refreshToken 자체가 없으면 재발급 불가 → 로그아웃
                 if (!userSession.user.refreshToken) {
                     userSession.logoutUser();
