@@ -22,8 +22,14 @@ import AdBottomBanner from './common/AdBottomBanner.vue';
   /* 모바일 하단 탭바(#comm-lnb)의 실제 높이. 바 자신과 각 화면의 하단 여백이
    * 같은 값을 보도록 한 곳에서 정의한다 — 따로 쓰면 반드시 한쪽이 어긋난다.
    * 홈 인디케이터(safe-area-inset-bottom)를 더해야 기기별로 맞는다. */
-  --lnb-height: 3.5rem;
+  --lnb-height: 3.75rem;
   --lnb-total: calc(var(--lnb-height) + env(safe-area-inset-bottom, 0px));
+  /* 양봉상회 브랜드 팔레트(런타임 CSS 변수 — sass/__variables.scss 의 yb-* 변수와 같은 값) */
+  --yb-yellow: #FFC107;
+  --yb-honey: #F9E076;
+  --yb-cream: #FFFDD0;
+  --yb-brown: #895129;
+  --yb-ink: #4A2A12;
   --ad-bottom-h: 0px;
   --ad-bottom-total: 0px;
 }
@@ -44,6 +50,21 @@ html.has-bottom-ad #comm-lnb {
   padding-bottom: 0;
 }
 
+/* 상태바(노치) 영역을 불투명하게 덮는다. #app 이 safe-area-inset-top 만큼 아래에서 시작하지만
+ * 스크롤하면 그 투명한 띠 위로 콘텐츠가 올라와 상태바(시간·배터리) 뒤로 비쳐 보였다.
+ * 노치가 없는 기기에서는 env() 가 0 이라 높이 0 — 아무것도 그려지지 않는다. */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: #FFF4C2;
+  z-index: 2000;
+  pointer-events: none;
+}
+
 html,
 body {
   /* 가로 넘침 방어. 안쪽 요소가 뷰포트보다 넓어지면 body 가 함께 넓어져
@@ -51,6 +72,10 @@ body {
    * 넘치는 요소는 개별로 고치되, 하나 놓쳐도 전체 레이아웃이 깨지지 않게 막아둔다. */
   max-width: 100%;
   overflow-x: hidden;
+  /* hidden 은 body 를 스크롤 컨테이너로 만들어 position:sticky 를 무력화한다(홈 헤더·웹 내비가
+   * 같이 스크롤돼 사라지던 원인). clip 은 같은 가로 넘침 방어를 하면서 컨테이너를 만들지 않는다.
+   * 미지원 브라우저는 위의 hidden 을 그대로 쓴다. */
+  overflow-x: clip;
 }
 
 body {

@@ -1,201 +1,237 @@
 <template>
     <div id="home">
-        <Headers :prop_title="title" />
 
-        <div class="contents">
-            <!-- ════════ 추천종목 섹션 (제목+정렬+카드를 한 패널로 묶음 — 아래에 다른 섹션이 이어 붙을 예정) ════════ -->
-            <section class="reco-section">
-                <div class="head-desc">
-                <div class="head-left">
-                    <h2 style="text-align: left;">오늘의 추천종목</h2>
-                </div>
-
-                <div class="head-actions">
-                    <div class="date-nav">
-                        <button type="button" class="date-arrow" title="이전 영업일" @click="stepSelectedDate(-1)">‹</button>
-                        <div class="date-picker-trigger" @click="openDatePicker">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                <line x1="16" y1="2" x2="16" y2="6"></line>
-                                <line x1="8" y1="2" x2="8" y2="6"></line>
-                                <line x1="3" y1="10" x2="21" y2="10"></line>
-                            </svg>
-                            <span class="date-value">{{ formattedDisplayDate }}</span>
-                            <input type="date" ref="dateInput" class="hidden-input" v-model="selectedDate"
-                                @change="handleDateChange" />
-                        </div>
-                        <button type="button" class="date-arrow" title="다음 영업일" @click="stepSelectedDate(1)">›</button>
-                    </div>
-                    <button type="button" class="btn-detail" @click="goToBuyTargetDetail">상세보기 ›</button>
-                </div>
-                </div>
-
-                <!-- ── 정렬 옵션 ──
-                     칩 나열에서 select 로 바꿨다. 옵션이 5개라 폰 폭에서는 한 줄에
-                     들어갈 수 없어 넘치거나 두 줄로 접혔고, 바로 아래 최우선타겟이
-                     이미 select 라 두 줄의 생김새도 따로 놀았다.
-                     방향 토글은 버튼으로 남긴다 — 이진 선택이라 한 번 탭이 가장 빠르고,
-                     select 에 합치면 옵션이 10개(5×2)로 늘어난다. -->
-                <div v-if="!isLoading && resultData.length > 0" class="sort-bar">
-                <span class="sort-label">정렬</span>
-                <select class="sort-select" v-model="sortKey" @change="onSortKeyChange">
-                    <option v-for="o in SORT_OPTIONS" :key="o.key" :value="o.key">{{ o.label }}</option>
-                </select>
-                <button type="button" class="sort-dir" @click="toggleSortDir"
-                    :title="sortDir === 'desc' ? '내림차순' : '오름차순'">
-                    <span class="dir-arrow">{{ sortDir === 'desc' ? '↓' : '↑' }}</span>
-                    {{ sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel }}
+        <!-- ════════ 상단: 로고 칩 + 즐겨찾기 + 계정, 아래에 12px 차양 띠 ════════
+             모바일에서는 sticky(+세이프 에어리어), 데스크톱은 상단 내비(Lnb)가 브랜드를 보여준다. -->
+        <header class="home-header" data-ad-anchor>
+            <div class="hh-row">
+                <button type="button" class="brand-chip" @click="router.push('/home')" aria-label="양봉상회 홈">
+                    <img class="brand-logo" src="/favicon.svg" alt="" aria-hidden="true" />
+                    <span class="brand-name">양봉상회</span>
                 </button>
+
+                <div class="hh-actions">
+                    <button type="button" class="icon-btn" aria-label="즐겨찾기" @click="goFavorites">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6L12 16.7 6.6 19.6l1.1-6-4.5-4.2 6.1-.8z"></path></svg>
+                    </button>
+
+                    <div class="account" ref="accountRef">
+                        <button v-if="isLoggedIn" type="button" class="icon-btn" :aria-label="`내 계정 · ${userName} 님`"
+                            aria-haspopup="menu" :aria-expanded="menuOpen ? 'true' : 'false'" @click.stop="menuOpen = !menuOpen">
+                            <span class="avatar">{{ userInitial }}</span>
+                        </button>
+                        <button v-else type="button" class="login-btn" @click="router.push('/login')">로그인</button>
+
+                        <ul v-if="menuOpen" class="account-menu" role="menu">
+                            <li class="am-name" aria-hidden="true">{{ userName }} 님</li>
+                            <li role="menuitem"><button type="button" @click="goTo('/user-option')">개인설정</button></li>
+                            <li role="menuitem"><button type="button" @click="goTo('/menu')">전체 메뉴</button></li>
+                            <li role="menuitem"><button type="button" class="danger" @click="logout">로그아웃</button></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="awning" aria-hidden="true"></div>
+        </header>
+
+        <main class="home-main">
+
+            <!-- ── 날짜 네비게이터: ‹ 날짜(요일) › + 장 상태 ── -->
+            <div class="date-nav">
+                <button type="button" class="nav-btn" aria-label="이전 영업일" @click="stepSelectedDate(-1)">‹</button>
+                <div class="date-center">
+                    <button type="button" class="date-btn" aria-label="날짜 선택" @click="openDatePicker">
+                        <span class="date-main">{{ dateLabel }}</span>
+                        <span class="date-status" :class="marketState"><i class="dot"></i>{{ statusLabel }}</span>
+                    </button>
+                    <input type="date" ref="dateInput" class="hidden-input" v-model="selectedDate"
+                        @change="handleDateChange" tabindex="-1" aria-hidden="true" />
+                </div>
+                <button type="button" class="nav-btn" aria-label="다음 영업일" @click="stepSelectedDate(1)">›</button>
+            </div>
+
+            <!-- ── 최우선 타겟 히어로 ── -->
+            <section class="priority-hero" aria-label="오늘의 최우선 타겟">
+                <div class="ph-top">
+                    <span class="ph-badge">오늘의 최우선 타겟</span>
+                    <button v-if="isLoggedIn && sortedData.length" type="button" class="ph-change" @click="sheetOpen = true">
+                        {{ priorityTarget ? '다른 타겟' : '타겟 고르기' }} ▾
+                    </button>
                 </div>
 
-                <!-- ── 최우선타겟 선택: 추천 항목 중 사용자가 직접 하나를 지정 ── -->
-                <div v-if="isLoggedIn && !isLoading && resultData.length > 0" class="priority-bar">
-                <span class="priority-label">최우선타겟</span>
-                <select class="priority-select" v-model="priorityTarget" @change="onPriorityChange">
-                    <option :value="null">선택 안 함</option>
-                    <!-- 저장된 최우선타겟이 지금 보고 있는 날짜 목록에 없으면(다른 날짜에서
-                         지정한 값) 그래도 선택 상태가 보이도록 임시 옵션을 하나 얹는다. -->
-                    <option v-if="priorityTarget && !sortedData.some(i => i.stock_code === priorityTarget)"
-                        :value="priorityTarget">
-                        {{ priorityTargetName || priorityTarget }} (다른 날짜)
-                    </option>
-                    <option v-for="item in sortedData" :key="item.stock_code" :value="item.stock_code">
-                        {{ item.stock_name }} ({{ item.stock_code }})
-                    </option>
-                </select>
+                <template v-if="priorityItem">
+                    <div class="ph-body">
+                        <div class="ph-who">
+                            <span class="ph-name">{{ priorityItem.stock_name }}</span>
+                            <span class="ph-code">{{ priorityItem.stock_code }}</span>
+                        </div>
+                        <div class="ph-px">
+                            <span class="ph-price">{{ formatNumber(priorityItem.close) }}</span>
+                            <span class="ph-chg" :class="changeInfo(priorityItem).cls">{{ changeInfo(priorityItem).text }}</span>
+                        </div>
+                    </div>
+                    <p class="ph-reason">{{ reasonLine(priorityItem) }}</p>
+                    <button type="button" class="ph-cta" @click="goToStockInfo(priorityItem.stock_code, priorityItem.stock_name)">AI 분석 보기</button>
+                </template>
+
+                <!-- 다른 날짜에서 지정해 지금 목록에는 없는 경우: 이름만 -->
+                <template v-else-if="priorityTarget">
+                    <div class="ph-body">
+                        <div class="ph-who">
+                            <span class="ph-name">{{ priorityTargetName || priorityTarget }}</span>
+                            <span class="ph-code">{{ priorityTarget }}</span>
+                        </div>
+                    </div>
+                    <p class="ph-reason">다른 날짜에서 지정한 타겟이에요. 이 날짜의 추천 목록에는 없습니다.</p>
+                    <button type="button" class="ph-cta" @click="goToStockInfo(priorityTarget, priorityTargetName)">AI 분석 보기</button>
+                </template>
+
+                <template v-else-if="isLoading">
+                    <div class="ph-skeleton"></div>
+                </template>
+
+                <template v-else>
+                    <p class="ph-empty">
+                        {{ isLoggedIn ? '추천 종목 중 하나를 최우선 타겟으로 정해 두면 여기에 보여드려요.' : '로그인하면 추천 종목 중 최우선 타겟을 직접 정할 수 있어요.' }}
+                    </p>
+                    <button v-if="isLoggedIn && sortedData.length" type="button" class="ph-cta" @click="sheetOpen = true">타겟 고르기</button>
+                    <button v-else-if="!isLoggedIn" type="button" class="ph-cta" @click="router.push('/login')">로그인</button>
+                </template>
+            </section>
+
+            <!-- 모바일 전용 광고(리스트 위). 데스크톱은 사이드 배너, AD_FREE 는 안 보임. -->
+            <AdBanner />
+
+            <!-- ── 추천 종목 리스트 ── -->
+            <section class="reco" aria-label="추천 종목">
+                <div class="list-head">
+                    <h2>추천 종목 <span class="count">{{ sortedData.length }}</span></h2>
+                    <div class="list-tools">
+                        <label class="sort-pill">
+                            <select v-model="sortKey" @change="onSortKeyChange" aria-label="정렬 기준">
+                                <option v-for="o in SORT_OPTIONS" :key="o.key" :value="o.key">{{ o.label }}</option>
+                            </select>
+                            <span class="pill-text" aria-hidden="true">{{ currentSort.label }} ▾</span>
+                        </label>
+                        <button type="button" class="dir-btn" @click="toggleSortDir"
+                            :aria-label="sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel"
+                            :title="sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel">
+                            {{ sortDir === 'desc' ? '↓' : '↑' }}
+                        </button>
+                    </div>
                 </div>
 
-                <!-- 모바일 전용 광고(매수추천 카드 위). 데스크톱은 사이드 배너, AD_FREE 는 안 보임. -->
-                <AdBanner />
-
-                <div class="buy-target">
-                <div v-if="!isLoading && pagedData.length > 0" class="signal-grid">
-                    <div v-for="(item, index) in pagedData" :key="item.stock_code ?? index" class="signal-card"
-                        :class="{ 'is-priority': item.stock_code === priorityTarget }">
-
-                        <!-- 헤더: 순위 + 종목명/코드 + 액션 버튼 + 금일 변동률 -->
-                        <div class="card-head">
-                            <div class="rank-num">{{ String(currentPage * PAGE_SIZE + index + 1).padStart(2, '0') }}</div>
-                            <div class="head-main">
-                                <h3 class="name">{{ item.stock_name }}</h3>
-                                <div class="code">{{ item.stock_code }}</div>
-                                <span v-if="item.stock_code === priorityTarget" class="priority-badge">최우선타겟</span>
-                            </div>
-                            <div class="actions-row">
-                                <button class="action-btn ai-btn" @click="goToStockInfo(item.stock_code, item.stock_name)">AI 분석</button>
-                                <button class="action-btn chart-btn" @click="toggleChart(item.stock_code)">
-                                    {{ expandedCharts.has(item.stock_code) ? '차트접기' : '차트보기' }}
-                                </button>
-                            </div>
-                            <div class="rate-badge" :class="rateClass(item.rate)">{{ item.rate ?? '-' }}</div>
-                        </div>
-
-                        <!-- 간이 차트: 최근 120영업일 봉차트 + 20/60/120일선 (기본 숨김, 차트보기로 토글) -->
-                        <div v-if="expandedCharts.has(item.stock_code) && item.chart_data && item.chart_data.length" class="mini-chart">
-                            <div class="mini-chart-head">
-                                <div class="mini-legend">
-                                    <span class="leg-item" style="--c:#efa55b">MA20</span>
-                                    <span class="leg-item" style="--c:#d0fe48">MA60</span>
-                                    <span class="leg-item" style="--c:#01b6f3">MA120</span>
-                                </div>
-                                <button type="button" class="mini-chart-detail" @click="goToChart(item.stock_code)">자세히보기 ›</button>
-                            </div>
-                            <div class="mini-chart-canvas">
-                                <CandlestickChart :chartData="buyTargetCandleData(item)" :extraOptions="miniCandleOptions" />
-                            </div>
-                        </div>
-
-                        <!-- 현재가 + 거래량 + 추천 -->
-                        <div class="stat-pair triple">
-                            <div class="stat-cell">
-                                <span class="stat-label">현재가</span>
-                                <div class="stat-main">{{ formatNumber(item.close) }}<span class="unit">원</span></div>
-                            </div>
-                            <div class="stat-cell">
-                                <span class="stat-label">거래량</span>
-                                <div class="stat-main">{{ formatVolume(item.volume || 0) }}</div>
-                            </div>
-                            <div class="stat-cell">
-                                <span class="stat-label">점수</span>
-                                <div class="stat-main" :class="scoreClass(item.score)">{{ item.score ?? '-' }}<span class="unit">/100</span></div>
-                            </div>
-                        </div>
-
-                        <!-- 시/고/저/종 -->
-                        <div class="price-row">
-                            <div class="price-item">
-                                <span class="price-label">시가</span>
-                                <span class="price-value">{{ formatNumber(item.open) }}</span>
-                            </div>
-                            <div class="price-item high">
-                                <span class="price-label">고가</span>
-                                <span class="price-value">{{ formatNumber(item.high) }}</span>
-                            </div>
-                            <div class="price-item low">
-                                <span class="price-label">저가</span>
-                                <span class="price-value">{{ formatNumber(item.low) }}</span>
-                            </div>
-                            <div class="price-item close">
-                                <span class="price-label">종가</span>
-                                <span class="price-value">{{ formatNumber(item.close) }}</span>
-                            </div>
-                        </div>
-
-                        <!-- 근거 · 조건 (펼치기) -->
-                        <button type="button" class="detail-toggle" @click="toggleDetail(item.stock_code)">
-                            <span class="arrow" :class="{ open: expandedCard === item.stock_code }">▶</span>
-                            근거 · 재무 · 조건 보기
+                <div v-if="!isLoading && rows.length" class="reco-list">
+                    <div v-for="(r, idx) in rows" :key="r.item.stock_code ?? idx" class="reco-item">
+                        <button type="button" class="reco-row" :class="{ open: expandedCode === r.item.stock_code }"
+                            :aria-expanded="expandedCode === r.item.stock_code ? 'true' : 'false'"
+                            @click="toggleRow(r.item.stock_code)">
+                            <span class="rank">{{ String(idx + 1).padStart(2, '0') }}</span>
+                            <span class="who">
+                                <span class="name-line">
+                                    <span class="name">{{ r.item.stock_name }}</span>
+                                    <span class="code">{{ r.item.stock_code }}</span>
+                                    <span v-if="r.item.stock_code === priorityTarget" class="pri-chip">최우선</span>
+                                </span>
+                                <span class="reason">{{ r.reason }}</span>
+                            </span>
+                            <span class="px">
+                                <span class="price">{{ formatNumber(r.item.close) }}</span>
+                                <span class="chg" :class="r.chg.cls">{{ r.chg.text }}</span>
+                            </span>
                         </button>
 
-                        <div v-show="expandedCard === item.stock_code" class="detail-panel">
-                            <div class="detail-group">
-                                <div class="detail-group-title">재무 펀더멘털</div>
-                                <div class="detail-row" v-for="row in fundamentalRows(item)" :key="row.label">
-                                    <div class="detail-row-name">{{ row.label }}</div>
-                                    <div class="detail-row-verdict" :class="row.pass ? 'pass' : (row.pass === false ? 'fail' : 'neutral')">
-                                        {{ row.verdict }}
-                                    </div>
-                                    <div class="detail-row-desc">{{ row.desc }}</div>
-                                </div>
+                        <div v-if="expandedCode === r.item.stock_code" class="reco-detail">
+                            <!-- 시/고/저/종 + 거래량 표 (장중에는 '종가' 대신 '현재가') -->
+                            <table class="ohlc">
+                                <thead>
+                                    <tr><th>시가</th><th>고가</th><th>저가</th><th>{{ priceLabel }}</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>{{ formatNumber(r.item.open) }}</td>
+                                        <td class="hi">{{ formatNumber(r.item.high) }}</td>
+                                        <td class="lo">{{ formatNumber(r.item.low) }}</td>
+                                        <td class="cl">{{ formatNumber(r.item.close) }}</td>
+                                    </tr>
+                                    <tr class="vol">
+                                        <th colspan="2" scope="row">거래량</th>
+                                        <td colspan="2">{{ formatNumber(r.item.volume) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <!-- 점수가 아직 없으면(장 마감 후 산출) 칸 자체를 숨긴다 -->
+                            <div v-if="hasValue(r.item.score)" class="score-line">종합 점수 <b>{{ numOrNull(r.item.score) }}</b> / 100</div>
+
+                            <div class="rd-actions">
+                                <button type="button" class="btn-outline strong" @click="goToStockInfo(r.item.stock_code, r.item.stock_name)">AI 분석</button>
+                                <button type="button" class="btn-outline" @click="toggleChart(r.item.stock_code)">
+                                    {{ expandedCharts.has(r.item.stock_code) ? '차트 접기' : '차트' }}
+                                </button>
                             </div>
 
-                            <div class="detail-group">
-                                <div class="detail-group-title">기술적 근거</div>
-                                <div class="detail-row" v-for="row in technicalRows(item)" :key="row.label">
-                                    <div class="detail-row-name">{{ row.label }}</div>
-                                    <div class="detail-row-verdict" :class="row.pass ? 'pass' : 'neutral'">
-                                        {{ row.verdict }}
+                            <!-- 간이 차트: 최근 120영업일 봉차트 + 20/60/120일선 -->
+                            <div v-if="expandedCharts.has(r.item.stock_code) && r.item.chart_data && r.item.chart_data.length" class="mini-chart">
+                                <div class="mini-chart-head">
+                                    <div class="mini-legend">
+                                        <span class="leg-item" style="--c:#efa55b">MA20</span>
+                                        <span class="leg-item" style="--c:#8bb400">MA60</span>
+                                        <span class="leg-item" style="--c:#01b6f3">MA120</span>
                                     </div>
-                                    <div class="detail-row-desc">{{ row.desc }}</div>
+                                    <button type="button" class="mini-chart-detail" @click="goToChart(r.item.stock_code)">자세히보기 ›</button>
+                                </div>
+                                <div class="mini-chart-canvas">
+                                    <CandlestickChart :chartData="buyTargetCandleData(r.item)" :extraOptions="miniCandleOptions" />
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- 푸터: 기준일 -->
-                        <div class="card-footer">
-                            <span class="timestamp">{{ formatDate(item.ymd) }} 기준</span>
                         </div>
                     </div>
+
+                    <!-- 홈에는 상위 3개만. 전체 목록은 매수추천 메뉴에서 본다. -->
+                    <button type="button" class="more-btn" @click="goToBuyTarget">
+                        전체 {{ sortedData.length }}개 자세히보기 ›
+                    </button>
                 </div>
 
-                <div v-else-if="isLoading" class="loader-grid">
-                    <div class="skeleton-card" v-for="n in 3" :key="n"></div>
+                <div v-else-if="isLoading" class="reco-list">
+                    <div class="skeleton-row" v-for="n in 4" :key="n"></div>
                 </div>
 
                 <div v-else class="empty-box">
                     <p>분석된 데이터가 없습니다. 날짜를 변경해 보세요.</p>
                 </div>
-
-                <!-- ── 페이지네이션: 3개씩 보여주는 디자인은 유지하되 다음 항목도 탐색 가능 ── -->
-                <div v-if="!isLoading && sortedData.length > PAGE_SIZE" class="pagination-bar">
-                    <button type="button" class="page-btn" :disabled="currentPage === 0" @click="prevPage">‹ 이전</button>
-                    <span class="page-info">{{ currentPage + 1 }} / {{ totalPages }}</span>
-                    <button type="button" class="page-btn" :disabled="currentPage >= totalPages - 1" @click="nextPage">다음 ›</button>
-                </div>
-                </div>
             </section>
-        </div>
+
+            <p class="disclaimer">본 정보는 투자 권유가 아니며, 투자 판단의 책임은 투자자 본인에게 있습니다.</p>
+        </main>
+
+        <!-- ── 최우선 타겟 선택 시트 ── -->
+        <teleport to="body">
+            <transition name="sheet">
+                <div v-if="sheetOpen" class="sheet-overlay" @click.self="sheetOpen = false">
+                    <div class="sheet" role="dialog" aria-modal="true" aria-label="최우선 타겟 선택">
+                        <div class="sheet-head">
+                            <strong>최우선 타겟 선택</strong>
+                            <button type="button" class="sheet-close" aria-label="닫기" @click="sheetOpen = false">✕</button>
+                        </div>
+                        <ul class="sheet-list">
+                            <li>
+                                <button type="button" class="sheet-item" :class="{ on: !priorityTarget }" @click="selectPriority(null)">
+                                    <span class="si-name">선택 안 함</span>
+                                </button>
+                            </li>
+                            <li v-for="(item, i) in sortedData" :key="item.stock_code">
+                                <button type="button" class="sheet-item" :class="{ on: item.stock_code === priorityTarget }" @click="selectPriority(item.stock_code)">
+                                    <span class="si-rank">{{ String(i + 1).padStart(2, '0') }}</span>
+                                    <span class="si-name">{{ item.stock_name }} <em>{{ item.stock_code }}</em></span>
+                                    <span class="si-chg" :class="changeInfo(item).cls">{{ changeInfo(item).text }}</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </transition>
+        </teleport>
     </div>
 </template>
 
@@ -204,79 +240,92 @@ import CandlestickChart from './common/comp/CandlestickChart.vue';
 import AdBanner from './common/AdBanner.vue';
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
+import {
+    numOrNull, formatNumber, hasValue, changeInfo, reasonLine,
+    kstNowParts, isMarketOpenNow, weekdayKo, toYmdString, shiftDate, getLatestBatchDate,
+} from '@scripts/stockSignals.js';
 
 const router = useRouter();
 const userSession = assUserSession();
 // 홈은 비로그인도 열린다. 최우선타겟처럼 계정에 묶인 기능은 로그인했을 때만 쓴다.
 const isLoggedIn = computed(() => !!userSession.user.accessToken);
-const title = ref('AIbees Trading');
+const userName = computed(() => userSession.getUserInfo || '');
+const userInitial = computed(() => (userName.value?.[0] ?? '?').toUpperCase());
 
+/* ── 이동 ── */
 const goToStockInfo = (stock_code, stock_name) => {
-    router.push({ path: '/stock/info', query: { stock_code, stock_name } });
+    // ymd: 상세 화면이 같은 날짜의 매수타겟 행(근거·재무·조건)을 찾는 데 쓴다.
+    router.push({ path: '/stock/info', query: { stock_code, stock_name, ymd: selectedDate.value.replaceAll('-', '') } });
 };
 const goToChart = (stock_code) => {
     router.push({ path: '/stock/chart', query: { code: stock_code } });
 };
-const goToBuyTargetDetail = () => {
-    router.push({ path: '/stock/buy-target' });
+const goTo = (path) => { menuOpen.value = false; router.push(path); };
+const goFavorites = () => {
+    if (!isLoggedIn.value) {
+        alert('로그인이 필요한 페이지입니다. 로그인메뉴로 이동합니다.');
+        router.push({ name: 'login' });
+        return;
+    }
+    router.push({ name: 'group' });
 };
+
+/* ── 계정 메뉴 ── */
+const menuOpen = ref(false);
+const accountRef = ref(null);
+const onDocClick = (e) => {
+    if (menuOpen.value && accountRef.value && !accountRef.value.contains(e.target)) menuOpen.value = false;
+};
+const onKeyDown = (e) => { if (e.key === 'Escape') { menuOpen.value = false; sheetOpen.value = false; } };
+const logout = () => {
+    menuOpen.value = false;
+    userSession.logoutUser();      // pinia + sessionStorage + localStorage 초기화
+    router.push('/login');
+};
+
 const resultData = ref([]);
 const isLoading = ref(true);
 
-/* ── 매수타겟 기준일 기본값: 가장 최신 배치 데이터가 있는 날 ──
- * - 배치는 KST 기준 평일 20:00에 완료된다.
- * - 주말(토·일)은 항상 직전 금요일 데이터가 최신이다.
- * - 평일 20:00 이전에는 당일 배치가 아직 안 끝났으므로 직전 영업일 데이터가 최신이다
- *   (월요일 20시 이전이면 일·토를 건너뛰어 금요일까지 거슬러 올라간다).
- * - 평일 20:00 이후에는 당일 데이터가 최신이다.
- * 뷰어의 브라우저 시간대와 무관하게 KST 기준으로 판단해야 하므로 Intl 로 명시적으로 구한다.
- */
-const getKstNow = () => {
-    const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Seoul',
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', hour12: false, weekday: 'short',
-    }).formatToParts(new Date());
-    const get = (type) => parts.find(p => p.type === type)?.value;
-    const WEEKDAY_NUM = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-    return {
-        year: Number(get('year')),
-        month: Number(get('month')),
-        day: Number(get('day')),
-        hour: Number(get('hour')) % 24, // 일부 브라우저가 자정을 '24'로 반환하는 것 방어
-        weekday: WEEKDAY_NUM[get('weekday')],
-    };
-};
-
-const toYmdString = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-
-const shiftDate = (y, m, d, deltaDays) => {
-    const dt = new Date(Date.UTC(y, m - 1, d));
-    dt.setUTCDate(dt.getUTCDate() + deltaDays);
-    return { year: dt.getUTCFullYear(), month: dt.getUTCMonth() + 1, day: dt.getUTCDate(), weekday: dt.getUTCDay() };
-};
-
-const getLatestBatchDate = () => {
-    const kst = getKstNow();
-    const isWeekend = kst.weekday === 0 || kst.weekday === 6;
-
-    if (!isWeekend && kst.hour >= 20) {
-        return toYmdString(kst.year, kst.month, kst.day); // 평일 20시 이후: 오늘
-    }
-
-    // 주말이거나 평일 20시 이전: 직전 영업일까지 거슬러 올라간다
-    let d = shiftDate(kst.year, kst.month, kst.day, -1);
-    while (d.weekday === 0 || d.weekday === 6) {
-        d = shiftDate(d.year, d.month, d.day, -1);
-    }
-    return toYmdString(d.year, d.month, d.day);
-};
+/* ── 장 상태 ──
+ * 선택한 날짜가 오늘(KST)이고 정규장(평일 09:00~15:30)이면 "장중". 그 외에는 마감 데이터다.
+ * ※ 공휴일은 반영하지 않는다(TODO: 휴장일 데이터가 생기면 연동). */
+const nowKst = ref(kstNowParts());
+let clock = null;
 
 const selectedDate = ref(getLatestBatchDate());
 const dateInput = ref(null);
 
+const todayDash = computed(() => toYmdString(nowKst.value.year, nowKst.value.month, nowKst.value.day));
+const marketState = computed(() =>
+    selectedDate.value === todayDash.value && isMarketOpenNow(nowKst.value) ? 'live' : 'closed');
+
+const dateLabel = computed(() => {
+    const [, m, d] = selectedDate.value.split('-');
+    return `${m}.${d} (${weekdayKo(selectedDate.value)})`;
+});
+// 장중: '종가'라는 말을 쓰지 않는다(현재가와 같은 값이라 오해를 부른다). 마감 후: 종가 · MM/DD 마감.
+const statusLabel = computed(() => {
+    if (marketState.value === 'live') {
+        const hh = String(nowKst.value.hour).padStart(2, '0');
+        const mm = String(nowKst.value.minute).padStart(2, '0');
+        return `장중 · ${hh}:${mm} 기준`;
+    }
+    const [, m, d] = selectedDate.value.split('-');
+    return `종가 · ${m}/${d} 마감`;
+});
+const priceLabel = computed(() => (marketState.value === 'live' ? '현재가' : '종가'));
+
 onMounted(async () => {
+    clock = setInterval(() => { nowKst.value = kstNowParts(); }, 30 * 1000);
+    document.addEventListener('click', onDocClick, true);
+    document.addEventListener('keydown', onKeyDown);
     await getStockMainData();
+    loadPriorityTarget();
+});
+onBeforeUnmount(() => {
+    clearInterval(clock);
+    document.removeEventListener('click', onDocClick, true);
+    document.removeEventListener('keydown', onKeyDown);
 });
 
 const getStockMainData = async () => {
@@ -285,11 +334,7 @@ const getStockMainData = async () => {
         const searchParam = { 'ymd': selectedDate.value.replaceAll('-', '') };
         const { data } = await aibeesApi.get('/api/v1/stocks/buy-target', { params: searchParam });
 
-        if (data.data.length == 0) {
-            resultData.value = [];
-        } else {
-            resultData.value = data.data;
-        }
+        resultData.value = data.data.length == 0 ? [] : data.data;
     } catch (e) {
         console.error(e);
     }
@@ -299,7 +344,7 @@ const getStockMainData = async () => {
 };
 
 const handleDateChange = () => getStockMainData();
-const openDatePicker = () => dateInput.value?.showPicker();
+const openDatePicker = () => dateInput.value?.showPicker?.();
 
 /* ── 날짜 ±1 이동 (주말은 건너뛴다: 금요일에서 +1 → 바로 월요일, 월요일에서 -1 → 바로 금요일) ── */
 const stepSelectedDate = (deltaDays) => {
@@ -312,11 +357,9 @@ const stepSelectedDate = (deltaDays) => {
     getStockMainData();
 };
 
-/* ══════════════ 매수타겟 정렬 (TOP 3 미리보기 — home 은 height 축소가 목적이라
- * 정렬만 바꿀 수 있고 순위번호 역순 표기는 안 씀. 전체 목록/역순은 /stock/buy-target 참고) ══
- */
+/* ══════════════ 매수타겟 정렬 ══════════════ */
 const SORT_OPTIONS = [
-    { key: 'composite_rank_no', label: '종합 순위(신규)', dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
+    { key: 'composite_rank_no', label: '종합 순위', dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
     { key: 'rank_no',     label: '추천순위',     dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
     { key: 'score',       label: '점수',         dir: 'desc', ascLabel: '낮은 점수 먼저', descLabel: '높은 점수 먼저' },
     { key: 'volume',      label: '거래량',       dir: 'desc', ascLabel: '적은 순',        descLabel: '많은 순' },
@@ -331,10 +374,9 @@ const sortDir = ref('asc');
 const currentSort = computed(
     () => SORT_OPTIONS.find(o => o.key === sortKey.value) ?? SORT_OPTIONS[0]);
 
-// select 의 v-model 이 sortKey 를 이미 바꿔 놓은 뒤에 불린다. 해야 할 일은 하나 —
-// 정렬 기준이 바뀌면 방향을 그 기준의 기본값으로 되돌린다(예: 점수는 높은 순,
-// 순위는 낮은 번호 먼저). 이걸 빼먹으면 "점수 ↑ 오름차순" 상태가 다른 기준으로
-// 넘어가 의도와 반대로 정렬된다. 칩 시절 setSortKey 가 하던 일을 그대로 이어받는다.
+// select 의 v-model 이 sortKey 를 이미 바꿔 놓은 뒤에 불린다. 정렬 기준이 바뀌면 방향을 그 기준의
+// 기본값으로 되돌린다(예: 점수는 높은 순, 순위는 낮은 번호 먼저). 빼먹으면 "점수 ↑" 상태가
+// 다른 기준으로 넘어가 의도와 반대로 정렬된다.
 const onSortKeyChange = () => {
     sortDir.value = SORT_OPTIONS.find(o => o.key === sortKey.value)?.dir ?? 'desc';
 };
@@ -360,20 +402,25 @@ const sortedData = computed(() => {
     });
 });
 
-// home 화면은 높이를 줄이는 게 목적이라 한 번에 3개만 보여준다. 대신 페이지네이션으로
-// 다음 항목을 넘겨볼 수 있다. 전체 목록/역순은 "상세보기" → /stock/buy-target 참고.
-const PAGE_SIZE = 3;
-const currentPage = ref(0);
-const totalPages = computed(() => Math.max(1, Math.ceil(sortedData.value.length / PAGE_SIZE)));
-const pagedData = computed(() =>
-    sortedData.value.slice(currentPage.value * PAGE_SIZE, currentPage.value * PAGE_SIZE + PAGE_SIZE));
+/* ── 목록: 홈은 상위 3개만 보여준다. 전체는 "자세히보기" → 매수추천 메뉴(/stock/buy-target) ── */
+const HOME_COUNT = 3;
+const goToBuyTarget = () => router.push({ path: '/stock/buy-target' });
 
-const prevPage = () => { if (currentPage.value > 0) currentPage.value -= 1; };
-const nextPage = () => { if (currentPage.value < totalPages.value - 1) currentPage.value += 1; };
+const rows = computed(() =>
+    sortedData.value.slice(0, HOME_COUNT).map(item => ({
+        item,
+        chg: changeInfo(item),
+        reason: reasonLine(item),
+    })));
 
-// 정렬 기준이 바뀌면 첫 페이지로 리셋한다. 날짜 이동은 리셋하지 않는다 — 최우선타겟은
-// 서버(전역 1건)에 저장되는 값이라 날짜를 넘나들어도 선택 상태가 유지돼야 한다.
-watch([sortKey, sortDir], () => { currentPage.value = 0; });
+// 정렬 기준·날짜가 바뀌면 처음 상태로. (최우선타겟은 서버 저장값이라 날짜를 넘나들어도 유지된다)
+watch([sortKey, sortDir, selectedDate], () => {
+    expandedCode.value = null;
+});
+
+/* ── 아코디언: 한 번에 하나만 펼침 ── */
+const expandedCode = ref(null);
+const toggleRow = (code) => { expandedCode.value = expandedCode.value === code ? null : code; };
 
 /* ── 최우선타겟: 사용자가 매수추천 항목 중 하나를 직접 지정 ──
  * 서버(trade_buy_target_priority, 유저당 1건·날짜 무관 전역값)에 저장된다.
@@ -382,7 +429,11 @@ watch([sortKey, sortDir], () => { currentPage.value = 0; });
  * 초기화한다 — 그래서 프론트도 "선택 즉시 서버에 반영"만 하고 별도 유효기간은 두지 않는다.
  */
 const priorityTarget = ref(null);     // 현재 지정된 stock_code (없으면 null)
-const priorityTargetName = ref('');   // 위 종목명 — 다른 날짜에서 지정된 경우 select 표시용
+const priorityTargetName = ref('');   // 위 종목명 — 다른 날짜에서 지정된 경우 표시용
+const sheetOpen = ref(false);
+
+const priorityItem = computed(() =>
+    priorityTarget.value ? sortedData.value.find(i => i.stock_code === priorityTarget.value) ?? null : null);
 
 const loadPriorityTarget = async () => {
     if (!isLoggedIn.value) return;   // 게스트는 로그인 전용 API 를 부르지 않는다
@@ -391,19 +442,20 @@ const loadPriorityTarget = async () => {
         priorityTarget.value = data?.data?.stock_code ?? null;
         priorityTargetName.value = data?.data?.stock_name ?? '';
     } catch (e) {
-        // 비로그인 등으로 조회가 안 돼도 화면 자체는 정상 동작해야 하므로 조용히 무시.
+        // 조회가 안 돼도 화면 자체는 정상 동작해야 하므로 조용히 무시.
         priorityTarget.value = null;
         priorityTargetName.value = '';
     }
 };
-onMounted(loadPriorityTarget);
 
-const onPriorityChange = async () => {
-    const code = priorityTarget.value;
-    const restorePage = currentPage.value;
+const selectPriority = async (code) => {
+    sheetOpen.value = false;
+    const prevCode = priorityTarget.value;
+    const prevName = priorityTargetName.value;
     try {
         if (!code) {
             await aibeesApi.delete('/api/v1/stocks/buy-target/priority');
+            priorityTarget.value = null;
             priorityTargetName.value = '';
             return;
         }
@@ -411,147 +463,17 @@ const onPriorityChange = async () => {
         // 지금 화면에 표시 중인 기준일(selectedDate)을 함께 보낸다.
         const ymd = selectedDate.value.replaceAll('-', '');
         const { data } = await aibeesApi.put('/api/v1/stocks/buy-target/priority', { ymd, stock_code: code });
+        priorityTarget.value = code;
         priorityTargetName.value = data?.data?.stock_name ?? '';
-        // 선택한 종목이 몇 번째 페이지에 있는지 찾아 바로 보여준다.
-        const idx = sortedData.value.findIndex(i => i.stock_code === code);
-        if (idx >= 0) currentPage.value = Math.floor(idx / PAGE_SIZE);
     } catch (e) {
         alert(e?.response?.data?.error?.message || '최우선타겟 저장에 실패했습니다.');
-        priorityTarget.value = null;   // 실패했으니 선택 상태를 되돌린다
-        currentPage.value = restorePage;
+        priorityTarget.value = prevCode;   // 실패했으니 선택 상태를 되돌린다
+        priorityTargetName.value = prevName;
     }
 };
 
-/* ── 카드 상세(근거·조건) 펼치기 ── */
-const expandedCard = ref(null);
-const toggleDetail = (code) => {
-    expandedCard.value = expandedCard.value === code ? null : code;
-};
-
-/* ── 재무 펀더멘털 판정 (일반적인 가치투자 기준선을 사용한 참고용 해석) ── */
-const numOrNull = (v) => {
-    if (v === null || v === undefined || v === '') return null;
-    const n = Number(v);
-    return Number.isNaN(n) ? null : n;
-};
-
-const fundamentalRows = (item) => {
-    const per = numOrNull(item.per);
-    const pbr = numOrNull(item.pbr);
-    const roe = numOrNull(item.roe);
-    const eps = numOrNull(item.eps);
-    const peg = numOrNull(item.peg);
-
-    return [
-        {
-            label: 'PER',
-            pass: per === null ? null : (per > 0 && per <= 15),
-            verdict: per === null ? '확인불가' : (per <= 0 ? '적자' : (per <= 15 ? '적합' : '높음')),
-            desc: per === null ? '주가수익비율 정보가 없습니다.' : `주가수익비율 ${per}배 · 15배 이하를 저평가 참고 기준으로 봅니다.`,
-        },
-        {
-            label: 'PBR',
-            pass: pbr === null ? null : (pbr > 0 && pbr <= 1),
-            verdict: pbr === null ? '확인불가' : (pbr <= 0 ? '확인불가' : (pbr <= 1 ? '적합' : '높음')),
-            desc: pbr === null ? '주가순자산비율 정보가 없습니다.' : `주가순자산비율 ${pbr}배 · 1배 이하를 저평가 참고 기준으로 봅니다.`,
-        },
-        {
-            label: 'ROE',
-            pass: roe === null ? null : roe > 0,
-            verdict: roe === null ? '확인불가' : (roe > 0 ? '적합' : '부적합'),
-            desc: roe === null ? '자기자본이익률 정보가 없습니다.' : `자기자본이익률 ${roe} · ${roe > 0 ? '이익을 내고 있습니다.' : '손실 상태입니다.'}`,
-        },
-        {
-            label: 'EPS',
-            pass: eps === null ? null : eps > 0,
-            verdict: eps === null ? '확인불가' : (eps > 0 ? '적합' : '부적합'),
-            desc: eps === null ? '주당순이익 정보가 없습니다.' : `주당순이익 ${formatNumber(eps)}원 · ${eps > 0 ? '흑자 기조입니다.' : '적자 상태입니다.'}`,
-        },
-        {
-            label: 'PEG',
-            pass: peg === null ? null : (peg > 0 && peg <= 1),
-            verdict: peg === null ? '확인불가' : (peg <= 0 ? '확인불가' : (peg <= 1 ? '적합' : '높음')),
-            desc: peg === null ? '이익성장 대비 주가 정보가 없습니다.' : `PEG ${peg} · 1 이하를 이익성장 대비 저평가 참고 기준으로 봅니다.`,
-        },
-    ];
-};
-
-/* ── 기술적 근거 판정 (실제 지표 플래그를 그대로 사용, 판정 문구만 서술형으로 변환)
- * 조건 정의는 strategy/kospi1.py, KisStockService.py 계산 로직을 그대로 따름 ── */
-const technicalRows = (item) => [
-    {
-        label: 'MACD 크로스',
-        pass: item.macd_cross === 'G',
-        verdict: item.macd_cross === 'G' ? '충족' : '미충족',
-        desc: item.macd_cross === 'G'
-            ? '최근 며칠 내 MACD 선이 시그널선을 상향 돌파(골든크로스)했습니다.'
-            : '최근 MACD 골든크로스가 발생하지 않았습니다.',
-    },
-    {
-        label: 'OBV 크로스',
-        pass: item.obv_cross === 'G',
-        verdict: item.obv_cross === 'G' ? '충족' : '미충족',
-        desc: item.obv_cross === 'G'
-            ? '거래량 누적지표(OBV)가 최근 며칠 내 9일 이동평균을 상향 돌파했습니다.'
-            : '거래량 누적지표(OBV)가 아직 9일 이동평균을 돌파하지 못했습니다.',
-    },
-    {
-        label: '거래제한',
-        pass: item.is_vol_limit === 'Y',
-        verdict: item.is_vol_limit === 'Y' ? '충족' : '미충족',
-        desc: item.is_vol_limit === 'Y'
-            ? '오늘 거래량이 최소 거래량 기준선을 넘었습니다.'
-            : '오늘 거래량이 최소 거래량 기준선에 못 미칩니다.',
-    },
-    {
-        label: '거래급등',
-        pass: item.is_vol_surge === 'Y',
-        verdict: item.is_vol_surge === 'Y' ? '충족' : '미충족',
-        desc: item.is_vol_surge === 'Y'
-            ? '최근 며칠 중 전일 대비 거래량이 급증한 날이 있었습니다.'
-            : '최근 전일 대비 거래량 급증이 없었습니다.',
-    },
-    {
-        label: 'BB중심돌파',
-        pass: item.is_bb_mid_breakout === 'Y',
-        verdict: item.is_bb_mid_breakout === 'Y' ? '충족' : '미충족',
-        desc: item.is_bb_mid_breakout === 'Y'
-            ? '볼린저밴드 중심선 아래에 있다가 위로 돌파한 뒤 그 위에서 유지되고 있습니다.'
-            : '볼린저밴드 중심선 돌파 후 유지 패턴이 확인되지 않았습니다.',
-    },
-    {
-        label: 'BB상단아래',
-        pass: item.is_under_bb_upper === 'Y',
-        verdict: item.is_under_bb_upper === 'Y' ? '충족' : '미충족',
-        desc: item.is_under_bb_upper === 'Y'
-            ? '종가가 볼린저밴드 상단선 이하로, 단기 과열(추격 매수 구간)은 아닙니다.'
-            : '종가가 볼린저밴드 상단선을 이미 넘어서 단기 과열 구간입니다.',
-    },
-    {
-        label: '중심선위',
-        pass: item.is_over_on_mid === 'Y',
-        verdict: item.is_over_on_mid === 'Y' ? '충족' : '미충족',
-        desc: item.is_over_on_mid === 'Y'
-            ? '종가가 20일 이동평균선 위에 있습니다.'
-            : '종가가 20일 이동평균선 아래에 있습니다.',
-    },
-];
-
-const formattedDisplayDate = computed(() => {
-    const d = new Date(selectedDate.value);
-    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
-});
-
-const rateClass = (rate) => {
-    if (!rate) return '';
-    const v = parseFloat(rate);
-    if (v > 0) return 'rate-up';
-    if (v < 0) return 'rate-down';
-    return '';
-};
-
-/* ── 매수타겟 카드 간이차트 (최근 120영업일 봉차트 + 5/20/60/120일선) ──
- * 기본 숨김 — "차트보기" 버튼으로 종목별 개별 토글. ChartStock.vue(전체 차트 페이지)와
+/* ── 간이차트 (최근 120영업일 봉차트 + 20/60/120일선) ──
+ * 기본 숨김 — "차트" 버튼으로 종목별 개별 토글. ChartStock.vue(전체 차트 페이지)와
  * 동일한 CandlestickChart 컴포넌트·색상 배색을 재사용해 일관성을 맞춘다.
  */
 const expandedCharts = ref(new Set());
@@ -580,7 +502,7 @@ const buyTargetCandleData = (item) => {
                 color: { up: '#c51300', down: '#03748d', unchanged: '#999999' },
             },
             { label: 'MA20',  data: toXY('ma20'),  borderColor: '#efa55b', type: 'line', pointRadius: 0 },
-            { label: 'MA60',  data: toXY('ma60'),  borderColor: '#d0fe48', type: 'line', pointRadius: 0 },
+            { label: 'MA60',  data: toXY('ma60'),  borderColor: '#8bb400', type: 'line', pointRadius: 0 },
             { label: 'MA120', data: toXY('ma120'), borderColor: '#01b6f3', type: 'line', pointRadius: 0 },
         ],
     };
@@ -602,693 +524,537 @@ const miniCandleOptions = {
         y: { position: 'right', beginAtZero: false, ticks: { font: { size: 9 } } },
     },
 };
-
-const scoreClass = (score) => {
-    if (score === null || score === undefined || score === '') return '';
-    const n = Number(score);
-    if (Number.isNaN(n)) return '';
-    if (n >= 80) return 'score-gold';
-    if (n >= 70) return 'score-bronze';
-    return '';
-};
-
-const formatNumber = (v) => Number(v).toLocaleString();
-const formatVolume = (v) => Number(v).toLocaleString();
-const formatDate = (v) => v ? `${v.substring(4, 6)}/${v.substring(6, 8)}` : '';
 </script>
 
 <style scoped lang="scss">
-@use '@@/common.scss' as *;
-
-// 무채색 팔레트(/trade 대시보드와 통일). 기존 변수명은 그대로 두고 값만 회색조로 교체 —
-// 아래에서 참조하는 모든 곳(강조색 포함)이 자동으로 무채색이 된다.
-$white:   #ffffff;
-$gray-50: #fafafa;
-$gray-100:#efefef;
-$gray-200:#dcdcdc;
-$gray-300:#c4c4c4;
-$gray-400:#9a9a9a;
-$gray-500:#737373;
-$gray-700:#3d3d3d;
-$gray-900:#141414;
-$blue:    #141414;
-$navy:    #141414;
-$red:     #141414;
-$amber:   #141414;
-$gold:    #141414;
-$bronze:  #3d3d3d;
+// 양봉상회 디자인 토큰(목업 기준)
+$bg:       #FFFBEA;
+$bar:      #FFF4C2;
+$card:     #FFFFFF;
+$line:     #EFE2BC;
+$line-2:   #EAD9A6;
+$brown:    #7A4423;
+$brown-d:  #4A2814;
+$yellow:   #FFC20E;
+$ink:      #2B1D14;
+$sub:      #6B5B4E;
+$sub-2:    #7A6B5D;
+$up:       #D12B2B;
+$down:     #1F5BD1;
 
 #home {
     min-height: 100vh;
-    background: $gray-50;
-    color: $gray-900;
-    font-family: 'Pretendard', -apple-system, sans-serif;
+    background: $bg;
+    color: $ink;
+    text-align: left;
+    font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
+    font-variant-numeric: tabular-nums;
 }
 
-/* ── 매수타겟 정렬 바 ── */
-// 추천종목 섹션 전체를 감싸는 패널 — 제목/정렬/카드가 한 공간에 들어있는 것처럼 보이게 한다.
-// 이 아래로 다른 섹션(칼럼 등)이 이어 붙을 예정이라 margin-bottom 으로 다음 섹션과 간격을 둔다.
-.reco-section {
-    background: $white;
-    border: 1px solid $gray-200;
-    padding: 20px 20px 16px;
-    margin-bottom: 24px;
+/* ── 헤더 ── */
+.home-header {
+    background: $bar;
+    // 모바일: 스크롤해도 상단에 붙는다. top 은 노치/상태바(env) 아래 — 상태바 영역 자체는
+    // App.vue 의 고정 덮개가 불투명하게 가린다(콘텐츠가 상태바 뒤로 비치지 않게).
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 50;
 }
 
-.sort-bar {
+.hh-row {
     display: flex;
     align-items: center;
-    justify-content: left;
-    gap: 8px;
-    flex-wrap: wrap;
-    padding-bottom: 16px;
-    margin-bottom: 16px;
-    border-bottom: 1px solid $gray-100;
-
-    .sort-label {
-        font-size: 0.74rem;
-        font-weight: 700;
-        color: $gray-400;
-        white-space: nowrap;
-    }
-
-    /* priority-select 와 같은 모양으로 맞춘다(둘이 위아래로 붙어 있다).
-     * 칩 나열은 옵션 5개가 폰 폭에 안 들어가 넘치던 원인이었다 — select 는 폭이
-     * 옵션 개수와 무관하게 일정해서 구조적으로 넘칠 수 없다.
-     * min-width:0 은 flex item 이 내용물 폭 밑으로 못 줄어드는 기본값을 푼다. */
-    .sort-select {
-        flex: 1;
-        min-width: 0;
-        max-width: 200px;
-        padding: 6px 10px;
-        border: 1px solid $gray-200;
-        background: $white;
-        color: $gray-900;
-        font-size: 0.8rem;
-        font-weight: 600;
-        font-family: inherit;
-        cursor: pointer;
-
-        &:hover { border-color: $gray-900; }
-    }
-
-    .sort-dir {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 5px 11px;
-        border: 1px solid $gray-200;
-        background: $gray-50;
-        color: $gray-700;
-        font-size: 0.74rem;
-        font-weight: 600;
-        cursor: pointer;
-        white-space: nowrap;
-
-        &:hover { border-color: $gray-900; color: $gray-900; }
-
-        .dir-arrow {
-            font-size: 0.85rem;
-            line-height: 1;
-            color: $gray-900;
-        }
-    }
-}
-
-.contents {
-    max-width: 1040px;
-    margin: 0 auto;
-    padding: 28px 16px 100px;
-}
-
-/* ── Header ── */
-.head-desc {
-    display: flex;
     justify-content: space-between;
-    align-items: flex-end;
-    padding-bottom: 16px;
-    margin-bottom: 16px;
-    border-bottom: 1px solid $gray-100;
-    text-align: start;
-
-    h2 {
-        font-size: 1.4rem;
-        font-weight: 700;
-        margin: 0;
-        color: $gray-900;
-    }
-
-    @media (max-width: 600px) {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-    }
+    padding: 4px 12px 8px 16px;
 }
 
-/* ── Head Actions ── */
-.head-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    @media (max-width: 600px) {
-        width: 100%;
-    }
-}
-
-// 상단 우측 소형 "상세보기" 버튼 — 전체 목록(/stock/buy-target)으로 이동.
-.btn-detail {
-    padding: 8px 12px;
-    border: 1px solid $gray-200;
-    background: $white;
-    color: $gray-700;
-    font-size: 0.8rem;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: inherit;
-    white-space: nowrap;
-    transition: border-color .15s, color .15s;
-
-    &:hover { border-color: $blue; color: $blue; }
-}
-
-/* ── Date Picker ── */
-.date-nav {
+.brand-chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
+    height: 40px;
+    padding: 0 12px 0 8px;
+    border: 0;
+    border-radius: 10px;
+    background: $brown;
+    box-shadow: 0 2px 0 $brown-d;
+    cursor: pointer;
+
+    .brand-logo { width: 26px; height: 26px; }
+    .brand-name {
+        font-family: 'Do Hyeon', 'Pretendard', sans-serif;
+        font-size: 21px;
+        color: $yellow;
+        letter-spacing: .5px;
+    }
 }
 
-.date-arrow {
+.hh-actions { display: flex; align-items: center; gap: 2px; }
+
+.icon-btn {
+    width: 44px;
+    height: 44px;
+    border: 0;
+    background: transparent;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
-    border: 1px solid $gray-200;
-    background: $white;
-    color: $gray-700;
-    font-size: 1rem;
-    font-weight: 700;
-    line-height: 1;
+    color: $brown;
     cursor: pointer;
-    font-family: inherit;
-    transition: border-color .15s, color .15s;
-
-    &:hover { border-color: $blue; color: $blue; }
 }
 
-.date-picker-trigger {
+.avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 16px;
+    background: $yellow;
+    color: #5C3118;
+    font-weight: 700;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-btn {
+    min-height: 44px;
+    padding: 0 12px;
+    border: 0;
+    background: transparent;
+    color: $brown;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.account { position: relative; }
+.account-menu {
+    position: absolute;
+    right: 0;
+    top: 46px;
+    z-index: 60;
+    min-width: 160px;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    background: $card;
+    border: 1px solid $line-2;
+    border-radius: 12px;
+    box-shadow: 0 10px 24px rgba(74, 40, 20, .16);
+
+    .am-name { padding: 8px 10px 6px; font-size: 12px; color: $sub; }
+    button {
+        width: 100%;
+        min-height: 44px;
+        padding: 0 10px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        text-align: left;
+        font-size: 14px;
+        color: $ink;
+        cursor: pointer;
+        &:hover { background: $bg; }
+        &.danger { color: $up; }
+    }
+}
+
+// 12px 차양 띠: 노랑 반원이 줄지어 늘어진다
+.awning {
+    height: 12px;
+    background: radial-gradient(circle at 50% 0, #{$yellow} 9px, transparent 9.5px) repeat-x;
+    background-size: 22px 12px;
+    border-top: 3px solid $brown;
+}
+
+/* ── 본문 ── */
+.home-main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 12px 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ── 날짜 네비게이터 ── */
+.date-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.nav-btn {
+    width: 44px;
+    height: 44px;
+    border: 1px solid $line-2;
+    border-radius: 12px;
+    background: $card;
+    color: $brown;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.date-center { position: relative; }
+.date-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-height: 44px;
+    padding: 0 8px;
+    border: 0;
+    background: transparent;
+    color: $ink;
+    cursor: pointer;
+}
+.date-main { font-size: 17px; font-weight: 700; }
+.date-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: $sub;
+
+    .dot { width: 7px; height: 7px; border-radius: 4px; background: #9A8F84; }
+    &.live .dot { background: #E07A00; }
+}
+.hidden-input {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* ── 최우선 타겟 히어로 ── */
+.priority-hero {
+    background: $brown;
+    border-radius: 18px;
+    padding: 18px;
+    color: #FFF8E1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 4px 0 $brown-d;
+
+    .ph-top { display: flex; align-items: center; justify-content: space-between; }
+    .ph-badge {
+        background: $yellow;
+        color: $brown-d;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 999px;
+    }
+    .ph-change {
+        border: 0;
+        background: transparent;
+        color: #FFE7A0;
+        font-size: 13px;
+        min-height: 44px;
+        padding: 0 4px;
+        cursor: pointer;
+    }
+
+    .ph-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+    .ph-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .ph-name { font-size: 22px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ph-code { font-size: 13px; color: #E8D5B8; }
+    .ph-px { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+    .ph-price { font-size: 20px; font-weight: 700; }
+    .ph-chg {
+        font-size: 13px;
+        font-weight: 600;
+        &.up   { color: #FFB4A8; }
+        &.down { color: #A9C4FF; }
+        &.flat { color: #E8D5B8; }
+    }
+
+    .ph-reason {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #F5E6CC;
+        background: rgba(0, 0, 0, .18);
+        border-radius: 10px;
+        padding: 10px 12px;
+    }
+    .ph-empty { margin: 0; font-size: 14px; line-height: 1.5; color: #F5E6CC; }
+    .ph-skeleton { height: 96px; border-radius: 12px; background: rgba(255, 255, 255, .12); animation: pulse 1.6s infinite ease-in-out; }
+
+    .ph-cta {
+        min-height: 48px;
+        border: 0;
+        border-radius: 12px;
+        background: $yellow;
+        color: #3A200F;
+        font-weight: 700;
+        font-size: 15px;
+        cursor: pointer;
+    }
+}
+
+/* ── 리스트 헤더 ── */
+.list-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+
+    h2 { margin: 0; font-size: 17px; font-weight: 700; }
+    .count { color: #A0662F; }
+}
+.list-tools { display: flex; align-items: center; gap: 6px; }
+
+.sort-pill {
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    border: 1px solid $gray-200;
-    background: $white;
-    color: $gray-700;
-    font-size: 0.88rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: border-color .15s;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid $line-2;
+    border-radius: 999px;
+    background: $card;
+    font-size: 13px;
+    color: #4A3628;
 
-    &:hover { border-color: $blue; }
-
-    .date-value { color: $blue; }
-
-    .hidden-input {
+    select {
         position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
         opacity: 0;
-        width: 0;
-        height: 0;
+        cursor: pointer;
+        font-size: 16px;   // iOS 포커스 확대 방지
     }
 }
+.dir-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid $line-2;
+    border-radius: 999px;
+    background: $card;
+    color: #4A3628;
+    font-size: 15px;
+    cursor: pointer;
+}
 
-/* ── 최우선타겟 선택 ── */
-.priority-bar {
+/* ── 컴팩트 리스트 ── */
+.reco-list {
+    background: $card;
+    border: 1px solid $line;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.reco-item { border-bottom: 1px solid #F3EAD2; }
+
+.reco-row {
+    width: 100%;
+    border: 0;
+    background: $card;
+    padding: 14px;
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: start;
+    text-align: left;
+    cursor: pointer;
+    color: $ink;
+    font-family: inherit;
+
+    &.open { background: #FFFDF5; }
+
+    .rank { font-family: 'Do Hyeon', 'Pretendard', sans-serif; font-size: 18px; color: #A0662F; padding-top: 1px; }
+    .who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .name-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+    .name { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .code { font-size: 12px; color: $sub-2; flex-shrink: 0; }
+    .pri-chip {
+        flex-shrink: 0;
+        padding: 1px 7px;
+        border-radius: 999px;
+        background: $yellow;
+        color: $brown-d;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .reason { font-size: 13px; color: $sub; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .px { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+    .price { font-size: 16px; font-weight: 700; }
+}
+
+// 등락: 색뿐 아니라 ▲/▼ 기호와 절대값을 함께 쓴다
+.chg {
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    &.up   { color: $up; }
+    &.down { color: $down; }
+    &.flat { color: $sub; }
+}
+
+.reco-detail {
+    padding: 4px 14px 16px 50px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: #FFFDF5;
+}
+
+.score-line { font-size: 12px; color: $sub; b { color: $ink; } }
+
+// 시/고/저/종 + 거래량 표
+.ohlc {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    background: $card;
+    border: 1px solid $line;
+    border-radius: 10px;
+    overflow: hidden;
+
+    th, td { padding: 8px 6px; text-align: right; font-size: 13px; border-bottom: 1px solid #F3EAD2; }
+    thead th { font-size: 11px; font-weight: 600; color: $sub; background: #FFFDF5; }
+    tbody td { font-weight: 600; }
+    td.hi { color: $up; }
+    td.lo { color: $down; }
+    td.cl { color: $ink; font-weight: 700; }
+    tr:last-child th, tr:last-child td { border-bottom: 0; }
+    .vol th { font-size: 11px; font-weight: 600; color: $sub; text-align: left; padding-left: 10px; background: #FFFDF5; }
+}
+
+.rd-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.btn-outline {
+    min-height: 44px;
+    border-radius: 10px;
+    border: 1px solid #E3D3A8;
+    background: transparent;
+    color: #4A3628;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+
+    &.strong { border: 1.5px solid $brown; color: $brown; font-weight: 600; }
+}
+
+.more-btn {
+    min-height: 48px;
+    border: 0;
+    background: #FFFDF5;
+    color: $brown;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.skeleton-row { height: 72px; border-bottom: 1px solid #F3EAD2; background: $card; animation: pulse 1.6s infinite ease-in-out; }
+.empty-box { text-align: center; padding: 56px 0; color: $sub; font-size: 14px; }
+
+.disclaimer { margin: 0; font-size: 11px; line-height: 1.5; color: $sub-2; text-align: center; }
+
+/* ── 간이 차트 ── */
+.mini-chart {
+    width: 100%;
+    box-sizing: border-box;
+
+    .mini-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+    .mini-legend { display: flex; gap: 8px; flex-wrap: wrap; }
+    .leg-item {
+        font-size: 11px;
+        font-weight: 600;
+        color: $sub;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        &::before { content: ''; display: inline-block; width: 10px; height: 2px; background: var(--c); }
+    }
+    .mini-chart-detail {
+        flex-shrink: 0;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 1px solid #E3D3A8;
+        border-radius: 8px;
+        background: $card;
+        color: $brown;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+    }
+    .mini-chart-canvas { width: 100%; height: 220px; }
+}
+
+/* ── 최우선 타겟 선택 시트 ── */
+.sheet-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    background: rgba(43, 29, 20, .45);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+.sheet {
+    width: 100%;
+    max-width: 640px;
+    max-height: 72vh;
+    display: flex;
+    flex-direction: column;
+    background: $card;
+    border-radius: 18px 18px 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    color: $ink;
+    text-align: left;
+}
+.sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px 6px 18px;
+    border-bottom: 1px solid $line;
+    strong { font-size: 16px; }
+}
+.sheet-close { width: 44px; height: 44px; border: 0; background: transparent; color: $sub; font-size: 16px; cursor: pointer; }
+.sheet-list { margin: 0; padding: 4px 8px 12px; list-style: none; overflow-y: auto; }
+.sheet-item {
+    width: 100%;
+    min-height: 48px;
     display: flex;
     align-items: center;
     gap: 10px;
-    flex-wrap: wrap;
-    padding-bottom: 16px;
-    margin-bottom: 16px;
-    border-bottom: 1px solid $gray-100;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    color: $ink;
 
-    .priority-label {
-        font-size: 0.74rem;
-        font-weight: 700;
-        color: $gray-400;
-        white-space: nowrap;
-    }
-
-    .priority-select {
-        flex: 1;
-        min-width: 160px;
-        max-width: 320px;
-        padding: 6px 10px;
-        border: 1px solid $gray-200;
-        background: $white;
-        color: $gray-900;
-        font-size: 0.8rem;
-        font-weight: 600;
-        font-family: inherit;
-        cursor: pointer;
-
-        &:hover { border-color: $gray-900; }
-    }
+    &.on { background: $bar; font-weight: 700; }
+    .si-rank { font-family: 'Do Hyeon', 'Pretendard', sans-serif; font-size: 16px; color: #A0662F; width: 24px; }
+    .si-name { flex: 1; min-width: 0; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        em { font-style: normal; font-size: 12px; color: $sub-2; margin-left: 4px; } }
+    .si-chg { font-size: 12px; font-weight: 600; &.up { color: $up; } &.down { color: $down; } &.flat { color: $sub; } }
 }
-
-/* ── 페이지네이션 ── */
-.pagination-bar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    margin-top: 4px;
-
-    .page-btn {
-        padding: 6px 14px;
-        border: 1px solid $gray-200;
-        background: $white;
-        color: $gray-700;
-        font-size: 0.78rem;
-        font-weight: 700;
-        cursor: pointer;
-        font-family: inherit;
-        white-space: nowrap;
-        transition: border-color .15s, color .15s;
-
-        &:hover:not(:disabled) { border-color: $blue; color: $blue; }
-
-        &:disabled {
-            opacity: .4;
-            cursor: not-allowed;
-        }
-    }
-
-    .page-info {
-        font-size: 0.78rem;
-        font-weight: 700;
-        color: $gray-500;
-        font-variant-numeric: tabular-nums;
-    }
-}
-
-/* ── Grid ── */
-.signal-grid {
-}
-
-/* ── Card ── */
-.signal-card {
-    background: $white;
-    border: 1px solid $gray-200;
-    margin-bottom: 16px;
-    overflow: hidden;
-    transition: border-color .15s;
-
-    &:hover {
-        border-color: $gray-900;
-    }
-
-    // 사용자가 최우선타겟으로 지정한 종목 — 굵은 테두리로 구분
-    &.is-priority {
-        border: 2px solid $gray-900;
-    }
-
-    /* ── 헤더: 순위 · 종목명/코드 · 액션 버튼 · 금일 변동률 ── */
-    .card-head {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 14px 8px;
-
-        .rank-num {
-            font-size: 1.2rem;
-            font-weight: 800;
-            color: $amber;
-            line-height: 1;
-            flex-shrink: 0;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .head-main {
-            flex: 1;
-            min-width: 0;
-            display: flex;
-            align-items: baseline;
-            gap: 6px;
-
-            .name {
-                font-size: 0.94rem;
-                font-weight: 700;
-                margin: 0;
-                color: $gray-900;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                text-align: start;
-            }
-            .code {
-                font-size: 0.72rem;
-                color: $gray-500;
-                text-align: start;
-                white-space: nowrap;
-            }
-
-            .priority-badge {
-                flex-shrink: 0;
-                padding: 2px 7px;
-                background: $gray-900;
-                color: $white;
-                font-size: 0.62rem;
-                font-weight: 700;
-                white-space: nowrap;
-            }
-        }
-
-        .actions-row {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-shrink: 0;
-        }
-
-        .action-btn {
-            padding: 4px 9px;
-            font-size: 0.72rem;
-            font-weight: 600;
-            cursor: pointer;
-            border: 1px solid;
-            transition: background .12s, color .12s;
-            font-family: inherit;
-            line-height: 1.4;
-            white-space: nowrap;
-
-            &.ai-btn {
-                background: $gray-50;
-                color: $navy;
-                border-color: $gray-300;
-                &:hover { background: $gray-200; }
-            }
-
-            &.chart-btn {
-                background: $white;
-                color: $gray-700;
-                border-color: $gray-200;
-                &:hover { border-color: $blue; color: $blue; background: $gray-50; }
-            }
-        }
-
-        .rate-badge {
-            flex-shrink: 0;
-            font-size: 1.05rem;
-            font-weight: 800;
-            color: $gray-500;
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-
-            &.rate-up { color: #d92b2b; }
-            &.rate-down { color: #2b62d9; }
-        }
-
-        @media (max-width: 480px) {
-            flex-wrap: wrap;
-
-            .actions-row { order: 3; width: 100%; padding-left: calc(1.2rem + 10px); }
-        }
-    }
-
-    /* ── 간이 차트: 봉차트 + 이평선, 카드와 같은 너비 (기본 숨김, 차트보기로 토글) ── */
-    .mini-chart {
-        width: 100%;
-        padding: 8px 14px 10px;
-        box-sizing: border-box;
-        border-top: 1px solid $gray-100;
-
-        .mini-chart-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            margin-bottom: 6px;
-        }
-
-        .mini-legend {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .leg-item {
-            font-size: 0.62rem;
-            font-weight: 600;
-            color: $gray-500;
-            display: flex;
-            align-items: center;
-            gap: 3px;
-
-            &::before {
-                content: '';
-                display: inline-block;
-                width: 10px;
-                height: 2px;
-                background: var(--c);
-            }
-        }
-
-        .mini-chart-detail {
-            flex-shrink: 0;
-            padding: 2px 8px;
-            border: 1px solid $gray-200;
-            background: $white;
-            color: $gray-700;
-            font-size: 0.68rem;
-            font-weight: 600;
-            cursor: pointer;
-            white-space: nowrap;
-            font-family: inherit;
-            transition: border-color .15s, color .15s;
-
-            &:hover { border-color: $blue; color: $blue; }
-        }
-
-        .mini-chart-canvas {
-            width: 100%;
-            height: 220px;
-        }
-    }
-
-    /* ── 현재가/거래량/추천 3열 통계 ── */
-    .stat-pair {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        border-top: 1px solid $gray-100;
-
-        .stat-cell {
-            padding: 7px 14px;
-            text-align: left;
-
-            &:not(:last-child) { border-right: 1px solid $gray-100; }
-        }
-
-        .stat-label {
-            display: block;
-            font-size: 0.66rem;
-            color: $gray-500;
-            margin-bottom: 1px;
-            text-align: right;
-        }
-
-        .stat-main {
-            text-align: right;
-            font-size: 0.94rem;
-            font-weight: 800;
-            color: $gray-900;
-            line-height: 1.2;
-
-            .unit {
-                font-size: 0.68rem;
-                font-weight: 600;
-                color: $gray-500;
-                margin-left: 2px;
-            }
-
-            &.score-gold   { color: $gold;   .unit { color: $gold; } }
-            &.score-bronze { color: $bronze; .unit { color: $bronze; } }
-        }
-
-        .stat-sub {
-            font-size: 0.7rem;
-            color: $gray-500;
-            line-height: 1.3;
-
-            &.rate-up   { color: $red; }
-            &.rate-down { color: $navy; }
-        }
-
-        &.triple { grid-template-columns: repeat(3, 1fr); }
-    }
-
-    /* ── OHLC ── */
-    .price-row {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        border-top: 1px solid $gray-100;
-        border-bottom: 1px solid $gray-100;
-        background: $gray-50;
-
-        .price-item {
-            padding: 0.3rem 0.8rem;
-            text-align: right;
-
-            &:not(:last-child) { border-right: 1px solid $gray-100; }
-
-            &.high  .price-value { color: $red; }
-            &.low   .price-value { color: $navy; }
-            &.close .price-value { color: $gray-900; font-weight: 800; }
-        }
-
-        .price-label {
-            display: block;
-            font-size: 0.6rem;
-            color: $gray-500;
-            margin-bottom: 1px;
-        }
-
-        .price-value {
-            font-size: 0.76rem;
-            font-weight: 600;
-            color: $gray-700;
-        }
-    }
-
-    /* ── 근거 · 조건 펼치기 ── */
-    .detail-toggle {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        width: 100%;
-        padding: 8px 14px;
-        border: none;
-        border-top: 1px solid $gray-100;
-        background: none;
-        color: $gray-500;
-        font-family: inherit;
-        font-size: 0.74rem;
-        font-weight: 600;
-        text-align: left;
-        cursor: pointer;
-
-        &:hover { color: $blue; }
-
-        .arrow {
-            display: inline-block;
-            font-size: 0.6rem;
-            transition: transform .15s;
-
-            &.open { transform: rotate(90deg); }
-        }
-    }
-
-    /* ── 근거 상세 패널 ── */
-    .detail-panel {
-        padding: 4px 14px 12px;
-        background: $gray-50;
-        text-align: left;
-
-        .detail-group {
-            margin-top: 10px;
-
-            &:first-child { margin-top: 0; }
-        }
-
-        .detail-group-title {
-            font-size: 0.72rem;
-            font-weight: 700;
-            color: $gray-500;
-            margin-bottom: 4px;
-        }
-
-        .detail-row {
-            display: grid;
-            grid-template-columns: 5.5rem 3.5rem 1fr;
-            gap: 8px;
-            align-items: start;
-            padding: 6px 0;
-            border-top: 1px solid $gray-100;
-
-            &:first-of-type { border-top: none; }
-        }
-
-        .detail-row-name {
-            font-size: 0.78rem;
-            font-weight: 600;
-            color: $gray-900;
-        }
-
-        .detail-row-verdict {
-            font-size: 0.7rem;
-            font-weight: 700;
-
-            &.pass    { color: $navy; }
-            &.fail    { color: $red; }
-            &.neutral { color: $gray-400; }
-        }
-
-        .detail-row-desc {
-            font-size: 0.76rem;
-            color: $gray-500;
-            line-height: 1.4;
-        }
-
-        @media (max-width: 480px) {
-            .detail-row {
-                grid-template-columns: 1fr;
-                gap: 2px;
-            }
-        }
-    }
-
-    /* ── Footer ── */
-    .card-footer {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        padding: 6px 14px;
-        background: $gray-50;
-        border-top: 1px solid $gray-100;
-
-        .timestamp {
-            font-size: 0.72rem;
-            color: $gray-500;
-        }
-    }
-}
-
-/* ── Skeleton ── */
-.loader-grid {
-    display: grid;
-    gap: 16px;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-}
-
-.skeleton-card {
-    height: 310px;
-    background: $gray-100;
-    animation: pulse 1.6s infinite ease-in-out;
-}
-
-/* ── Empty ── */
-.empty-box {
-    text-align: center;
-    padding: 80px 0;
-    color: $gray-500;
-    font-size: 0.9rem;
-}
+.sheet-enter-active, .sheet-leave-active { transition: opacity .18s ease; .sheet { transition: transform .22s ease; } }
+.sheet-enter-from, .sheet-leave-to { opacity: 0; .sheet { transform: translateY(24px); } }
 
 @keyframes pulse {
-    0%, 100% { opacity: .5; }
-    50%       { opacity: .9; }
+    0%, 100% { opacity: 1; }
+    50% { opacity: .5; }
+}
+
+/* ── 데스크톱: 상단 내비(Lnb)가 브랜드를 보여주므로 로고 칩은 숨기고 헤더는 흐름에 둔다 ── */
+@media (min-width: 640px) {
+    .home-header { position: static; }
+    .hh-row { justify-content: flex-end; }
+    .brand-chip { display: none; }
+    .home-main { max-width: 720px; padding-top: 20px; }
 }
 </style>

@@ -4,4 +4,6 @@
     <string name="title_activity_main">AIbees Trading</string>
     <string name="package_name">com.aibeesworld.stocks</string>
     <string name="custom_url_scheme">com.aibeesworld.stocks</string>
+    <!-- AdMob Android 앱 ID -->
+    <string name="admob_app_id">ca-app-pub-5330672724286218~9642267822</string>
 </resources>

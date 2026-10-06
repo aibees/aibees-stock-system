@@ -164,3 +164,58 @@ yarn build && npx cap sync
 - [ ] `.env.prd` 기준으로 빌드됐는지 확인 (`stock.aibeesworld.com` 대상)
 - [ ] 버전/빌드 번호 갱신 (iOS: Xcode General 탭, Android: `android/app/build.gradle`의 `versionCode`/`versionName`)
 - [ ] 앱 아이콘/스플래시는 이미 준비돼 있음 (`ios/App/App/Assets.xcassets`, `android/app/src/main/res/mipmap-*`) — 로고 바꾸고 싶으면 별도로 알려줘, `@capacitor/assets` 같은 도구로 한번에 재생성 가능
+
+---
+
+## 6. AdMob 광고 (앱 하단 배너)
+
+`@capacitor-community/admob` 로 모바일 하단 배너를 네이티브로 띄운다. 코드는 `src/scripts/useAdMob.js`(SDK·배너),
+`src/components/common/AdBottomBanner.vue`(노출 판단 — 권한 `AD_FREE`, `/login` 제외 — 과 레이아웃 연동).
+웹 브라우저에서는 동작하지 않고 기존 자리표시 그대로다.
+
+### 6-1. 지금 상태 = 전부 Google "테스트" 값
+- 앱 ID: iOS `Info.plist` 의 `GADApplicationIdentifier`, Android `strings.xml` 의 `admob_app_id` 모두 **실제 ID 적용됨**
+- 광고 단위: `.env.prd` 에 아무것도 없으면 Google 테스트 배너가 나간다 (실계정에 영향 없음)
+
+### 6-2. 릴리스 전 교체 (필수)
+1. AdMob 콘솔에서 iOS/Android **앱**을 각각 등록 → 앱 ID 발급
+   - Android: `android/app/src/main/res/values/strings.xml` 의 `admob_app_id`
+   - iOS: `ios/App/App/Info.plist` 의 `GADApplicationIdentifier`
+2. 각 앱에 **배너 광고 단위** 생성 → `.env.prd` 에 추가
+   ```
+   VITE_ADMOB_BANNER_ID_IOS=ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY
+   VITE_ADMOB_BANNER_ID_ANDROID=ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ
+   ```
+3. `yarn build:prd` → `yarn cap:prod` 후 패키징
+
+### 6-3. 환경변수
+| 변수 | 의미 |
+|---|---|
+| `VITE_ADMOB_BANNER_ID_IOS` / `_ANDROID` | 실제 배너 광고 단위 ID |
+| `VITE_ADMOB_REWARDED_ID_IOS` / `_ANDROID` | 실제 보상형 광고 단위 ID (광고 게이트용) |
+| `VITE_ADMOB_ENABLED=false` | 네이티브 광고 끄기 — 배너는 자리표시, 게이트는 5초 대기로 복귀 |
+| `VITE_ADMOB_TESTING=true` | 실ID 가 있어도 테스트 광고 강제 |
+
+`yarn dev` / `--mode dev` 빌드는 실ID 가 있어도 **항상 테스트 광고**다. (개발 중 본인 광고 클릭으로 계정이 정지되는 사고 방지)
+
+### 6-4. 동의 / 개인정보
+- iOS ATT: 푸시 권한 팝업에 응답한 **뒤**(최대 20초 대기) 추적 허용 팝업이 뜬다. 문구는 `Info.plist` 의 `NSUserTrackingUsageDescription`.
+- UMP(개인정보 동의): AdMob 콘솔 > 개인정보 및 메시지 에서 메시지를 만들어야 EEA 등에서 동의 폼이 뜬다.
+  동의 정보 **조회가 실패**해도(`Request consent info failed` — AdMob 앱 설정 미완료/네트워크 등) 광고 요청은 계속 시도한다.
+  (예전엔 여기서 초기화 전체가 실패 처리돼 배너·보상형이 모두 안 나왔다.)
+- 스토어 제출 시: App Store Connect "앱 개인정보" 와 Play Console "데이터 보안" 에 광고 식별자 사용을 신고해야 한다.
+- `Info.plist` 의 `SKAdNetworkItems` 에는 Google 항목(`cstr6suwn9`) 하나만 넣어 뒀다. 광고 수익 최적화를 하려면 AdMob 문서의 전체 목록으로 확장한다.
+
+### 6-5. 레이아웃
+배너는 320×50 고정(적응형 아님)이고, 기존 `html.has-bottom-ad` 규칙이 예약한 하단 50px 칸 위에 겹쳐 그려진다.
+광고를 못 받으면(`failed`) 칸을 접어 빈 공간이 남지 않는다.
+
+### 6-6. 보상형 광고 (광고 게이트)
+`AD_GATE_MENU_CODES`(매수추천상세 `StockBuyTarget` / 개별주식 `StockInfo` / 개별차트 `ChartStock`)에 들어가기 전
+`/ad-gate`(`src/components/AdGate.vue`)에서 보상형 광고를 끝까지 봐야 통과한다. 통과 후 `AD_GATE_PASS_MINUTES`(30분)는 다시 묻지 않고,
+`AD_FREE` 권한자는 건너뛴다.
+- 광고를 중간에 닫으면(보상 없음) 통과되지 않고 새 광고를 받아 다시 시도하게 한다.
+- **광고를 못 받으면(미채움/네트워크/동의 없음/10초 초과) 사용자를 막지 않고 기존 5초 대기 방식으로 통과**시킨다.
+  신규 광고 단위는 한동안 미채움일 수 있어 3개 핵심 메뉴가 막히는 사고를 피하려는 정책이다. 막으려면 `AdGate.vue` 의 `startTimer()` 폴백을 제거한다.
+- 웹 브라우저는 기존처럼 5초 대기(광고 자리표시)다.
+- 보상형 단위(iOS/Android)가 `.env.prd` 에 없으면 해당 플랫폼은 Google **테스트** 보상형 광고가 나간다(수익 없음). 현재 두 플랫폼 모두 입력돼 있다.

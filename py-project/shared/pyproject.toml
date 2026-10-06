@@ -15,6 +15,8 @@ python-kis = "^2.1.6"
 # stock_shared.ml.shape_model 전용 선택 의존성. shape_features 는 이 없이도 동작한다.
 scikit-learn = "1.9.1"
 joblib = "1.6.0"
+# stock_shared.crypto 는 ccxt 를 지연 import 한다. 여기 선언하지 않는 이유: 추가하면
+# py-naver-stock-theme 의 lock/이미지에도 ccxt 가 들어간다. 쓰는 앱(py-stock-batch)이 직접 선언.
 
 [build-system]
 requires = ["poetry-core"]

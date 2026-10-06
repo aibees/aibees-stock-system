@@ -62,6 +62,8 @@ if [[ -n "$ASC_KEY_ID" && -z "$ASC_KEY_PATH" ]]; then
   ASC_KEY_PATH="$ROOT/AuthKey_${ASC_KEY_ID}.p8"
 fi
 
+# 빈 배열을 "${AUTH_ARGS[@]}" 로 펼치면 macOS 기본 bash 3.2 + set -u 에서 unbound variable 로 죽는다
+# (ASC 키 없이 실행할 때). 아래 사용처는 ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"} 형태로 쓴다.
 AUTH_ARGS=()
 if [[ -n "$ASC_KEY_ID" && -n "$ASC_ISSUER_ID" && -n "$ASC_KEY_PATH" ]]; then
   if [[ ! -f "$ASC_KEY_PATH" ]]; then
@@ -109,7 +111,7 @@ xcodebuild \
   -destination 'generic/platform=iOS' \
   -archivePath "$ARCHIVE" \
   "${VERSION_ARGS[@]}" \
-  "${AUTH_ARGS[@]}" \
+  ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"} \
   clean archive
 
 # ── 3) ExportOptions.plist 생성 ──────────────────────────────────────────────
@@ -144,7 +146,7 @@ xcodebuild -exportArchive \
   -archivePath "$ARCHIVE" \
   -exportOptionsPlist "$PLIST" \
   -exportPath "$EXPORT_DIR" \
-  "${AUTH_ARGS[@]}"
+  ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"}
 
 echo ""
 echo ">>> DONE  (build number = $BUILD_NUMBER)"

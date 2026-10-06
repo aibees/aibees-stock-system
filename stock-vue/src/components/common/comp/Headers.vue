@@ -1,5 +1,5 @@
 <template>
-    <div class="header">
+    <div class="header" data-ad-anchor>
         <div class="left">
             <div class="title">{{ title }}</div>
         </div>

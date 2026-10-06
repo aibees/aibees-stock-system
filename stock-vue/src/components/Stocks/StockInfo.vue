@@ -11,11 +11,35 @@
                 v-model:code="inputCode"
                 @search="stockSearchHandler"
                 width="100%" />
-                <button v-if="inputCode" class="chart-btn" @click="goToChart">차트보기</button>
+                <!-- 차트 이동은 하단 고정 바의 "차트 보기" 버튼이 맡는다 -->
             </section>
 
             <transition name="fade-slide">
                 <div v-if="stockDetail" class="body-box">
+
+                    <!-- ═══ 종목 요약 헤더: 이름/코드 + (추천 행이 있으면) 현재가·등락·장 상태 ═══ -->
+                    <section class="stock-head">
+                        <div class="sh-who">
+                            <span class="sh-name">{{ item?.stock_name || inputName }}</span>
+                            <span class="sh-code">{{ inputCode }}</span>
+                        </div>
+                        <div v-if="item" class="sh-px">
+                            <span class="sh-price">{{ formatNumber(item.close) }}</span>
+                            <span class="sh-chg" :class="chg.cls">{{ chg.text }}</span>
+                        </div>
+                        <div v-if="item" class="sh-status" :class="status.state"><i class="dot"></i>{{ status.label }}</div>
+                    </section>
+
+                    <!-- ═══ 탭: 근거 / 재무 / 조건 ═══ -->
+                    <div class="tabs" role="tablist" aria-label="종목 상세">
+                        <button v-for="t in TABS" :key="t.key" type="button" role="tab" class="tab-btn"
+                            :class="{ on: tab === t.key }" :aria-selected="tab === t.key ? 'true' : 'false'" @click="tab = t.key">
+                            {{ t.label }}<em v-if="t.key === 'cond' && item"> {{ cond.pass }}/{{ cond.total }}</em>
+                        </button>
+                    </div>
+
+                    <!-- ───────────── 근거 탭 ───────────── -->
+                    <div v-show="tab === 'basis'" class="tab-panel" role="tabpanel">
 
                     <!-- ① 기업개요 + 재무현황 (버튼 갱신, 실적발표월만) -->
                     <section class="ai-result-section">
@@ -35,6 +59,36 @@
                             </div>
                             <div v-else class="ai-empty">아직 생성된 내용이 없습니다. 새로고침을 눌러주세요.</div>
                         </div>
+                    </section>
+
+                    <!-- 신호 칩 + 오늘의 가격 범위 (추천 목록에 있는 종목만) -->
+                    <section v-if="item" class="ai-result-section signal-section">
+                        <div class="section-header">
+                            <span class="section-icon">📡</span>
+                            <span class="section-title">충족한 신호</span>
+                            <span class="token-info">{{ cond.pass }}/{{ cond.total }}</span>
+                        </div>
+                        <div v-if="passedSignals.length" class="chips">
+                            <span v-for="r in passedSignals" :key="r.label" class="chip">{{ r.short }}</span>
+                        </div>
+                        <p v-else class="muted">충족한 신호가 아직 없어요.</p>
+
+                        <div class="range">
+                            <div class="range-title">오늘의 가격 범위</div>
+                            <div class="range-labels"><span>저가 {{ formatNumber(item.low) }}</span><span>고가 {{ formatNumber(item.high) }}</span></div>
+                            <div class="track">
+                                <span v-if="rangePos(item, item.open) !== null" class="op-tick" :style="{ left: rangePos(item, item.open) + '%' }"></span>
+                                <span v-if="rangePos(item, item.close) !== null" class="cur-dot" :class="chg.cls" :style="{ left: rangePos(item, item.close) + '%' }"></span>
+                            </div>
+                            <div class="range-legend">
+                                <span>│ 시가 {{ formatNumber(item.open) }}</span>
+                                <span><i class="legend-dot" :class="chg.cls"></i>{{ status.state === 'live' ? '현재가' : '종가' }}</span>
+                                <span>거래량 {{ formatNumber(item.volume) }}</span>
+                            </div>
+                        </div>
+                    </section>
+                    <section v-else-if="itemLoaded" class="ai-result-section">
+                        <p class="muted">이 날짜의 추천 목록에 없는 종목이라 신호·가격 범위 정보가 없어요.</p>
                     </section>
 
                     <!-- ② 현재 테마 (버튼 갱신, 주 1회 권장) -->
@@ -135,6 +189,56 @@
                         </div>
                     </section>
 
+                    </div><!-- /근거 탭 -->
+
+                    <!-- ───────────── 재무 탭 ───────────── -->
+                    <div v-show="tab === 'fin'" class="tab-panel" role="tabpanel">
+                        <template v-if="item">
+                            <div class="fin-grid">
+                                <div v-for="r in finRows" :key="r.label" class="fin-card">
+                                    <span class="fin-label">{{ r.label }}</span>
+                                    <span class="fin-value">{{ r.value ?? '-' }}</span>
+                                    <span class="verdict" :class="r.pass === true ? 'ok' : (r.pass === false ? 'ng' : 'na')">{{ r.verdict }}</span>
+                                    <span class="fin-desc">{{ r.desc }}</span>
+                                </div>
+                            </div>
+                            <!-- TODO: 기준 분기·출처 — 현재 API(buy-target)는 재무 지표의 기준 분기/출처를 내려주지 않는다.
+                                 필드가 생기면 이 문구를 "2026 2Q · DART" 같은 실제 값으로 교체. -->
+                            <p class="basis-note">{{ itemDateLabel }} 추천 산출 시점의 재무 지표예요. 일반적인 가치투자 기준선(PER 15배↓, PBR 1배↓ 등)으로 해석한 참고용입니다.</p>
+                        </template>
+                        <p v-else class="muted card-empty">{{ itemLoaded ? '이 날짜의 추천 목록에 없는 종목이라 재무 지표가 없어요.' : '불러오는 중입니다…' }}</p>
+                    </div>
+
+                    <!-- ───────────── 조건 탭 ───────────── -->
+                    <div v-show="tab === 'cond'" class="tab-panel" role="tabpanel">
+                        <template v-if="item">
+                            <div class="cond-head">
+                                <strong>조건 충족 {{ cond.pass }}/{{ cond.total }}개</strong>
+                                <div class="cond-bar" aria-hidden="true"><span :style="{ width: (cond.pass / cond.total * 100) + '%' }"></span></div>
+                            </div>
+                            <ul class="cond-list">
+                                <li v-for="r in condRows" :key="r.label" :class="{ ok: r.pass }">
+                                    <span class="mark" aria-hidden="true">{{ r.pass ? '✓' : '–' }}</span>
+                                    <div class="cond-body">
+                                        <div class="cond-name">{{ r.label }}<span class="cond-state">{{ r.pass ? '충족' : '미충족' }}</span></div>
+                                        <div class="cond-desc">{{ r.desc }}</div>
+                                    </div>
+                                </li>
+                            </ul>
+                            <!-- 점수는 장 마감 후 산출된다 — 값이 없으면 빈칸 대신 안내 -->
+                            <p v-if="!hasValue(item.score)" class="basis-note">종합 점수는 장 마감 후 산출됩니다.</p>
+                            <p v-else class="basis-note">종합 점수 {{ numOrNull(item.score) }} / 100</p>
+                        </template>
+                        <p v-else class="muted card-empty">{{ itemLoaded ? '이 날짜의 추천 목록에 없는 종목이라 조건 정보가 없어요.' : '불러오는 중입니다…' }}</p>
+                    </div>
+
+                    <p class="disclaimer">본 정보는 투자 권유가 아니며, 투자 판단의 책임은 투자자 본인에게 있습니다.</p>
+
+                    <!-- ═══ 하단 고정 버튼 ═══ -->
+                    <div class="action-bar">
+                        <button type="button" class="act primary" @click="goToChart">차트 보기</button>
+                        <button v-if="canTradeLog" type="button" class="act outline" @click="goToTradeLog">매매 기록 추가</button>
+                    </div>
                 </div>
             </transition>
         </div>
@@ -146,6 +250,10 @@ import { ref, computed } from 'vue';
 import { marked } from 'marked';
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores';
+import {
+    numOrNull, formatNumber as fmtNum, hasValue, changeInfo, rangePos, fundamentalRows, technicalRows,
+    conditionCount, kstNowParts, marketStatus, getLatestBatchDate,
+} from '@scripts/stockSignals.js';
 
 // marked 옵션
 marked.setOptions({ breaks: true, gfm: true });
@@ -158,6 +266,56 @@ const inputName = ref('');
 const inputCode = ref('');
 
 const userSession = assUserSession();
+
+/* ── 탭 / 추천 행(item) ──
+ * 근거·재무·조건 정보는 /stocks/buy-target 의 한 행에서 나온다(홈과 같은 데이터·판정 로직).
+ * 홈에서 들어오면 query.ymd 로 같은 날짜의 행을 찾고, 직접 검색해 들어오면 최신 배치일을 쓴다.
+ * 그 날짜 추천 목록에 없는 종목이면 item 이 null — 해당 탭은 안내 문구를 보여준다. */
+const TABS = [
+    { key: 'basis', label: '근거' },
+    { key: 'fin',   label: '재무' },
+    { key: 'cond',  label: '조건' },
+];
+const tab = ref('basis');
+const item = ref(null);
+const itemLoaded = ref(false);
+
+const status = computed(() => {
+    const ymd = item.value?.ymd;
+    const dash = ymd ? `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}` : getLatestBatchDate();
+    return marketStatus(dash, kstNowParts());
+});
+const chg = computed(() => (item.value ? changeInfo(item.value) : { cls: 'flat', text: '' }));
+const cond = computed(() => (item.value ? conditionCount(item.value) : { pass: 0, total: 0 }));
+const condRows = computed(() => (item.value ? technicalRows(item.value) : []));
+const passedSignals = computed(() => condRows.value.filter(r => r.pass));
+const finRows = computed(() => (item.value ? fundamentalRows(item.value) : []));
+const itemDateLabel = computed(() => {
+    const y = item.value?.ymd;
+    return y ? `${y.slice(4, 6)}/${y.slice(6, 8)}` : '';
+});
+
+const loadItem = async (code) => {
+    item.value = null;
+    itemLoaded.value = false;
+    const ymd = String(route.query.ymd || getLatestBatchDate().replaceAll('-', ''));
+    try {
+        const { data } = await aibeesApi.get('/api/v1/stocks/buy-target', { params: { ymd } });
+        item.value = (data?.data ?? []).find(r => r.stock_code === code) ?? null;
+    } catch (e) {
+        console.error(e);
+    } finally {
+        itemLoaded.value = true;
+    }
+};
+
+// 매매 기록 화면(/trade/trade-log)에 접근 권한이 있는 사용자에게만 버튼을 보여준다.
+const canTradeLog = computed(() => userSession.access.paths.includes('/trade/trade-log'));
+// TODO: 종목을 지정한 "매매 기록 추가" 폼은 아직 없다 — 지금은 매매 기록 화면으로 이동만 한다.
+const goToTradeLog = () => {
+    router.push({ path: '/trade/trade-log', query: { stock_code: inputCode.value } });
+};
+
 const ADMIN_USER_ID = 1;
 const ANNOUNCEMENT_MONTHS = [2, 5, 8, 11];
 const MIN_REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1시간
@@ -249,6 +407,8 @@ const goToChart = () => {
 const stockSearchHandler = (code) => {
     if (!code) return;
     stockDetail.value = { code };
+    tab.value = 'basis';
+    loadItem(code);
     overview.value = null;
     theme.value = null;
     news.value = null;
@@ -378,7 +538,7 @@ const rateClass = (rate) => {
     return 'neutral';
 };
 
-const formatNumber = (v) => Number(v).toLocaleString();
+const formatNumber = (v) => fmtNum(v);
 const formatRate = (v) => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
 </script>
 
@@ -918,5 +1078,249 @@ $amber:    #141414;
 @keyframes bounce {
     0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
     40%           { transform: scale(1);   opacity: 1; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+ * 양봉상회 상세 화면 테마 (홈과 같은 토큰). 아래 규칙이 위의 기본 규칙을 덮어쓴다.
+ * ════════════════════════════════════════════════════════════════ */
+$yb-bg:     #FFFBEA;
+$yb-bar:    #FFF4C2;
+$yb-line:   #EFE2BC;
+$yb-line-2: #EAD9A6;
+$yb-brown:  #7A4423;
+$yb-brown-d:#4A2814;
+$yb-yellow: #FFC20E;
+$yb-ink:    #2B1D14;
+$yb-sub:    #6B5B4E;
+$yb-up:     #D12B2B;
+$yb-down:   #1F5BD1;
+
+#stock-analysis :deep(.search-btn) {
+    background: $yb-yellow;
+    color: #3A200F;
+    font-weight: 700;
+    border-radius: 8px;
+}
+#stock-analysis :deep(.search-bar) {
+    border-radius: 14px;
+    border-color: $yb-line-2;
+    background: #fff;
+}
+
+#stock-analysis {
+    background: $yb-bg;
+    color: $yb-ink;
+    font-variant-numeric: tabular-nums;
+    text-align: left;
+}
+.contents { padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
+
+.ai-result-section {
+    border: 1px solid $yb-line;
+    border-radius: 16px;
+    box-shadow: none;
+    margin-bottom: 12px;
+}
+.section-header .section-title { color: $yb-ink; }
+.ai-refresh-btn { border-radius: 8px; }
+
+.body-box { display: flex; flex-direction: column; gap: 12px; }
+
+/* ── 종목 요약 헤더 ── */
+.stock-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    align-items: end;
+    padding: 4px 2px 0;
+
+    .sh-who { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+    .sh-name { font-size: 22px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sh-code { font-size: 13px; color: #7A6B5D; }
+    .sh-px { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+    .sh-price { font-size: 22px; font-weight: 700; }
+    .sh-chg {
+        font-size: 13px;
+        font-weight: 600;
+        &.up { color: $yb-up; }
+        &.down { color: $yb-down; }
+        &.flat { color: $yb-sub; }
+    }
+    .sh-status {
+        grid-column: 1 / -1;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: $yb-sub;
+        .dot { width: 7px; height: 7px; border-radius: 4px; background: #9A8F84; }
+        &.live .dot { background: #E07A00; }
+    }
+}
+
+/* ── 탭 ── */
+.tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-bottom: 1px solid $yb-line-2;
+    margin-top: 4px;
+
+    .tab-btn {
+        min-height: 44px;
+        border: 0;
+        border-bottom: 3px solid transparent;
+        background: transparent;
+        color: $yb-sub;
+        font-size: 15px;
+        font-family: inherit;
+        cursor: pointer;
+        em { font-style: normal; font-size: 13px; margin-left: 4px; }
+
+        &.on {
+            color: $yb-brown;
+            font-weight: 700;
+            border-bottom-color: $yb-yellow;
+        }
+    }
+}
+.tab-panel { display: flex; flex-direction: column; gap: 12px; }
+
+/* ── 신호 칩 · 가격 범위 ── */
+.signal-section .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.chip {
+    padding: 5px 11px;
+    border-radius: 999px;
+    background: $yb-bar;
+    border: 1px solid $yb-line-2;
+    color: #5C3118;
+    font-size: 13px;
+    font-weight: 600;
+}
+.muted { margin: 0; font-size: 13px; color: $yb-sub; line-height: 1.5; }
+.card-empty { background: #fff; border: 1px solid $yb-line; border-radius: 16px; padding: 28px 16px; text-align: center; }
+
+.range {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    .range-title { font-size: 13px; font-weight: 700; color: $yb-ink; }
+    .range-labels { display: flex; justify-content: space-between; font-size: 12px; color: $yb-sub; }
+    .range-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: $yb-sub; }
+}
+.track {
+    position: relative;
+    height: 8px;
+    margin: 4px 0 8px;
+    border-radius: 4px;
+    background: #F1E6C8;
+    .op-tick { position: absolute; top: -3px; width: 2px; height: 14px; background: #8A7A6A; }
+    .cur-dot {
+        position: absolute; top: -4px; width: 16px; height: 16px; margin-left: -8px;
+        border-radius: 8px; border: 3px solid #fff; box-shadow: 0 0 0 1px #D9C8A0; background: $yb-sub;
+        &.up { background: $yb-up; }
+        &.down { background: $yb-down; }
+    }
+}
+.legend-dot {
+    display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 4px; background: $yb-sub;
+    &.up { background: $yb-up; }
+    &.down { background: $yb-down; }
+}
+
+/* ── 재무 탭: 2열 지표 카드 ── */
+.fin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.fin-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px;
+    background: #fff;
+    border: 1px solid $yb-line;
+    border-radius: 14px;
+
+    .fin-label { font-size: 12px; font-weight: 700; color: $yb-sub; }
+    .fin-value { font-size: 20px; font-weight: 700; }
+    .fin-desc { font-size: 12px; line-height: 1.45; color: $yb-sub; }
+}
+// 판정은 색만이 아니라 글자("적합/높음/…")로도 구분한다
+.verdict {
+    align-self: flex-start;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    &.ok { background: $yb-bar; color: #5C3118; border: 1px solid $yb-line-2; }
+    &.ng { background: #FDECEC; color: #A32020; }
+    &.na { background: #F1ECE2; color: $yb-sub; }
+}
+.basis-note { margin: 0; font-size: 12px; line-height: 1.5; color: #7A6B5D; }
+
+/* ── 조건 탭: 체크리스트 ── */
+.cond-head {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+    background: #fff;
+    border: 1px solid $yb-line;
+    border-radius: 14px;
+    strong { font-size: 15px; }
+    .cond-bar { height: 8px; border-radius: 4px; background: #F1E6C8; overflow: hidden;
+        span { display: block; height: 100%; background: $yb-yellow; } }
+}
+.cond-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    background: #fff;
+    border: 1px solid $yb-line;
+    border-radius: 14px;
+    overflow: hidden;
+
+    li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 14px; border-bottom: 1px solid #F3EAD2; &:last-child { border-bottom: 0; } }
+    .mark {
+        width: 24px; height: 24px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
+        background: #F1ECE2; color: $yb-sub; font-weight: 700; font-size: 13px;
+    }
+    li.ok .mark { background: $yb-yellow; color: $yb-brown-d; }
+    .cond-name { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .cond-state { font-size: 12px; font-weight: 700; color: $yb-sub; }
+    li.ok .cond-state { color: $yb-brown; }
+    .cond-desc { margin-top: 3px; font-size: 12px; line-height: 1.5; color: $yb-sub; }
+}
+
+.disclaimer { margin: 4px 0 0; font-size: 11px; line-height: 1.5; color: #7A6B5D; text-align: center; }
+
+/* ── 하단 고정 버튼 (모바일에서는 하단 탭바 위) ── */
+.action-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--lnb-total, 0px);
+    z-index: 900;
+    display: flex;
+    gap: 8px;
+    padding: 10px 16px;
+    background: $yb-bar;
+    border-top: 1px solid $yb-line-2;
+
+    .act {
+        flex: 1;
+        min-height: 48px;
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+        &.primary { border: 0; background: $yb-yellow; color: #3A200F; }
+        &.outline { border: 1.5px solid $yb-brown; background: transparent; color: $yb-brown; }
+    }
+
+    // 데스크톱: 하단 탭바가 없으므로 화면 맨 아래, 내용 폭에 맞춘다
+    @media (min-width: 640px) {
+        bottom: 0;
+        padding-left: calc(50% - 284px);
+        padding-right: calc(50% - 284px);
+    }
 }
 </style>

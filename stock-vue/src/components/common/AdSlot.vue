@@ -79,8 +79,8 @@ onMounted(() => {
 .ad-slot {
     position: relative;
     overflow: hidden;
-    background: #f1f1f1;
-    border: 1px dashed #c4c4c4;
+    background: #fff;
+    border: 1px dashed #F9E076;   /* 브랜드 허니색. 실제 광고가 들어가면 광고가 면을 덮는다 */
     border-radius: 6px;
     box-sizing: border-box;
 }
@@ -92,7 +92,8 @@ onMounted(() => {
     align-items: center;
     justify-content: center;
     gap: 4px;
-    color: #9a9a9a;
+    color: #895129;
+    opacity: .6;
     font-size: 12px;
     .tag { font-weight: 700; letter-spacing: 1px; }
     .hint { font-size: 11px; }
