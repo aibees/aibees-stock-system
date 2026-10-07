@@ -1,14 +1,11 @@
 <template>
     <div id="trade-log">
-        <Headers :prop_title="title" />
+        <BrandHeader :title="title" back="/trade" />
 
         <div class="contents">
 
             <!-- ── 상단 타이틀 ── -->
             <section class="head-desc">
-                <div class="head-left">
-                    <h2 style="text-align: left;">거래 내역</h2>
-                </div>
                 <div class="head-right">
                     <button class="btn-refresh" @click="reloadCurrent">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -404,19 +401,20 @@ const formatDateTime = (v) => v ? String(v).replace('T', ' ').replace(/\.\d+Z?$/
 <style scoped lang="scss">
 // 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
 $white: #ffffff;
-$gray-50: #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-300: #c4c4c4;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-700: #3d3d3d;
-$gray-900: #141414;
-$blue: #141414;
-$navy: #141414;
-$red: #141414;
-$amber: #141414;
-$green: #141414;
+$gray-50: #FFFBEA;
+$gray-100: #F3EAD2;
+$gray-200: #EFE2BC;
+$gray-300: #E3D3A8;
+$gray-400: #9A8C7E;
+$gray-500: #6B5B4E;
+$gray-700: #4A3628;
+$gray-900: #2B1D14;
+$blue: #1F5BD1;
+$accent: #7A4423;
+$navy: #74462A;
+$red: #C8282A;
+$amber: #B7791F;
+$green: #1F7A3E;
 
 #trade-log {
     min-height: 100vh;
@@ -439,7 +437,7 @@ $green: #141414;
     display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
     background: $navy; color: $white; border: none;
     font-size: 0.84rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s;
-    &:hover { background: #000000; }
+    &:hover { background: #74462A; }
 }
 
 /* Tabs */
@@ -454,6 +452,7 @@ $green: #141414;
 
 /* Filter bar */
 .filter-bar {
+    border-radius: 12px;
     display: flex; flex-wrap: wrap; align-items: center; gap: 18px;
     margin-bottom: 16px; padding: 14px 16px;
     background: $white; border: 1px solid $gray-200;
@@ -462,26 +461,29 @@ $green: #141414;
 .filter-label { font-size: 0.76rem; font-weight: 700; color: $gray-500; letter-spacing: .03em; }
 .chip-group { display: flex; gap: 6px; }
 .filter-chip {
+    border-radius: 12px;
     padding: 5px 13px; border: 1px solid $gray-200; background: $white;
     color: $gray-700; font-size: 0.78rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .12s;
-    &:hover { border-color: $blue; color: $blue; }
+    &:hover { border-color: $accent; color: $accent; }
     &.active { background: $navy; border-color: $navy; color: $white; }
 }
 .filter-input {
+    border-radius: 12px;
     padding: 6px 10px; border: 1px solid $gray-200;
     font-size: 0.8rem; color: $gray-900; font-family: inherit; outline: none; transition: border-color .15s;
-    &:focus { border-color: $blue; }
+    &:focus { border-color: $accent; }
     &.date { padding: 5px 8px; }
 }
 .tilde { color: $gray-400; }
 .btn-apply {
     padding: 7px 18px; border: none; background: $navy; color: $white;
     font-size: 0.82rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: background .15s;
-    &:hover { background: #000000; }
+    &:hover { background: #74462A; }
 }
 
 /* Table */
 .table-section {
+    border-radius: 12px;
     background: $white; border: 1px solid $gray-200;
     overflow: hidden; overflow-x: auto;
     @media (max-width: 860px) { display: none; }
@@ -504,6 +506,7 @@ $green: #141414;
 .stk-name { color: $gray-900; }
 
 .code-chip {
+    border-radius: 12px;
     font-size: 0.72rem; font-weight: 600; background: $gray-100; color: $gray-700;
     padding: 2px 7px; border: 1px solid $gray-200;
     font-family: 'SFMono-Regular', Consolas, monospace;
@@ -511,19 +514,19 @@ $green: #141414;
 
 .action-badge, .source-badge, .status-badge {
     font-size: 0.7rem; font-weight: 700; padding: 2px 9px; white-space: nowrap;
-    &.buy { background: $gray-900; color: $white; border: 1px solid $gray-900; }
-    &.sell { background: $white; color: $gray-900; border: 1px solid $gray-300; }
-    &.holding { background: $gray-100; color: $gray-900; border: 1px solid $gray-300; }
-    &.sold { background: $gray-100; color: $gray-700; border: 1px solid $gray-200; }
-    &.default { background: $gray-100; color: $gray-500; border: 1px solid $gray-200; }
+    &.buy { background: #74462A; color: $white; border: 1px solid #74462A; border-radius: 12px; }
+    &.sell { background: $white; color: #74462A; border: 1px solid $gray-300; border-radius: 12px; }
+    &.holding { background: $gray-100; color: #74462A; border: 1px solid $gray-300; border-radius: 12px; }
+    &.sold { background: $gray-100; color: $gray-700; border: 1px solid $gray-200; border-radius: 12px; }
+    &.default { background: $gray-100; color: $gray-500; border: 1px solid $gray-200; border-radius: 12px; }
 }
 /* 심각도를 색상 대신 명도 단계로 구분: info < warn < error */
 .level-badge {
     font-size: 0.7rem; font-weight: 700; padding: 2px 8px; white-space: nowrap;
-    &.info { background: $white; color: $gray-500; border: 1px solid $gray-200; }
-    &.warn { background: $gray-100; color: $gray-900; border: 1px solid $gray-400; }
-    &.error { background: $gray-900; color: $white; border: 1px solid $gray-900; }
-    &.default { background: $gray-100; color: $gray-500; border: 1px solid $gray-200; }
+    &.info { background: $white; color: $gray-500; border: 1px solid $gray-200; border-radius: 12px; }
+    &.warn { background: $gray-100; color: #74462A; border: 1px solid $gray-400; border-radius: 12px; }
+    &.error { background: #74462A; color: $white; border: 1px solid #74462A; border-radius: 12px; }
+    &.default { background: $gray-100; color: $gray-500; border: 1px solid $gray-200; border-radius: 12px; }
 }
 
 /* skeleton / empty */
@@ -534,7 +537,7 @@ $green: #141414;
 /* Mobile */
 .mobile-list { display: none; @media (max-width: 860px) { display: block; } }
 .m-ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.m-li { background: $white; border: 1px solid $gray-200; padding: 14px; }
+.m-li { background: $white; border: 1px solid $gray-200; padding: 14px; border-radius: 12px; }
 .li-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .li-badges { display: flex; gap: 6px; }
 .li-name { font-size: 0.95rem; font-weight: 700; color: $gray-900; margin-bottom: 8px; }
@@ -549,12 +552,16 @@ $green: #141414;
 /* Pagination (렌더 함수 컴포넌트가 생성) */
 .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 18px; }
 :deep(.page-btn) {
+    border-radius: 12px;
     padding: 6px 14px; border: 1px solid $gray-200; background: $white; color: $gray-700;
     font-size: 0.8rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: border-color .12s, color .12s;
-    &:hover:not(:disabled) { border-color: $blue; color: $blue; }
+    &:hover:not(:disabled) { border-color: $accent; color: $accent; }
     &:disabled { opacity: .45; cursor: not-allowed; }
 }
 :deep(.page-info) { font-size: 0.82rem; font-weight: 600; color: $gray-700; padding: 0 6px; }
 
 @keyframes pulse { 0%, 100% { opacity: .5; } 50% { opacity: .9; } }
+
+/* 안쪽 제목을 걷어내고 버튼만 남았으므로 오른쪽 끝에 둔다(헤더에 이미 제목이 있다) */
+.head-desc .head-right { margin-left: auto; }
 </style>

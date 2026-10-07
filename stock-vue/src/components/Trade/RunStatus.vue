@@ -1,6 +1,6 @@
 <template>
     <div id="auto-trade-status">
-        <Headers :prop_title="'운용 현황'" />
+        <BrandHeader :title="'운용 현황'" back="/trade" />
 
         <div class="contents">
 
@@ -156,19 +156,19 @@ const rateClass = computed(() => {
 <style scoped lang="scss">
 // 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
 $white: #ffffff;
-$gray-50: #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-300: #c4c4c4;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-700: #3d3d3d;
-$gray-900: #141414;
-$blue: #141414;
-$navy: #141414;
-$red: #141414;
-$amber: #141414;
-$green: #141414;
+$gray-50: #FFFBEA;
+$gray-100: #F3EAD2;
+$gray-200: #EFE2BC;
+$gray-300: #E3D3A8;
+$gray-400: #9A8C7E;
+$gray-500: #6B5B4E;
+$gray-700: #4A3628;
+$gray-900: #2B1D14;
+$blue: #1F5BD1;
+$navy: #74462A;
+$red: #C8282A;
+$amber: #B7791F;
+$green: #1F7A3E;
 
 #auto-trade-status {
     min-height: 100vh;
@@ -195,6 +195,7 @@ $green: #141414;
 }
 
 .sum-item {
+    border-radius: 12px;
     background: $white;
     border: 1px solid $gray-100;
     padding: 14px;
@@ -231,6 +232,7 @@ $green: #141414;
 }
 
 .card {
+    border-radius: 12px;
     background: $white;
     border: 1px solid $gray-100;
     padding: 18px;
@@ -296,6 +298,7 @@ $green: #141414;
         }
 
         li {
+            border-radius: 12px;
             background: $gray-50;
             border: 1px solid $gray-100;
             padding: 10px;
@@ -350,6 +353,7 @@ $green: #141414;
         cursor: pointer;
 
         &.ghost {
+            border-radius: 12px;
             background: transparent;
             border: 1px solid $amber;
             color: $amber;
@@ -363,6 +367,7 @@ $green: #141414;
 }
 
 .worker-msg {
+    border-radius: 12px;
     margin: 0;
     font-size: .84rem;
     color: $gray-900;

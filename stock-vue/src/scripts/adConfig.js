@@ -16,15 +16,16 @@ export const AD_PROVIDER = 'placeholder';
 
 export const AD_CONFIG = {
     // AdSense: client='ca-pub-XXXXXXXXXXXXXXXX', slots 는 광고 단위 ID.
-    adsense: { client: '', slots: { side: '', gate: '', mobileInline: '', mobileBottom: '' } },
+    adsense: { client: '', slots: { side: '', gate: '', homeHero: '', mobileInline: '', mobileBottom: '' } },
     // Kakao AdFit: 광고단위 ID('DAN-...'). 단위 생성 시 정한 크기와 아래 SIZES 가 같아야 한다.
-    adfit: { units: { side: '', gate: '', mobileInline: '', mobileBottom: '' } },
+    adfit: { units: { side: '', gate: '', homeHero: '', mobileInline: '', mobileBottom: '' } },
 };
 
 // 슬롯별 크기(px)
 export const AD_SIZES = {
     side: { width: 160, height: 600 },
     gate: { width: 300, height: 250 },
+    homeHero: { width: 300, height: 250 },       // 홈: 최우선 타겟 카드 자리(WORKER_USER 가 아닌 사용자)
     mobileInline: { width: 320, height: 100 },   // 모바일 홈: 매수추천 카드 위
     mobileBottom: { width: 320, height: 50 },    // 모바일: 하단 탭바(Lnb) 아래
 };

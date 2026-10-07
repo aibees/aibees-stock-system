@@ -8,6 +8,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    BrandHeader: typeof import('./components/common/comp/BrandHeader.vue')['default']
     CandlestickChart: typeof import('./components/common/comp/CandlestickChart.vue')['default']
     CArea: typeof import('./components/common/comp/CArea.vue')['default']
     CBodyArea: typeof import('./components/common/comp/CBodyArea.vue')['default']

@@ -1,18 +1,19 @@
 <template>
     <div id="home">
 
-        <!-- ════════ 상단: 로고 칩 + 즐겨찾기 + 계정, 아래에 12px 차양 띠 ════════
+        <!-- ════════ 상단(v2 경량화): 로고 + 즐겨찾기 + 계정 ════════
+             칩/띠 대신 같은 색 한 장. 맨 위에서는 아래쪽에 물결 가장자리, 스크롤하면 1px 구분선.
              모바일에서는 sticky(+세이프 에어리어), 데스크톱은 상단 내비(Lnb)가 브랜드를 보여준다. -->
-        <header class="home-header" data-ad-anchor>
+        <header class="home-header" :class="{ scrolled }" data-ad-anchor>
             <div class="hh-row">
-                <button type="button" class="brand-chip" @click="router.push('/home')" aria-label="양봉상회 홈">
+                <button type="button" class="brand" @click="router.push('/home')" aria-label="양봉상회 홈">
                     <img class="brand-logo" src="/favicon.svg" alt="" aria-hidden="true" />
                     <span class="brand-name">양봉상회</span>
                 </button>
 
                 <div class="hh-actions">
                     <button type="button" class="icon-btn" aria-label="즐겨찾기" @click="goFavorites">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6L12 16.7 6.6 19.6l1.1-6-4.5-4.2 6.1-.8z"></path></svg>
+                        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6L12 16.7 6.6 19.6l1.1-6-4.5-4.2 6.1-.8z"></path></svg>
                     </button>
 
                     <div class="account" ref="accountRef">
@@ -31,7 +32,7 @@
                     </div>
                 </div>
             </div>
-            <div class="awning" aria-hidden="true"></div>
+            <div class="header-edge" aria-hidden="true"></div>
         </header>
 
         <main class="home-main">
@@ -41,7 +42,9 @@
                 <button type="button" class="nav-btn" aria-label="이전 영업일" @click="stepSelectedDate(-1)">‹</button>
                 <div class="date-center">
                     <button type="button" class="date-btn" aria-label="날짜 선택" @click="openDatePicker">
-                        <span class="date-main">{{ dateLabel }}</span>
+                        <span class="date-main">{{ dateLabel }}
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A0662F" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                        </span>
                         <span class="date-status" :class="marketState"><i class="dot"></i>{{ statusLabel }}</span>
                     </button>
                     <input type="date" ref="dateInput" class="hidden-input" v-model="selectedDate"
@@ -50,8 +53,13 @@
                 <button type="button" class="nav-btn" aria-label="다음 영업일" @click="stepSelectedDate(1)">›</button>
             </div>
 
-            <!-- ── 최우선 타겟 히어로 ── -->
-            <section class="priority-hero" aria-label="오늘의 최우선 타겟">
+            <!-- ── 최우선 타겟 히어로: WORKER_USER(매매 사용자)에게만 ──
+                 그 외 사용자는 같은 자리에 광고가 들어간다(AD_FREE 면 자리째 비어 있음, 앱은 하단 배너가 맡는다). -->
+            <section v-if="heroAdVisible" class="hero-ad" aria-label="광고">
+                <AdSlot placement="homeHero" />
+            </section>
+
+            <section v-if="isWorker" class="priority-hero" aria-label="오늘의 최우선 타겟">
                 <div class="ph-top">
                     <span class="ph-badge">오늘의 최우선 타겟</span>
                     <button v-if="isLoggedIn && sortedData.length" type="button" class="ph-change" @click="sheetOpen = true">
@@ -60,7 +68,7 @@
                 </div>
 
                 <template v-if="priorityItem">
-                    <div class="ph-body">
+                    <div class="ph-body" :class="{ stack: (priorityItem.stock_name || '').length > 8 }">
                         <div class="ph-who">
                             <span class="ph-name">{{ priorityItem.stock_name }}</span>
                             <span class="ph-code">{{ priorityItem.stock_code }}</span>
@@ -70,7 +78,10 @@
                             <span class="ph-chg" :class="changeInfo(priorityItem).cls">{{ changeInfo(priorityItem).text }}</span>
                         </div>
                     </div>
-                    <p class="ph-reason">{{ reasonLine(priorityItem) }}</p>
+                    <div class="ph-chips">
+                        <span class="ph-chip strong">조건 {{ heroChips(priorityItem).cond }}</span>
+                        <span v-for="c in heroChips(priorityItem).signals" :key="c" class="ph-chip">{{ c }}</span>
+                    </div>
                     <button type="button" class="ph-cta" @click="goToStockInfo(priorityItem.stock_code, priorityItem.stock_name)">AI 분석 보기</button>
                 </template>
 
@@ -99,24 +110,26 @@
                 </template>
             </section>
 
-            <!-- 모바일 전용 광고(리스트 위). 데스크톱은 사이드 배너, AD_FREE 는 안 보임. -->
-            <AdBanner />
+            <!-- 모바일 전용 광고(리스트 위). 데스크톱은 사이드 배너, AD_FREE 는 안 보임.
+                 히어로 자리의 광고가 이미 있는 사용자(WORKER_USER 가 아님)에게는 중복이라 그리지 않는다. -->
+            <AdBanner v-if="isWorker" />
 
             <!-- ── 추천 종목 리스트 ── -->
             <section class="reco" aria-label="추천 종목">
                 <div class="list-head">
                     <h2>추천 종목 <span class="count">{{ sortedData.length }}</span></h2>
                     <div class="list-tools">
-                        <label class="sort-pill">
+                        <label class="sort-btn">
                             <select v-model="sortKey" @change="onSortKeyChange" aria-label="정렬 기준">
                                 <option v-for="o in SORT_OPTIONS" :key="o.key" :value="o.key">{{ o.label }}</option>
                             </select>
-                            <span class="pill-text" aria-hidden="true">{{ currentSort.label }} ▾</span>
+                            <span class="sort-text" aria-hidden="true">{{ currentSort.label }} ▾</span>
                         </label>
                         <button type="button" class="dir-btn" @click="toggleSortDir"
-                            :aria-label="sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel"
+                            :aria-label="`정렬 방향: ${sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel}`"
                             :title="sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel">
-                            {{ sortDir === 'desc' ? '↓' : '↑' }}
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
+                                :style="{ transform: sortDir === 'desc' ? 'rotate(180deg)' : 'none' }" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg>
                         </button>
                     </div>
                 </div>
@@ -238,11 +251,16 @@
 <script setup>
 import CandlestickChart from './common/comp/CandlestickChart.vue';
 import AdBanner from './common/AdBanner.vue';
+import AdSlot from './common/AdSlot.vue';
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
+import { hasRole, WORKER_ROLE } from '@scripts/useAccess.js';
+import { useShowAds } from '@scripts/useAds.js';
+import { isNativeAdsEnabled } from '@scripts/useAdMob.js';
 import {
     numOrNull, formatNumber, hasValue, changeInfo, reasonLine,
     kstNowParts, isMarketOpenNow, weekdayKo, toYmdString, shiftDate, getLatestBatchDate,
+    technicalRows, conditionCount,
 } from '@scripts/stockSignals.js';
 
 const router = useRouter();
@@ -251,6 +269,15 @@ const userSession = assUserSession();
 const isLoggedIn = computed(() => !!userSession.user.accessToken);
 const userName = computed(() => userSession.getUserInfo || '');
 const userInitial = computed(() => (userName.value?.[0] ?? '?').toUpperCase());
+
+/* ── 최우선 타겟은 WORKER_USER(매매 사용자) 전용 ──
+ * 권한은 서버(/master/menus/my 의 roles)가 준 값을 쓴다. 아니면 그 자리에 광고를 넣는다.
+ * ※ 이건 화면 노출 정책이다. 최우선타겟 API(/stocks/buy-target/priority)는 로그인 사용자 본인 것만 다루며
+ *   WORKER_USER 인지는 서버가 따로 검사하지 않는다(TODO: 필요하면 서버에서도 막는다). */
+const isWorker = computed(() => hasRole(WORKER_ROLE));
+const showAds = useShowAds();
+// 앱(AdMob)은 네이티브 광고가 화면 위에 겹쳐 그려져 스크롤되는 자리에 못 넣는다 → 하단 배너가 맡는다.
+const heroAdVisible = computed(() => !isWorker.value && showAds.value && !isNativeAdsEnabled());
 
 /* ── 이동 ── */
 const goToStockInfo = (stock_code, stock_name) => {
@@ -276,6 +303,22 @@ const accountRef = ref(null);
 const onDocClick = (e) => {
     if (menuOpen.value && accountRef.value && !accountRef.value.contains(e.target)) menuOpen.value = false;
 };
+/* ── 헤더: 맨 위에서는 물결 가장자리, 스크롤하면 1px 구분선 ── */
+const scrolled = ref(false);
+const onScroll = () => {
+    const next = window.scrollY > 8;
+    if (next !== scrolled.value) scrolled.value = next;
+};
+
+// 히어로 칩: 조건 n/m + 충족한 신호 최대 2개 (기존 기술 플래그에서 뽑는다)
+const heroChips = (item) => {
+    const { pass, total } = conditionCount(item);
+    return {
+        cond: `${pass}/${total}`,
+        signals: technicalRows(item).filter(r => r.pass).slice(0, 2).map(r => r.short),
+    };
+};
+
 const onKeyDown = (e) => { if (e.key === 'Escape') { menuOpen.value = false; sheetOpen.value = false; } };
 const logout = () => {
     menuOpen.value = false;
@@ -319,6 +362,8 @@ onMounted(async () => {
     clock = setInterval(() => { nowKst.value = kstNowParts(); }, 30 * 1000);
     document.addEventListener('click', onDocClick, true);
     document.addEventListener('keydown', onKeyDown);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
     await getStockMainData();
     loadPriorityTarget();
 });
@@ -326,6 +371,7 @@ onBeforeUnmount(() => {
     clearInterval(clock);
     document.removeEventListener('click', onDocClick, true);
     document.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('scroll', onScroll);
 });
 
 const getStockMainData = async () => {
@@ -436,7 +482,7 @@ const priorityItem = computed(() =>
     priorityTarget.value ? sortedData.value.find(i => i.stock_code === priorityTarget.value) ?? null : null);
 
 const loadPriorityTarget = async () => {
-    if (!isLoggedIn.value) return;   // 게스트는 로그인 전용 API 를 부르지 않는다
+    if (!isLoggedIn.value || !isWorker.value) return;   // 게스트·비대상 사용자는 부르지 않는다
     try {
         const { data } = await aibeesApi.get('/api/v1/stocks/buy-target/priority');
         priorityTarget.value = data?.data?.stock_code ?? null;
@@ -450,6 +496,7 @@ const loadPriorityTarget = async () => {
 
 const selectPriority = async (code) => {
     sheetOpen.value = false;
+    if (!isWorker.value) return;
     const prevCode = priorityTarget.value;
     const prevName = priorityTargetName.value;
     try {
@@ -529,17 +576,19 @@ const miniCandleOptions = {
 <style scoped lang="scss">
 // 양봉상회 디자인 토큰(목업 기준)
 $bg:       #FFFBEA;
-$bar:      #FFF4C2;
+$bar:      #FFF6D2;
 $card:     #FFFFFF;
 $line:     #EFE2BC;
 $line-2:   #EAD9A6;
 $brown:    #7A4423;
 $brown-d:  #4A2814;
-$yellow:   #FFC20E;
+$brown-ink:#5C3118;
+$hero:     #74462A;
+$yellow:   #F6C445;
 $ink:      #2B1D14;
 $sub:      #6B5B4E;
 $sub-2:    #7A6B5D;
-$up:       #D12B2B;
+$up:       #C8282A;
 $down:     #1F5BD1;
 
 #home {
@@ -551,7 +600,7 @@ $down:     #1F5BD1;
     font-variant-numeric: tabular-nums;
 }
 
-/* ── 헤더 ── */
+/* ── 헤더 (v2 경량화) ── */
 .home-header {
     background: $bar;
     // 모바일: 스크롤해도 상단에 붙는다. top 은 노치/상태바(env) 아래 — 상태바 영역 자체는
@@ -565,31 +614,29 @@ $down:     #1F5BD1;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 4px 12px 8px 16px;
+    padding: 2px 8px 6px 16px;
 }
 
-.brand-chip {
+.brand {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    height: 40px;
-    padding: 0 12px 0 8px;
+    gap: 7px;
+    min-height: 44px;
+    padding: 0;
     border: 0;
-    border-radius: 10px;
-    background: $brown;
-    box-shadow: 0 2px 0 $brown-d;
+    background: transparent;
     cursor: pointer;
 
-    .brand-logo { width: 26px; height: 26px; }
+    .brand-logo { width: 28px; height: 28px; }
     .brand-name {
         font-family: 'Do Hyeon', 'Pretendard', sans-serif;
-        font-size: 21px;
-        color: $yellow;
-        letter-spacing: .5px;
+        font-size: 22px;
+        color: $brown-ink;
+        letter-spacing: .3px;
     }
 }
 
-.hh-actions { display: flex; align-items: center; gap: 2px; }
+.hh-actions { display: flex; align-items: center; }
 
 .icon-btn {
     width: 44px;
@@ -599,18 +646,18 @@ $down:     #1F5BD1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: $brown;
+    color: $brown-ink;
     cursor: pointer;
 }
 
 .avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 16px;
-    background: $yellow;
-    color: #5C3118;
+    width: 30px;
+    height: 30px;
+    border-radius: 15px;
+    background: #F6E3A8;
+    color: $brown-ink;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 13px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -621,10 +668,28 @@ $down:     #1F5BD1;
     padding: 0 12px;
     border: 0;
     background: transparent;
-    color: $brown;
+    color: $brown-ink;
     font-size: 14px;
     font-weight: 700;
     cursor: pointer;
+}
+
+// 맨 위: 같은 색의 물결 가장자리가 본문 위로 8px 늘어진다 / 스크롤: 1px 구분선으로 교체
+.header-edge { position: relative; height: 0; }
+.header-edge::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 8px;
+    background: radial-gradient(circle at 50% 0, #{$bar} 6.5px, transparent 7px) repeat-x;
+    background-size: 16px 8px;
+    transition: opacity .15s ease;
+}
+.home-header.scrolled {
+    .header-edge::after { opacity: 0; }
+    .hh-row { box-shadow: 0 1px 0 $line-2; }
 }
 
 .account { position: relative; }
@@ -659,19 +724,11 @@ $down:     #1F5BD1;
     }
 }
 
-// 12px 차양 띠: 노랑 반원이 줄지어 늘어진다
-.awning {
-    height: 12px;
-    background: radial-gradient(circle at 50% 0, #{$yellow} 9px, transparent 9.5px) repeat-x;
-    background-size: 22px 12px;
-    border-top: 3px solid $brown;
-}
-
 /* ── 본문 ── */
 .home-main {
     max-width: 640px;
     margin: 0 auto;
-    padding: 12px 16px 24px;
+    padding: 14px 16px 24px;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -687,11 +744,10 @@ $down:     #1F5BD1;
 .nav-btn {
     width: 44px;
     height: 44px;
-    border: 1px solid $line-2;
-    border-radius: 12px;
-    background: $card;
+    border: 0;
+    background: transparent;
     color: $brown;
-    font-size: 18px;
+    font-size: 22px;
     cursor: pointer;
 }
 
@@ -702,13 +758,13 @@ $down:     #1F5BD1;
     align-items: center;
     gap: 2px;
     min-height: 44px;
-    padding: 0 8px;
+    padding: 4px 12px;
     border: 0;
     background: transparent;
     color: $ink;
     cursor: pointer;
 }
-.date-main { font-size: 17px; font-weight: 700; }
+.date-main { display: inline-flex; align-items: center; gap: 6px; font-size: 17px; font-weight: 700; }
 .date-status {
     display: inline-flex;
     align-items: center;
@@ -716,7 +772,7 @@ $down:     #1F5BD1;
     font-size: 12px;
     color: $sub;
 
-    .dot { width: 7px; height: 7px; border-radius: 4px; background: #9A8F84; }
+    .dot { width: 6px; height: 6px; border-radius: 3px; background: #9A8C7E; }
     &.live .dot { background: #E07A00; }
 }
 .hidden-input {
@@ -730,20 +786,28 @@ $down:     #1F5BD1;
 }
 
 /* ── 최우선 타겟 히어로 ── */
+.hero-ad {
+    display: flex;
+    justify-content: center;
+    padding: 12px;
+    background: $card;
+    border-radius: 20px;
+    box-shadow: 0 1px 0 $line, 0 0 0 1px #F3EAD2;
+}
+
 .priority-hero {
-    background: $brown;
-    border-radius: 18px;
-    padding: 18px;
+    background: $hero;
+    border-radius: 20px;
+    padding: 18px 18px 16px;
     color: #FFF8E1;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    box-shadow: 0 4px 0 $brown-d;
+    gap: 14px;
 
     .ph-top { display: flex; align-items: center; justify-content: space-between; }
     .ph-badge {
         background: $yellow;
-        color: $brown-d;
+        color: #3A200F;
         font-size: 12px;
         font-weight: 700;
         padding: 4px 10px;
@@ -752,25 +816,45 @@ $down:     #1F5BD1;
     .ph-change {
         border: 0;
         background: transparent;
-        color: #FFE7A0;
+        color: #F3DCA8;
         font-size: 13px;
-        min-height: 44px;
-        padding: 0 4px;
+        min-height: 36px;
+        padding: 0 2px;
         cursor: pointer;
     }
 
     .ph-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
     .ph-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-    .ph-name { font-size: 22px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .ph-code { font-size: 13px; color: #E8D5B8; }
+    // 긴 종목명은 2줄까지(말줄임 대신) — 가격 쪽 폭을 침범하지 않게 줄바꿈 허용
+    .ph-name { font-size: 26px; font-weight: 700; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; overflow-wrap: anywhere; }
+    .ph-code { font-size: 13px; color: #DCC6A6; }
     .ph-px { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
-    .ph-price { font-size: 20px; font-weight: 700; }
+    // 이름이 길면(9자↑) 이름은 한 줄 전체 폭, 가격·등락은 그 아래 한 줄로
+    .ph-body.stack {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        .ph-px { flex-direction: row; align-items: baseline; justify-content: space-between; }
+    }
+    .ph-price { font-size: 26px; font-weight: 700; }
     .ph-chg {
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 600;
-        &.up   { color: #FFB4A8; }
+        &.up   { color: #FFB8AC; }
         &.down { color: #A9C4FF; }
-        &.flat { color: #E8D5B8; }
+        &.flat { color: #DCC6A6; }
+    }
+
+    // 근거: 조건 n/m(강조 칩) + 충족한 신호 칩
+    .ph-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .ph-chip {
+        border: 1px solid rgba(255, 248, 225, .32);
+        color: #F5E6CC;
+        font-size: 12px;
+        padding: 5px 10px;
+        border-radius: 999px;
+
+        &.strong { border-color: $yellow; color: $yellow; font-weight: 700; }
     }
 
     .ph-reason {
@@ -786,13 +870,13 @@ $down:     #1F5BD1;
     .ph-skeleton { height: 96px; border-radius: 12px; background: rgba(255, 255, 255, .12); animation: pulse 1.6s infinite ease-in-out; }
 
     .ph-cta {
-        min-height: 48px;
+        min-height: 50px;
         border: 0;
-        border-radius: 12px;
+        border-radius: 14px;
         background: $yellow;
         color: #3A200F;
         font-weight: 700;
-        font-size: 15px;
+        font-size: 16px;
         cursor: pointer;
     }
 }
@@ -804,21 +888,19 @@ $down:     #1F5BD1;
     justify-content: space-between;
     margin-bottom: 12px;
 
-    h2 { margin: 0; font-size: 17px; font-weight: 700; }
+    h2 { margin: 0; font-size: 18px; font-weight: 700; }
     .count { color: #A0662F; }
 }
-.list-tools { display: flex; align-items: center; gap: 6px; }
+.list-tools { display: flex; align-items: center; gap: 4px; }
 
-.sort-pill {
+// 정렬 기준: 테두리 없는 글자 버튼(실제 선택은 투명 select 가 받는다)
+.sort-btn {
     position: relative;
     display: inline-flex;
     align-items: center;
-    min-height: 36px;
-    padding: 0 14px;
-    border: 1px solid $line-2;
-    border-radius: 999px;
-    background: $card;
-    font-size: 13px;
+    min-height: 40px;
+    padding: 0 8px;
+    font-size: 14px;
     color: #4A3628;
 
     select {
@@ -832,34 +914,36 @@ $down:     #1F5BD1;
     }
 }
 .dir-btn {
-    width: 36px;
-    height: 36px;
-    border: 1px solid $line-2;
-    border-radius: 999px;
-    background: $card;
-    color: #4A3628;
-    font-size: 15px;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 20px;
+    background: #F6EBC8;
+    color: $brown-ink;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* ── 컴팩트 리스트 ── */
 .reco-list {
     background: $card;
-    border: 1px solid $line;
-    border-radius: 16px;
+    border-radius: 18px;
+    box-shadow: 0 1px 0 $line, 0 0 0 1px #F3EAD2;
     overflow: hidden;
     display: flex;
     flex-direction: column;
 }
-.reco-item { border-bottom: 1px solid #F3EAD2; }
+.reco-item { border-bottom: 1px solid #F5EEDA; }
 
 .reco-row {
     width: 100%;
     border: 0;
     background: $card;
-    padding: 14px;
+    padding: 16px;
     display: grid;
-    grid-template-columns: 26px minmax(0, 1fr) auto;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
     gap: 10px;
     align-items: start;
     text-align: left;
@@ -869,10 +953,10 @@ $down:     #1F5BD1;
 
     &.open { background: #FFFDF5; }
 
-    .rank { font-family: 'Do Hyeon', 'Pretendard', sans-serif; font-size: 18px; color: #A0662F; padding-top: 1px; }
-    .who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-    .name-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-    .name { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rank { font-family: 'Do Hyeon', 'Pretendard', sans-serif; font-size: 20px; color: #A0662F; }
+    .who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .name-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; }
+    .name { font-size: 16px; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
     .code { font-size: 12px; color: $sub-2; flex-shrink: 0; }
     .pri-chip {
         flex-shrink: 0;
@@ -884,13 +968,13 @@ $down:     #1F5BD1;
         font-weight: 700;
     }
     .reason { font-size: 13px; color: $sub; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .px { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
-    .price { font-size: 16px; font-weight: 700; }
+    .px { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .price { font-size: 17px; font-weight: 700; }
 }
 
 // 등락: 색뿐 아니라 ▲/▼ 기호와 절대값을 함께 쓴다
 .chg {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
     &.up   { color: $up; }
@@ -943,9 +1027,9 @@ $down:     #1F5BD1;
 }
 
 .more-btn {
-    min-height: 48px;
+    min-height: 52px;
     border: 0;
-    background: #FFFDF5;
+    background: $card;
     color: $brown;
     font-size: 14px;
     font-weight: 600;
@@ -1054,7 +1138,7 @@ $down:     #1F5BD1;
 @media (min-width: 640px) {
     .home-header { position: static; }
     .hh-row { justify-content: flex-end; }
-    .brand-chip { display: none; }
+    .brand { display: none; }
     .home-main { max-width: 720px; padding-top: 20px; }
 }
 </style>

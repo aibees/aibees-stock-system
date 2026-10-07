@@ -46,6 +46,7 @@ export const ensureAccess = async (force = false) => {
             const menus = data.data?.menus ?? [];
             store.access.paths    = collectPaths(menus);
             store.access.features = data.data?.features ?? [];
+            store.access.roles    = data.data?.roles ?? [];
             // Lnb / TradeDashboard 가 sessionStorage 의 menuList 를 읽으므로 권한이 반영된
             // 트리로 덮어쓴다(전체 목록은 router.js 가 따로 들고 있다).
             store.setMenuList(menus);
@@ -55,6 +56,7 @@ export const ensureAccess = async (force = false) => {
             console.error('[access] 권한 로드 실패 — 제한 메뉴 접근을 막는다', e);
             store.access.paths    = [];
             store.access.features = [];
+            store.access.roles    = [];
             store.access.loaded   = false; // 다음 이동 때 재시도
             store.setMenuList([]);         // 전체 목록이 메뉴에 노출되지 않게 비운다
         } finally {
@@ -67,3 +69,13 @@ export const ensureAccess = async (force = false) => {
 
 /** 기능 플래그 보유 여부. 예) hasFeature('AD_FREE') */
 export const hasFeature = (code) => assUserSession().access.features.includes(code);
+
+/**
+ * 권한(role) 보유 여부. 예) hasRole('WORKER_USER')
+ * 대소문자는 구분하지 않는다. ADMIN 이라고 다른 권한을 자동으로 갖지는 않는다(AD_FREE 와 같은 원칙) —
+ * 필요하면 그 사용자에게 해당 권한을 따로 부여한다.
+ */
+export const hasRole = (code) =>
+    assUserSession().access.roles.some(r => String(r).toUpperCase() === String(code).toUpperCase());
+
+export const WORKER_ROLE = 'WORKER_USER';

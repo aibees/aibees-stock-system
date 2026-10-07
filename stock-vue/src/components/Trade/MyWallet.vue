@@ -1,105 +1,95 @@
 <template>
     <div id="my-wallet">
-        <Headers :prop_title="title" />
 
-        <div class="contents">
-
-            <!-- ── 상단 타이틀 ── -->
-            <section class="head-desc">
-                <div class="head-left">
-                    <h2 style="text-align: left;">계좌 현황</h2>
-                </div>
-                <div class="head-right">
-                    <button class="btn-refresh" @click="reloadAll">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M23 4v6h-6" />
-                            <path d="M1 20v-6h6" />
-                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
-                            <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
-                        </svg>
-                        새로고침
+        <!-- ════════ 헤더(v2): 내 자산 + 갱신 시각 + 새로고침. 모바일에서는 sticky(+세이프 에어리어) ════════ -->
+        <header class="wallet-header" data-ad-anchor>
+            <div class="wh-row">
+                <h1>내 자산</h1>
+                <div class="wh-right">
+                    <span v-if="updatedAt" class="wh-time">{{ updatedAt }} 갱신</span>
+                    <button type="button" class="icon-btn" aria-label="새로고침" @click="reloadAll">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"></path><path d="M4 4v4h4"></path><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"></path><path d="M20 20v-4h-4"></path></svg>
                     </button>
                 </div>
-            </section>
+            </div>
+        </header>
 
-            <!-- ── 계좌 요약 ──
-                 증권사 앱(총 자산 화면) 구조를 따른다: 총자산을 한 번만 크게 보여주고
-                 평가손익·수익률을 바로 아래 붙인 뒤, 세부 금액은 라벨-값 목록으로
-                 내린다. 이전의 4-카드 그리드는 네 값이 같은 비중으로 보여서
-                 "내 자산이 얼마인가"가 한눈에 안 들어왔다. -->
-            <section class="account-panel" :class="{ skeleton: loadingAccount }">
+        <main class="wallet-main">
+
+            <!-- ── 총자산 히어로 ──
+                 총자산을 한 번만 크게 보여주고 평가손익·수익률을 바로 아래 붙인다.
+                 수익률 분모는 매입금액이다(portfolioTotals.costBasis 주석 참고). -->
+            <section class="asset-hero" :class="{ skeleton: loadingAccount }">
                 <template v-if="!loadingAccount">
-                    <div class="ap-total">
-                        <div class="ap-total-label">총자산</div>
-                        <div class="ap-total-amount">
-                            {{ fmtWon(account?.total_asset) }}<span class="won">원</span>
-                        </div>
-                        <!-- 평가손익/수익률. 분모는 매입금액이다(portfolioTotals.costBasis 주석 참고).
-                             보유종목이 없으면 계산할 게 없으므로 숨긴다. -->
-                        <div v-if="portfolioTotals.profitPct !== null" class="ap-pnl"
-                             :class="pnlClass(portfolioTotals.profitSum)">
-                            <span class="ap-pnl-arrow">{{ portfolioTotals.profitSum >= 0 ? '▲' : '▼' }}</span>
-                            <span>{{ fmtWon(Math.abs(portfolioTotals.profitSum)) }}원</span>
-                            <span class="ap-pnl-sep">|</span>
-                            <span>{{ fmtPct(portfolioTotals.profitPct) }}</span>
-                        </div>
-                    </div>
-
-                    <dl class="ap-rows">
-                        <div class="ap-row">
-                            <dt>예수금</dt>
-                            <dd>{{ fmtWon(account?.deposit) }}원</dd>
-                        </div>
-                        <div class="ap-row">
-                            <dt>매입금액</dt>
-                            <dd>{{ fmtWon(portfolioTotals.costBasis) }}원</dd>
-                        </div>
-                        <div class="ap-row">
-                            <dt>평가금액</dt>
-                            <dd>{{ fmtWon(account?.stock_amount) }}원</dd>
-                        </div>
-                        <!-- 주문가능금액(=미수없는매수금액). 예수금과 다른 값이다 —
-                             증거금징수율이 반영되고, 미체결 주문에 묶인 금액이 빠져 있다. -->
-                        <div class="ap-row">
-                            <dt>
-                                주문가능금액
-                                <!-- title 속성은 데스크톱 hover 에서만 뜨고 터치에서는
-                                     아무 일도 일어나지 않는다 → 클릭 토글로 바꿨다. -->
-                                <button type="button" class="ap-help" :aria-expanded="showBuyableHelp"
-                                        aria-label="주문가능금액 설명"
-                                        @click="showBuyableHelp = !showBuyableHelp">?</button>
-                            </dt>
-                            <dd>{{ fmtWon(account?.user_balance) }}원</dd>
-                        </div>
-                        <div v-if="showBuyableHelp" class="ap-help-box">{{ buyableHelp }}</div>
-                    </dl>
+                    <span class="ah-label">총자산</span>
+                    <span class="ah-amount">{{ fmtWon(account?.total_asset) }}<span class="won">원</span></span>
+                    <span class="ah-pnl">평가손익
+                        <b :class="pnlClass(portfolioTotals.profitSum)">
+                            <template v-if="portfolioTotals.profitPct !== null">
+                                {{ portfolioTotals.profitSum > 0 ? '▲ ' : (portfolioTotals.profitSum < 0 ? '▼ ' : '') }}{{ fmtWon(Math.abs(portfolioTotals.profitSum)) }}원 ({{ fmtPct(portfolioTotals.profitPct) }})
+                            </template>
+                            <template v-else>0원 (0.00%)</template>
+                        </b>
+                    </span>
                 </template>
             </section>
 
-            <!-- 예수금 ≠ 주문가능금액 인 이유를 한 줄로. 차이가 없으면 띄우지 않는다.
-                 방향은 계좌마다 다르다 — 미체결·증거금으로 줄기도 하고,
-                 재사용가능금액·대용증권으로 예수금보다 늘기도 한다. -->
-            <p v-if="!loadingAccount && cashGap !== 0" class="cash-gap-note">
-                <template v-if="cashGap > 0">
-                    주문가능금액이 예수금보다 {{ fmtWon(cashGap) }}원 적습니다 — 종목별 증거금징수율과 미체결 주문에 묶인 금액입니다.
+            <!-- ── 금액 카드 2×2 ── -->
+            <section class="amount-grid" :class="{ skeleton: loadingAccount }">
+                <template v-if="!loadingAccount">
+                    <div class="amt-card">
+                        <span class="amt-label">예수금</span>
+                        <span class="amt-value">{{ fmtWon(account?.deposit) }}원</span>
+                    </div>
+                    <!-- 주문가능금액(=미수없는매수금액). 예수금과 다른 값이다 —
+                         증거금징수율이 반영되고, 미체결 주문에 묶인 금액이 빠져 있다. -->
+                    <div class="amt-card">
+                        <span class="amt-label">주문가능
+                            <!-- title 속성은 터치에서 안 뜬다 → 클릭 토글 -->
+                            <button type="button" class="amt-help" :aria-expanded="showBuyableHelp ? 'true' : 'false'"
+                                aria-label="주문가능금액 설명" @click="showBuyableHelp = !showBuyableHelp">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+                            </button>
+                        </span>
+                        <span class="amt-value">{{ fmtWon(account?.user_balance) }}원</span>
+                    </div>
+                    <div class="amt-card">
+                        <span class="amt-label">매입금액</span>
+                        <span class="amt-value">{{ fmtWon(portfolioTotals.costBasis) }}원</span>
+                    </div>
+                    <div class="amt-card">
+                        <span class="amt-label">평가금액</span>
+                        <span class="amt-value">{{ fmtWon(account?.stock_amount) }}원</span>
+                    </div>
                 </template>
-                <template v-else>
-                    주문가능금액이 예수금보다 {{ fmtWon(-cashGap) }}원 많습니다 — 재사용가능금액·대용증권이 반영된 금액입니다.
-                </template>
-            </p>
+            </section>
 
-            <!-- ── 탭 ── -->
-            <nav class="tab-nav">
-                <button v-for="t in tabs" :key="t.key" :class="['tab-btn', { active: activeTab === t.key }]"
+            <!-- 주문가능금액 설명: 예수금과 다른 이유. 방향은 계좌마다 다르다 — 미체결·증거금으로 줄기도 하고,
+                 재사용가능금액·대용증권으로 늘기도 한다. 차이가 없으면 일반 설명을 보여준다. -->
+            <div v-if="showBuyableHelp && !loadingAccount" class="tip-box">
+                <template v-if="cashGap > 0">주문가능금액이 예수금보다 <b>{{ fmtWon(cashGap) }}원</b> 적어요. 종목별 증거금징수율과 미체결 주문에 묶인 금액이에요.</template>
+                <template v-else-if="cashGap < 0">재사용가능금액·대용증권이 반영되어 예수금보다 <b>{{ fmtWon(-cashGap) }}원</b> 많아요.</template>
+                <template v-else>{{ buyableHelp }}</template>
+            </div>
+
+            <!-- ── 탭(세그먼트) ── -->
+            <nav class="segment" role="tablist">
+                <button v-for="t in tabs" :key="t.key" type="button" role="tab"
+                    :class="['seg-btn', { on: activeTab === t.key }]" :aria-selected="activeTab === t.key ? 'true' : 'false'"
                     @click="switchTab(t.key)">
-                    {{ t.label }}
+                    {{ t.label }}<em v-if="t.key === 'holdings' && !loadingPortfolio"> {{ holdings.length }}</em>
                 </button>
             </nav>
 
             <!-- ══ 탭1: 보유종목 (portfolio) ══ -->
             <div v-show="activeTab === 'holdings'">
-                <section class="table-section">
+                <section v-if="!loadingPortfolio && holdings.length === 0" class="empty-card">
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="#FFF6D2" stroke="#C9A866" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20.5 7.25v9.5L12 21.5 3.5 16.75v-9.5z"></path></svg>
+                    <span class="ec-title">아직 보유 종목이 없어요</span>
+                    <span class="ec-body">추천종목을 둘러보고 첫 매수를 시작해 보세요.</span>
+                    <button type="button" class="ec-cta" @click="router.push('/home')">오늘의 추천종목 보기</button>
+                </section>
+                <section v-if="loadingPortfolio || holdings.length > 0" class="table-section">
                     <div v-if="loadingPortfolio" class="loader-rows">
                         <div v-for="n in 5" :key="n" class="skeleton-row"></div>
                     </div>
@@ -151,7 +141,7 @@
                 </section>
 
                 <!-- 모바일 -->
-                <section class="mobile-list">
+                <section v-if="loadingPortfolio || holdings.length > 0" class="mobile-list">
                     <div v-if="loadingPortfolio" class="loader-rows">
                         <div v-for="n in 3" :key="n" class="skeleton-row"></div>
                     </div>
@@ -184,7 +174,13 @@
 
             <!-- ══ 탭2: worker 포지션 (positions HOLDING) ══ -->
             <div v-show="activeTab === 'positions'">
-                <section class="table-section">
+                <section v-if="!loadingPositions && positions.length === 0" class="empty-card">
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="#FFF6D2" stroke="#C9A866" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20.5 7.25v9.5L12 21.5 3.5 16.75v-9.5z"></path></svg>
+                    <span class="ec-title">진행 중인 자동매매 포지션이 없어요</span>
+                    <span class="ec-body">자동매매로 진입한 포지션이 여기에 표시돼요.</span>
+                    <button type="button" class="ec-cta" @click="router.push('/home')">오늘의 추천종목 보기</button>
+                </section>
+                <section v-if="loadingPositions || positions.length > 0" class="table-section">
                     <div v-if="loadingPositions" class="loader-rows">
                         <div v-for="n in 5" :key="n" class="skeleton-row"></div>
                     </div>
@@ -227,7 +223,7 @@
                 </section>
 
                 <!-- 모바일 -->
-                <section class="mobile-list">
+                <section v-if="loadingPositions || positions.length > 0" class="mobile-list">
                     <div v-if="loadingPositions" class="loader-rows">
                         <div v-for="n in 3" :key="n" class="skeleton-row"></div>
                     </div>
@@ -247,7 +243,7 @@
                 </section>
             </div>
 
-        </div>
+        </main>
     </div>
 </template>
 
@@ -255,14 +251,15 @@
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores';
 
-const title = ref('계좌 현황');
+const title = ref('내 자산');
+const router = useRouter();
 
 const userSession = assUserSession();
 const userId = computed(() => userSession.user?.loginInfo?.user_id);
 
 const tabs = [
-    { key: 'holdings', label: '보유종목' },
-    { key: 'positions', label: 'worker 포지션' },
+    { key: 'holdings', label: '보유 종목' },
+    { key: 'positions', label: '자동매매 포지션' },
 ];
 const activeTab = ref('holdings');
 const positionsLoaded = ref(false);
@@ -317,13 +314,21 @@ const switchTab = (key) => {
     if (key === 'positions' && !positionsLoaded.value) fetchPositions();
 };
 
+/* ── 갱신 시각 ── */
+const updatedAt = ref('');
+const stampUpdated = () => {
+    const d = new Date();
+    updatedAt.value = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
 const reloadAll = () => {
+    stampUpdated();
     fetchAccount();
     fetchPortfolio();
     if (activeTab.value === 'positions' || positionsLoaded.value) fetchPositions();
 };
 
 onMounted(() => {
+    stampUpdated();
     fetchAccount();
     fetchPortfolio();
 });
@@ -727,4 +732,191 @@ $green: #141414;
 .down { color: $blue; }
 
 @keyframes pulse { 0%, 100% { opacity: .5; } 50% { opacity: .9; } }
+
+/* ════════════════════════════════════════════════════════════════
+ * 양봉상회 내 자산 v2 (목업 기준 토큰). 아래 규칙이 위의 기본 규칙을 덮어쓴다.
+ *   헤더/탭바 #FFF6D2 · 카드 #FFF · 테두리 #EFE2BC · 갈색 #74462A · 노랑 #F6C445
+ *   상승 #C8282A / 하락 #1F5BD1 (색만으로 구분하지 않는다: ▲/▼ 기호 병기)
+ * ════════════════════════════════════════════════════════════════ */
+$yb-bg:    #FFFBEA;
+$yb-bar:   #FFF6D2;
+$yb-line:  #EFE2BC;
+$yb-hero:  #74462A;
+$yb-brown: #7A4423;
+$yb-ink:   #2B1D14;
+$yb-sub:   #6B5B4E;
+$yb-yellow:#F6C445;
+$yb-up:    #C8282A;
+$yb-down:  #1F5BD1;
+
+#my-wallet {
+    background: $yb-bg;
+    color: $yb-ink;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── 헤더 ── */
+.wallet-header {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);   // 상태바 영역은 App.vue 의 고정 덮개가 가린다
+    z-index: 50;
+    background: $yb-bar;
+    border-bottom: 1px solid $yb-line;
+    padding: 0 8px 0 16px;
+
+    .wh-row { display: flex; align-items: center; justify-content: space-between; min-height: 52px; }
+    h1 { margin: 0; font-size: 20px; font-weight: 700; color: #3A200F; }
+    .wh-right { display: flex; align-items: center; gap: 2px; }
+    .wh-time { font-size: 12px; color: #7A6B5D; }
+    .icon-btn {
+        width: 44px; height: 44px; border: 0; background: transparent; color: #5C3118;
+        display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+}
+
+.wallet-main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 16px 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* ── 총자산 히어로 ── */
+.asset-hero {
+    background: $yb-hero;
+    border-radius: 20px;
+    padding: 20px 18px;
+    color: #FFF8E1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-sizing: border-box;
+    min-height: 118px;
+
+    .ah-label { font-size: 13px; color: #E8D5B8; }
+    .ah-amount { font-size: 32px; font-weight: 700; letter-spacing: -.5px;
+        .won { font-size: 18px; font-weight: 500; margin-left: 2px; } }
+    .ah-pnl { font-size: 13px; color: #E8D5B8;
+        b { color: #FFF8E1; font-weight: 600; }
+        b.up   { color: #FFB8AC; }
+        b.down { color: #A9C4FF; } }
+    &.skeleton { animation: pulse 1.6s infinite ease-in-out; }
+}
+
+/* ── 금액 카드 2×2 ── */
+.amount-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    box-sizing: border-box;
+    min-height: 92px;
+    &.skeleton { animation: pulse 1.6s infinite ease-in-out; }
+
+    .amt-card {
+        background: #fff;
+        border: 1px solid $yb-line;
+        border-radius: 14px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .amt-label { display: flex; align-items: center; gap: 2px; font-size: 12px; color: $yb-sub; }
+    .amt-value { font-size: 17px; font-weight: 700; }
+    // 터치 영역 44px 를 확보하되 카드 높이는 늘리지 않는다(음수 마진)
+    .amt-help {
+        width: 28px; height: 28px; margin: -8px 0; border: 0; background: transparent; color: #7A6B5D;
+        display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+}
+
+.tip-box {
+    background: $yb-bar;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: #4A2814;
+}
+
+/* ── 탭(세그먼트) ── */
+.segment {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    background: #F3E8C6;
+    border-radius: 12px;
+    padding: 3px;
+    margin-top: 4px;
+
+    .seg-btn {
+        border: 0;
+        border-radius: 9px;
+        min-height: 40px;
+        font-size: 14px;
+        font-family: inherit;
+        font-weight: 500;
+        background: transparent;
+        color: $yb-sub;
+        cursor: pointer;
+        em { font-style: normal; margin-left: 4px; }
+
+        &.on {
+            background: #fff;
+            color: #3A200F;
+            font-weight: 700;
+            box-shadow: 0 1px 2px rgba(74, 40, 20, .18);
+        }
+    }
+}
+
+/* ── 빈 상태 ── */
+.empty-card {
+    background: #fff;
+    border: 1px solid $yb-line;
+    border-radius: 16px;
+    padding: 32px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+
+    .ec-title { font-size: 15px; font-weight: 600; }
+    .ec-body { font-size: 13px; color: $yb-sub; }
+    .ec-cta {
+        margin-top: 6px;
+        min-height: 44px;
+        padding: 0 18px;
+        border: 0;
+        border-radius: 12px;
+        background: $yb-yellow;
+        color: #3A200F;
+        font-size: 14px;
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+    }
+}
+
+/* ── 보유종목/포지션 표·목록: 브랜드 색 + 상승/하락 색 복원 ── */
+.table-section { background: #fff; border: 1px solid $yb-line; border-radius: 16px; overflow-x: auto; }
+.grid-table {
+    .up   { color: $yb-up; }
+    .down { color: $yb-down; }
+    .stop { color: $yb-up; }
+    thead th { color: $yb-sub; background: #FFFDF5; }
+}
+.m-li { border: 1px solid $yb-line; border-radius: 14px; }
+.m-subtotal { border-radius: 12px; }
+.up   { color: $yb-up; }
+.down { color: $yb-down; }
+
+// 데스크톱: 상단 내비(Lnb)가 있으니 헤더는 흐름에 둔다
+@media (min-width: 640px) {
+    .wallet-header { position: static; padding-left: 16px; }
+    .wallet-main { padding-top: 20px; }
+}
 </style>

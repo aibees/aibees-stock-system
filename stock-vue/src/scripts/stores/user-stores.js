@@ -67,6 +67,7 @@ export const assUserSession = defineStore('user', () => {
     const access = reactive({
         loaded: false,
         asGuest: true,  // 이 권한을 받을 때 토큰이 없었는가(게스트 권한인가)
+        roles: [],      // 사용자의 권한 ID(auth_id). 예) ['STOCK_USER', 'WORKER_USER']
         paths: [],      // 이동 허용 경로(부모 + 리프, 선행 '/' 포함)
         features: []    // AD_FREE 등
     });
@@ -74,6 +75,7 @@ export const assUserSession = defineStore('user', () => {
     const resetAccess = () => {
         access.loaded = false;
         access.asGuest = true;
+        access.roles = [];
         access.paths = [];
         access.features = [];
     };

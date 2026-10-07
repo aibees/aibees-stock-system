@@ -1,6 +1,6 @@
 <template>
     <div id="auto-trade-limit">
-        <Headers :prop_title="'매도 수기 등록'" />
+        <BrandHeader :title="'매도 수기 등록'" back="/trade" />
 
         <div class="contents">
             <section class="card">
@@ -179,18 +179,18 @@ const onCancelTier = async (tier) => {
 <style scoped lang="scss">
 // 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
 $white: #ffffff;
-$gray-50: #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-300: #c4c4c4;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-700: #3d3d3d;
-$gray-900: #141414;
-$blue: #141414;
-$navy: #141414;
-$red: #141414;
-$green: #141414;
+$gray-50: #FFFBEA;
+$gray-100: #F3EAD2;
+$gray-200: #EFE2BC;
+$gray-300: #E3D3A8;
+$gray-400: #9A8C7E;
+$gray-500: #6B5B4E;
+$gray-700: #4A3628;
+$gray-900: #2B1D14;
+$blue: #1F5BD1;
+$navy: #74462A;
+$red: #C8282A;
+$green: #1F7A3E;
 
 #auto-trade-limit {
     min-height: 100vh;
@@ -222,6 +222,7 @@ $green: #141414;
 }
 
 .card {
+    border-radius: 12px;
     background: $white;
     border: 1px solid $gray-200;
     padding: 10px 14px;
@@ -331,6 +332,7 @@ $green: #141414;
 }
 
 .tier-row {
+    border-radius: 12px;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -365,13 +367,14 @@ $green: #141414;
         color: $gray-900;
 
         &.armed {
+            border-radius: 12px;
             background: $gray-100;
             color: $gray-900;
             border: 1px solid $gray-300;
         }
 
         &.done {
-            background: $gray-900;
+            background: #74462A;
             color: $white;
         }
 
@@ -398,6 +401,7 @@ $green: #141414;
 }
 
 .btn-tier-cancel {
+    border-radius: 12px;
     margin-left: auto;
     flex: 0 0 auto;
     border: 1px solid $gray-300;
@@ -414,6 +418,7 @@ $green: #141414;
 }
 
 .tier-form {
+    border-radius: 12px;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
@@ -452,6 +457,7 @@ $green: #141414;
     }
 
     input {
+        border-radius: 12px;
         width: 100%;
         height: 36px;
         border: 1px solid $gray-200;
@@ -462,6 +468,7 @@ $green: #141414;
 }
 
 .toggle-btn {
+    border-radius: 12px;
     width: 44px;
     height: 24px;
     border: 1px solid $gray-300;
@@ -471,7 +478,7 @@ $green: #141414;
     background: $white;
 
     &.active {
-        background: $gray-900;
+        background: #74462A;
         border-color: $gray-900;
     }
 

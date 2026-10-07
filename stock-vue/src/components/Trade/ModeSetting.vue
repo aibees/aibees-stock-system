@@ -1,6 +1,6 @@
 <template>
     <div id="auto-trade-mode">
-        <Headers :prop_title="'자동매매'" />
+        <BrandHeader :title="'자동매매'" back="/trade" />
 
         <div class="contents">
 
@@ -298,15 +298,15 @@ const goManualSell = () => router.push({ path: '/auto-trade/limit-order' });
 <style scoped lang="scss">
 /* ── 무채색 팔레트 (/trade 대시보드와 동일) ── */
 $white:    #ffffff;
-$gray-50:  #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-300: #c4c4c4;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-700: #3d3d3d;
-$gray-900: #141414;
-$black:    #000000;
+$gray-50:  #FFFBEA;
+$gray-100: #F3EAD2;
+$gray-200: #EFE2BC;
+$gray-300: #E3D3A8;
+$gray-400: #9A8C7E;
+$gray-500: #6B5B4E;
+$gray-700: #4A3628;
+$gray-900: #2B1D14;
+$black:    #2B1D14;
 
 #auto-trade-mode {
     min-height: 100vh;
@@ -323,6 +323,7 @@ $black:    #000000;
 
 /* ── 상태 배너 ── */
 .state-banner {
+    border-radius: 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -352,6 +353,7 @@ $black:    #000000;
     }
 
     .state-badge {
+        border-radius: 12px;
         font-size: .72rem;
         font-weight: 700;
         padding: 4px 10px;
@@ -391,6 +393,7 @@ $black:    #000000;
 }
 
 .toggle-btn {
+    border-radius: 12px;
     width: 44px;
     height: 24px;
     border: 1px solid $gray-300;
@@ -400,7 +403,7 @@ $black:    #000000;
     transition: background .18s, border-color .18s;
 
     &.active {
-        background: $gray-900;
+        background: #74462A;
         border-color: $gray-900;
     }
 
@@ -426,6 +429,7 @@ $black:    #000000;
 
 /* ── 예약 배너 ── */
 .pending-banner {
+    border-radius: 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -452,6 +456,7 @@ $black:    #000000;
     }
 
     .btn-cancel {
+        border-radius: 12px;
         border: 1px solid $gray-300;
         background: $white;
         color: $gray-700;
@@ -461,11 +466,12 @@ $black:    #000000;
         cursor: pointer;
         white-space: nowrap;
 
-        &:hover { background: $gray-900; color: $white; border-color: $gray-900; }
+        &:hover { background: #74462A; color: $white; border-color: #74462A; }
     }
 }
 
 .lock-note {
+    border-radius: 12px;
     font-size: .8rem;
     color: $gray-500;
     background: $white;
@@ -476,6 +482,7 @@ $black:    #000000;
 
 /* ── 모드 카드 ── */
 .mode-cards {
+    border-radius: 12px;
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 1px;
@@ -516,6 +523,7 @@ $black:    #000000;
     }
 
     .radio {
+        border-radius: 12px;
         width: 14px;
         height: 14px;
         border: 1.5px solid $gray-300;
@@ -523,7 +531,7 @@ $black:    #000000;
 
         &.on {
             border-color: $gray-900;
-            background: $gray-900;
+            background: #74462A;
             box-shadow: inset 0 0 0 2px $white;
         }
     }
@@ -532,7 +540,7 @@ $black:    #000000;
         font-size: .66rem;
         font-weight: 700;
         color: $white;
-        background: $gray-900;
+        background: #74462A;
         padding: 3px 8px;
     }
 
@@ -546,6 +554,7 @@ $black:    #000000;
 
 /* ── 상세 설정 ── */
 .mode-config {
+    border-radius: 12px;
     background: $white;
     border: 1px solid $gray-200;
     padding: 18px;
@@ -568,6 +577,7 @@ $black:    #000000;
 
 /* ── 매도 수기 등록 안내 (모드 무관, mode-config 밖의 독립 섹션) ── */
 .config-link {
+    border-radius: 12px;
     background: $white;
     border: 1px solid $gray-200;
     padding: 16px 18px;
@@ -588,6 +598,7 @@ $black:    #000000;
     }
 
     .btn-link {
+        border-radius: 12px;
         border: 1px solid $gray-300;
         color: $gray-700;
         background: $white;
@@ -598,7 +609,7 @@ $black:    #000000;
         white-space: nowrap;
         flex: 0 0 auto;
 
-        &:hover { background: $gray-900; color: $white; border-color: $gray-900; }
+        &:hover { background: #74462A; color: $white; border-color: #74462A; }
     }
 }
 
@@ -634,6 +645,7 @@ $black:    #000000;
 
     input,
     select {
+        border-radius: 12px;
         height: 38px;
         border: 1px solid $gray-300;
         padding: 0 10px;
@@ -653,6 +665,7 @@ $black:    #000000;
     }
 
     .btn-pick {
+        border-radius: 12px;
         height: 38px;
         padding: 0 14px;
         border: 1px solid $gray-300;
@@ -663,7 +676,7 @@ $black:    #000000;
         cursor: pointer;
         white-space: nowrap;
 
-        &:hover { background: $gray-900; color: $white; border-color: $gray-900; }
+        &:hover { background: #74462A; color: $white; border-color: #74462A; }
 
         &:disabled {
             opacity: .45;
@@ -673,6 +686,7 @@ $black:    #000000;
 }
 
 .stepper {
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -681,6 +695,7 @@ $black:    #000000;
     padding: 0 6px;
 
     button {
+        border-radius: 12px;
         width: 28px;
         height: 26px;
         border: 1px solid $gray-300;
@@ -688,7 +703,7 @@ $black:    #000000;
         font-size: .95rem;
         cursor: pointer;
 
-        &:hover { background: $gray-900; color: $white; border-color: $gray-900; }
+        &:hover { background: #74462A; color: $white; border-color: #74462A; }
     }
 
     span {
@@ -713,16 +728,17 @@ $black:    #000000;
 }
 
 .btn-save {
+    border-radius: 12px;
     height: 42px;
     padding: 0 26px;
     border: 1px solid $gray-900;
-    background: $gray-900;
+    background: #74462A;
     color: $white;
     font-size: .88rem;
     font-weight: 700;
     cursor: pointer;
 
-    &:hover:not(:disabled) { background: $black; border-color: $black; }
+    &:hover:not(:disabled) { background: #74462A; border-color: #74462A; }
 
     &:disabled {
         opacity: .4;

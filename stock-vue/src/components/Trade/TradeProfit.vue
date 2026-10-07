@@ -1,13 +1,12 @@
 <template>
     <div id="trade-profit">
-        <Headers :prop_title="title" />
+        <BrandHeader :title="title" back="/trade" />
 
         <div class="contents">
 
             <!-- ── 상단 타이틀 ── -->
             <section class="head-desc">
                 <div class="head-left">
-                    <h2 style="text-align: left;">매매손익</h2>
                     <p class="sub-text">
                         매도로 <b>확정된 실현손익</b>입니다(수수료·제세금 차감 후).
                         보유 중인 종목의 평가손익은 <b>계좌 현황</b>에서 확인하세요.
@@ -387,18 +386,19 @@ const pnlClass = (v) => {
 <style scoped lang="scss">
 // 무채색 팔레트(MyWallet / trade 대시보드와 통일).
 $white: #ffffff;
-$gray-50: #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-300: #c4c4c4;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-700: #3d3d3d;
-$gray-900: #141414;
-$blue: #141414;
-$navy: #141414;
-$red: #141414;
-$green: #141414;
+$gray-50: #FFFBEA;
+$gray-100: #F3EAD2;
+$gray-200: #EFE2BC;
+$gray-300: #E3D3A8;
+$gray-400: #9A8C7E;
+$gray-500: #6B5B4E;
+$gray-700: #4A3628;
+$gray-900: #2B1D14;
+$blue: #1F5BD1;
+$accent: #7A4423;
+$navy: #74462A;
+$red: #C8282A;
+$green: #1F7A3E;
 
 #trade-profit {
     min-height: 100vh;
@@ -431,12 +431,13 @@ $green: #141414;
     padding: 8px 16px; background: $navy; color: $white; border: none;
     font-size: 0.84rem; font-weight: 600; cursor: pointer;
     font-family: inherit; transition: background .15s;
-    &:hover:not(:disabled) { background: #000000; }
+    &:hover:not(:disabled) { background: #74462A; }
     &:disabled { background: $gray-400; cursor: default; }
 }
 
 /* 조회 조건 */
 .card {
+    border-radius: 12px;
     background: $white; border: 1px solid $gray-200;
     padding: 16px; margin-bottom: 16px;
 }
@@ -449,6 +450,7 @@ $green: #141414;
     display: flex; flex-direction: column; gap: 6px;
     span { font-size: 0.74rem; font-weight: 700; color: $gray-500; letter-spacing: .03em; }
     input, select {
+        border-radius: 12px;
         padding: 7px 10px; border: 1px solid $gray-300; background: $white;
         font-size: 0.84rem; font-family: inherit; color: $gray-900;
         &:focus { outline: none; border-color: $gray-900; }
@@ -456,19 +458,20 @@ $green: #141414;
     input[type="text"] { width: 110px; }
 }
 .seg {
+    border-radius: 12px;
     display: inline-flex; border: 1px solid $gray-300;
     button {
         padding: 7px 12px; background: $white; border: none; cursor: pointer;
         font-size: 0.8rem; font-weight: 600; color: $gray-500; font-family: inherit;
         border-right: 1px solid $gray-200;
         &:last-child { border-right: none; }
-        &.on { background: $gray-900; color: $white; }
+        &.on { background: #74462A; color: $white; }
     }
 }
 .btn-run {
     padding: 8px 20px; background: $navy; color: $white; border: none;
     font-size: 0.84rem; font-weight: 700; cursor: pointer; font-family: inherit;
-    &:hover:not(:disabled) { background: #000000; }
+    &:hover:not(:disabled) { background: #74462A; }
     &:disabled { background: $gray-400; cursor: default; }
 }
 .run-opts {
@@ -482,6 +485,7 @@ $green: #141414;
 }
 .hint-text { font-size: 0.78rem; color: $gray-400; }
 .warn-note {
+    border-radius: 12px;
     background: $gray-100; border: 1px solid $gray-300;
     padding: 10px 14px; margin: 0 0 16px; font-size: 0.8rem; color: $gray-700;
 }
@@ -496,6 +500,7 @@ $green: #141414;
     @media (max-width: 860px) { grid-template-columns: 1fr 1fr; }
 }
 .s-card {
+    border-radius: 12px;
     background: $white; border: 1px solid $gray-200; padding: 16px;
     min-height: 92px;
     &.total { border-color: $gray-900; }
@@ -518,6 +523,7 @@ $green: #141414;
 
 /* Table */
 .table-section {
+    border-radius: 12px;
     background: $white; border: 1px solid $gray-200; overflow-x: auto;
     @media (max-width: 860px) { display: none; }
 }
@@ -542,7 +548,7 @@ $green: #141414;
     .down { color: $blue; font-weight: 600; }
 
     tfoot .total-row td {
-        background: $gray-50; font-weight: 700; color: $gray-900;
+        background: $gray-50; font-weight: 700; color: #74462A;
         border-top: 2px solid $gray-200;
     }
 }
@@ -551,14 +557,15 @@ $green: #141414;
 .stk-name { color: $gray-900; }
 
 .code-chip {
+    border-radius: 12px;
     font-size: 0.72rem; font-weight: 600; background: $gray-100; color: $gray-700;
     padding: 2px 7px; border: 1px solid $gray-200;
     font-family: 'SFMono-Regular', Consolas, monospace;
 }
 .action-badge {
     font-size: 0.7rem; font-weight: 700; padding: 2px 8px; white-space: nowrap;
-    &.sell { background: $gray-900; color: $white; border: 1px solid $gray-900; }
-    &.default { background: $gray-100; color: $gray-500; border: 1px solid $gray-200; }
+    &.sell { background: #74462A; color: $white; border: 1px solid #74462A; border-radius: 12px; }
+    &.default { background: $gray-100; color: $gray-500; border: 1px solid $gray-200; border-radius: 12px; }
 }
 
 /* skeleton */
@@ -572,6 +579,7 @@ $green: #141414;
 /* Mobile list */
 .mobile-list { display: none; @media (max-width: 860px) { display: block; } }
 .m-subtotal {
+    border-radius: 12px;
     display: flex; align-items: center; gap: 8px;
     background: $white; border: 1px solid $gray-200; padding: 10px 14px;
     margin-bottom: 10px; font-size: 0.82rem;
@@ -580,7 +588,7 @@ $green: #141414;
     .num { font-weight: 700; }
 }
 .m-ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.m-li { background: $white; border: 1px solid $gray-200; padding: 14px; }
+.m-li { background: $white; border: 1px solid $gray-200; padding: 14px; border-radius: 12px; }
 .li-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .li-name {
     display: flex; align-items: center; gap: 8px;
@@ -594,4 +602,7 @@ $green: #141414;
 .down { color: $blue; }
 
 @keyframes pulse { 0%, 100% { opacity: .5; } 50% { opacity: .9; } }
+
+/* 안쪽 제목을 걷어내고 버튼만 남았으므로 오른쪽 끝에 둔다(헤더에 이미 제목이 있다) */
+.head-desc .head-right { margin-left: auto; }
 </style>

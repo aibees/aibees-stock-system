@@ -73,11 +73,11 @@ const close = () => emit('close');
 
 <style scoped lang="scss">
 // 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-500: #737373;
-$gray-900: #141414;
-$blue: #141414;
+$gray-100: #F3EAD2;
+$gray-200: #EFE2BC;
+$gray-500: #6B5B4E;
+$gray-900: #2B1D14;
+$blue: #1F5BD1;
 
 .picker-overlay {
     position: fixed;
@@ -90,6 +90,7 @@ $blue: #141414;
 }
 
 .picker-panel {
+    border-radius: 12px;
     width: min(460px, 92vw);
     background: #fff;
     border: 1px solid $gray-200;
@@ -125,6 +126,7 @@ $blue: #141414;
     padding: 14px 16px;
 
     input {
+        border-radius: 12px;
         flex: 1;
         height: 36px;
         border: 1px solid $gray-200;
@@ -136,7 +138,7 @@ $blue: #141414;
         height: 36px;
         padding: 0 16px;
         border: 0;
-        background: $blue;
+        background: #74462A;
         color: #fff;
         font-size: .84rem;
         font-weight: 600;

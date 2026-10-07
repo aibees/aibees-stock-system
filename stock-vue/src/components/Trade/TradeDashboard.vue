@@ -1,98 +1,59 @@
 <template>
     <div id="trade-dashboard">
-        <Headers :prop_title="title" />
 
-        <div class="contents">
-            <!-- ── 하위 메뉴 바로가기 ── -->
-            <section class="menu-grid" v-if="tradeChildren.length">
-                <div
-                    v-for="c in tradeChildren" :key="c.menu_code"
-                    class="menu-tile"
-                    @click="goPath(childPath(c))"
-                >
-                    <span class="menu-label">{{ c.menu_title || c.menu_name }}</span>
-                    <span class="menu-arrow">&rarr;</span>
+        <!-- ════════ 헤더(v2): 트레이드 + 갱신 시각 + 새로고침. 모바일에서는 sticky(+세이프 에어리어) ════════ -->
+        <header class="dash-header" data-ad-anchor>
+            <div class="dh-row">
+                <h1>트레이드</h1>
+                <div class="dh-right">
+                    <span v-if="updatedAt" class="dh-time">{{ updatedAt }} 갱신</span>
+                    <button type="button" class="icon-btn" aria-label="새로고침" @click="reloadAll">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"></path><path d="M4 4v4h4"></path><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"></path><path d="M20 20v-4h-4"></path></svg>
+                    </button>
                 </div>
-            </section>
-            <section v-else class="menu-grid-empty">
-                <p>등록된 하위 메뉴가 없습니다.</p>
-            </section>
+            </div>
+        </header>
 
-            <!-- ── 요약 대시보드 ── -->
-            <section class="summary-grid">
+        <main class="dash-main">
 
-                <!-- 자산현황 -->
-                <article class="d-card">
-                    <header class="d-card-head">
-                        <h3>자산현황</h3>
-                        <button v-if="assetLink" class="d-link" @click="goPath(assetLink)">자세히</button>
-                    </header>
-
-                    <div v-if="loadingAccount" class="d-skel"></div>
-                    <div v-else-if="!account" class="d-empty">데이터를 불러올 수 없습니다.</div>
-                    <div v-else class="d-body">
-                        <div class="d-figure">
-                            <span class="d-num">{{ fmtWon(account.total_asset) }}</span>
-                            <span class="d-unit">원</span>
-                        </div>
-                        <dl class="d-rows">
-                            <!-- deposit=예수금(ord_psbl_cash) / user_balance=주문가능금액(nrcvb_buy_amt).
-                                 증거금징수율·미체결 주문 때문에 서로 다른 값이다. -->
-                            <div class="d-row"><dt>예수금</dt><dd>{{ fmtWon(account.deposit) }}원</dd></div>
-                            <div class="d-row"><dt>주문가능금액</dt><dd>{{ fmtWon(account.user_balance) }}원</dd></div>
-                            <div class="d-row"><dt>주식평가액</dt><dd>{{ fmtWon(account.stock_amount) }}원</dd></div>
+            <!-- ── 자산현황 히어로: 총자산 + 예수금/주문가능/평가액 ── -->
+            <section class="asset-hero" :class="{ skeleton: loadingAccount }" aria-label="자산현황">
+                <div class="ah-top">
+                    <span class="ah-label">총자산</span>
+                    <button v-if="assetLink" type="button" class="ah-link" @click="goPath(assetLink)">내 자산 ›</button>
+                </div>
+                <template v-if="!loadingAccount">
+                    <template v-if="account">
+                        <span class="ah-amount">{{ fmtWon(account.total_asset) }}<span class="won">원</span></span>
+                        <!-- deposit=예수금(ord_psbl_cash) / user_balance=주문가능금액(nrcvb_buy_amt).
+                             증거금징수율·미체결 주문 때문에 서로 다른 값이다. -->
+                        <dl class="ah-stats">
+                            <div><dt>예수금</dt><dd>{{ fmtWon(account.deposit) }}원</dd></div>
+                            <div><dt>주문가능</dt><dd>{{ fmtWon(account.user_balance) }}원</dd></div>
+                            <div><dt>주식평가</dt><dd>{{ fmtWon(account.stock_amount) }}원</dd></div>
                         </dl>
-                    </div>
-                </article>
+                    </template>
+                    <p v-else class="ah-empty">데이터를 불러올 수 없습니다.</p>
+                </template>
+            </section>
 
-                <!-- 보유종목 -->
+            <!-- ── 하위 메뉴 바로가기 ── -->
+            <section v-if="tradeChildren.length" class="quick-grid" aria-label="바로가기">
+                <button v-for="c in tradeChildren" :key="c.menu_code" type="button" class="quick-tile"
+                    @click="goPath(childPath(c))">
+                    <span class="qt-label">{{ c.menu_title || c.menu_name }}</span>
+                    <span class="qt-arrow" aria-hidden="true">›</span>
+                </button>
+            </section>
+            <p v-else class="quick-empty">등록된 하위 메뉴가 없습니다.</p>
+
+            <div class="card-grid">
+
+                <!-- 자동매매(Worker) 상태 -->
                 <article class="d-card">
                     <header class="d-card-head">
-                        <h3>보유종목</h3>
-                        <button v-if="assetLink" class="d-link" @click="goPath(assetLink)">자세히</button>
-                    </header>
-
-                    <div v-if="loadingPortfolio" class="d-skel"></div>
-                    <div v-else-if="!holdings.length" class="d-empty">보유 종목이 없습니다.</div>
-                    <div v-else class="d-body">
-                        <div class="d-figure">
-                            <span class="d-num">{{ holdings.length }}</span>
-                            <span class="d-unit">종목</span>
-                        </div>
-                        <ul class="d-list">
-                            <li v-for="h in holdings.slice(0, 3)" :key="h.stock_code">
-                                <span class="d-list-name">{{ h.stock_name }}</span>
-                                <span class="d-list-val">{{ fmtSigned(h.profit) }}</span>
-                            </li>
-                        </ul>
-                        <p v-if="holdings.length > 3" class="d-more">외 {{ holdings.length - 3 }}종목</p>
-                    </div>
-                </article>
-
-                <!-- 매수 / 매도 정책 요약 -->
-                <article class="d-card">
-                    <header class="d-card-head">
-                        <h3>매수 · 매도 정책</h3>
-                        <button v-if="buyLink" class="d-link" @click="goPath(buyLink)">자세히</button>
-                    </header>
-
-                    <div v-if="loadingOptions" class="d-skel"></div>
-                    <div v-else-if="!options" class="d-empty">데이터를 불러올 수 없습니다.</div>
-                    <dl v-else class="d-rows">
-                        <div class="d-row"><dt>손절</dt><dd>-{{ pct(options.s1_stop_loss_pct, 0.05) }}%</dd></div>
-                        <div class="d-row"><dt>익절</dt><dd>+{{ pct(options.s1_take_profit_pct, 0.30) }}%</dd></div>
-                        <div class="d-row"><dt>트레일링</dt><dd>{{ bool(options.s1_use_trailing, 1) ? '사용' : '미사용' }}</dd></div>
-                        <div class="d-row"><dt>보유 한도</dt><dd>{{ options.s1_max_hold_bars ?? 12 }}봉</dd></div>
-                        <div class="d-row"><dt>RSI 신뢰구간</dt><dd>{{ options.s1_rsi_ideal_low ?? 40 }} ~ {{ options.s1_rsi_ideal_high ?? 65 }}</dd></div>
-                        <div class="d-row"><dt>진입 필터</dt><dd>{{ enabledFilterCount }} / {{ FILTER_KEYS.length }} 사용</dd></div>
-                    </dl>
-                </article>
-
-                <!-- Worker mode -->
-                <article class="d-card">
-                    <header class="d-card-head">
-                        <h3>Worker Mode</h3>
-                        <button v-if="workerLink" class="d-link" @click="goPath(workerLink)">자세히</button>
+                        <h3>자동매매 상태</h3>
+                        <button v-if="workerLink" type="button" class="d-link" @click="goPath(workerLink)">자세히 ›</button>
                     </header>
 
                     <div v-if="loadingWorker" class="d-skel"></div>
@@ -111,8 +72,51 @@
                     </div>
                 </article>
 
-            </section>
-        </div>
+                <!-- 보유종목 -->
+                <article class="d-card">
+                    <header class="d-card-head">
+                        <h3>보유 종목</h3>
+                        <button v-if="assetLink" type="button" class="d-link" @click="goPath(assetLink)">자세히 ›</button>
+                    </header>
+
+                    <div v-if="loadingPortfolio" class="d-skel"></div>
+                    <div v-else-if="!holdings.length" class="d-empty">보유 종목이 없어요.</div>
+                    <div v-else class="d-body">
+                        <div class="d-figure">
+                            <span class="d-num">{{ holdings.length }}</span>
+                            <span class="d-unit">종목</span>
+                        </div>
+                        <ul class="d-list">
+                            <li v-for="h in holdings.slice(0, 3)" :key="h.stock_code">
+                                <span class="d-list-name">{{ h.stock_name }}</span>
+                                <span class="d-list-val" :class="pnlClass(h.profit)">{{ pnlMark(h.profit) }}{{ fmtSigned(h.profit) }}</span>
+                            </li>
+                        </ul>
+                        <p v-if="holdings.length > 3" class="d-more">외 {{ holdings.length - 3 }}종목</p>
+                    </div>
+                </article>
+
+                <!-- 매수 / 매도 정책 요약 -->
+                <article class="d-card wide">
+                    <header class="d-card-head">
+                        <h3>매수 · 매도 정책</h3>
+                        <button v-if="buyLink" type="button" class="d-link" @click="goPath(buyLink)">자세히 ›</button>
+                    </header>
+
+                    <div v-if="loadingOptions" class="d-skel"></div>
+                    <div v-else-if="!options" class="d-empty">데이터를 불러올 수 없습니다.</div>
+                    <dl v-else class="d-rows two-col">
+                        <div class="d-row"><dt>손절</dt><dd>-{{ pct(options.s1_stop_loss_pct, 0.05) }}%</dd></div>
+                        <div class="d-row"><dt>익절</dt><dd>+{{ pct(options.s1_take_profit_pct, 0.30) }}%</dd></div>
+                        <div class="d-row"><dt>트레일링</dt><dd>{{ bool(options.s1_use_trailing, 1) ? '사용' : '미사용' }}</dd></div>
+                        <div class="d-row"><dt>보유 한도</dt><dd>{{ options.s1_max_hold_bars ?? 12 }}봉</dd></div>
+                        <div class="d-row"><dt>RSI 신뢰구간</dt><dd>{{ options.s1_rsi_ideal_low ?? 40 }} ~ {{ options.s1_rsi_ideal_high ?? 65 }}</dd></div>
+                        <div class="d-row"><dt>진입 필터</dt><dd>{{ enabledFilterCount }} / {{ FILTER_KEYS.length }} 사용</dd></div>
+                    </dl>
+                </article>
+
+            </div>
+        </main>
     </div>
 </template>
 
@@ -123,7 +127,6 @@ import { fetchModes, fetchState, RUN_STATE_LABEL } from '@scripts/useAutoTrade.j
 
 const router = useRouter();
 const userSession = assUserSession();
-const title = '트레이딩 대시보드';
 
 const userId = computed(() => userSession.user?.loginInfo?.user_id);
 
@@ -259,8 +262,37 @@ const fmtSigned = (v) => {
     return n > 0 ? `+${s}` : s;
 };
 
+// 국내 관례: 이익=적색, 손실=청색. 색만으로 구분하지 않도록 ▲/▼ 도 붙인다.
+const pnlClass = (v) => {
+    const n = toNum(v);
+    if (n === null || n === 0) return '';
+    return n > 0 ? 'up' : 'down';
+};
+const pnlMark = (v) => {
+    const n = toNum(v);
+    if (n === null || n === 0) return '';
+    return n > 0 ? '▲ ' : '▼ ';
+};
+
+/* ── 갱신 ── */
+const updatedAt = ref('');
+const stampUpdated = () => {
+    const d = new Date();
+    updatedAt.value = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+const reloadAll = () => {
+    stampUpdated();
+    loadingAccount.value = loadingPortfolio.value = loadingOptions.value = loadingWorker.value = true;
+    fetchAccount();
+    fetchPortfolio();
+    fetchOptions();
+    fetchWorker();
+};
+
 onMounted(() => {
     allMenu.value = userSession.loadMenuList() ?? [];
+    stampUpdated();
     fetchAccount();
     fetchPortfolio();
     fetchOptions();
@@ -269,94 +301,138 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
-/* ── 무채색 팔레트 ── */
-$white:    #ffffff;
-$gray-50:  #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-300: #c4c4c4;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-700: #3d3d3d;
-$gray-900: #141414;
-$black:    #000000;
+/* ════════════════════════════════════════════════════════════════
+ * 양봉상회 트레이드 대시보드 (홈·내 자산과 같은 토큰)
+ *   헤더/탭바 #FFF6D2 · 카드 #FFF · 테두리 #EFE2BC · 갈색 #74462A · 노랑 #F6C445
+ *   상승 #C8282A / 하락 #1F5BD1
+ * ════════════════════════════════════════════════════════════════ */
+$bg:      #FFFBEA;
+$bar:     #FFF6D2;
+$line:    #EFE2BC;
+$hero:    #74462A;
+$brown:   #7A4423;
+$ink:     #2B1D14;
+$sub:     #6B5B4E;
+$sub-2:   #7A6B5D;
+$yellow:  #F6C445;
+$up:      #C8282A;
+$down:    #1F5BD1;
 
 #trade-dashboard {
     min-height: 100vh;
-    background: $white;
-    color: $gray-900;
+    background: $bg;
+    color: $ink;
+    text-align: left;
     font-family: 'Pretendard', -apple-system, sans-serif;
+    font-variant-numeric: tabular-nums;
 }
 
-.contents {
-    max-width: 1100px;
+/* ── 헤더 ── */
+.dash-header {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);   // 상태바 영역은 App.vue 의 고정 덮개가 가린다
+    z-index: 50;
+    background: $bar;
+    border-bottom: 1px solid $line;
+    padding: 0 8px 0 16px;
+
+    .dh-row { display: flex; align-items: center; justify-content: space-between; min-height: 52px; }
+    h1 { margin: 0; font-size: 20px; font-weight: 700; color: #3A200F; }
+    .dh-right { display: flex; align-items: center; gap: 2px; }
+    .dh-time { font-size: 12px; color: $sub-2; }
+    .icon-btn {
+        width: 44px; height: 44px; border: 0; background: transparent; color: #5C3118;
+        display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+}
+
+.dash-main {
+    max-width: 960px;
     margin: 0 auto;
-    padding: 24px 16px 100px;
+    padding: 16px 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
 }
 
-/* ── 하위 메뉴 그리드 ── */
-.menu-grid {
+/* ── 자산현황 히어로 ── */
+.asset-hero {
+    background: $hero;
+    border-radius: 20px;
+    padding: 18px;
+    color: #FFF8E1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-sizing: border-box;
+    min-height: 128px;
+
+    &.skeleton { animation: pulse 1.6s infinite ease-in-out; }
+
+    .ah-top { display: flex; align-items: center; justify-content: space-between; }
+    .ah-label { font-size: 13px; color: #E8D5B8; }
+    .ah-link {
+        border: 0; background: transparent; color: #F3DCA8; font-size: 13px;
+        min-height: 36px; padding: 0 2px; cursor: pointer; font-family: inherit;
+    }
+    .ah-amount {
+        font-size: 32px; font-weight: 700; letter-spacing: -.5px;
+        .won { font-size: 18px; font-weight: 500; margin-left: 2px; }
+    }
+    .ah-empty { margin: 0; font-size: 14px; color: #F5E6CC; }
+
+    .ah-stats {
+        margin: 8px 0 0;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 248, 225, .18);
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+
+        dt { font-size: 12px; color: #E8D5B8; margin: 0 0 2px; }
+        dd { margin: 0; font-size: 14px; font-weight: 700; color: #FFF8E1; word-break: keep-all; }
+    }
+}
+
+/* ── 하위 메뉴 바로가기 ── */
+.quick-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 1px;
-    background: $gray-200;
-    border: 1px solid $gray-200;
-    margin-bottom: 20px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
 }
-
-.menu-tile {
-    background: $white;
-    padding: 18px 16px;
+.quick-tile {
+    min-height: 52px;
+    padding: 0 14px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    background: #fff;
+    border: 1px solid $line;
+    border-radius: 14px;
     cursor: pointer;
-    transition: background .12s;
+    font-family: inherit;
+    color: $ink;
+    text-align: left;
 
-    .menu-label {
-        font-size: 0.88rem;
-        font-weight: 700;
-        color: $gray-900;
-    }
-
-    .menu-arrow {
-        color: $gray-400;
-        font-size: 0.9rem;
-        transition: transform .12s;
-    }
-
-    &:hover {
-        background: $gray-50;
-
-        .menu-arrow { transform: translateX(2px); color: $gray-900; }
-    }
-
-    &:active { background: $gray-100; }
+    .qt-label { font-size: 14px; font-weight: 600; }
+    .qt-arrow { font-size: 18px; color: #A0662F; }
+    &:active { background: #FFFDF5; }
 }
+.quick-empty { margin: 0; padding: 14px; text-align: center; font-size: 13px; color: $sub; background: #fff; border: 1px solid $line; border-radius: 14px; }
 
-.menu-grid-empty {
-    border: 1px solid $gray-200;
-    padding: 20px;
-    margin-bottom: 20px;
-    color: $gray-500;
-    font-size: 0.85rem;
-    text-align: center;
-}
-
-/* ── 요약 카드 그리드 ── */
-.summary-grid {
+/* ── 요약 카드 ── */
+.card-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1px;
-    background: $gray-200;
-    border: 1px solid $gray-200;
+    grid-template-columns: 1fr;
+    gap: 14px;
 }
 
 .d-card {
-    background: $white;
-    padding: 20px;
-    min-height: 168px;
+    background: #fff;
+    border: 1px solid $line;
+    border-radius: 16px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
 }
@@ -365,43 +441,25 @@ $black:    #000000;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
 
-    h3 {
-        font-size: 0.82rem;
-        font-weight: 700;
-        color: $gray-500;
-        letter-spacing: .03em;
-        margin: 0;
-        text-transform: uppercase;
-    }
+    h3 { font-size: 15px; font-weight: 700; margin: 0; color: $ink; }
 }
 
 .d-link {
-    border: 1px solid $gray-300;
-    background: $white;
-    color: $gray-700;
-    font-size: 0.72rem;
+    border: 0;
+    background: transparent;
+    color: $brown;
+    font-size: 13px;
     font-weight: 600;
-    padding: 4px 10px;
+    min-height: 36px;
+    padding: 0 2px;
     cursor: pointer;
     font-family: inherit;
-    transition: background .12s, border-color .12s;
-
-    &:hover { background: $gray-900; color: $white; border-color: $gray-900; }
 }
 
-.d-skel {
-    height: 90px;
-    background: $gray-100;
-    animation: pulse 1.6s infinite ease-in-out;
-}
-
-.d-empty {
-    color: $gray-400;
-    font-size: 0.82rem;
-    padding: 20px 0;
-}
+.d-skel { height: 90px; border-radius: 12px; background: #F6EFD6; animation: pulse 1.6s infinite ease-in-out; }
+.d-empty { color: $sub; font-size: 13px; padding: 16px 0; }
 
 .d-body { display: flex; flex-direction: column; gap: 10px; }
 
@@ -409,10 +467,8 @@ $black:    #000000;
     display: flex;
     align-items: baseline;
     gap: 4px;
-    margin-bottom: 2px;
-
-    .d-num { font-size: 1.7rem; font-weight: 800; color: $black; font-variant-numeric: tabular-nums; }
-    .d-unit { font-size: 0.8rem; color: $gray-500; font-weight: 600; }
+    .d-num { font-size: 26px; font-weight: 700; }
+    .d-unit { font-size: 13px; color: $sub; font-weight: 600; }
 }
 
 .d-rows {
@@ -420,19 +476,17 @@ $black:    #000000;
     display: flex;
     flex-direction: column;
 }
-
 .d-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 7px 0;
-    border-top: 1px solid $gray-100;
-    font-size: 0.82rem;
+    min-height: 40px;
+    border-top: 1px solid #F3EAD2;
+    font-size: 14px;
 
     &:first-child { border-top: none; }
-
-    dt { color: $gray-500; margin: 0; }
-    dd { margin: 0; color: $gray-900; font-weight: 700; font-variant-numeric: tabular-nums; }
+    dt { color: $sub; margin: 0; }
+    dd { margin: 0; font-weight: 700; }
 }
 
 .d-list {
@@ -445,48 +499,41 @@ $black:    #000000;
     li {
         display: flex;
         justify-content: space-between;
-        padding: 6px 0;
-        border-top: 1px solid $gray-100;
-        font-size: 0.82rem;
-
+        align-items: center;
+        min-height: 40px;
+        border-top: 1px solid #F3EAD2;
+        font-size: 14px;
         &:first-child { border-top: none; }
     }
-
-    .d-list-name { color: $gray-900; font-weight: 600; }
-    .d-list-val  { color: $gray-700; font-variant-numeric: tabular-nums; }
+    .d-list-name { font-weight: 600; }
+    .d-list-val { font-weight: 700; &.up { color: $up; } &.down { color: $down; } }
 }
+.d-more { margin: 2px 0 0; font-size: 12px; color: $sub-2; }
 
-.d-more { margin: 4px 0 0; font-size: 0.76rem; color: $gray-400; }
-
+// 운용 상태: 점 + 글자(색만으로 구분하지 않는다)
 .d-status {
+    align-self: flex-start;
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    font-size: 0.86rem;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: #F1ECE2;
+    color: $sub;
+    font-size: 13px;
     font-weight: 700;
-    color: $gray-400;
-    margin-bottom: 10px;
 
-    .d-dot {
-        width: 9px;
-        height: 9px;
-        background: $white;
-        border: 1.5px solid $gray-400;
-    }
-
-    &.on {
-        color: $gray-900;
-
-        .d-dot { background: $gray-900; border-color: $gray-900; }
-    }
+    .d-dot { width: 8px; height: 8px; border-radius: 4px; background: #9A8F84; }
+    &.on { background: $bar; color: #5C3118; border: 1px solid #EAD9A6; padding: 4px 11px;
+        .d-dot { background: #2E9E5B; } }
 }
 
 .d-msg {
-    margin: 10px 0 0;
+    margin: 4px 0 0;
     padding-top: 10px;
-    border-top: 1px solid $gray-100;
-    font-size: 0.76rem;
-    color: $gray-500;
+    border-top: 1px solid #F3EAD2;
+    font-size: 12px;
+    color: $sub;
     line-height: 1.5;
 }
 
@@ -496,13 +543,17 @@ $black:    #000000;
 }
 
 /* ── 반응형 ── */
-@media (max-width: 768px) {
-    .contents { padding: 16px 12px 80px; }
-    .d-card { padding: 16px; min-height: unset; }
+@media (min-width: 768px) {
+    .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .d-card.wide { grid-column: 1 / -1; }
+    .d-rows.two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
+    .d-rows.two-col .d-row:nth-child(2) { border-top: none; }
+    .quick-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
-@media (max-width: 560px) {
-    .summary-grid { grid-template-columns: 1fr; }
-    .menu-grid { grid-template-columns: repeat(2, 1fr); }
+// 데스크톱: 상단 내비(Lnb)가 있으니 헤더는 흐름에 둔다
+@media (min-width: 640px) {
+    .dash-header { position: static; }
+    .dash-main { padding-top: 20px; }
 }
 </style>

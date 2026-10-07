@@ -31,15 +31,16 @@
         </div>
     </nav>
 
-    <!-- ── Mobile: 하단 탭 바 (홈 / 종목 / 차트 / 매매 기록) ──
+    <!-- ── Mobile: 하단 탭 바 (홈 / 종목 / 차트 / [트레이드] / 메뉴) ──
          권한이 없는 탭은 그리지 않는다(access.paths — 서버가 내려준 접근 가능 경로). -->
     <nav id="comm-lnb" aria-label="주요 메뉴">
         <a v-for="t in visibleTabs" :key="t.key" class="tab" :class="{ active: isTabActive(t) }"
             :href="t.path" :aria-current="isTabActive(t) ? 'page' : undefined" @click.prevent="goPath(t.path)">
-            <svg v-if="t.key === 'home'" width="24" height="24" viewBox="0 0 24 24" :fill="isTabActive(t) ? '#FFC20E' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>
+            <svg v-if="t.key === 'home'" width="24" height="24" viewBox="0 0 24 24" :fill="isTabActive(t) ? '#F6C445' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>
             <svg v-else-if="t.key === 'stocks'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>
             <svg v-else-if="t.key === 'chart'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-5 4 3 8-8"></path><path d="M15 7h5v5"></path></svg>
-            <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M9 8h6M9 12h6M9 16h3" stroke-linecap="round"></path></svg>
+            <svg v-else-if="t.key === 'menu'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            <svg v-else-if="t.key === 'trade'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4"></path></svg>
             <span class="tab-label">{{ t.label }}</span>
         </a>
     </nav>
@@ -49,6 +50,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { assUserSession } from "../../scripts/stores/user-stores";
+import { hasRole, WORKER_ROLE } from "../../scripts/useAccess.js";
 
 const router = useRouter();
 const route = useRoute();
@@ -59,12 +61,26 @@ const TABS = [
     { key: 'home',   label: '홈',      path: '/home',              match: ['/home'] },
     { key: 'stocks', label: '종목',    path: '/stock/buy-target',  match: ['/stock/buy-target', '/stock/info'] },
     { key: 'chart',  label: '차트',    path: '/stock/chart',       match: ['/stock/chart'] },
-    { key: 'log',    label: '매매 기록', path: '/trade/trade-log',   match: ['/trade/trade-log'] },
+    // 트레이드(매매 대시보드): WORKER_USER(매매 사용자) 전용 — 권한이 없으면 탭 자체를 그리지 않는다.
+    { key: 'trade',  label: '트레이드', path: '/trade',             match: ['/trade'], role: WORKER_ROLE },
+    // 전체 메뉴: 항상 맨 오른쪽에 둔다(권한과 무관 — 공개 메뉴라 비로그인도 열린다).
+    { key: 'menu',   label: '메뉴',    path: '/menu',              match: ['/menu'], always: true },
 ];
-// 홈은 항상, 나머지는 서버가 이 사용자에게 허용한 경로(access.paths)에 있을 때만 보인다.
+// 홈/메뉴는 항상, 트레이드는 WORKER_USER 만, 나머지는 서버가 이 사용자에게 허용한 경로(access.paths)에 있을 때만 보인다.
+// (매매 기록은 하단 탭에 두지 않는다 — 화면 자체는 메뉴/트레이드 화면에서 들어간다.)
+// role 이 지정된 탭은 그 권한이 있어야 보인다(경로 접근은 서버 권한 매핑과 가드가 따로 막는다).
 const visibleTabs = computed(() =>
-    TABS.filter(t => t.key === 'home' || userSession.access.paths.includes(t.path)));
-const isTabActive = (t) => t.match.some(p => route.path === p || route.path.startsWith(p + '/'));
+    TABS.filter(t => {
+        if (t.always) return true;
+        if (t.role) return hasRole(t.role);
+        return t.key === 'home' || userSession.access.paths.includes(t.path);
+    }));
+// 더 구체적인 경로의 탭이 있으면 그쪽이 활성이 되도록(접두사가 겹치는 탭이 같이 켜지지 않게) 한다.
+const isTabActive = (t) => {
+    const hit = (tab) => tab.match.some(p => route.path === p || route.path.startsWith(p + '/'));
+    if (!hit(t)) return false;
+    return !TABS.some(o => o !== t && o.path.startsWith(t.path + '/') && hit(o));
+};
 
 const isUser = ref(false);
 const userName = ref('');
@@ -297,8 +313,8 @@ onMounted(() => {
      * 아이콘/라벨은 항상 --lnb-height 안에 있게 한다(App.vue 의 --lnb-total 과 같은 출처). */
     height: var(--lnb-total);
     box-sizing: border-box;
-    background-color: #FFF4C2;
-    border-top: 1px solid #EAD9A6;
+    background-color: #FFF6D2;
+    border-top: 1px solid #EFE2BC;
     padding: 6px 4px env(safe-area-inset-bottom, 0px);
     display: grid;
     grid-auto-flow: column;
@@ -317,7 +333,7 @@ onMounted(() => {
         justify-content: center;
         gap: 3px;
         min-height: 48px;
-        color: #6B5B4E;          // 비활성도 대비 4.5:1 이상 유지
+        color: #7A6B5D;          // 비활성도 대비 4.5:1 이상 유지
         font-size: 11px;
         text-decoration: none;
         -webkit-tap-highlight-color: transparent;
