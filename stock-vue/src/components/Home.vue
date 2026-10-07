@@ -983,7 +983,7 @@ $down:     #1F5BD1;
 }
 
 .reco-detail {
-    padding: 4px 14px 16px 50px;
+    padding: 4px 16px 16px;
     display: flex;
     flex-direction: column;
     gap: 12px;

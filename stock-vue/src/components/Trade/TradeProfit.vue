@@ -26,43 +26,26 @@
                 </div>
             </section>
 
-            <!-- ── 조회 조건 ── -->
-            <section class="card">
-                <div class="run-form">
-                    <div class="rf-field">
-                        <span>기간</span>
-                        <div class="seg">
-                            <button v-for="p in presets" :key="p.days" type="button"
-                                :class="{ on: activePreset === p.days }" @click="applyPreset(p.days)">
-                                {{ p.label }}
-                            </button>
-                        </div>
-                    </div>
-                    <label class="rf-field">
+            <!-- ── 조회 조건: 1줄 기간 / 2줄 시작일·종료일·조회 ── -->
+            <section class="card query-card">
+                <div class="seg full" role="group" aria-label="기간">
+                    <button v-for="p in presets" :key="p.days" type="button"
+                        :class="{ on: activePreset === p.days }" @click="applyPreset(p.days)">
+                        {{ p.label }}
+                    </button>
+                </div>
+                <div class="date-row">
+                    <label class="df">
                         <span>시작일</span>
                         <input type="date" v-model="form.start" :max="form.end" />
                     </label>
-                    <label class="rf-field">
+                    <label class="df">
                         <span>종료일</span>
                         <input type="date" v-model="form.end" :min="form.start" :max="todayStr" />
-                    </label>
-                    <label class="rf-field">
-                        <span>종목코드</span>
-                        <input type="text" v-model.trim="form.stockCode" placeholder="전체" maxlength="6"
-                            inputmode="numeric" />
                     </label>
                     <button class="btn-run" :disabled="loading" @click="fetchData">
                         {{ loading ? '조회 중…' : '조회' }}
                     </button>
-                </div>
-                <div class="run-opts">
-                    <label class="chk">
-                        <input type="checkbox" v-model="sellOnly" />
-                        <span>매도 발생분만 보기</span>
-                    </label>
-                    <span class="hint-text">
-                        매수만 있었던 날도 매수 수수료만큼 손익에 잡혀 조회됩니다.
-                    </span>
                 </div>
             </section>
 
@@ -70,46 +53,7 @@
             <section v-if="errorMsg" class="card empty-card"><p>{{ errorMsg }}</p></section>
             <p v-if="truncated" class="warn-note">
                 조회 결과가 많아 일부만 표시했습니다. 기간을 좁혀서 다시 조회해 주세요.
-                (아래 합계는 KIS 가 내려준 전체 기간 합계입니다)
             </p>
-
-            <!-- ── 요약 카드 ── -->
-            <section class="summary-cards">
-                <div class="s-card total" :class="{ skeleton: loading }">
-                    <template v-if="!loading">
-                        <div class="s-label">총 실현손익</div>
-                        <div class="s-amount" :class="pnlClass(summary?.total_realized_profit)">
-                            {{ fmtSigned(summary?.total_realized_profit) }}<span class="won">원</span>
-                        </div>
-                        <div class="s-sub" :class="pnlClass(summary?.total_profit_rate)">
-                            {{ fmtPct(summary?.total_profit_rate) }}
-                        </div>
-                    </template>
-                </div>
-                <div class="s-card" :class="{ skeleton: loading }">
-                    <template v-if="!loading">
-                        <div class="s-label">매도금액</div>
-                        <div class="s-amount sub">{{ fmtWon(summary?.sell_amount) }}<span class="won">원</span></div>
-                        <div class="s-sub">{{ fmtQty(summary?.sell_qty) }}주</div>
-                    </template>
-                </div>
-                <div class="s-card" :class="{ skeleton: loading }">
-                    <template v-if="!loading">
-                        <div class="s-label">매수금액</div>
-                        <div class="s-amount sub">{{ fmtWon(summary?.buy_amount) }}<span class="won">원</span></div>
-                        <div class="s-sub">{{ fmtQty(summary?.buy_qty) }}주</div>
-                    </template>
-                </div>
-                <div class="s-card" :class="{ skeleton: loading }">
-                    <template v-if="!loading">
-                        <div class="s-label">수수료 + 제세금</div>
-                        <div class="s-amount sub">{{ fmtWon(costTotal) }}<span class="won">원</span></div>
-                        <div class="s-sub">
-                            수수료 {{ fmtWon(summary?.total_fee) }} · 제세금 {{ fmtWon(summary?.total_tax) }}
-                        </div>
-                    </template>
-                </div>
-            </section>
 
             <!-- ── 표 (데스크톱) ── -->
             <section class="table-section">
@@ -121,7 +65,6 @@
                         <tr>
                             <th class="tl">매매일자</th>
                             <th class="tl">종목</th>
-                            <th class="tc">구분</th>
                             <th class="tr">매도수량</th>
                             <th class="tr">매입단가</th>
                             <th class="tr">매도단가</th>
@@ -137,39 +80,42 @@
                             <td class="tl num">{{ row.trade_date }}</td>
                             <td class="tl">
                                 <div class="stk">
-                                    <span class="code-chip">{{ row.stock_code }}</span>
+                                    <span :class="['action-badge', sideClass(row)]">{{ sideLabel(row) }}</span>
                                     <span class="stk-name">{{ row.stock_name }}</span>
+                                    <span class="stk-code">{{ row.stock_code }}</span>
                                 </div>
-                            </td>
-                            <td class="tc">
-                                <span :class="['action-badge', row.sell_qty > 0 ? 'sell' : 'default']">
-                                    {{ row.sell_qty > 0 ? '매도' : '매수만' }}
-                                </span>
                             </td>
                             <td class="tr num">{{ fmtQty(row.sell_qty) }}</td>
                             <td class="tr num">{{ fmtWon(row.buy_price) }}</td>
                             <td class="tr num">{{ fmtWon(row.sell_price) }}</td>
                             <td class="tr num">{{ fmtWon(row.sell_amount) }}</td>
-                            <td class="tr num" :class="pnlClass(row.realized_profit)">
+                            <td class="tr num pnl" :class="pnlClass(row.realized_profit)">
                                 {{ fmtSigned(row.realized_profit) }}
                             </td>
-                            <td class="tr num" :class="pnlClass(row.profit_rate)">{{ fmtPct(row.profit_rate) }}</td>
+                            <td class="tr num pnl" :class="pnlClass(row.profit_rate)">{{ fmtPct(row.profit_rate) }}</td>
                             <td class="tr num">{{ fmtWon(row.fee) }}</td>
                             <td class="tr num">{{ fmtWon(row.tax) }}</td>
                         </tr>
                         <tr v-if="visibleRows.length === 0">
-                            <td colspan="11" class="empty-cell">{{ emptyText }}</td>
+                            <td colspan="10" class="empty-cell">{{ emptyText }}</td>
                         </tr>
                     </tbody>
                     <tfoot v-if="visibleRows.length > 0">
-                        <!-- 화면에 보이는 행만의 소계. 전체 기간 합계는 위 요약 카드(KIS output2)다 —
-                             '매도분만' 필터를 켜면 둘이 달라지므로 라벨로 구분해 둔다. -->
+                        <!-- 화면에 보이는 행의 소계: 이익 / 손실 / 총계 -->
+                        <tr class="sub-row">
+                            <td class="tl" colspan="6">이익 소계 <em class="cnt">{{ pnlSplit.gainCount }}건</em></td>
+                            <td class="tr num pnl up">{{ fmtSigned(pnlSplit.gain) }}</td>
+                            <td class="tr num" colspan="3"></td>
+                        </tr>
+                        <tr class="sub-row">
+                            <td class="tl" colspan="6">손실 소계 <em class="cnt">{{ pnlSplit.lossCount }}건</em></td>
+                            <td class="tr num pnl down">{{ fmtSigned(pnlSplit.loss) }}</td>
+                            <td class="tr num" colspan="3"></td>
+                        </tr>
                         <tr class="total-row">
-                            <td class="tl" colspan="6">{{ sellOnly ? '매도분 소계' : '조회분 소계' }}</td>
+                            <td class="tl" colspan="5">총계 <em class="cnt">{{ visibleRows.length }}건</em></td>
                             <td class="tr num">{{ fmtWon(pageTotals.sellAmount) }}</td>
-                            <td class="tr num" :class="pnlClass(pageTotals.profit)">
-                                {{ fmtSigned(pageTotals.profit) }}
-                            </td>
+                            <td class="tr num pnl" :class="pnlClass(pnlSplit.total)">{{ fmtSigned(pnlSplit.total) }}</td>
                             <td class="tr num"></td>
                             <td class="tr num">{{ fmtWon(pageTotals.fee) }}</td>
                             <td class="tr num">{{ fmtWon(pageTotals.tax) }}</td>
@@ -184,25 +130,32 @@
                     <div v-for="n in 3" :key="n" class="skeleton-row"></div>
                 </div>
                 <template v-else>
-                    <div v-if="visibleRows.length > 0" class="m-subtotal">
-                        <span class="m-subtotal-label">{{ sellOnly ? '매도분 소계' : '조회분 소계' }}</span>
-                        <span class="m-subtotal-amt">{{ visibleRows.length }}건</span>
-                        <span class="num" :class="pnlClass(pageTotals.profit)">{{ fmtSigned(pageTotals.profit) }}</span>
+                    <div v-if="visibleRows.length > 0" class="m-summary">
+                        <div class="ms-row">
+                            <span class="ms-label">이익 소계 <em class="cnt">{{ pnlSplit.gainCount }}건</em></span>
+                            <span class="num pnl up">{{ fmtSigned(pnlSplit.gain) }}</span>
+                        </div>
+                        <div class="ms-row">
+                            <span class="ms-label">손실 소계 <em class="cnt">{{ pnlSplit.lossCount }}건</em></span>
+                            <span class="num pnl down">{{ fmtSigned(pnlSplit.loss) }}</span>
+                        </div>
+                        <div class="ms-row total">
+                            <span class="ms-label">총계 <em class="cnt">{{ visibleRows.length }}건</em></span>
+                            <span class="num pnl" :class="pnlClass(pnlSplit.total)">{{ fmtSigned(pnlSplit.total) }}</span>
+                        </div>
                     </div>
                     <ul class="m-ul">
                         <li v-for="(row, i) in visibleRows" :key="`m-${row.trade_date}-${row.stock_code}-${i}`"
                             class="m-li">
                             <div class="li-top">
-                                <span class="code-chip">{{ row.stock_code }}</span>
-                                <span class="num" :class="pnlClass(row.realized_profit)">
+                                <span :class="['action-badge', sideClass(row)]">{{ sideLabel(row) }}</span>
+                                <span class="num pnl" :class="pnlClass(row.realized_profit)">
                                     {{ fmtSigned(row.realized_profit) }} ({{ fmtPct(row.profit_rate) }})
                                 </span>
                             </div>
                             <div class="li-name">
                                 {{ row.stock_name }}
-                                <span :class="['action-badge', row.sell_qty > 0 ? 'sell' : 'default']">
-                                    {{ row.sell_qty > 0 ? '매도' : '매수만' }}
-                                </span>
+                                <span class="stk-code">{{ row.stock_code }}</span>
                             </div>
                             <div class="li-row"><span class="li-label">매매일자</span><span>{{ row.trade_date }}</span></div>
                             <div class="li-row"><span class="li-label">매도수량</span><span>{{ fmtQty(row.sell_qty) }}</span></div>
@@ -261,8 +214,7 @@ const presets = [
     { days: 90, label: '3개월' },
 ];
 
-const form = reactive({ start: daysAgoStr(30), end: todayStr, stockCode: '' });
-const sellOnly = ref(false);
+const form = reactive({ start: daysAgoStr(30), end: todayStr });
 
 // 프리셋 버튼 활성 표시 — 날짜를 직접 고치면 어떤 프리셋과도 안 맞으므로 null.
 const activePreset = computed(() => {
@@ -279,7 +231,6 @@ const applyPreset = (days) => {
 
 /* ── 상태 ── */
 const rows = ref([]);
-const summary = ref(null);
 const truncated = ref(false);
 const loading = ref(true);
 const errorMsg = ref('');
@@ -293,7 +244,6 @@ const fetchData = async () => {
     }
     loading.value = true;
     errorMsg.value = '';
-    console.log("TradeProfit fetchData");
     try {
         const { data } = await aibeesApi.get('/api/v1/profit/trade-profit', {
             // user_id 는 보내지 않는다 — 서버가 JWT(g.current_user_id)로 대상 유저를
@@ -301,12 +251,9 @@ const fetchData = async () => {
             params: {
                 start: form.start,
                 end: form.end,
-                stock_code: form.stockCode || undefined,
             },
         });
-        console.log(data);
         rows.value = data?.data?.rows ?? [];
-        summary.value = data?.data?.summary ?? null;
         truncated.value = !!data?.data?.truncated;
         loaded.value = true;
     } catch (e) {
@@ -317,7 +264,6 @@ const fetchData = async () => {
             || e?.response?.data?.message
             || '매매손익 조회에 실패했습니다.';
         rows.value = [];
-        summary.value = null;
         truncated.value = false;
     } finally {
         loading.value = false;
@@ -327,17 +273,28 @@ const fetchData = async () => {
 onMounted(fetchData);
 
 /* ── 표시용 가공 ── */
-const visibleRows = computed(() =>
-    sellOnly.value ? rows.value.filter(r => Number(r.sell_qty) > 0) : rows.value);
+const visibleRows = computed(() => rows.value);
 
 const emptyText = computed(() => {
     if (errorMsg.value) return '조회에 실패했습니다.';
     if (!loaded.value) return '조회 조건을 선택해 주세요.';
-    if (sellOnly.value && rows.value.length > 0) return '해당 기간에 매도 발생분이 없습니다.';
     return '해당 기간에 매매 내역이 없습니다.';
 });
 
-// 화면에 보이는 행의 소계(요약 카드의 전체 합계와는 별개 — tfoot 주석 참고).
+// 화면에 보이는 행의 이익/손실 분리 소계. 총계 = 이익 + 손실(= 순 실현손익).
+// 손익이 0 이거나 없는 행은 어느 쪽에도 넣지 않는다(건수 합이 전체 건수보다 작을 수 있다).
+const pnlSplit = computed(() => {
+    let gain = 0, loss = 0, gainCount = 0, lossCount = 0;
+    for (const r of visibleRows.value) {
+        const v = toNum(r.realized_profit);
+        if (v === null || Number.isNaN(v) || v === 0) continue;
+        if (v > 0) { gain += v; gainCount += 1; }
+        else { loss += v; lossCount += 1; }
+    }
+    return { gain, loss, gainCount, lossCount, total: gain + loss };
+});
+
+// 화면에 보이는 행의 합계(매도금액·수수료·제세금).
 const pageTotals = computed(() => {
     let sellAmount = 0, profit = 0, fee = 0, tax = 0;
     for (const r of visibleRows.value) {
@@ -348,9 +305,6 @@ const pageTotals = computed(() => {
     }
     return { sellAmount, profit, fee, tax };
 });
-
-const costTotal = computed(() =>
-    (toNum(summary.value?.total_fee) ?? 0) + (toNum(summary.value?.total_tax) ?? 0));
 
 /* ── 헬퍼 (MyWallet.vue 와 동일 규칙) ── */
 const toNum = (v) => (v === null || v === undefined || v === '') ? null : Number(v);
@@ -375,7 +329,11 @@ const fmtPct = (v) => {
     const s = n.toFixed(2);
     return n > 0 ? `+${s}%` : `${s}%`;
 };
-// 국내 관례: 이익=적색, 손실=청색 (팔레트가 무채색이라 굵기로 구분된다)
+// 매수/매도 구분(뱃지). 매도 수량이 있으면 매도, 아니면 매수만 있었던 날이다.
+const sideLabel = (row) => (Number(row.sell_qty) > 0 ? '매도' : '매수');
+const sideClass = (row) => (Number(row.sell_qty) > 0 ? 'sell' : 'buy');
+
+// 국내 관례: 이익=적색, 손실=청색
 const pnlClass = (v) => {
     const n = toNum(v);
     if (n === null || n === 0) return '';
@@ -421,7 +379,7 @@ $green: #1F7A3E;
     margin-bottom: 20px;
 
     h2 { font-size: 1.4rem; font-weight: 700; margin: 0; }
-    .sub-text { font-size: 0.82rem; color: $gray-500; margin: 6px 0 0; line-height: 1.5; }
+    .sub-text { font-size: 0.82rem; color: $gray-500; margin: 6px 0 0; line-height: 1.5; text-align: left; }
 
     @media (max-width: 600px) { flex-direction: column; align-items: flex-start; gap: 12px; }
 }
@@ -443,23 +401,49 @@ $green: #1F7A3E;
 }
 .empty-card p { margin: 0; color: $gray-500; font-size: 0.86rem; }
 
-.run-form {
-    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;
+.query-card { display: flex; flex-direction: column; gap: 12px; }
+// 데스크톱에서는 조회 영역이 화면 전체로 늘어나지 않게 폭을 제한한다
+@media (min-width: 640px) { .query-card { max-width: 520px; } }
+.seg.full {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; box-sizing: border-box;
+    button { padding: 10px 0; }
 }
-.rf-field {
-    display: flex; flex-direction: column; gap: 6px;
+.date-row { display: flex; align-items: flex-end; gap: 6px; }
+.df {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px;
     span { font-size: 0.74rem; font-weight: 700; color: $gray-500; letter-spacing: .03em; }
-    input, select {
-        border-radius: 12px;
-        padding: 7px 10px; border: 1px solid $gray-300; background: $white;
+    input {
+        width: 100%; min-width: 0; box-sizing: border-box; border-radius: 12px;
+        padding: 8px 6px; border: 1px solid $gray-300; background: $white;
         font-size: 0.84rem; font-family: inherit; color: $gray-900;
         &:focus { outline: none; border-color: $gray-900; }
     }
-    input[type="text"] { width: 110px; }
+}
+// App.vue 의 모바일 전역 규칙(#app input → 16px, iOS 확대 방지)은 한 줄에 날짜 2개 + 버튼을 넣기엔 너무 커서
+// 이 화면의 날짜 입력만 id 로 우선순위를 높여 줄인다(날짜 입력은 키보드가 아니라 선택기가 열린다).
+#trade-profit .df input {
+    font-size: 13px;
+    padding: 6px 2px 6px 5px;     // 좌우 여백을 최소로 — 글자와 달력 아이콘이 겹치지 않게
+    letter-spacing: -0.3px;
+    text-align: left;
+    -webkit-appearance: none;
+    appearance: none;
+}
+// 브라우저가 날짜 입력 내부(연·월·일 필드, 구분자)에 넣는 기본 여백도 걷어낸다
+#trade-profit .df input::-webkit-datetime-edit,
+#trade-profit .df input::-webkit-datetime-edit-fields-wrapper { padding: 0; }
+#trade-profit .df input::-webkit-datetime-edit-text { padding: 0; margin: 0 1px 0 0; }
+#trade-profit .df input::-webkit-datetime-edit-year-field,
+#trade-profit .df input::-webkit-datetime-edit-month-field,
+#trade-profit .df input::-webkit-datetime-edit-day-field { padding: 0; }
+#trade-profit .df input::-webkit-date-and-time-value { text-align: left; margin: 0; min-height: 1em; }
+// 달력 아이콘: 크기·여백을 줄여 글자 쪽 폭을 확보한다
+#trade-profit .df input::-webkit-calendar-picker-indicator {
+    width: 12px; height: 12px; padding: 0; margin: 0 3px 0 0;
 }
 .seg {
     border-radius: 12px;
-    display: inline-flex; border: 1px solid $gray-300;
+    display: inline-flex; border: 1px solid $gray-300; overflow: hidden;
     button {
         padding: 7px 12px; background: $white; border: none; cursor: pointer;
         font-size: 0.8rem; font-weight: 600; color: $gray-500; font-family: inherit;
@@ -469,56 +453,15 @@ $green: #1F7A3E;
     }
 }
 .btn-run {
-    padding: 8px 20px; background: $navy; color: $white; border: none;
+    flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 12px; background: $navy; color: $white; border: none;
     font-size: 0.84rem; font-weight: 700; cursor: pointer; font-family: inherit;
     &:hover:not(:disabled) { background: #74462A; }
     &:disabled { background: $gray-400; cursor: default; }
 }
-.run-opts {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
-    margin-top: 12px; padding-top: 12px; border-top: 1px solid $gray-100;
-}
-.chk {
-    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
-    font-size: 0.82rem; font-weight: 600; color: $gray-700;
-    input { cursor: pointer; }
-}
-.hint-text { font-size: 0.78rem; color: $gray-400; }
 .warn-note {
     border-radius: 12px;
     background: $gray-100; border: 1px solid $gray-300;
     padding: 10px 14px; margin: 0 0 16px; font-size: 0.8rem; color: $gray-700;
-}
-
-/* Summary cards */
-.summary-cards {
-    display: grid;
-    grid-template-columns: 1.3fr 1fr 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 16px;
-
-    @media (max-width: 860px) { grid-template-columns: 1fr 1fr; }
-}
-.s-card {
-    border-radius: 12px;
-    background: $white; border: 1px solid $gray-200; padding: 16px;
-    min-height: 92px;
-    &.total { border-color: $gray-900; }
-    &.skeleton { animation: pulse 1.6s infinite ease-in-out; background: $gray-100; }
-}
-.s-label {
-    font-size: 0.74rem; font-weight: 700; color: $gray-500;
-    letter-spacing: .03em; margin-bottom: 8px;
-}
-.s-amount {
-    font-size: 1.22rem; font-weight: 700; color: $gray-900;
-    font-variant-numeric: tabular-nums;
-    &.sub { font-size: 1.05rem; font-weight: 600; }
-    .won { font-size: 0.74rem; font-weight: 600; color: $gray-500; margin-left: 2px; }
-}
-.s-sub {
-    font-size: 0.78rem; color: $gray-500; margin-top: 4px;
-    font-variant-numeric: tabular-nums;
 }
 
 /* Table */
@@ -544,9 +487,10 @@ $green: #1F7A3E;
     .tc { text-align: center; }
     .num { font-variant-numeric: tabular-nums; }
 
-    .up { color: $red; font-weight: 600; }
-    .down { color: $blue; font-weight: 600; }
+    .up { color: $red; }
+    .down { color: $blue; }
 
+    tfoot .sub-row td { background: $gray-50; border-top: 1px solid $gray-100; color: $gray-700; font-weight: 600; }
     tfoot .total-row td {
         background: $gray-50; font-weight: 700; color: #74462A;
         border-top: 2px solid $gray-200;
@@ -554,19 +498,17 @@ $green: #1F7A3E;
 }
 
 .stk { display: flex; align-items: center; gap: 8px; }
-.stk-name { color: $gray-900; }
-
-.code-chip {
-    border-radius: 12px;
-    font-size: 0.72rem; font-weight: 600; background: $gray-100; color: $gray-700;
-    padding: 2px 7px; border: 1px solid $gray-200;
-    font-family: 'SFMono-Regular', Consolas, monospace;
-}
+.stk-name { color: $gray-900; font-weight: 600; }
+// 종목코드: 뱃지가 아니라 종목명 옆에 작게
+.stk-code { font-size: 0.72rem; color: $gray-400; font-variant-numeric: tabular-nums; }
+// 매수/매도 뱃지(글자로도 구분된다)
 .action-badge {
-    font-size: 0.7rem; font-weight: 700; padding: 2px 8px; white-space: nowrap;
-    &.sell { background: #74462A; color: $white; border: 1px solid #74462A; border-radius: 12px; }
-    &.default { background: $gray-100; color: $gray-500; border: 1px solid $gray-200; border-radius: 12px; }
+    font-size: 0.7rem; font-weight: 700; padding: 2px 8px; white-space: nowrap; border-radius: 12px;
+    &.sell { background: #E8F0FE; color: $blue; border: 1px solid #C9DAFB; }
+    &.buy  { background: #FDECEC; color: $red;  border: 1px solid #F6CFCF; }
 }
+// 손익 금액·%: 굵게, 글자는 살짝 작게
+.pnl { font-weight: 700; font-size: 0.92em; }
 
 /* skeleton */
 .loader-rows { padding: 8px; }
@@ -578,15 +520,16 @@ $green: #1F7A3E;
 
 /* Mobile list */
 .mobile-list { display: none; @media (max-width: 860px) { display: block; } }
-.m-subtotal {
+.m-summary {
     border-radius: 12px;
-    display: flex; align-items: center; gap: 8px;
-    background: $white; border: 1px solid $gray-200; padding: 10px 14px;
-    margin-bottom: 10px; font-size: 0.82rem;
-    .m-subtotal-label { font-weight: 700; color: $gray-900; }
-    .m-subtotal-amt { color: $gray-700; margin-left: auto; }
-    .num { font-weight: 700; }
+    background: $white; border: 1px solid $gray-200; padding: 4px 14px;
+    margin-bottom: 10px; font-size: 0.84rem;
+    .ms-row { display: flex; align-items: center; justify-content: space-between; min-height: 38px; border-top: 1px solid $gray-100; }
+    .ms-row:first-child { border-top: none; }
+    .ms-label { color: $gray-700; font-weight: 600; }
+    .ms-row.total { border-top: 1.5px solid $gray-300; .ms-label { color: $gray-900; font-weight: 700; } }
 }
+.cnt { font-style: normal; font-weight: 500; font-size: 0.74rem; color: $gray-400; margin-left: 4px; }
 .m-ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .m-li { background: $white; border: 1px solid $gray-200; padding: 14px; border-radius: 12px; }
 .li-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }

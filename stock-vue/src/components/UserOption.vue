@@ -1,13 +1,8 @@
 <template>
     <div id="user-option">
-        <Headers :prop_title="title" />
+        <BrandHeader :title="title" back="/menu" />
 
         <div class="contents">
-
-            <!-- ── 상단 타이틀 ── -->
-            <section class="head-desc">
-                <h2 style="text-align: left;">개인설정</h2>
-            </section>
 
             <div v-if="isLoading" class="loader-rows">
                 <div v-for="n in 4" :key="n" class="skeleton-row"></div>
@@ -19,7 +14,6 @@
                 <section class="setting-card">
                     <header class="card-head">
                         <h3>기본 정보</h3>
-                        <span class="card-desc">연락처와 이메일 정보입니다.</span>
                     </header>
 
                     <div class="field-grid">
@@ -41,7 +35,6 @@
                 <section class="setting-card">
                     <header class="card-head">
                         <h3>API / 알림 연동 키</h3>
-                        <span class="card-desc">민감 정보입니다. 오른쪽 버튼으로 표시/숨김을 전환할 수 있습니다.</span>
                     </header>
 
                     <div class="field-grid">
@@ -96,7 +89,6 @@
                 <section class="setting-card special-card" v-if="isSpecialUser">
                     <header class="card-head">
                         <h3>관리자 설정</h3>
-                        <span class="card-desc">user_id = 1 전용 매수 포지션 체크 파라미터입니다.</span>
                     </header>
 
                     <div class="field-grid two-col">
@@ -104,14 +96,12 @@
                             <label>거래량 하한 (vol_limit)</label>
                             <input v-model.trim="form.user_options.vol_limit" type="number"
                                 placeholder="예) 100000" min="0" step="1" inputmode="numeric" />
-                            <span class="field-hint">매수 포지션 체크 시 최소 거래량 수치</span>
                         </div>
 
                         <div class="form-field">
                             <label>거래량 급증 배수 (vol_surge)</label>
                             <input v-model.trim="form.user_options.vol_surge" type="number"
                                 placeholder="예) 2.5" min="0" step="any" inputmode="decimal" />
-                            <span class="field-hint">평균 대비 거래량 급증 판단 배수</span>
                         </div>
 
                         <!-- 추후 관리자 설정 항목이 이 그리드에 2단으로 추가됩니다. -->
@@ -121,15 +111,13 @@
                 <!-- ════════════ 알림 설정 (user_options) ════════════ -->
                 <section class="setting-card">
                     <header class="card-head">
-                        <h3>알림 설정</h3>
-                        <span class="card-desc">메일 알림 수신 여부를 설정합니다.</span>
+                        <h3>알림</h3>
                     </header>
 
                     <div class="field-grid">
                         <div class="form-field switch-field">
                             <div class="switch-text">
                                 <label>매수 추천 종목 메일 수신</label>
-                                <span class="switch-sub">배치가 선정한 매수 추천 종목을 메일로 받습니다.</span>
                             </div>
                             <button type="button"
                                 :class="['toggle-btn', form.user_options.stock_buy_target_mail_flag === 'Y' ? 'active' : 'inactive']"
@@ -161,7 +149,7 @@
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores';
 
-const title = ref('개인설정');
+const title = ref('계정 설정');
 
 const userSession = assUserSession();
 // user_id = 1 사용자는 별도 주문(추가 설정)이 예정되어 있어 분기 처리.
@@ -291,220 +279,112 @@ const save = async () => {
 </script>
 
 <style scoped>
+/* 양봉상회 v2 — 계정 설정 */
 #user-option {
     min-height: 100vh;
-    background: #fafafa;
+    background: #FFFBEA;
+    color: #2B1D14;
+    text-align: left;
 }
 
 .contents {
-    max-width: 720px;
+    max-width: 640px;
     margin: 0 auto;
-    padding: 16px 14px 96px;
+    padding: 16px 16px 24px;
     box-sizing: border-box;
-}
-
-/* ── 상단 타이틀 ── */
-.head-desc {
-    padding: 8px 4px 16px;
-}
-
-.head-desc h2 {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #141414;
-}
-
-.head-desc .sub-text {
-    margin: 6px 0 0;
-    font-size: 0.85rem;
-    color: #737373;
-    line-height: 1.4;
 }
 
 /* ── 카드 ── */
 .setting-card {
     background: #fff;
-    border: 1px solid #efefef;
-    border-radius: 0;
-    padding: 18px 18px 20px;
-    margin-bottom: 14px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-}
-
-.card-head {
+    border: 1px solid #EFE2BC;
+    border-radius: 16px;
+    padding: 16px 14px 18px;
     margin-bottom: 14px;
 }
 
+.card-head { margin-bottom: 12px; }
 .card-head h3 {
     margin: 0;
-    font-size: 1rem;
-    font-weight: 700;
-    color: #141414;
+    font-size: 13px;
+    font-weight: 600;
+    color: #7A6B5D;
 }
 
-.card-head .card-desc {
-    display: block;
-    margin-top: 4px;
-    font-size: 0.78rem;
-    color: #737373;
-    line-height: 1.4;
-}
-
-.special-card {
-    border-style: dashed;
-    border-color: #c4c4c4;
-    background: #fafafa;
-}
-
-.placeholder-note {
-    margin: 0;
-    font-size: 0.85rem;
-    color: #9a9a9a;
-}
+.special-card { border-style: dashed; border-color: #E3CF8F; background: #FFFDF5; }
 
 /* ── 필드 ── */
-.field-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
+.field-grid { display: flex; flex-direction: column; gap: 14px; }
+.field-grid.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; }
 
-/* 2단 그리드 (관리자 설정 등) */
-.field-grid.two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px 16px;
-}
-
-.field-hint {
-    font-size: 0.74rem;
-    color: #9a9a9a;
-    line-height: 1.3;
-}
-
-.form-field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.form-field label {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #3d3d3d;
-}
+.form-field { display: flex; flex-direction: column; gap: 6px; }
+.form-field label { font-size: 13px; font-weight: 600; color: #2B1D14; }
 
 .form-field input {
     width: 100%;
     box-sizing: border-box;
     height: 44px;
     padding: 0 12px;
-    border: 1px solid #dcdcdc;
-    border-radius: 0;
-    font-size: 0.92rem;
-    color: #141414;
+    border: 1px solid #EAD9A6;
+    border-radius: 12px;
+    font-size: 15px;
+    color: #2B1D14;
     background: #fff;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
-
 .form-field input:focus {
     outline: none;
-    border-color: #141414;
-    box-shadow: 0 0 0 3px rgba(20, 20, 20, 0.12);
+    border-color: #F6C445;
+    box-shadow: 0 0 0 3px rgba(246, 196, 69, 0.28);
 }
-
-.form-field input::placeholder {
-    color: #9a9a9a;
-}
+.form-field input::placeholder { color: #B8A890; }
 
 /* ── 비밀 입력 + 표시 토글 ── */
-.secret-input {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.secret-input input {
-    padding-right: 46px;
-}
-
+.secret-input { position: relative; display: flex; align-items: center; }
+.secret-input input { padding-right: 48px; }
 .btn-reveal {
     position: absolute;
-    right: 6px;
+    right: 2px;
     top: 50%;
     transform: translateY(-50%);
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
     display: grid;
     place-items: center;
     border: 0;
     background: transparent;
-    color: #737373;
+    color: #7A6B5D;
     cursor: pointer;
-    border-radius: 0;
 }
 
-.btn-reveal:hover {
-    color: #141414;
-    background: rgba(20, 20, 20, 0.06);
-}
-
-/* ── 스위치 필드 ── */
-.switch-field {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-.switch-text {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
-.switch-text label {
-    font-size: 0.9rem;
-}
-
-.switch-sub {
-    font-size: 0.76rem;
-    color: #737373;
-    line-height: 1.3;
-}
+/* ── 스위치 ── */
+.switch-field { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.switch-text label { font-size: 15px; font-weight: 500; }
 
 .toggle-btn {
     flex: 0 0 auto;
-    width: 46px;
-    height: 26px;
-    border-radius: 0;
+    width: 50px;
+    height: 30px;
+    border-radius: 15px;
     border: 0;
     position: relative;
     cursor: pointer;
     transition: background 0.18s;
-    background: #c4c4c4;
+    background: #DCCFA8;
 }
-
-.toggle-btn.active {
-    background: #141414;
-}
-
+.toggle-btn.active { background: #F6C445; }
 .toggle-knob {
     position: absolute;
     top: 3px;
     left: 3px;
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     background: #fff;
-    border-radius: 0;
+    border-radius: 12px;
     transition: transform 0.18s;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
-
-.toggle-btn.active .toggle-knob {
-    transform: translateX(20px);
-}
+.toggle-btn.active .toggle-knob { transform: translateX(20px); }
 
 /* ── 저장 바 ── */
 .save-bar {
@@ -513,95 +393,45 @@ const save = async () => {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 14px;
-    margin: 4px -14px 0;
-    background: rgba(255, 255, 255, 0.92);
+    padding: 10px 16px;
+    margin: 4px -16px 0;
+    background: rgba(255, 246, 210, 0.96);
     backdrop-filter: blur(6px);
-    border-top: 1px solid #efefef;
+    border-top: 1px solid #EFE2BC;
 }
-
-.dirty-note {
-    flex: 1;
-    font-size: 0.8rem;
-    color: #141414;
-    font-weight: 600;
-}
-
-.dirty-note.clean {
-    color: #9a9a9a;
-    font-weight: 500;
-}
+.dirty-note { flex: 1; font-size: 13px; color: #7A4423; font-weight: 600; }
+.dirty-note.clean { color: #A89C88; font-weight: 500; }
 
 .btn-reset,
 .btn-save {
-    height: 42px;
+    height: 44px;
     padding: 0 18px;
-    border-radius: 0;
-    font-size: 0.9rem;
-    font-weight: 600;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
     cursor: pointer;
     border: 1px solid transparent;
 }
-
-.btn-reset {
-    background: #fff;
-    border-color: #dcdcdc;
-    color: #3d3d3d;
-}
-
-.btn-reset:disabled {
-    opacity: 0.5;
-    cursor: default;
-}
-
-.btn-save {
-    background: #141414;
-    color: #fff;
-}
-
-.btn-save:disabled {
-    background: #dcdcdc;
-    cursor: default;
-}
+.btn-reset { background: #fff; border-color: #EAD9A6; color: #7A4423; }
+.btn-reset:disabled { opacity: 0.5; cursor: default; }
+.btn-save { background: #F6C445; color: #3A200F; }
+.btn-save:disabled { background: #EFE5C4; color: #B8A890; cursor: default; }
 
 /* ── 로딩 스켈레톤 ── */
-.loader-rows {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
+.loader-rows { display: flex; flex-direction: column; gap: 12px; }
 .skeleton-row {
     height: 96px;
-    border-radius: 0;
-    background: linear-gradient(90deg, #efefef 25%, #fafafa 50%, #efefef 75%);
+    border-radius: 16px;
+    background: linear-gradient(90deg, #F6EDC9 25%, #FFFBEA 50%, #F6EDC9 75%);
     background-size: 200% 100%;
     animation: shimmer 1.2s infinite;
 }
-
 @keyframes shimmer {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
 }
 
-/* ── 모바일 ── */
-@media (max-width: 768px) {
-    .contents {
-        padding: 12px 10px 96px;
-    }
-
-    .setting-card {
-        padding: 16px 14px 18px;
-        border-radius: 0;
-    }
-
-    .head-desc h2 {
-        font-size: 1.15rem;
-    }
-
-    /* 모바일에서는 2단 → 1단 */
-    .field-grid.two-col {
-        grid-template-columns: 1fr;
-    }
+@media (max-width: 480px) {
+    .field-grid.two-col { grid-template-columns: 1fr; }
 }
 </style>

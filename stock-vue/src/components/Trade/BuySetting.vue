@@ -32,22 +32,6 @@
             <!-- ══════════ M1 : 현행 설정 ══════════ -->
             <template v-if="activeMode === 'M1'">
 
-            <!-- ── 범위 안내 ── -->
-            <section class="scope-bar">
-                <div class="scope-row">
-                    <span class="scope-badge personal">개인</span>
-                    <div class="scope-text">
-                        <b>매수 후보 우선순위</b> — 개인서버에만 적용합니다. 다른 사용자와 무관하게 자유롭게 바꿀 수 있습니다.
-                    </div>
-                </div>
-                <div class="scope-row">
-                    <span class="scope-badge admin">공용</span>
-                    <div class="scope-text">
-                        <b>후보 선정 조건</b> — 매수타겟 배치가 <b>전 사용자 공용 추천 테이블</b>을 만들 때 쓰는 값입니다.
-                    </div>
-                </div>
-            </section>
-
             <!-- ── 로딩 스켈레톤 ── -->
             <div v-if="isLoading" class="loader-rows">
                 <div v-for="n in 5" :key="n" class="skeleton-row"></div>
@@ -61,14 +45,9 @@
                 <section class="setting-card order-card">
                     <header class="card-head">
                         <div class="ch-left">
-                            <span class="prio-badge personal">개인</span>
                             <h3>매수 후보 우선순위</h3>
                         </div>
                     </header>
-                    <span class="card-desc">
-                        같은 날 추천된 후보들 중 <b>무엇을 먼저 살지</b> 정합니다.
-                        위에 있는 기준이 우선이고, 값이 <b>동점일 때만</b> 아래 기준으로 넘어갑니다.
-                    </span>
 
                     <ul class="order-list">
                         <li v-for="(row, idx) in orderRows" :key="row.field"
@@ -85,7 +64,6 @@
 
                             <div class="or-main">
                                 <span class="or-label">{{ ORDER_FIELD_META[row.field].label }}</span>
-                                <span class="or-hint">{{ ORDER_FIELD_META[row.field].hint }}</span>
                             </div>
 
                             <div class="or-dir">
@@ -113,53 +91,6 @@
 
                     <p v-if="orderError" class="field-error block">{{ orderError }}</p>
 
-                    <!-- 정렬 미리보기 -->
-                    <div class="order-preview">
-                        <div class="op-head">
-                            <span class="op-title">
-                                정렬 예시
-                                <span v-if="!isFallback && targetYmd" class="op-ymd">{{ fmtYmd(targetYmd) }} 기준</span>
-                                <span v-else-if="isTargetLoading" class="op-ymd">불러오는 중…</span>
-                                <span v-else class="op-ymd warn">샘플 데이터</span>
-                            </span>
-                            <span v-if="!isFallback" class="op-note">
-                                실제 매수타겟 <b>{{ previewSource.length }}종목</b>에 현재 설정을 적용한 결과입니다
-                                (상위 {{ Math.min(PREVIEW_LIMIT, previewSource.length) }}건 표시).
-                                <b>맨 위 종목부터 매수됩니다.</b>
-                            </span>
-                            <span v-else class="op-note">
-                                매수타겟을 불러오지 못해 샘플로 표시합니다. <b>맨 위 종목부터 매수됩니다.</b>
-                            </span>
-                        </div>
-                        <table class="op-table">
-                            <thead>
-                                <tr>
-                                    <th class="tc">순위</th>
-                                    <th>종목</th>
-                                    <th class="tr">score</th>
-                                    <th class="tr">거래량</th>
-                                    <th class="tr">등락률</th>
-                                    <th class="tr">급등패턴</th>
-                                    <th class="tc">rank</th>
-                                    <th class="tc">종합순위</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="(r, i) in sortedSample" :key="r.stock_code"
-                                    :class="{ top: i === 0 }">
-                                    <td class="tc rank-cell">{{ i + 1 }}</td>
-                                    <td>{{ r.stock_name }}</td>
-                                    <td class="tr num">{{ r.score ?? '–' }}</td>
-                                    <td class="tr num">{{ r.volume === null ? '–' : r.volume.toLocaleString() }}</td>
-                                    <td class="tr num" :class="pctClass(r.rate)">{{ r.rate ?? '–' }}</td>
-                                    <td class="tr num">{{ r.shape_proba ?? '–' }}</td>
-                                    <td class="tc num">{{ r.rank_no ?? '–' }}</td>
-                                    <td class="tc num">{{ r.composite_rank_no ?? '–' }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <p class="op-legend">값이 없는(–) 종목은 정렬 방향과 무관하게 항상 뒤로 밀립니다.</p>
-                    </div>
                 </section>
 
                 <!-- ════════════════════════════════════════════════
@@ -181,12 +112,10 @@
                     :class="{ locked: !canEditStrategy }">
                     <header class="card-head">
                         <div class="ch-left">
-                            <span class="prio-badge admin">공용</span>
                             <h3>{{ g.title }}</h3>
                         </div>
                         <span v-if="!canEditStrategy" class="lock-badge">관리자 전용</span>
                     </header>
-                    <span class="card-desc" v-html="g.desc"></span>
 
                     <div class="field-list">
                         <div v-for="f in g.fields" :key="f.k"
@@ -260,7 +189,6 @@
                                 </div>
                             </div>
 
-                            <span v-if="f.hint" class="field-hint">{{ f.hint }}</span>
                             <span v-if="errors[f.k]" class="field-error">{{ errors[f.k] }}</span>
                         </div>
                     </div>
@@ -332,38 +260,13 @@ const canEditStrategy = computed(() => serverIsAdmin.value && isAdminRole.value)
  * 항목 추가 시 여기 + 백엔드 두 곳만 고치면 된다.
  * ═══════════════════════════════════════════════════════════ */
 const ORDER_FIELD_META = {
-    score: {
-        label: '추천 점수 (score)', descLabel: '높은 순', ascLabel: '낮은 순',
-        hint: '배치가 매긴 종합 점수. 기본 1순위 기준입니다.',
-    },
-    volume: {
-        label: '거래량', descLabel: '많은 순', ascLabel: '적은 순',
-        hint: '전일 거래량. 유동성이 큰 종목을 먼저 잡고 싶을 때 씁니다.',
-    },
-    rate: {
-        label: '등락률 (rate)', descLabel: '높은 순', ascLabel: '낮은 순',
-        hint: '전일 대비 등락률. 음수도 정상 처리됩니다.',
-    },
-    rank_no: {
-        label: '추천 순번 (rank)', descLabel: '큰 순', ascLabel: '작은 순',
-        hint: '배치가 부여한 순번. 작을수록 상위 추천입니다.',
-    },
-    close: {
-        label: '종가', descLabel: '높은 순', ascLabel: '낮은 순',
-        hint: '전일 종가. 저가주/고가주 선호를 반영할 때 씁니다.',
-    },
-    shape_proba: {
-        label: '급등패턴 확률 (shape_proba)', descLabel: '높은 순', ascLabel: '낮은 순',
-        hint: '14봉 가격패턴+OBV 모델이 예측한 "5일 내 순엣지 15%p+" 확률(0~1). 참고용으로 계속' +
-              ' 계산·저장됩니다 — 종합순위(composite_rank_no) 산정에 쓰이는 원점수이기도 합니다.',
-    },
-    composite_rank_no: {
-        label: '종합 순위 (composite_rank_no)', descLabel: '큰 순', ascLabel: '작은 순',
-        hint: 'watch 신호 게이트와 별개로, 전종목 중 안정성 필터(관리종목/거래정지/동전주/' +
-              '급변동 이력 제외 등) 통과 종목의 shape+OBV 모델 top10을 OBV/MACD/RSI/거래량' +
-              ' 합성점수로 재정렬한 순위(1~10). 그날 top10 밖이면 값이 없어 자동으로 score' +
-              ' 기준으로 밀립니다. 2026-09 세션 후속 리서치 — 기본 1순위입니다.',
-    },
+    score:             { label: '추천 점수',   descLabel: '높은 순', ascLabel: '낮은 순' },
+    volume:            { label: '거래량',      descLabel: '많은 순', ascLabel: '적은 순' },
+    rate:              { label: '등락률',      descLabel: '높은 순', ascLabel: '낮은 순' },
+    rank_no:           { label: '추천 순번',   descLabel: '큰 순',   ascLabel: '작은 순' },
+    close:             { label: '종가',        descLabel: '높은 순', ascLabel: '낮은 순' },
+    shape_proba:       { label: '급등패턴 확률', descLabel: '높은 순', ascLabel: '낮은 순' },
+    composite_rank_no: { label: '종합 순위',   descLabel: '큰 순',   ascLabel: '작은 순' },
 };
 const ORDER_FIELDS = Object.keys(ORDER_FIELD_META);
 // worker 기본 정렬(stock_shared.strategy.buy_order.DEFAULT_BUY_ORDER)과 동일하게 맞춘다
@@ -433,100 +336,6 @@ const onDragOver = (idx) => {
 
 const resetOrderToDefault = () => { orderRows.value = specToRows(DEFAULT_ORDER_SPEC); };
 
-/* ── 정렬 미리보기 ──
- * worker(repository.make_buy_order_key)와 동일한 규칙을 화면에서 재현한다:
- *   · NULL 은 방향과 무관하게 항상 뒤
- *   · desc 는 부호를 뒤집어 오름차순 비교
- *   · 전 키 동점이면 stock_code 로 최종 결정
- */
-/* 최근 매수타겟을 그대로 미리보기에 쓴다.
- * 가상의 예시로는 "내 설정이면 오늘 뭘 사는가"를 알 수 없어 실효가 없었다.
- * ymd 없이 호출하면 서버가 가장 최근 영업일자를 찾아 반환한다.
- * 조회 실패/데이터 없음이면 아래 FALLBACK_ROWS 로 떨어져 화면이 비지 않게 한다. */
-const FALLBACK_ROWS = [
-    { stock_code: '005070', stock_name: '코스모신소재', score: 90, volume: 512000, rate: '12.5%', rank_no: 1, shape_proba: 0.41, composite_rank_no: 1 },
-    { stock_code: '066430', stock_name: '와이오엠', score: 90, volume: 9120000, rate: '-3.2%', rank_no: 2, shape_proba: 0.37, composite_rank_no: 3 },
-    { stock_code: '015760', stock_name: '한국전력', score: 80, volume: 1030000, rate: '5.0%', rank_no: 3, shape_proba: 0.36, composite_rank_no: null },
-    { stock_code: '109070', stock_name: '컨버즈', score: null, volume: 24500000, rate: '29.9%', rank_no: null, shape_proba: 0.35, composite_rank_no: 2 },
-    { stock_code: '048910', stock_name: '대원미디어', score: 80, volume: null, rate: null, rank_no: 4, shape_proba: 0.35, composite_rank_no: null },
-];
-
-const targetRows = ref([]);      // 실제 매수타겟 (비어 있으면 fallback 사용)
-const targetYmd = ref('');
-const isTargetLoading = ref(false);
-
-// 표에는 상위 몇 건만 보여준다. 정렬은 **전체**로 하고 자르는 건 마지막이다.
-// (먼저 자르고 정렬하면 1위가 잘려나가 완전히 틀린 결과가 나온다)
-const PREVIEW_LIMIT = 6;
-
-const previewSource = computed(
-    () => (targetRows.value.length ? targetRows.value : FALLBACK_ROWS));
-const isFallback = computed(() => targetRows.value.length === 0);
-
-const fetchBuyTargets = async () => {
-    isTargetLoading.value = true;
-    try {
-        // ymd 미지정 → 서버가 최신 영업일자로 조회
-        const { data } = await aibeesApi.get('/api/v1/stocks/buy-target');
-        const rows = data.data ?? [];
-        targetRows.value = rows;
-        targetYmd.value = rows[0]?.ymd ?? '';
-    } catch (e) {
-        console.error('[BuySetting] 매수타겟 조회 실패', e);
-        targetRows.value = [];
-    } finally {
-        isTargetLoading.value = false;
-    }
-};
-
-const fmtYmd = (v) => (v && v.length === 8
-    ? `${v.slice(0, 4)}.${v.slice(4, 6)}.${v.slice(6, 8)}`
-    : v || '');
-
-const numOf = (v) => {
-    if (v === null || v === undefined) return null;
-    const n = Number(v);
-    return Number.isNaN(n) ? null : n;
-};
-const pctOf = (v) => {
-    if (v === null || v === undefined) return null;
-    const n = Number(String(v).replace('%', '').replace(/,/g, '').trim());
-    return Number.isNaN(n) ? null : n;
-};
-const FIELD_VALUE = {
-    score: r => numOf(r.score),
-    volume: r => numOf(r.volume),
-    rate: r => pctOf(r.rate),
-    rank_no: r => numOf(r.rank_no),
-    close: r => numOf(r.close),
-    shape_proba: r => numOf(r.shape_proba),
-    composite_rank_no: r => numOf(r.composite_rank_no),
-};
-
-const sortedSample = computed(() => {
-    const steps = orderRows.value.filter(r => r.on);
-    const active = steps.length ? steps : specToRows(DEFAULT_ORDER_SPEC).filter(r => r.on);
-    const sorted = [...previewSource.value].sort((a, b) => {
-        for (const s of active) {
-            const va = FIELD_VALUE[s.field](a);
-            const vb = FIELD_VALUE[s.field](b);
-            // null 은 항상 뒤 (방향 무관)
-            if (va === null && vb === null) continue;
-            if (va === null) return 1;
-            if (vb === null) return -1;
-            if (va !== vb) return s.dir === 'desc' ? vb - va : va - vb;
-        }
-        return String(a.stock_code ?? '').localeCompare(String(b.stock_code ?? ''));
-    });
-    return sorted.slice(0, PREVIEW_LIMIT);   // 정렬 후 자른다
-});
-
-const pctClass = (rate) => {
-    const n = pctOf(rate);
-    if (n === null) return '';
-    return n > 0 ? 'up-c' : n < 0 ? 'down-c' : '';
-};
-
 /* ═══════════════════════════════════════════════════════════
  * 2. 후보 선정 조건 (관리자 전용) — KospiStrategy0.get_action_in_watch
  * ═══════════════════════════════════════════════════════════ */
@@ -545,117 +354,93 @@ const MA20_SIGNAL_MODE_OPTIONS = [
 const STRATEGY_GROUPS = [
     {
         id: 'S', title: '진입 신호 (core)',
-        desc: 'MACD·OBV 두 신호를 <b>모두 만족</b>해야 후보가 됩니다. 둘 다 "사용 안 함"이면 아래 필터만으로 판정합니다.',
         fields: [
             {
                 k: 's1_macd_signal_mode', label: 'MACD 신호', type: 'enum', def: 'slope',
                 options: SIGNAL_MODE_OPTIONS,
-                hint: '골든크로스=신호선 상향 돌파 시점만. 기울기 상승=전봉 대비 MACD가 오르는 중이면 통과(더 느슨).',
             },
             {
                 k: 's1_obv_signal_mode', label: 'OBV 신호', type: 'enum', def: 'golden',
                 options: SIGNAL_MODE_OPTIONS,
-                hint: '거래량 누적 지표. 골든크로스가 기본이며 세력 유입 확인용입니다.',
             },
             {
                 k: 's1_ma20_signal_mode', label: 'MA20 기울기', type: 'enum', def: 'off',
                 options: MA20_SIGNAL_MODE_OPTIONS,
-                hint: '켜면 20일선이 전봉보다 올라가는 중(기울기 상승)이어야 진입을 허용합니다. MACD/OBV 신호와 별개의 추가 AND 게이트입니다.',
             },
         ],
     },
     {
         id: 'F', title: '매수 필터 on/off',
-        desc: '진입 신호를 통과한 종목에 순서대로 적용되는 게이트입니다. 끄면 해당 조건을 건너뜁니다.',
         fields: [
             {
                 k: 's1_enable_macd_filter', label: 'MACD 조건', type: 'bool', def: 1,
-                hint: '0선 위 · 음권이지만 빠르게 상승 · 크로스 임박(갭 축소) 중 하나를 요구합니다.',
             },
             {
                 k: 's1_enable_rsi_filter', label: '과매수 진입 차단', type: 'bool', def: 1,
-                hint: 'RSI가 과매수 기준 이상이면 진입하지 않습니다.',
             },
             {
                 k: 's1_enable_bb_upper_filter', label: '볼린저 상단 추격 금지', type: 'bool', def: 1,
-                hint: '종가가 BB 상단을 넘은 종목은 제외합니다.',
             },
             {
                 k: 's1_enable_vol_avg_filter', label: '평균 거래량 하한', type: 'bool', def: 1,
-                hint: '거래가 죽은 종목을 거릅니다. 하한선은 아래 임계값에서 조정합니다.',
             },
             {
                 k: 's1_enable_regime_gate', label: '추세국면 게이트', type: 'bool', def: 1,
-                hint: '하락국면이면 엄격, 상승국면이면 느슨하게 판정합니다. 끄면 국면 구분 없이 통과합니다.',
             },
         ],
     },
     {
         id: 'T', title: '임계값',
-        desc: '위 필터들이 실제로 사용하는 숫자 기준입니다.',
         fields: [
             {
                 k: 's1_rsi_overbought', label: '과매수 기준 RSI', unit: '', type: 'int', def: 70,
                 min: 50, max: 90, step: 1,
-                hint: 'RSI가 이 값 이상이면 진입을 차단합니다. 낮출수록 보수적입니다.',
             },
             {
                 k: 's1_rsi_ideal_low', label: 'RSI 신뢰구간 하한', unit: '', type: 'int', def: 40,
                 min: 0, max: 100, step: 1, ui: 'stepper',
-                hint: '지표 표시용 구간입니다. 진입을 직접 막지는 않습니다.',
             },
             {
                 k: 's1_rsi_ideal_high', label: 'RSI 신뢰구간 상한', unit: '', type: 'int', def: 65,
                 min: 0, max: 100, step: 1, ui: 'stepper',
-                hint: '하한보다 크거나 같아야 합니다.',
             },
             {
                 k: 's1_vol_ma_window', label: '평균 거래량 산정 기간', unit: '일', type: 'int', def: 20,
                 min: 5, max: 60, step: 1,
-                hint: '이 기간의 평균 거래량을 기준값으로 씁니다.',
             },
             {
                 k: 's1_vol_ma_mult', label: '평균 거래량 하한 배수', unit: '배', type: 'float', def: 0.5,
                 min: 0.1, max: 3, step: 0.1,
-                hint: '평균 × 이 배수 이상이어야 통과. 1.0=평균 이상, 0.5=죽은 거래량만 제거.',
             },
         ],
     },
     {
         id: 'R', title: '추세국면 게이트',
-        desc: '최근 N봉 중 종가가 60일선 아래였던 <b>비율</b>로 국면을 먼저 분류한 뒤, 국면별로 다른 강도의 조건을 적용합니다.',
         fields: [
             {
                 k: 's1_regime_window', label: '국면 분류 기간', unit: '봉', type: 'int', def: 90,
                 min: 20, max: 250, step: 5,
-                hint: '이 기간의 봉을 보고 하락/상승 국면을 판정합니다.',
             },
             {
                 k: 's1_regime_threshold', label: '하락국면 판정 비율', unit: '%', type: 'pct', def: 0.70,
                 min: 10, max: 100, step: 5,
-                hint: '기간 중 이 비율 이상 60일선 아래였으면 하락국면 → 엄격 조건 적용.',
             },
             {
                 k: 's1_strict_need_macd_up', label: '[하락국면] MACD 모멘텀 요구', type: 'bool', def: 1,
-                hint: '하락국면에서 macd ≥ signal 을 추가로 요구합니다.',
             },
             {
                 k: 's1_downtrend_surge_bypass', label: '[하락국면] 거래량 급증 우회', type: 'bool', def: 1,
-                hint: '급반등 초입을 놓치지 않도록, 급증 + 20일선 위면 배열 요건을 면제합니다.',
             },
             {
                 k: 's1_surge_bypass_mult', label: '[하락국면] 우회 급증 배수', unit: '배', type: 'float', def: 2.0,
                 min: 1, max: 5, step: 0.1,
-                hint: '전봉 거래량 대비 이 배수 이상이어야 우회를 허용합니다.',
             },
             {
                 k: 's1_loose_need_vol_surge', label: '[상승국면] 거래량 급증 요구', type: 'bool', def: 1,
-                hint: '상승국면에서도 급증을 동반한 진입만 허용합니다. 끄면 20일선 위이기만 하면 통과.',
             },
             {
                 k: 's1_surge_relax_mult', label: '[상승국면] 완화 급증 배수', unit: '배', type: 'float', def: 2.0,
                 min: 1, max: 5, step: 0.1,
-                hint: '3배 기준을 못 넘는 2배대 돌파도 잡기 위한 보조 기준입니다.',
             },
         ],
     },
@@ -739,10 +524,9 @@ const fetchOptions = async () => {
 };
 const reloadAll = () => {
     fetchOptions();
-    fetchBuyTargets();
 };
 
-onMounted(reloadAll);   // 두 조회는 독립 — 타겟 조회가 실패해도 설정 화면은 뜬다
+onMounted(reloadAll);
 
 /* ═══════════════ 컨트롤 헬퍼 ═══════════════ */
 const isOn = (k) => Number(form[k]) === 1;
@@ -983,42 +767,6 @@ const save = async () => {
     color: #2B1D14;
 }
 
-/* ── 범위 안내 ── */
-.scope-bar {
-    background: #fff;
-    border: 1px solid #F3EAD2;
-    border-radius: 10px;
-    padding: 12px 14px;
-    margin-bottom: 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.scope-row {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-}
-
-.scope-text {
-    font-size: 0.8rem;
-    color: #4A3628;
-    line-height: 1.5;
-}
-
-.scope-badge {
-    flex: none;
-    padding: 2px 9px;
-    border-radius: 10px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    margin-top: 1px;
-}
-
-.scope-badge.personal { background: #F3EAD2; color: #74462A; }
-.scope-badge.admin    { background: #F3EAD2; color: #74462A; }
-
 /* ── 스켈레톤 ── */
 .loader-rows { display: flex; flex-direction: column; gap: 10px; }
 
@@ -1062,21 +810,6 @@ const save = async () => {
     color: #2B1D14;
 }
 
-.prio-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 34px;
-    height: 22px;
-    padding: 0 8px;
-    border-radius: 10px;
-    font-size: 0.7rem;
-    font-weight: 700;
-}
-
-.prio-badge.personal { background: #F3EAD2; color: #74462A; }
-.prio-badge.admin    { background: #F3EAD2; color: #74462A; }
-
 .lock-badge {
     font-size: 0.7rem;
     font-weight: 700;
@@ -1086,14 +819,6 @@ const save = async () => {
     border-radius: 10px;
     padding: 3px 10px;
     white-space: nowrap;
-}
-
-.card-desc {
-    display: block;
-    margin: 8px 0 4px;
-    font-size: 0.79rem;
-    color: #6B5B4E;
-    line-height: 1.55;
 }
 
 /* ── 관리자 안내 ── */
@@ -1175,15 +900,6 @@ const save = async () => {
     text-align: left;
 }
 
-.or-hint {
-    display: block;
-    margin-top: 2px;
-    font-size: 1rem;
-    color: #6B5B4E;
-    line-height: 1.4;
-    text-align: left;
-}
-
 .or-dir { display: flex; gap: 4px; flex: none; }
 
 .dir-chip {
@@ -1232,84 +948,6 @@ const save = async () => {
     background: #FFFBEA;
     border-radius: 10px;
     flex-wrap: wrap;
-}
-
-/* ── 정렬 미리보기 ── */
-.order-preview {
-    margin-top: 14px;
-    border: 1px solid #F3EAD2;
-    border-radius: 10px;
-    overflow: hidden;
-    font-size: 1.2rem;
-}
-
-.op-head { padding: 10px 12px; background: #FFFBEA; text-align: left; }
-
-.op-ymd {
-    margin-left: 8px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    background: #F3EAD2;
-    color: #2B1D14;
-    font-size: 0.68rem;
-    font-weight: 600;
-    vertical-align: middle;
-}
-
-.op-ymd.warn { background: #FFFBEA; color: #74462A; }
-
-.op-title {
-    display: block;
-    font-size: 1rem;
-    font-weight: 700;
-    color: #2B1D14;
-}
-
-.op-note {
-    display: block;
-    margin-top: 3px;
-    font-size: 0.8rem;
-    color: #6B5B4E;
-    line-height: 1.45;
-}
-
-.op-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
-
-.op-table th {
-    padding: 7px 8px;
-    background: #fff;
-    border-bottom: 1px solid #F3EAD2;
-    color: #6B5B4E;
-    font-weight: 600;
-    font-size: 0.9rem;
-    text-align: center;
-    white-space: nowrap;
-}
-
-.op-table td {
-    padding: 8px;
-    font-size: 0.9rem;
-    border-bottom: 1px solid #F3EAD2;
-    color: #2B1D14;
-    white-space: nowrap;
-}
-
-.op-table tr.top td { background: #FFFBEA; font-weight: 600; }
-
-.op-table tr.top .rank-cell { color: #2B1D14; font-weight: 700; }
-
-.op-table .tr { text-align: right; }
-.op-table .tc { text-align: center; }
-.op-table .num { font-variant-numeric: tabular-nums; }
-.op-table .up-c { color: #2B1D14; }
-.op-table .down-c { color: #2B1D14; }
-
-.op-legend {
-    margin: 0;
-    padding: 8px 12px;
-    font-size: 0.7rem;
-    color: #6B5B4E;
-    background: #fff;
 }
 
 /* ══════ 일반 필드 ══════ */
@@ -1470,14 +1108,6 @@ const save = async () => {
 
 .sl-unit { font-size: 0.74rem; color: #6B5B4E; }
 
-.field-hint {
-    display: block;
-    margin-top: 7px;
-    font-size: 1rem;
-    color: #6B5B4E;
-    line-height: 1.5;
-}
-
 .field-error {
     display: block;
     margin-top: 5px;
@@ -1525,9 +1155,7 @@ const save = async () => {
 .btn-save:disabled { background: #E3D3A8; cursor: not-allowed; }
 .btn-reset:disabled { opacity: .45; cursor: not-allowed; }
 
-@media (max-width: 560px) {
-    .or-hint { display: none; }
-    .order-row { gap: 7px; padding: 9px 10px; }
+@media (max-width: 560px) {    .order-row { gap: 7px; padding: 9px 10px; }
     .or-dir { flex-direction: column; }
 }
 
