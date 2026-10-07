@@ -34,12 +34,11 @@ export const AD_SIZES = {
 export const MOBILE_MAX_WIDTH = 639;
 export const MOBILE_BOTTOM_BANNER_HEIGHT = 50;
 
-// 이 메뉴들에 들어가려면(AD_FREE 가 없는 사용자는) 먼저 광고를 봐야 한다.
+// 이 메뉴들에 들어갈 때마다(AD_FREE 가 없는 사용자는) 먼저 광고를 봐야 한다.
 export const AD_GATE_MENU_CODES = ['StockBuyTarget', 'StockInfo', 'ChartStock'];
 // 게이트에서 "계속하기"가 열리기까지 대기 시간(초)
 export const AD_GATE_SECONDS = 5;
-// 한 번 본 뒤 이 시간(분) 동안은 다시 묻지 않는다. 0 이면 진입할 때마다 본다.
-export const AD_GATE_PASS_MINUTES = 30;
+// 시간 기반 면제는 없다 — 게이트 대상 메뉴는 들어갈 때마다 광고를 본다(useAdGate.js 의 1회용 통과권).
 
 // 사이드 배너는 콘텐츠(최대 1200px) 양옆에 겹치지 않을 만큼 넓은 화면에서만 보인다.
 //   1200 + 2 × (배너 160 + 여백 12) = 1544 → 여유를 두어 1560.

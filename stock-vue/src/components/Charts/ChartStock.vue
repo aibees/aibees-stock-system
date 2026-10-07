@@ -1,6 +1,6 @@
 <template>
     <div id="chart-stocks">
-        <Headers :prop_title="title" />
+        <BrandHeader :title="title" />
 
         <div class="contents">
             <!-- <section class="head-desc">
@@ -10,7 +10,7 @@
                 </div>
             </section> -->
 
-            <!-- 검색 카드 -->
+            <!-- 검색 영역 (카드 없음) -->
             <section class="search-card">
                 <div class="search-row">
                     <SAutoInput
@@ -47,7 +47,7 @@
                 </div>
             </section>
 
-            <!-- 차트 카드 -->
+            <!-- 차트 영역 (카드 없음) -->
             <section class="chart-section">
                 <div v-if="isLoading" class="chart-skeleton">
                     <div class="loading-bar"></div>
@@ -63,13 +63,13 @@
                         <div class="legend">
                             <span class="leg-item" style="--c:#f38980">MA5</span>
                             <span class="leg-item" style="--c:#efa55b">MA20</span>
-                            <span class="leg-item" style="--c:#d0fe48">MA60</span>
+                            <span class="leg-item" style="--c:#8bb400">MA60</span>
                             <span class="leg-item" style="--c:#01b6f3">MA120</span>
                             <span class="leg-item leg-dashed" style="--c:#a78bfa">BB</span>
                             <span class="leg-item leg-bar" style="--c:rgba(100,100,100,0.35)">Vol</span>
                         </div>
                     </div>
-                    <div class="chart-scroll">
+                    <div class="chart-scroll" ref="chartScroll">
                         <div class="chart-wrap" :style="{ width: dynamicWidth }">
                             <CandlestickChart :chartData="chartData" :extraOptions="chartOptions" />
                         </div>
@@ -189,11 +189,11 @@ const fetchChart = async () => {
                 {
                     label: 'Candle',
                     data:  ohcl,
-                    color: { up: '#c51300', down: '#03748d', unchanged: '#999999' }
+                    color: { up: '#C8282A', down: '#1F5BD1', unchanged: '#9A8C7E' }
                 },
                 { label: 'MA5',      data: all.ma5      || [], borderColor: '#f38980', type: 'line', pointRadius: 0 },
                 { label: 'MA20',     data: all.ma20     || [], borderColor: '#efa55b', type: 'line', pointRadius: 0 },
-                { label: 'MA60',     data: all.ma60     || [], borderColor: '#d0fe48', type: 'line', pointRadius: 0 },
+                { label: 'MA60',     data: all.ma60     || [], borderColor: '#8bb400', type: 'line', pointRadius: 0 },
                 { label: 'MA120',    data: all.ma120    || [], borderColor: '#01b6f3', type: 'line', pointRadius: 0 },
                 { label: 'BB Upper', data: all.bb_upper || [], borderColor: '#a78bfa', borderDash: [4, 3], type: 'line', pointRadius: 0 },
                 { label: 'BB Mid',   data: all.bb_mid   || [], borderColor: '#818cf8', borderDash: [4, 3], type: 'line', pointRadius: 0 },
@@ -222,118 +222,112 @@ const dynamicWidth = computed(() => {
     const px = windowWidth.value < 768 ? 10 : 20;
     return Math.max(slicedLength.value * px, 400) + 'px';
 });
+
+// 차트가 화면보다 넓으면 가로 스크롤이 생긴다. 로드 직후엔 최근 봉(오른쪽 끝)이 보이게 맞춘다.
+// .chart-scroll 은 로딩이 끝나야 렌더되므로 DOM 갱신(nextTick)과 레이아웃(rAF)을 기다린 뒤 이동한다.
+const chartScroll = ref(null);
+const scrollToLatest = async () => {
+    await nextTick();
+    requestAnimationFrame(() => {
+        const el = chartScroll.value;
+        if (el) el.scrollLeft = el.scrollWidth;
+    });
+};
+watch([chartData, isLoading, dynamicWidth], () => {
+    if (chartData.value && !isLoading.value) scrollToLatest();
+});
 </script>
 
 <style scoped lang="scss">
-// 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
-// 캔들 색상(양봉/음봉)·이동평균선·볼린저밴드는 데이터를 구분하는 정보값이라
-// 예외적으로 유지한다 — 아래 <script>의 chartData/color 설정 참고.
-$white:    #ffffff;
-$gray-50:  #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-300: #c4c4c4;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-700: #3d3d3d;
-$gray-900: #141414;
-$blue:     #141414;
-$navy:     #141414;
+// 양봉상회 디자인 토큰(홈·매수추천과 동일). 카드 없이 흰 배경 + 구분선.
+// 캔들(상승/하락)은 앱 공통 등락색, 이동평균선·볼린저밴드는 데이터 구분용 색이라 <script> 쪽에 그대로 둔다.
+$white:   #FFFFFF;
+$line:    #EFE2BC;
+$line-2:  #EAD9A6;
+$chip:    #F6EBC8;
+$hero:    #74462A;
+$brown:   #7A4423;
+$ink:     #2B1D14;
+$sub:     #6B5B4E;
+$sub-2:   #7A6B5D;
+$cream:   #FFF8E1;
 
 #chart-stocks {
     min-height: 100vh;
     background: $white;
-    color: $gray-900;
-    font-family: 'Pretendard', -apple-system, sans-serif;
+    color: $ink;
+    text-align: left;
+    font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
+    font-variant-numeric: tabular-nums;
 }
 
 .contents {
     max-width: 900px;
     margin: 0 auto;
-    padding: 24px 16px 100px;
+    padding: 16px 16px 100px;
 }
 
-/* ── 헤더 ── */
-.head-desc {
-    margin-bottom: 16px;
-
-    h2 {
-        font-size: 1.3rem;
-        font-weight: 700;
-        margin: 0;
-        color: $gray-900;
-    }
-
-    .sub-text {
-        font-size: 0.8rem;
-        color: $gray-500;
-        margin: 3px 0 0;
-    }
-}
-
-/* ── 검색 카드 ── */
+/* ── 검색 영역: 카드 대신 아래 구분선으로 차트와 나눈다 ── */
 .search-card {
-    background: $white;
-    border: 1px solid $gray-200;
-    border-radius: 0;
-    padding: 14px 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.05);
-    margin-bottom: 16px;
     display: flex;
     flex-direction: column;
     gap: 10px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid $line;
 
-    /* SAutoInput 오버라이드 */
+    /* SAutoInput 오버라이드(공용 컴포넌트라 이 화면에서만 덮어쓴다) */
     :deep(.auto-complete-container) { margin: 0; width: 100%; }
 
     :deep(.search-bar) {
         width: 100% !important;
         box-sizing: border-box;
         margin: 0 !important;
+        min-height: 46px;
         background: $white;
-        border: 1.5px solid $gray-200;
-        border-radius: 0;
-        padding: 6px 12px;   // 우측 버튼(분석하기)이 없어 좌우 대칭
+        border: 1px solid $line-2;
+        border-radius: 12px;
+        padding: 2px 14px;
         box-shadow: none;
         transition: border-color .15s;
 
-        &:focus-within {
-            border-color: $blue;
-            box-shadow: 0 0 0 3px rgba(20,20,20,.08);
-        }
+        &:focus-within { border-color: $brown; }
     }
 
-    :deep(.search-bar .search-icon) { font-size: 0.95rem; margin-right: 8px; }
+    // 돋보기 이모지·검정 '종목' 배지는 이 화면 톤과 맞지 않아 숨긴다(placeholder 가 같은 뜻을 전한다)
+    :deep(.search-bar .search-icon),
+    :deep(.search-bar .label-badge) { display: none; }
 
     :deep(.search-bar input) {
-        color: $gray-900;
-        font-size: 0.92rem;
+        color: $ink;
+        font-size: 16px;   // iOS 포커스 확대 방지
+        text-align: left !important;
         background: transparent;
-        &::placeholder { color: $gray-400; }
+        &::placeholder { color: $sub-2; }
     }
 
     :deep(.suggestion-div) {
         background: $white;
-        border: 1px solid $gray-200;
-        border-radius: 0;
-        box-shadow: 0 8px 24px rgba(0,0,0,.1);
+        border: 1px solid $line-2;
+        border-radius: 12px;
+        box-shadow: 0 10px 24px rgba(74, 40, 20, .12);
     }
 
     :deep(.suggestion-header) {
-        background: $gray-50;
-        border-bottom: 1px solid $gray-100;
-        .item { color: $gray-500; font-size: 0.73rem; font-weight: 700; }
+        background: $white;
+        border-bottom: 1px solid $line;
+        .item { color: $sub; font-size: 12px; font-weight: 700; }
     }
 
     :deep(.list-item) {
-        .s_code { color: $gray-400; }
-        .s_name { color: $gray-900; }
-        .s_type { color: $gray-400; }
-        &:hover { background: $gray-50; }
+        border-bottom: 1px solid $line;
+        .s_code { color: $sub-2; }
+        .s_name { color: $ink; }
+        .s_type { color: $sub-2; }
+        &:hover { background: rgba(239, 226, 188, .3); }
     }
 }
 
-/* ── 날짜 행 ── */
+/* ── 기간 · 기준일 · 조회 ── */
 .date-row {
     display: flex;
     align-items: center;
@@ -341,32 +335,31 @@ $navy:     #141414;
     flex-wrap: wrap;
 }
 
-/* ── Period 버튼 그룹 ── */
+// 일/주/월: 베이지 바탕의 세그먼트, 선택 항목만 갈색으로 채운다
 .period-group {
     display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
+    gap: 2px;
+    padding: 3px;
+    background: $chip;
+    border-radius: 10px;
 }
 
 .period-btn {
-    padding: 6px 11px;
-    border: 1.5px solid $gray-200;
-    border-radius: 0;
-    background: $white;
-    color: $gray-500;
-    font-size: 0.78rem;
+    min-width: 40px;
+    min-height: 36px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: $brown;
+    font-size: 14px;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    transition: border-color .12s, background .12s, color .12s;
+    transition: background .12s, color .12s;
 
-    &:hover { border-color: $blue; color: $blue; }
-
-    &.active {
-        background: $navy;
-        border-color: $navy;
-        color: $white;
-    }
+    &.active { background: $hero; color: $cream; }
+    &:focus-visible { outline: 2px solid $brown; outline-offset: 1px; }
 }
 
 .date-field {
@@ -377,89 +370,70 @@ $navy:     #141414;
     min-width: 140px;
 
     .date-label {
-        font-size: 0.78rem;
+        font-size: 13px;
         font-weight: 600;
-        color: $gray-500;
+        color: $sub;
         white-space: nowrap;
-        min-width: 24px;
     }
 
     .date-input {
         flex: 1;
-        padding: 7px 10px;
-        border: 1.5px solid $gray-200;
-        border-radius: 0;
-        font-size: 0.85rem;
+        min-height: 42px;
+        padding: 0 10px;
+        border: 1px solid $line-2;
+        border-radius: 10px;
+        font-size: 16px;
         font-family: inherit;
-        color: $gray-700;
+        color: $ink;
         background: $white;
         outline: none;
         transition: border-color .15s;
 
-        &:focus { border-color: $blue; box-shadow: 0 0 0 3px rgba(20,20,20,.08); }
+        &:focus { border-color: $brown; }
     }
-}
-
-.date-sep {
-    font-size: 0.9rem;
-    color: $gray-400;
-    flex-shrink: 0;
 }
 
 .search-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    padding: 8px 18px;
-    background: $navy;
-    color: $white;
+    min-height: 42px;
+    padding: 0 18px;
+    background: $hero;
+    color: $cream;
     border: none;
-    border-radius: 0;
-    font-size: 0.85rem;
+    border-radius: 10px;
+    font-size: 15px;
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
     white-space: nowrap;
-    transition: background .15s, transform .1s;
     flex-shrink: 0;
 
-    &:hover  { background: $blue; }
     &:active { transform: scale(0.97); }
+    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
 }
 
-/* ── 차트 카드 ── */
-.chart-card {
-    background: $white;
-    border: 1px solid $gray-200;
-    border-radius: 0;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,.05);
+/* ── 차트: 카드 없이 제목 줄 + 차트 ── */
+.chart-section { padding-top: 16px; }
 
+.chart-card {
     .chart-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px 16px;
-        border-bottom: 1px solid $gray-100;
         gap: 12px;
         flex-wrap: wrap;
+        padding-bottom: 10px;
 
         .stock-title {
             display: flex;
             align-items: baseline;
             gap: 8px;
 
-            .stock-name {
-                font-size: 1rem;
-                font-weight: 700;
-                color: $gray-900;
-            }
-
-            .stock-code {
-                font-size: 0.75rem;
-                color: $gray-500;
-            }
-
+            .stock-name { font-size: 18px; font-weight: 700; color: $ink; }
+            .stock-code { font-size: 13px; color: $sub-2; }
         }
 
         .legend {
@@ -469,9 +443,9 @@ $navy:     #141414;
         }
 
         .leg-item {
-            font-size: 0.72rem;
+            font-size: 12px;
             font-weight: 600;
-            color: $gray-500;
+            color: $sub;
             display: flex;
             align-items: center;
             gap: 5px;
@@ -479,10 +453,9 @@ $navy:     #141414;
             &::before {
                 content: '';
                 display: inline-block;
-                width: 18px;
+                width: 16px;
                 height: 2px;
                 background: var(--c);
-                border-radius: 0;
             }
 
             &.leg-dashed::before {
@@ -493,7 +466,7 @@ $navy:     #141414;
             &.leg-bar::before {
                 width: 10px;
                 height: 10px;
-                border-radius: 0;
+                border-radius: 2px;
                 background: var(--c);
             }
         }
@@ -501,11 +474,11 @@ $navy:     #141414;
 
     .chart-scroll {
         overflow-x: auto;
-        padding: 16px;
+        padding: 4px 0 8px;
 
-        &::-webkit-scrollbar         { height: 4px; }
-        &::-webkit-scrollbar-track   { background: $gray-50; }
-        &::-webkit-scrollbar-thumb   { background: $gray-200; border-radius: 0; }
+        &::-webkit-scrollbar       { height: 4px; }
+        &::-webkit-scrollbar-track { background: transparent; }
+        &::-webkit-scrollbar-thumb { background: $line-2; border-radius: 2px; }
     }
 
     .chart-wrap {
@@ -517,23 +490,21 @@ $navy:     #141414;
 /* ── Loading ── */
 .chart-skeleton {
     height: 62vh;
-    background: $gray-50;
-    border: 1px solid $gray-100;
-    border-radius: 0;
+    background: rgba(239, 226, 188, .25);
+    border-radius: 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 16px;
     overflow: hidden;
-    position: relative;
 }
 
 .loading-bar {
     width: 220px;
     height: 3px;
-    background: $gray-100;
-    border-radius: 0;
+    background: $line;
+    border-radius: 2px;
     overflow: hidden;
 
     &::after {
@@ -541,16 +512,12 @@ $navy:     #141414;
         display: block;
         height: 100%;
         width: 40%;
-        background: $navy;
-        border-radius: 0;
+        background: $hero;
         animation: slide 1.2s ease-in-out infinite;
     }
 }
 
-.loading-label {
-    font-size: 0.8rem;
-    color: $gray-400;
-}
+.loading-label { font-size: 13px; color: $sub-2; }
 
 @keyframes slide {
     0%   { transform: translateX(-100%); }
@@ -561,80 +528,56 @@ $navy:     #141414;
 .empty-box {
     text-align: center;
     padding: 72px 0;
-    color: $gray-500;
-    font-size: 0.88rem;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: .5; }
-    50%       { opacity: .85; }
+    color: $sub;
+    font-size: 14px;
 }
 
 /* ── 태블릿 / 좁은 화면 ── */
 @media (max-width: 768px) {
-    .contents { padding: 16px 12px 80px; }
-
-    .search-card { padding: 12px; gap: 8px; }
-
-    .chart-header { padding: 10px 12px; }
-
     .legend { gap: 8px; }
-    .leg-item { font-size: 0.68rem; }
-
-    .chart-scroll { padding: 12px; }
-
+    .leg-item { font-size: 11px; }
     .chart-wrap { height: 52vh; }
-
     .chart-skeleton { height: 52vh; }
 }
 
 /* ── 모바일 ── */
 @media (max-width: 480px) {
-    .contents { padding: 12px 8px 72px; }
+    .contents { padding: 12px 16px 72px; }
 
-    /* [일|주|월] [기준일자 ____] [조회] 를 한 줄에 — 세로로 3단 쌓이던 것을 편다.
-     * 한 줄에 들어가야 하므로 nowrap 으로 두고, 가변 폭은 날짜 칸 하나만 맡긴다.
-     * (기간 버튼과 조회 버튼은 flex:none 으로 제 크기를 지킨다) */
-    .date-row     { flex-wrap: nowrap; align-items: center; gap: 4px; }
-    .period-group { flex: none; flex-wrap: nowrap; gap: 2px; }
-    .period-btn   { flex: none; padding: 6px 9px; font-size: 0.74rem; }
+    /* [일|주|월] [날짜] [조회] 를 한 줄에. 가변 폭은 날짜 칸 하나만 맡긴다. */
+    .date-row     { flex-wrap: nowrap; gap: 6px; }
+    .period-group { flex: none; }
+    .period-btn   { min-width: 34px; padding: 0 6px; }
 
-    /* min-width:0 이 핵심 — flex item 은 기본값(auto)이면 내용물 폭 밑으로 못 줄어서
-     * date input 의 내재 폭이 행을 화면 밖으로 밀어낸다. */
+    /* min-width:0 이 핵심 — 기본값(auto)이면 date input 의 내재 폭이 행을 화면 밖으로 밀어낸다.
+     * 라벨('기준일자')은 375px 에서 날짜 끝을 자르므로 숨긴다(접근성 이름은 aria-label). */
     .date-field   { flex: 1 1 0; min-width: 0; gap: 4px; }
-    /* 날짜 칸이 필요로 하는 자연 폭은 약 153px(16px 폰트 + 달력 아이콘)이다. 라벨('기준일자' ≈47px)을
-     * 두면 375px 에서 138px, 320px 에서 114px 로 날짜 끝이 잘린다. 라벨을 빼면 모든 폭에서 충분하다.
-     * 일/주/월 · 조회 사이의 날짜 칸이라 의미는 남고, 접근성 이름은 input 의 aria-label 이 맡는다. */
     .date-label   { display: none; }
-    .date-input   { flex: 1 1 0; min-width: 0; width: 100%; padding: 6px 4px; }
+    .date-input   { flex: 1 1 0; min-width: 0; width: 100%; padding: 0 6px; }
 
-    .search-btn   { flex: none; width: auto; padding: 6px 10px; font-size: 0.78rem; }
-    .search-btn svg { display: none; }   // 한 줄 확보를 위해 돋보기 아이콘은 모바일에서 생략
+    .search-btn   { padding: 0 12px; }
+    .search-btn svg { display: none; }
 
-    .chart-header {
+    .chart-card .chart-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 8px;
     }
-    .legend {
+    .chart-card .chart-header .legend {
         width: 100%;
         overflow-x: auto;
         flex-wrap: nowrap;
         padding-bottom: 2px;
         -webkit-overflow-scrolling: touch;
-
         &::-webkit-scrollbar { height: 3px; }
     }
     .leg-item { white-space: nowrap; }
 
-    .chart-wrap  { height: 46vh; min-width: 320px; }
+    .chart-card .chart-wrap { height: 46vh; min-width: 320px; }
     .chart-skeleton { height: 46vh; }
-
-    .stock-name { font-size: 0.92rem; }
-    .stock-code { font-size: 0.7rem; }
 }
 
 @media (max-width: 360px) {
-    .period-btn { font-size: 0.72rem; padding: 7px 4px; }
+    .period-btn { min-width: 30px; padding: 0 4px; font-size: 13px; }
 }
 </style>

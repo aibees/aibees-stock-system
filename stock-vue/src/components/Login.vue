@@ -165,7 +165,9 @@ const submitReset = async () => {
 }
 // ─────────────────────────────────────────────────────────────
 
-const redirect_url = aibeesGlobal.API_REDIRECT_URL + '/oauth/'
+// 네이버 콜백은 지금 열린 웹 주소 기준(개발/운영 모두 별도 설정 없이 맞는다).
+// 네이버 개발자센터의 Callback URL 에 <origin>/oauth/naver 를 등록해야 한다.
+const naver_callback_url = `${window.location.origin}/oauth/naver`
 const naver_info_url = '/api/oauth/infos/naver'
 
 // ── 아이디 기억하기 / 자동로그인 ───────────────────────────────
@@ -192,8 +194,7 @@ watch(autoLogin, (val) => {
 
 const login = (type) => {
     if (type === 'naver') {
-        alert('준비중입니다');
-        // naverlogin();
+        naverlogin();
     } else if (type === 'kakao') {
         alert('준비중입니다');
         // kakaologin();
@@ -249,19 +250,23 @@ const naverlogin = async () => {
         isLoading.value = true
         const { data } = await aibeesApi.get(naver_info_url)
         let naver_key_id = ''
-        const redirectURI = encodeURI(redirect_url + 'naver')
+        const redirectURI = encodeURIComponent(naver_callback_url)
         const state = StrUtils.createStatusKey()
+        // 콜백에서 같은 state 인지 확인한다(다른 곳에서 만든 인가 응답으로 로그인되는 것 방지)
+        sessionStorage.setItem('naverState', state)
 
         data?.data?.forEach((d) => {
             if (String(d.key_type).endsWith('ID')) naver_key_id = d.key_value
         })
+
+        if (!naver_key_id) throw new Error('NAVER_AUTH_ID 없음')
 
         const loginUrl =
             'https://nid.naver.com/oauth2.0/authorize?' +
             'response_type=code' +
             `&client_id=${naver_key_id}` +
             `&redirect_uri=${redirectURI}` +
-            `&state=${state}`
+            `&state=${encodeURIComponent(state)}`
 
         window.location.href = loginUrl
     } catch (err) {

@@ -49,6 +49,25 @@ class BatchLogDao:
         results = session.execute(stmt).scalars().all()
         return [obj.to_dict() for obj in results]
 
+    # 코드별 최신 로그 1건 - BatchSetting.vue "최근 실행" 표시용
+    # ================================================================
+    def select_latest_by_codes(self, session, codes):
+        """batch_code 별 가장 최근(batch_seq 최대) 로그. {batch_code: dict}.
+        로그의 batch_code 는 클래스명(StockBuyCheckJob)인 경우와 job_id 인 경우가 섞여 있어
+        호출측이 두 키를 모두 넘기고 더 최근 것을 고른다."""
+        codes = [c for c in set(codes) if c]
+        if not codes:
+            return {}
+        latest = (
+            select(func.max(NStockBatchLog.batch_seq))
+            .where(NStockBatchLog.batch_code.in_(codes))
+            .group_by(NStockBatchLog.batch_code)
+        )
+        rows = session.execute(
+            select(NStockBatchLog).where(NStockBatchLog.batch_seq.in_(latest))
+        ).scalars().all()
+        return {r.batch_code: r.to_dict() for r in rows}
+
     # count total rows
     # ================================================================
     def count_batch_log(self, session):

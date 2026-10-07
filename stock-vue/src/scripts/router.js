@@ -3,15 +3,15 @@ import { loadComponent } from './utils/componentLoader.js'
 import aibeesApi from './aibeesApi.js'
 import { assUserSession } from "./stores/user-stores";
 import { ensureAccess } from "./useAccess.js";
-import { hasAdPass } from "./useAdGate.js";
+import { consumeAdPass } from "./useAdGate.js";
 import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
 import AdGate from '@/components/AdGate.vue';
+import NaverCallback from '@/components/NaverCallback.vue';
 
 // ----- import components -----
 import Home from '@/components/Home.vue'
 import Login from '@/components/Login.vue'
 import App from '@/components/App.vue'
-import Group from '@/components/StocksGroup.vue';
 import UserOption from '@/components/UserOption.vue';
 import NotFound from '@/components/except/NotFound.vue'
 // -----------------------------
@@ -46,9 +46,10 @@ const routes = [
         component: AdGate
     },
     {
-        path: "/group",
-        name: "group",
-        component: Group
+        // 네이버 로그인 콜백(code/state 를 서버로 넘겨 로그인/연결/가입). 비로그인 공개 경로.
+        path: "/oauth/naver",
+        name: "naver-callback",
+        component: NaverCallback
     },
     {
         path: "/user-option",
@@ -144,7 +145,7 @@ const getRouteList = async () => {
 
 // 로그인 없이 접근 가능한 화이트리스트
 // /ad-gate: 비로그인도 광고 게이트를 거쳐 공개 메뉴로 갈 수 있어야 한다(이동 대상의 접근 가능 여부는 다시 검사된다).
-const PUBLIC_PATHS = ['/login', '/', '/home', '/ad-gate'];
+const PUBLIC_PATHS = ['/login', '/', '/home', '/ad-gate', '/oauth/naver'];
 
 export const setRouterToApp = async () => {
     const dynamicRoutes = await getRouteList();
@@ -160,7 +161,7 @@ export const setRouterToApp = async () => {
     });
 
     // ── 전역 네비게이션 가드 ──
-    router.beforeEach(async (to) => {
+    router.beforeEach(async (to, from) => {
         const userSession = assUserSession();
         const loggedIn = userSession.isUserSession();
         const isPublic = PUBLIC_PATHS.includes(to.path);
@@ -188,9 +189,12 @@ export const setRouterToApp = async () => {
             }
         }
 
-        // 광고 게이트: 접근이 허용된 게이트 대상 메뉴에만(비로그인 포함). AD_FREE 보유자는 건너뛴다.
-        if (AD_ENABLED && access?.loaded && allowed && adGatedPaths.has(target)
-            && !access.features.includes('AD_FREE') && !hasAdPass()) {
+        // 광고 게이트: 접근이 허용된 게이트 대상 메뉴에 "들어올 때마다"(비로그인 포함). AD_FREE 보유자는 건너뛴다.
+        //   같은 메뉴 안에서 쿼리만 바뀌는 이동(종목 검색·기간 변경)은 재입장이 아니라 묻지 않는다.
+        //   게이트에서 광고를 다 보면 이 경로 전용 1회용 통과권이 생기고, 여기서 소모된다.
+        const entering = normPath(from.path) !== target;
+        if (AD_ENABLED && access?.loaded && allowed && adGatedPaths.has(target) && entering
+            && !access.features.includes('AD_FREE') && !consumeAdPass(target)) {
             return { path: '/ad-gate', query: { next: to.fullPath } };
         }
     });

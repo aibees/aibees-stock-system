@@ -45,9 +45,9 @@
                         <button type="button" class="reco-row" :class="{ open: expandedCode === r.item.stock_code }"
                             :aria-expanded="expandedCode === r.item.stock_code ? 'true' : 'false'"
                             @click="toggleRow(r.item.stock_code)">
-                            <span class="rank">{{ String(rankNumber(idx)).padStart(2, '0') }}</span>
                             <span class="who">
                                 <span class="name-line">
+                                    <span class="rank">{{ String(rankNumber(idx)).padStart(2, '0') }}</span>
                                     <span class="name">{{ r.item.stock_name }}</span>
                                     <span class="code">{{ r.item.stock_code }}</span>
                                 </span>
@@ -106,6 +106,7 @@
 
 <script setup>
 import CandlestickChart from '../common/comp/CandlestickChart.vue';
+import { buyTargetCandleData, miniCandleOptions } from '@scripts/miniCandle.js';
 import aibeesApi from '@scripts/aibeesApi.js';
 import {
     numOrNull, formatNumber, hasValue, changeInfo, reasonLine,
@@ -248,48 +249,6 @@ const toggleChart = (code) => {
     expandedCharts.value = next;
 };
 
-const buyTargetCandleData = (item) => {
-    const rows = item.chart_data || [];
-    const toXY = (key) => rows.map(r => ({
-        x: (r.date || '').slice(0, 10),
-        y: r[key] != null ? Number(r[key]) : null,
-    }));
-
-    return {
-        labels: rows.map(r => (r.date || '').slice(0, 10)),
-        datasets: [
-            {
-                label: 'Candle',
-                data: rows.map(r => ({
-                    x: (r.date || '').slice(0, 10),
-                    o: Number(r.open), h: Number(r.high), l: Number(r.low), c: Number(r.close),
-                })),
-                color: { up: '#c51300', down: '#03748d', unchanged: '#999999' },
-            },
-            { label: 'MA20',  data: toXY('ma20'),  borderColor: '#efa55b', type: 'line', pointRadius: 0 },
-            { label: 'MA60',  data: toXY('ma60'),  borderColor: '#8bb400', type: 'line', pointRadius: 0 },
-            { label: 'MA120', data: toXY('ma120'), borderColor: '#01b6f3', type: 'line', pointRadius: 0 },
-        ],
-    };
-};
-
-// 카드 내 미니 프리뷰용 — 줌/팬 비활성화, 범례는 커스텀 legend로 대체, 축은 최소화
-const miniCandleOptions = {
-    plugins: {
-        legend: { display: false },
-        zoom: {
-            pan: { enabled: false },
-            zoom: { wheel: { enabled: false }, pinch: { enabled: false } },
-        },
-    },
-    scales: {
-        // x축 display:false 를 바로 주면(Chart.js 3.9 + category 스케일) 범위(min/max) 계산 자체가
-        // 깨져서 데이터가 거의 안 보이는 버그가 있다 — 축은 켜두고 눈금표시(ticks)만 숨긴다.
-        x: { type: 'category', grid: { display: false }, ticks: { display: false } },
-        y: { position: 'right', beginAtZero: false, ticks: { font: { size: 9 } } },
-    },
-};
-
 </script>
 
 <style scoped lang="scss">
@@ -312,7 +271,7 @@ $blue:     #7A4423;
 
 #stock-buy-target {
     min-height: 100vh;
-    background: $bg;
+    background: $card;
     color: $ink;
     text-align: left;
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
@@ -409,24 +368,21 @@ $blue:     #7A4423;
     justify-content: center;
 }
 
-/* ── 컴팩트 리스트 ── */
+/* ── 컴팩트 리스트: 카드 없이 페이지 배경 위에 구분선으로만 나열 (홈과 동일) ── */
 .reco-list {
-    background: $card;
-    border-radius: 18px;
-    box-shadow: 0 1px 0 $line, 0 0 0 1px #F3EAD2;
-    overflow: hidden;
+    border-top: 1px solid $line;
     display: flex;
     flex-direction: column;
 }
-.reco-item { border-bottom: 1px solid #F5EEDA; }
+.reco-item { border-bottom: 1px solid $line; }
 
 .reco-row {
     width: 100%;
     border: 0;
-    background: $card;
-    padding: 16px;
+    background: transparent;
+    padding: 16px 0;
     display: grid;
-    grid-template-columns: 30px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;   // 순위는 종목명 줄 안에(아래 공백 없음)
     gap: 10px;
     align-items: start;
     text-align: left;
@@ -434,9 +390,7 @@ $blue:     #7A4423;
     color: $ink;
     font-family: inherit;
 
-    &.open { background: #FFFDF5; }
-
-    .rank { font-family: 'Do Hyeon', 'Pretendard', sans-serif; font-size: 20px; color: #A0662F; }
+    .rank { font-family: 'Do Hyeon', 'Pretendard', sans-serif; font-size: 20px; line-height: 1; color: #A0662F; flex-shrink: 0; margin-right: 2px; }
     .who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .name-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; }
     .name { font-size: 16px; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
@@ -457,11 +411,10 @@ $blue:     #7A4423;
 }
 
 .reco-detail {
-    padding: 4px 16px 16px;
+    padding: 0 0 16px;
     display: flex;
     flex-direction: column;
     gap: 12px;
-    background: #FFFDF5;
 }
 
 .score-line { font-size: 12px; color: $sub; b { color: $ink; } }
@@ -471,19 +424,15 @@ $blue:     #7A4423;
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
-    background: $card;
-    border: 1px solid $line;
-    border-radius: 10px;
-    overflow: hidden;
 
-    th, td { padding: 8px 6px; text-align: right; font-size: 13px; border-bottom: 1px solid #F3EAD2; }
-    thead th { font-size: 11px; font-weight: 600; color: $sub; background: #FFFDF5; }
+    th, td { padding: 8px 6px; text-align: right; font-size: 13px; border-bottom: 1px solid $line; }
+    thead th { font-size: 11px; font-weight: 600; color: $sub; }
     tbody td { font-weight: 600; }
     td.hi { color: $up; }
     td.lo { color: $down; }
     td.cl { color: $ink; font-weight: 700; }
     tr:last-child th, tr:last-child td { border-bottom: 0; }
-    .vol th { font-size: 11px; font-weight: 600; color: $sub; text-align: left; padding-left: 10px; background: #FFFDF5; }
+    .vol th { font-size: 11px; font-weight: 600; color: $sub; text-align: left; padding-left: 0; }
 }
 
 .rd-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -503,17 +452,14 @@ $blue:     #7A4423;
 .more-btn {
     min-height: 52px;
     border: 0;
-    background: $card;
+    background: transparent;
     color: $brown;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
 }
 
-.skeleton-row { height: 72px; border-bottom: 1px solid #F3EAD2; background: $card; animation: pulse 1.6s infinite ease-in-out; }
-.empty-box { text-align: center; padding: 56px 0; color: $sub; font-size: 14px; }
-
-.skeleton-row { height: 72px; border-bottom: 1px solid #F3EAD2; background: $card; animation: pulse 1.6s infinite ease-in-out; }
+.skeleton-row { height: 72px; border-bottom: 1px solid $line; background: rgba(239, 226, 188, .35); animation: pulse 1.6s infinite ease-in-out; }
 .empty-box { text-align: center; padding: 56px 0; color: $sub; font-size: 14px; }
 
 /* ── 간이 차트 ── */

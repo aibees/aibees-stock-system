@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select, update
 
 from app.domains.models.masterMenu import MasterMenu
 from app.domains.models.roleMenu import RoleFeature, RoleMenu
@@ -88,13 +88,40 @@ class RoleMenuDao:
     # 관리 화면용
     # ================================================================
     def select_role_list(self, session):
+        """권한 목록 + 현재 부여된 사용자 수(user_count). 삭제 가능 여부 판단에 쓴다."""
+        counts = dict(session.execute(
+            select(UserAuth.auth_id, func.count())
+            .where(UserAuth.enabled_flag == 'Y')
+            .group_by(UserAuth.auth_id)
+        ).all())
         stmt = select(UserRole).order_by(UserRole.auth_id)
-        return [r.to_dict() for r in session.execute(stmt).scalars().all()]
+        return [{**r.to_dict(), 'user_count': counts.get(r.auth_id, 0)}
+                for r in session.execute(stmt).scalars().all()]
 
     def role_exists(self, session, auth_id):
         return session.execute(
             select(UserRole.auth_id).where(UserRole.auth_id == auth_id)
         ).first() is not None
+
+    def insert_role(self, session, auth_id, auth_nm):
+        session.add(UserRole(auth_id=auth_id, auth_nm=auth_nm))
+
+    def update_role_name(self, session, auth_id, auth_nm):
+        session.execute(update(UserRole).where(UserRole.auth_id == auth_id).values(auth_nm=auth_nm))
+
+    def count_role_users(self, session, auth_id):
+        return session.execute(
+            select(func.count()).select_from(UserAuth)
+            .where(UserAuth.auth_id == auth_id, UserAuth.enabled_flag == 'Y')
+        ).scalar_one()
+
+    def delete_role(self, session, auth_id):
+        """권한과 그 매핑(메뉴/기능)을 지운다. 회수된(enabled N) user_auth 이력도 함께 정리한다.
+        부여 중인 사용자가 있으면 호출측에서 막는다(count_role_users)."""
+        session.execute(delete(RoleMenu).where(RoleMenu.auth_id == auth_id))
+        session.execute(delete(RoleFeature).where(RoleFeature.auth_id == auth_id))
+        session.execute(delete(UserAuth).where(UserAuth.auth_id == auth_id))
+        session.execute(delete(UserRole).where(UserRole.auth_id == auth_id))
 
     def select_role_menu_codes(self, session, auth_id):
         stmt = select(RoleMenu.menu_code).where(

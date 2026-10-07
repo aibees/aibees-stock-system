@@ -19,6 +19,10 @@ import jwt  # PyJWT 패키지 (pyproject.toml에 PyJWT = "^2.8.0" 추가됨)
 from stock_shared.dao.userMasterDao import UserMasterDao
 from app.domains.dao.userRefreshTokenDao import UserRefreshTokenDao  # [신규] refreshToken DAO
 from app.exceptions import ResetRequiredException  # 단일 출처 임포트 — 이 파일에서 직접 정의하지 않음
+from app.domains.dao.masterInfoDao import MasterInfosDao
+from app.domains.dao.socialLoginDao import SocialLoginDao
+
+import requests
 
 
 # ── JWT 서명 시크릿 ──────────────────────────────────────────────────
@@ -33,26 +37,24 @@ JWT_ALGORITHM = 'HS256'  # 명세 허용 알고리즘: HS256 또는 RS256
 ACCESS_TOKEN_EXPIRE_MINUTES = 30   # accessToken 유효기간 (분)
 REFRESH_TOKEN_EXPIRE_DAYS   = 1   # refreshToken 유효기간 (일) — 7~30일 범위 내
 
+# ── 네이버 로그인 ─────────────────────────────────────────────────────
+NAVER = 'NAVER'                                   # user_login_type.login_type 값
+DEFAULT_SIGNUP_ROLE = 'STOCK_USER'                # 네이버로 신규 가입한 사용자의 기본 권한
+NAVER_TOKEN_URL = 'https://nid.naver.com/oauth2.0/token'
+NAVER_PROFILE_URL = 'https://openapi.naver.com/v1/nid/me'
+
+
+class NaverLoginError(Exception):
+    """사용자에게 그대로 보여줄 수 있는 네이버 로그인 실패 사유."""
+
 
 class AuthService:
     def __init__(self):
         self.name = 'AuthService'
         self.userMasterDaoImpl    = UserMasterDao()
         self.refreshTokenDaoImpl  = UserRefreshTokenDao()
-
-    # ────────────────────────────────────────────────────────────────
-    # oAuth 로그인 (카카오 등) — 기존 로직 유지
-    # ────────────────────────────────────────────────────────────────
-    def oAuthProcess(self, session, data):
-        user_param = data['data']
-        param = {
-            'type': data['type'],
-            'user_phone': user_param['mobile']
-        }
-        user_data = self.userMasterDaoImpl.select_user_by_phone(session, param)
-        if user_data is None:
-            return dict()
-        return user_data
+        self.socialLoginDaoImpl   = SocialLoginDao()
+        self.masterInfosDaoImpl   = MasterInfosDao()
 
     # ────────────────────────────────────────────────────────────────
     # [수정] 이메일 로그인
@@ -101,31 +103,115 @@ class AuthService:
             raise Exception("사용자 정보가 불일치합니다.")
 
         # ── 3. 권한 목록 조회 ──────────────────────────────────────────
-        param['user_id'] = user_info['user_id']
-        user_role_rows = self.userMasterDaoImpl.select_user_roleinfo(session, param)
+        # ── 4. 권한 + 토큰 쌍 발급 (네이버 로그인과 공통) ────────────────
+        return self._login_result(session, user_info['user_id'], user_info['user_name'])
 
-        # [수정] role을 문자열 리스트로 변환
-        # 기존: [{'auth_id': ..., 'auth_nm': 'USER'}, ...]
-        # 변경: ['USER', 'ADMIN', ...]  ← 명세 포맷
-        # auth_nm 컬럼 값이 'USER', 'ADMIN' 등 단순 문자열임을 전제로 함.
-        # DB 값이 다를 경우 아래 키를 auth_id 등으로 교체할 것.
+    def _login_result(self, session, user_id, user_name):
+        """로그인 성공 응답: 권한 목록 + accessToken/refreshToken. 이메일·네이버 로그인 공통."""
+        user_role_rows = self.userMasterDaoImpl.select_user_roleinfo(session, {'user_id': user_id})
+
+        # role 은 문자열 리스트(명세 포맷). auth_nm 값을 쓴다.
         role_list = [row['auth_nm'] for row in user_role_rows]
 
         login_info = {
-            'user_id': str(user_info['user_id']),  # 명세가 문자열("1") 형태로 정의
-            'user_name': user_info['user_name'],
+            'user_id': str(user_id),  # 명세가 문자열("1") 형태로 정의
+            'user_name': user_name,
             'role': role_list
         }
 
-        # ── 4. 토큰 쌍 발급 ────────────────────────────────────────────
-        # [신규] 공통 토큰 발급 메서드 호출
-        token_pair = self._issue_token_pair(session, user_info['user_id'])
+        token_pair = self._issue_token_pair(session, user_id)
 
         return {
             'accessToken':  token_pair['accessToken'],
             'refreshToken': token_pair['refreshToken'],
             'loginInfo':    login_info
         }
+
+    # ────────────────────────────────────────────────────────────────
+    # 네이버 로그인 (최초 로그인 시 이메일로 기존 계정 자동 연결 / 없으면 신규 가입)
+    # ────────────────────────────────────────────────────────────────
+    def naverProcess(self, session, data):
+        """
+        프런트는 네이버 인가 후 받은 code/state 만 보낸다. 사용자 정보는 서버가 네이버에서 직접 받는다
+        (클라이언트가 보낸 이메일·전화번호를 믿지 않는다).
+
+        계정 결정 순서:
+            ① 이 네이버 고유 ID 가 이미 연결된 사용자 → 그 사용자로 로그인
+            ② 네이버가 준 이메일과 user_master.email 이 정확히 1명 일치 → 그 사용자에 연결 후 로그인
+            ③ 일치하는 사용자가 없음 → 신규 가입(기본 권한 STOCK_USER) 후 로그인
+        반환: 이메일 로그인과 같은 형식 + 'naverResult': 'login' | 'linked' | 'created'
+        Raises: NaverLoginError(사용자에게 보여줄 메시지)
+        """
+        code, state = (data or {}).get('code'), (data or {}).get('state')
+        if not code or not state:
+            raise NaverLoginError("네이버 인증 정보가 없습니다. 다시 시도해 주세요.")
+
+        profile = self._naver_profile(session, code, state)
+        naver_id = profile.get('id')
+        email = (profile.get('email') or '').strip()
+        if not naver_id:
+            raise NaverLoginError("네이버 사용자 정보를 받지 못했습니다.")
+
+        dao = self.socialLoginDaoImpl
+
+        # ① 이미 연결된 네이버 계정
+        row = dao.select_by_provider_uid(session, NAVER, naver_id)
+        if row is not None:
+            if row.enabled_flag != 'Y':
+                raise NaverLoginError("네이버 로그인이 비활성화된 계정입니다. 관리자에게 문의해 주세요.")
+            user = dao.select_user(session, row.user_id)
+            return {**self._login_result(session, user.user_id, user.user_name), 'naverResult': 'login'}
+
+        if not email:
+            raise NaverLoginError("네이버 이메일 제공에 동의해야 로그인할 수 있어요.")
+
+        # ② 이메일이 같은 기존 사용자에 자동 연결
+        matches = dao.select_users_by_email(session, email)
+        if len(matches) > 1:
+            raise NaverLoginError("같은 이메일의 계정이 여러 개라 자동 연결할 수 없습니다. 관리자에게 문의해 주세요.")
+        if len(matches) == 1:
+            user = matches[0]
+            existing = dao.select_login_type(session, user.user_id, NAVER)
+            if existing is not None and existing.enabled_flag != 'Y':
+                raise NaverLoginError("네이버 로그인이 비활성화된 계정입니다. 관리자에게 문의해 주세요.")
+            if existing is not None and existing.provider_uid and existing.provider_uid != naver_id:
+                raise NaverLoginError("이 계정에는 다른 네이버 계정이 이미 연결돼 있습니다.")
+            dao.link(session, user.user_id, NAVER, naver_id)
+            return {**self._login_result(session, user.user_id, user.user_name), 'naverResult': 'linked'}
+
+        # ③ 신규 가입
+        name = (profile.get('name') or profile.get('nickname') or email.split('@')[0])[:45]
+        phone = (profile.get('mobile') or '').strip() or None
+        if phone and (len(phone) > 13 or dao.phone_in_use(session, phone)):
+            phone = None   # user_phone 은 UNIQUE — 다른 계정이 쓰는 번호면 비워 둔다
+        new_id = dao.create_user(session, user_name=name, email=email, phone=phone,
+                                 login_type=NAVER, provider_uid=naver_id, auth_id=DEFAULT_SIGNUP_ROLE)
+        return {**self._login_result(session, new_id, name), 'naverResult': 'created'}
+
+    def _naver_profile(self, session, code, state):
+        """code → 네이버 access token → 회원 프로필(/v1/nid/me). client secret 은 서버에만 있다."""
+        keys = {r['key_type']: r['key_value']
+                for r in self.masterInfosDaoImpl.select_master_key_by_category(session, 'NAVER_AUTH')}
+        client_id, client_secret = keys.get('NAVER_AUTH_ID'), keys.get('NAVER_AUTH_SECRET')
+        if not client_id or not client_secret:
+            raise NaverLoginError("네이버 로그인 설정이 없습니다. 관리자에게 문의해 주세요.")
+
+        token = requests.post(NAVER_TOKEN_URL, data={
+            'grant_type': 'authorization_code', 'client_id': client_id, 'client_secret': client_secret,
+            'code': code, 'state': state,
+        }, timeout=10).json()
+        access_token = token.get('access_token')
+        if not access_token:
+            # 코드 만료·재사용 등. 네이버 오류 내용은 로그로만 남기고 사용자에게는 일반 문구.
+            print(f"[naverProcess] token 실패: {token.get('error')} {token.get('error_description')}", flush=True)
+            raise NaverLoginError("네이버 인증이 만료됐어요. 다시 로그인해 주세요.")
+
+        me = requests.get(NAVER_PROFILE_URL, headers={'Authorization': f'Bearer {access_token}'},
+                          timeout=10).json()
+        if me.get('resultcode') != '00':
+            print(f"[naverProcess] profile 실패: {me.get('resultcode')} {me.get('message')}", flush=True)
+            raise NaverLoginError("네이버 사용자 정보를 받지 못했습니다.")
+        return me.get('response') or {}
 
     # ────────────────────────────────────────────────────────────────
     # [신규] 토큰 재발급 (Silent Refresh)

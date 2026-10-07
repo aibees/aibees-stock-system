@@ -4,9 +4,6 @@
             <div class="title">{{ title }}</div>
         </div>
         <div class="right">
-            <div class="group" @click="goTo('group')">
-                <div>즐겨찾기</div>
-            </div>
             <div class="users" v-if="isUser" ref="userMenuRef">
                 <div
                     class="user-btn"
@@ -106,8 +103,6 @@ const isUser = ref(false);
 const userName = ref("");
 const router = useRouter();
 
-const loginCheckRoutes = ["group"];
-
 onMounted(() => {
   title.value = toRefs(props).prop_title.value;
   isUser.value = userSession.isUserSession();
@@ -133,17 +128,11 @@ const goUserOption = () => {
 const logout = () => {
     userSession.logoutUser(); // pinia 상태 + sessionStorage + localStorage 모두 초기화
     closeUserMenu();
-    router.push('/home');
+    router.push('/login');
 };
 
 // 로그인 여부 비활성화
 const goTo = (name) => {
-    if (loginCheckRoutes.includes(name) && !userSession.isUserSession()) {
-        alert("로그인이 필요한 페이지입니다. 로그인메뉴로 이동합니다.");
-        router.push({ name: 'login' });
-        return;
-    }
-
     router.push({ name });
 };
 </script>

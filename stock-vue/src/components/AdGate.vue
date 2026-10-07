@@ -26,7 +26,7 @@
 <script setup>
 import AdSlot from './common/AdSlot.vue';
 import { AD_GATE_SECONDS } from '@scripts/adConfig.js';
-import { grantAdPass } from '@scripts/useAdGate.js';
+import { adPassPath, grantAdPass } from '@scripts/useAdGate.js';
 import { hasFeature } from '@scripts/useAccess.js';
 import { isNativeAdsEnabled, loadRewardedAd, showRewardedAd } from '@scripts/useAdMob.js';
 
@@ -75,7 +75,7 @@ const prepareAd = async () => {
 };
 
 const pass = () => {
-    grantAdPass();
+    grantAdPass(adPassPath(next.value));   // 이동할 경로 하나에만 쓰는 1회용 통과권
     router.replace(next.value);
 };
 

@@ -1,91 +1,68 @@
 <template>
     <div id="route-setting">
-        <Headers :prop_title="title" />
+        <BrandHeader :title="title" back="/menu" />
 
         <div class="contents">
 
-            <!-- ── 상단 타이틀 + 추가 버튼 ── -->
-            <section class="head-desc">
-                <div class="head-left">
-                    <h2 style="text-align: left;">메뉴 라우트 설정</h2>
-                </div>
-                <button class="btn-add" @click="openAdd">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                    메뉴 추가
-                </button>
+            <!-- ── 요약 + 추가 버튼 ── -->
+            <section class="toolbar">
+                <p class="summary">메뉴 <b>{{ totalCount }}</b>개 · 비활성 {{ disabledCount }}</p>
+                <button type="button" class="btn-primary" @click="openAdd">+ 메뉴 추가</button>
             </section>
 
-            <!-- ── 테이블 ── -->
-            <section class="table-section">
-                <div v-if="isLoading" class="loader-rows">
-                    <div v-for="n in 6" :key="n" class="skeleton-row"></div>
-                </div>
+            <div v-if="isLoading" class="loader-rows">
+                <div v-for="n in 6" :key="n" class="skeleton-row"></div>
+            </div>
 
-                <table v-else class="menu-table">
-                    <thead>
-                        <tr>
-                            <th class="col-sort">순서</th>
-                            <th class="col-code">코드</th>
-                            <th class="col-parent">부모</th>
-                            <th class="col-name">메뉴명</th>
-                            <th class="col-path">경로</th>
-                            <th class="col-title">타이틀</th>
-                            <th class="col-component">컴포넌트</th>
-                            <th class="col-flag">표시</th>
-                            <th class="col-flag">활성</th>
-                            <th class="col-admin">관리자</th>
-                            <th class="col-action"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template v-for="row in flatList" :key="row.menu_code">
-                            <tr
-                                :class="{ 'row-disabled': row.enabled_flag === 'N', 'row-child': row.menu_parents !== 'ROOT' }">
-                                <td class="col-sort">{{ row.sort }}</td>
-                                <td class="col-code"><span class="code-chip">{{ row.menu_code }}</span></td>
-                                <td class="col-parent">
-                                    <span v-if="row.menu_parents !== 'ROOT'" class="parent-chip">{{ row.menu_parents
-                                    }}</span>
-                                    <span v-else class="root-label">ROOT</span>
-                                </td>
-                                <td class="col-name">
-                                    <span :class="['indent', { child: row.menu_parents !== 'ROOT' }]">{{ row.menu_name
-                                    }}</span>
-                                </td>
-                                <td class="col-path"><span class="path-text">{{ row.menu_path }}</span></td>
-                                <td class="col-title">{{ row.menu_title ?? '-' }}</td>
-                                <td class="col-component"><span class="comp-text">{{ row.menu_component }}</span></td>
-                                <td class="col-flag">
-                                    <span :class="['flag-badge', row.display_flag === 'Y' ? 'on' : 'off']">
-                                        {{ row.display_flag === 'Y' ? '표시' : '숨김' }}
-                                    </span>
-                                </td>
-                                <td class="col-flag">
-                                    <button :class="['toggle-btn', row.enabled_flag === 'Y' ? 'active' : 'inactive']"
-                                        @click="toggleEnabled(row)" :disabled="togglingCode === row.menu_code">
-                                        <span class="toggle-knob"></span>
-                                    </button>
-                                </td>
-                                <td class="col-admin">
-                                    <span :class="['flag-badge', row.admin_only === 'Y' ? 'admin' : 'off']">
-                                        {{ row.admin_only === 'Y' ? '전용' : '-' }}
-                                    </span>
-                                </td>
-                                <td class="col-action">
-                                    <button class="btn-edit" @click="openEdit(row)">수정</button>
-                                </td>
-                            </tr>
-                        </template>
-                        <tr v-if="!isLoading && flatList.length === 0">
-                            <td colspan="11" class="empty-cell">등록된 메뉴가 없습니다.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </section>
+            <!-- ── 메뉴 트리: 최상위 메뉴 = 그룹 제목, 하위 메뉴 = 구분선 목록(카드 없음) ── -->
+            <template v-else>
+                <section v-for="root in tree" :key="root.menu_code" class="menu-group">
+                    <div class="group-head" :class="{ off: root.enabled_flag === 'N' }">
+                        <div class="gh-title">
+                            <div class="gh-line">
+                                <h2>{{ labelOf(root) }}</h2>
+                                <span v-for="t in tagsOf(root)" :key="t.text" class="tag" :class="t.cls">{{ t.text }}</span>
+                            </div>
+                            <span class="route-path">{{ fullPath(root) }}</span>
+                        </div>
+                        <div class="gh-right">
+                            <button type="button" class="act" @click="openEdit(root)">수정</button>
+                            <button type="button" :class="['toggle-btn', root.enabled_flag === 'Y' ? 'active' : 'inactive']"
+                                role="switch" :aria-checked="root.enabled_flag === 'Y' ? 'true' : 'false'"
+                                :aria-label="`${labelOf(root)} 활성`"
+                                @click="toggleEnabled(root)" :disabled="togglingCode === root.menu_code">
+                                <span class="toggle-knob"></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <ul v-if="root.children && root.children.length" class="menu-list">
+                        <li v-for="c in childrenOf(root)" :key="c.menu_code" class="menu" :class="{ off: c.enabled_flag === 'N' }">
+                            <div class="m-top">
+                                <div class="m-title">
+                                    <span class="m-name">{{ labelOf(c) }}</span>
+                                    <span v-for="t in tagsOf(c)" :key="t.text" class="tag" :class="t.cls">{{ t.text }}</span>
+                                </div>
+                                <button type="button" :class="['toggle-btn', c.enabled_flag === 'Y' ? 'active' : 'inactive']"
+                                    role="switch" :aria-checked="c.enabled_flag === 'Y' ? 'true' : 'false'"
+                                    :aria-label="`${labelOf(c)} 활성`"
+                                    @click="toggleEnabled(c)" :disabled="togglingCode === c.menu_code">
+                                    <span class="toggle-knob"></span>
+                                </button>
+                            </div>
+                            <div class="m-route">
+                                <span class="route-path">{{ fullPath(c, root) }}</span>
+                            </div>
+                            <div class="m-foot">
+                                <!-- 컴포넌트명은 메뉴 코드와 다를 때만(대부분 같아 반복되던 것) -->
+                                <span class="m-tech">{{ c.menu_code }}<template v-if="c.menu_component && c.menu_component !== c.menu_code"> · {{ c.menu_component }}</template> · 순서 {{ c.sort }}</span>
+                                <button type="button" class="act" @click="openEdit(c)">수정</button>
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+                <p v-if="!tree.length" class="empty">등록된 메뉴가 없습니다.</p>
+            </template>
         </div>
 
         <!-- ── 레이어 팝업 ── -->
@@ -238,23 +215,38 @@
 <script setup>
 import aibeesApi from '@scripts/aibeesApi.js';
 
-const title = ref('메뉴 설정');
+const title = ref('라우팅 관리');
 
 /* ── 목록 ── */
 const rawList = ref([]);
 const isLoading = ref(true);
 const togglingCode = ref(null);
 
-const flatList = computed(() => {
-    const result = [];
-    for (const m of rawList.value) {
-        result.push(m);
-        if (m.children?.length) {
-            result.push(...m.children);
-        }
-    }
-    return result;
-});
+// /master/menus 는 최상위 메뉴 배열 + 각자의 children. 그룹/하위 모두 정렬 순서대로.
+// (예전 화면은 최상위를 'ROOT' 로 비교했는데 DB 값은 'root' 라 전부 하위 메뉴로 그려졌다)
+const bySort = (a, b) => (a.sort ?? 0) - (b.sort ?? 0);
+// 원본 객체를 그대로 쓴다(복사하면 활성 토글이 복사본만 바꿔 화면이 되돌아간다)
+const tree = computed(() => [...rawList.value].sort(bySort));
+const childrenOf = (r) => [...(r.children ?? [])].sort(bySort);
+const allMenus = computed(() => tree.value.flatMap(r => [r, ...(r.children ?? [])]));
+const totalCount = computed(() => allMenus.value.length);
+const disabledCount = computed(() => allMenus.value.filter(m => m.enabled_flag === 'N').length);
+
+const labelOf = (m) => m.menu_title || m.menu_name;
+const norm = (p) => String(p ?? '').replace(/^\/+|\/+$/g, '');
+// router.js 와 같은 규칙: 하위 메뉴 경로 = /부모경로/자기경로
+const fullPath = (m, parent) => (parent ? `/${norm(parent.menu_path)}/${norm(m.menu_path)}` : `/${norm(m.menu_path)}`);
+
+// 상태 태그: 접근 범위(공개 > 공통 > 관리자) + 숨김/비활성
+const tagsOf = (m) => {
+    const tags = [];
+    if (m.public_flag === 'Y') tags.push({ text: '공개', cls: 'pub' });
+    else if (m.common_flag === 'Y') tags.push({ text: '공통', cls: 'com' });
+    if (m.admin_only === 'Y') tags.push({ text: '관리자', cls: 'adm' });
+    if (m.display_flag === 'N') tags.push({ text: '숨김', cls: 'mute' });
+    if (m.enabled_flag === 'N') tags.push({ text: '비활성', cls: 'mute' });
+    return tags;
+};
 
 const fetchMenus = async () => {
     isLoading.value = true;
@@ -337,448 +329,286 @@ const saveMenu = async () => {
 </script>
 
 <style scoped lang="scss">
-$white: #ffffff;
-$gray-50: #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-300: #c4c4c4;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-700: #3d3d3d;
-$gray-900: #141414;
-$blue: #141414;
-$navy: #141414;
-$red: #141414;
-$amber: #141414;
-$green: #141414;
+// 양봉상회 토큰(홈·배치 관리와 동일). 카드 없이 흰 배경 + 구분선.
+$white:   #ffffff;
+$line:    #EFE2BC;
+$line-2:  #EAD9A6;
+$chip:    #F6EBC8;
+$hero:    #74462A;
+$brown:   #7A4423;
+$ink:     #2B1D14;
+$sub:     #6B5B4E;
+$sub-2:   #7A6B5D;
+$cream:   #FFF8E1;
+$red:     #C8282A;
 
 #route-setting {
     min-height: 100vh;
-    background: $gray-50;
-    color: $gray-900;
-    font-family: 'Pretendard', -apple-system, sans-serif;
+    background: $white;
+    color: $ink;
+    text-align: left;
+    font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
+    font-variant-numeric: tabular-nums;
 }
 
 .contents {
-    max-width: 1200px;
+    max-width: 760px;
     margin: 0 auto;
-    padding: 28px 16px 100px;
+    padding: 16px 16px calc(96px + env(safe-area-inset-bottom, 0px));
 }
 
-/* ── Head ── */
-.head-desc {
+/* ── 요약 + 추가 ── */
+.toolbar {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    margin-bottom: 20px;
-
-    h2 {
-        font-size: 1.4rem;
-        font-weight: 700;
-        margin: 0;
-        color: $gray-900;
-    }
-
-    .sub-text {
-        font-size: 0.82rem;
-        color: $gray-500;
-        margin: 4px 0 0;
-    }
-}
-
-.btn-add {
-    display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    background: $navy;
-    color: $white;
-    border: none;
-    border-radius: 0;
-    font-size: 0.84rem;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 4px;
+    .summary { margin: 0; font-size: 14px; color: $sub; b { color: $ink; font-size: 16px; } }
+}
+.btn-primary {
+    min-height: 40px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 10px;
+    background: $hero;
+    color: $cream;
+    font-size: 14px;
     font-weight: 600;
-    cursor: pointer;
     font-family: inherit;
-    transition: background .15s;
-
-    &:hover {
-        background: #000000;
-    }
+    cursor: pointer;
+    white-space: nowrap;
+    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
 }
 
-/* ── Table ── */
-.table-section {
-    background: $white;
-    border: 1px solid $gray-200;
-    border-radius: 0;
+/* ── 그룹(최상위 메뉴) ── */
+.menu-group { margin-top: 18px; }
+.group-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid $line;
+
+    &.off .gh-title { opacity: .55; }
+}
+.gh-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gh-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.gh-line h2 { margin: 0; font-size: 17px; font-weight: 700; color: $ink; }
+.gh-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+.route-path {
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    font-size: 12.5px;
+    color: $brown;
+    overflow-wrap: anywhere;
+}
+
+/* ── 하위 메뉴 목록 ── */
+.menu-list { margin: 0; padding: 0; list-style: none; }
+.menu {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 0;
+    border-bottom: 1px solid $line;
+
+    &.off .m-title,
+    &.off .m-route { opacity: .55; }
+}
+.m-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.m-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
+.m-name { font-size: 15px; font-weight: 600; color: $ink; }
+.m-route { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.m-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.m-tech {
+    min-width: 0;
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    font-size: 11.5px;
+    color: $sub-2;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.menu-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.83rem;
-
-    thead tr {
-        background: $gray-50;
-        border-bottom: 1px solid $gray-200;
-    }
-
-    th {
-        padding: 10px 12px;
-        text-align: left;
-        font-size: 0.72rem;
-        font-weight: 700;
-        color: $gray-500;
-        letter-spacing: .04em;
-        text-transform: uppercase;
-        white-space: nowrap;
-    }
-
-    td {
-        padding: 10px 12px;
-        border-bottom: 1px solid $gray-100;
-        vertical-align: middle;
-        color: $gray-700;
-    }
-
-    tbody tr:last-child td {
-        border-bottom: none;
-    }
-
-    tbody tr:hover td {
-        background: $gray-50;
-    }
-
-    .row-disabled td {
-        opacity: .45;
-    }
-
-    .row-child td:first-child {
-        padding-left: 24px;
-    }
-}
-
-/* column widths */
-.col-sort {
-    width: 52px;
-    text-align: center;
-}
-
-.col-code {
-    width: 140px;
-}
-
-.col-parent {
-    width: 110px;
-}
-
-.col-name {
-    width: 110px;
-}
-
-.col-path {
-    width: 110px;
-}
-
-.col-title {
-    min-width: 120px;
-}
-
-.col-component {
-    width: 120px;
-}
-
-.col-flag {
-    width: 70px;
-    text-align: center;
-}
-
-.col-admin {
-    width: 70px;
-    text-align: center;
-}
-
-.col-action {
-    width: 60px;
-    text-align: center;
-}
-
-/* chips */
-.code-chip {
-    font-size: 0.72rem;
-    font-weight: 600;
-    background: $gray-100;
-    color: $gray-700;
-    padding: 2px 7px;
-    border-radius: 0;
-    border: 1px solid $gray-200;
-}
-
-.parent-chip {
-    font-size: 0.72rem;
-    background: #efefef;
-    color: $navy;
-    padding: 2px 7px;
-    border-radius: 0;
-    border: 1px solid #c4c4c4;
-}
-
-.root-label {
-    font-size: 0.72rem;
-    color: $gray-400;
-}
-
-.path-text,
-.comp-text {
-    font-family: 'SFMono-Regular', Consolas, monospace;
-    font-size: 0.78rem;
-    color: $gray-700;
-}
-
-.indent.child::before {
-    content: '└ ';
-    color: $gray-400;
-}
-
-/* flag badge */
-.flag-badge {
-    font-size: 0.7rem;
+// 상태 태그: 글자로 의미를 전한다(색은 보조)
+.tag {
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
     font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 0;
-
-    &.on {
-        background: #141414;
-        color: $green;
-        border: 1px solid #141414;
-    }
-
-    &.off {
-        background: $gray-100;
-        color: $gray-400;
-        border: 1px solid $gray-200;
-    }
-
-    &.admin {
-        background: #efefef;
-        color: $amber;
-        border: 1px solid #9a9a9a;
-    }
+    white-space: nowrap;
+    &.pub  { background: #E6F3EA; color: #23784A; }
+    &.com  { background: $chip; color: $brown; }
+    &.adm  { background: #F3E3D6; color: #8A3F14; }
+    &.mute { background: #F1ECE2; color: $sub; }
 }
 
-/* toggle */
+.act {
+    min-height: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: $brown;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+    &:hover { background: rgba(239, 226, 188, .4); }
+    &:focus-visible { outline: 2px solid $brown; outline-offset: 0; }
+}
+
+/* ── 활성 스위치 ── */
 .toggle-btn {
     position: relative;
-    width: 36px;
-    height: 20px;
-    border-radius: 0;
-    border: none;
+    flex-shrink: 0;
+    width: 44px;
+    height: 26px;
+    border: 0;
+    border-radius: 13px;
     cursor: pointer;
-    transition: background .2s;
-    padding: 0;
+    transition: background .15s;
 
-    &.active {
-        background: $green;
-    }
-
-    &.inactive {
-        background: $gray-200;
-    }
-
-    &:disabled {
-        opacity: .5;
-        cursor: not-allowed;
-    }
+    &.active   { background: $hero; }
+    &.inactive { background: $line-2; }
+    &:disabled { opacity: .6; cursor: default; }
+    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
 
     .toggle-knob {
         position: absolute;
         top: 3px;
-        width: 14px;
-        height: 14px;
-        border-radius: 0;
-        background: $white;
-        transition: left .2s;
-    }
-
-    &.active .toggle-knob {
-        left: 19px;
-    }
-
-    &.inactive .toggle-knob {
         left: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        background: $white;
+        box-shadow: 0 1px 2px rgba(74, 40, 20, .25);
+        transition: transform .15s;
     }
+    &.active .toggle-knob { transform: translateX(18px); }
 }
 
-.btn-edit {
-    padding: 4px 10px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    border: 1px solid $gray-200;
-    border-radius: 0;
-    background: $white;
-    color: $gray-700;
-    cursor: pointer;
-    font-family: inherit;
-    transition: border-color .12s, color .12s;
+/* ── 로딩 / 빈 상태 ── */
+.loader-rows { display: flex; flex-direction: column; margin-top: 18px; border-top: 1px solid $line; }
+.skeleton-row { height: 76px; border-bottom: 1px solid $line; background: rgba(239, 226, 188, .3); animation: pulse 1.6s infinite ease-in-out; }
+.empty { padding: 48px 0; text-align: center; color: $sub; font-size: 14px; }
 
-    &:hover {
-        border-color: $blue;
-        color: $blue;
-    }
-}
-
-/* skeleton */
-.loader-rows {
-    padding: 8px;
-}
-
-.skeleton-row {
-    height: 42px;
-    background: $gray-100;
-    border-radius: 0;
-    margin-bottom: 6px;
-    animation: pulse 1.6s infinite ease-in-out;
-}
-
-.empty-cell {
-    text-align: center;
-    padding: 60px 0;
-    color: $gray-400;
-    font-size: 0.88rem;
-}
-
-/* ── Popup ── */
+/* ── 추가/수정 팝업: 모바일은 바텀시트 ── */
 .popup-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, .45);
+    background: rgba(43, 29, 20, .45);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 2000;
     padding: 16px;
+
+    @media (max-width: 600px) { align-items: flex-end; padding: 0; }
 }
 
 .popup-panel {
     background: $white;
-    border-radius: 0;
+    border-radius: 16px;
     width: 100%;
     max-width: 560px;
     max-height: 90vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, .18);
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(74, 40, 20, .2);
+
+    @media (max-width: 600px) {
+        max-width: none;
+        max-height: 88vh;
+        border-radius: 16px 16px 0 0;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
 }
 
 .popup-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 18px 20px 14px;
-    border-bottom: 1px solid $gray-100;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid $line;
 
-    h3 {
-        margin: 0;
-        font-size: 1rem;
-        font-weight: 700;
-        color: $gray-900;
-    }
+    h3 { margin: 0; font-size: 17px; font-weight: 700; color: $ink; }
 
     .btn-close {
         border: none;
         background: none;
         cursor: pointer;
-        color: $gray-400;
-        padding: 4px;
-        border-radius: 0;
+        color: $sub-2;
+        padding: 6px;
         display: flex;
         align-items: center;
-        transition: color .12s;
-
-        &:hover {
-            color: $gray-900;
-        }
+        &:hover { color: $ink; }
     }
 }
 
 .popup-body {
-    padding: 20px;
+    padding: 16px 20px 20px;
     overflow-y: auto;
+    overflow-x: hidden;   // 입력칸이 넘쳐도 가로로 밀리지 않게
     flex: 1;
 }
 
 .form-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px 16px;
+    // minmax(0, …) 이 핵심 — 1fr 은 입력칸의 최소 폭 아래로 못 줄어 좁은 화면에서 팝업 밖으로 넘친다
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px 12px;
+
+    @media (max-width: 480px) { grid-template-columns: minmax(0, 1fr); }
 
     .form-field {
         display: flex;
         flex-direction: column;
         gap: 5px;
+        min-width: 0;
 
-        &.full {
-            grid-column: 1 / -1;
-        }
+        &.full { grid-column: 1 / -1; }
 
-        label {
-            font-size: 0.78rem;
-            font-weight: 600;
-            color: $gray-700;
-        }
+        label { font-size: 13px; font-weight: 600; color: #4A3628; }
+        .req { color: $red; margin-left: 2px; }
 
-        .req {
-            color: $red;
-            margin-left: 2px;
-        }
-
-        input[type="text"],
-        input[type="number"],
         input:not([type="radio"]) {
-            padding: 8px 10px;
-            border: 1px solid $gray-200;
-            border-radius: 0;
-            font-size: 0.84rem;
-            color: $gray-900;
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            min-height: 42px;
+            padding: 0 12px;
+            border: 1px solid $line-2;
+            border-radius: 10px;
+            font-size: 16px;   // iOS 포커스 확대 방지
+            color: $ink;
             font-family: inherit;
             background: $white;
             outline: none;
             transition: border-color .15s;
 
-            &:focus {
-                border-color: $blue;
-            }
-
-            &:disabled {
-                background: $gray-50;
-                color: $gray-400;
-            }
-
-            &::placeholder {
-                color: $gray-400;
-            }
+            &:focus { border-color: $brown; }
+            &:disabled { background: #FFFDF5; color: $sub-2; }
+            &::placeholder { color: #9A8C7E; }
         }
 
-        .radio-group {
-            display: flex;
-            gap: 16px;
-            padding: 8px 0 4px;
-        }
+        .radio-group { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 6px 0 2px; }
 
         .radio-label {
             display: flex;
             align-items: center;
-            gap: 5px;
-            font-size: 0.84rem;
+            gap: 6px;
+            min-height: 32px;
+            font-size: 14px;
             font-weight: 500;
-            color: $gray-700;
+            color: #4A3628;
             cursor: pointer;
 
-            input[type="radio"] {
-                cursor: pointer;
-                accent-color: $navy;
-            }
+            input[type="radio"] { cursor: pointer; accent-color: $hero; }
         }
     }
 }
@@ -787,68 +617,38 @@ $green: #141414;
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    padding: 14px 20px 18px;
-    border-top: 1px solid $gray-100;
+    padding: 12px 20px 16px;
+    border-top: 1px solid $line;
 
-    .btn-cancel {
-        padding: 8px 18px;
-        border: 1px solid $gray-200;
-        border-radius: 0;
-        background: $white;
-        color: $gray-700;
-        font-size: 0.84rem;
-        font-weight: 600;
-        cursor: pointer;
-        font-family: inherit;
-        transition: border-color .12s;
-
-        &:hover {
-            border-color: $gray-400;
-        }
-    }
-
+    .btn-cancel,
     .btn-save {
-        padding: 8px 20px;
-        border: none;
-        border-radius: 0;
-        background: $navy;
-        color: $white;
-        font-size: 0.84rem;
-        font-weight: 700;
-        cursor: pointer;
+        min-height: 42px;
+        padding: 0 18px;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
         font-family: inherit;
-        transition: background .15s;
-
-        &:hover {
-            background: #000000;
-        }
-
-        &:disabled {
-            opacity: .55;
-            cursor: not-allowed;
-        }
+        cursor: pointer;
+    }
+    .btn-cancel { border: 1px solid $line-2; background: $white; color: #4A3628; }
+    .btn-save {
+        border: none;
+        background: $hero;
+        color: $cream;
+        font-weight: 700;
+        &:hover { background: $brown; }
+        &:disabled { opacity: .55; cursor: not-allowed; }
     }
 }
 
 /* ── Transition ── */
 .fade-enter-active,
-.fade-leave-active {
-    transition: opacity .18s;
-}
-
+.fade-leave-active { transition: opacity .18s; }
 .fade-enter-from,
-.fade-leave-to {
-    opacity: 0;
-}
+.fade-leave-to { opacity: 0; }
 
 @keyframes pulse {
-
-    0%,
-    100% {
-        opacity: .5;
-    }
-
-    50% {
-        opacity: .9;
-    }
-}</style>
+    0%, 100% { opacity: .5; }
+    50%      { opacity: .9; }
+}
+</style>

@@ -10,6 +10,8 @@ router_user_options.py — 개인설정 조회 / 수정
     - 서버가 JWT 에서 user_id 를 추출해 본인 데이터만 처리한다.
     - 화이트리스트에 없는 컬럼은 무시 또는 400 반환.
     - vol_limit / vol_surge 는 user_id=1(관리자)에게만 허용.
+    - user_detail(KIS·텔레그램 연동 키)은 매매 사용자(WORKER_USER 권한)만 조회/수정할 수 있다.
+      그 외 사용자는 GET 응답에서 user_detail 을 빼고, PATCH 로 보내면 403.
 
 대상 테이블 / 컬럼:
     user_master  : user_phone, email
@@ -21,6 +23,7 @@ router_user_options.py — 개인설정 조회 / 수정
 import logging
 from flask import Blueprint, g
 
+from app.domains.dao.roleMenuDao import RoleMenuDao
 from app.domains.dao.userOptionsDao import UserOptionsDao
 from app.flask_app.routers.router_oauth import require_auth
 from app.flask_app.utils.apiResponse import ApiResponse
@@ -29,6 +32,14 @@ logging.basicConfig(level=logging.ERROR)
 
 user_options_bp = Blueprint("user_options", __name__)
 userOptionsDaoImpl = UserOptionsDao()
+roleMenuDaoImpl = RoleMenuDao()
+
+# 연동 키(user_detail)를 다룰 수 있는 권한 — 프런트 useAccess.js 의 WORKER_ROLE 과 같은 값
+WORKER_AUTH_ID = 'WORKER_USER'
+
+
+def _is_worker(user_id) -> bool:
+    return WORKER_AUTH_ID in roleMenuDaoImpl.select_user_auth_ids(g.db, user_id)
 
 # 관리자 user_id
 ADMIN_USER_ID = 1
@@ -128,6 +139,8 @@ def get_user_options():
     try:
         is_admin = (g.current_user_id == ADMIN_USER_ID)
         data = userOptionsDaoImpl.select_user_settings(g.db, g.current_user_id, is_admin)
+        if not _is_worker(g.current_user_id):
+            data.pop('user_detail', None)   # 연동 키는 매매 사용자에게만 내려준다
         return ApiResponse.success(data)
     except Exception as e:
         logging.exception(e)
@@ -150,6 +163,9 @@ def patch_user_options():
     clean_body, err_response = _validate_patch_body(body, g.current_user_id)
     if err_response:
         return err_response
+
+    if 'user_detail' in clean_body and not _is_worker(g.current_user_id):
+        return ApiResponse.error("연동 키는 매매 사용자만 수정할 수 있습니다.", status=403)
 
     is_admin = (g.current_user_id == ADMIN_USER_ID)
 

@@ -1,6 +1,6 @@
 <template>
     <div id="stock-analysis">
-        <Headers :prop_title="title" />
+        <BrandHeader :title="title" />
 
         <div class="contents">
             <!-- 검색 섹션 -->
@@ -44,7 +44,6 @@
                     <!-- ① 기업개요 + 재무현황 (버튼 갱신, 실적발표월만) -->
                     <section class="ai-result-section">
                         <div class="section-header">
-                            <span class="section-icon">🏢</span>
                             <span class="section-title">기업개요 · 재무현황</span>
                             <span v-if="overview" class="token-info">{{ formatUpdatedAt(overview.updated_at) }} 업데이트</span>
                             <button type="button" class="ai-refresh-btn" :disabled="overviewButtonDisabled" @click="refreshOverview">
@@ -61,40 +60,40 @@
                         </div>
                     </section>
 
-                    <!-- 신호 칩 + 오늘의 가격 범위 (추천 목록에 있는 종목만) -->
-                    <section v-if="item" class="ai-result-section signal-section">
+                    <!-- 봉 모양: 매수추천 펼침 행과 같은 DayCandle(그날 시/고/저/종 + 거래량, 장중엔 '현재가') -->
+                    <section v-if="item" class="ai-result-section">
                         <div class="section-header">
-                            <span class="section-icon">📡</span>
-                            <span class="section-title">충족한 신호</span>
-                            <span class="token-info">{{ cond.pass }}/{{ cond.total }}</span>
+                            <span class="section-title">봉 모양</span>
+                            <span class="token-info">{{ itemDateLabel }} 기준</span>
                         </div>
-                        <div v-if="passedSignals.length" class="chips">
-                            <span v-for="r in passedSignals" :key="r.label" class="chip">{{ r.short }}</span>
-                        </div>
-                        <p v-else class="muted">충족한 신호가 아직 없어요.</p>
+                        <DayCandle class="flat-candle" :open="item.open" :high="item.high" :low="item.low" :close="item.close"
+                            :volume="item.volume" :close-label="status.state === 'live' ? '현재가' : '종가'" />
+                    </section>
 
-                        <div class="range">
-                            <div class="range-title">오늘의 가격 범위</div>
-                            <div class="range-labels"><span>저가 {{ formatNumber(item.low) }}</span><span>고가 {{ formatNumber(item.high) }}</span></div>
-                            <div class="track">
-                                <span v-if="rangePos(item, item.open) !== null" class="op-tick" :style="{ left: rangePos(item, item.open) + '%' }"></span>
-                                <span v-if="rangePos(item, item.close) !== null" class="cur-dot" :class="chg.cls" :style="{ left: rangePos(item, item.close) + '%' }"></span>
-                            </div>
-                            <div class="range-legend">
-                                <span>│ 시가 {{ formatNumber(item.open) }}</span>
-                                <span><i class="legend-dot" :class="chg.cls"></i>{{ status.state === 'live' ? '현재가' : '종가' }}</span>
-                                <span>거래량 {{ formatNumber(item.volume) }}</span>
-                            </div>
+                    <!-- 충족한 신호: 칩 나열 대신 체크 + 이름 + 한 줄 설명의 목록(전체 조건은 조건 탭) -->
+                    <section v-if="item" class="ai-result-section">
+                        <div class="section-header">
+                            <span class="section-title">충족한 신호</span>
+                            <span class="sig-count"><b>{{ cond.pass }}</b> / {{ cond.total }}</span>
                         </div>
+                        <ul v-if="passedSignals.length" class="sig-list">
+                            <li v-for="r in passedSignals" :key="r.label">
+                                <span class="sig-mark" aria-hidden="true">✓</span>
+                                <div class="sig-body">
+                                    <div class="sig-name">{{ r.short }}</div>
+                                    <div class="sig-desc">{{ r.desc }}</div>
+                                </div>
+                            </li>
+                        </ul>
+                        <p v-else class="muted">아직 충족한 신호가 없어요. 전체 조건은 조건 탭에서 볼 수 있어요.</p>
                     </section>
                     <section v-else-if="itemLoaded" class="ai-result-section">
-                        <p class="muted">이 날짜의 추천 목록에 없는 종목이라 신호·가격 범위 정보가 없어요.</p>
+                        <p class="muted">이 날짜의 추천 목록에 없는 종목이라 차트 모양·신호 정보가 없어요.</p>
                     </section>
 
                     <!-- ② 현재 테마 (버튼 갱신, 주 1회 권장) -->
                     <section class="ai-result-section">
                         <div class="section-header">
-                            <span class="section-icon">🔥</span>
                             <span class="section-title">현재 테마</span>
                             <span v-if="theme" class="token-info">{{ formatUpdatedAt(theme.updated_at) }} 업데이트</span>
                             <button type="button" class="ai-refresh-btn" :disabled="themeButtonDisabled" @click="refreshTheme">
@@ -114,7 +113,6 @@
                     <!-- ③ 최근 공시·뉴스 (자동, 2시간 캐시) -->
                     <section class="ai-result-section">
                         <div class="section-header">
-                            <span class="section-icon">📰</span>
                             <span class="section-title">최근 공시 · 뉴스</span>
                             <span v-if="news" class="token-info">{{ formatUpdatedAt(news.updated_at) }} 업데이트</span>
                         </div>
@@ -237,7 +235,6 @@
                     <!-- ═══ 하단 고정 버튼 ═══ -->
                     <div class="action-bar">
                         <button type="button" class="act primary" @click="goToChart">차트 보기</button>
-                        <button v-if="canTradeLog" type="button" class="act outline" @click="goToTradeLog">매매 기록 추가</button>
                     </div>
                 </div>
             </transition>
@@ -251,7 +248,7 @@ import { marked } from 'marked';
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores';
 import {
-    numOrNull, formatNumber as fmtNum, hasValue, changeInfo, rangePos, fundamentalRows, technicalRows,
+    numOrNull, formatNumber as fmtNum, hasValue, changeInfo, fundamentalRows, technicalRows,
     conditionCount, kstNowParts, marketStatus, getLatestBatchDate,
 } from '@scripts/stockSignals.js';
 
@@ -288,8 +285,8 @@ const status = computed(() => {
 const chg = computed(() => (item.value ? changeInfo(item.value) : { cls: 'flat', text: '' }));
 const cond = computed(() => (item.value ? conditionCount(item.value) : { pass: 0, total: 0 }));
 const condRows = computed(() => (item.value ? technicalRows(item.value) : []));
-const passedSignals = computed(() => condRows.value.filter(r => r.pass));
 const finRows = computed(() => (item.value ? fundamentalRows(item.value) : []));
+const passedSignals = computed(() => condRows.value.filter(r => r.pass));
 const itemDateLabel = computed(() => {
     const y = item.value?.ymd;
     return y ? `${y.slice(4, 6)}/${y.slice(6, 8)}` : '';
@@ -307,13 +304,6 @@ const loadItem = async (code) => {
     } finally {
         itemLoaded.value = true;
     }
-};
-
-// 매매 기록 화면(/trade/trade-log)에 접근 권한이 있는 사용자에게만 버튼을 보여준다.
-const canTradeLog = computed(() => userSession.access.paths.includes('/trade/trade-log'));
-// TODO: 종목을 지정한 "매매 기록 추가" 폼은 아직 없다 — 지금은 매매 기록 화면으로 이동만 한다.
-const goToTradeLog = () => {
-    router.push({ path: '/trade/trade-log', query: { stock_code: inputCode.value } });
 };
 
 const ADMIN_USER_ID = 1;
@@ -543,20 +533,20 @@ const formatRate = (v) => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
 </script>
 
 <style scoped lang="scss">
-/* ── 색상 변수 (Home.vue 동일) ── */
+/* ── 색상 변수: 양봉상회 토큰(홈·매수추천과 동일). 변수명은 유지하고 값만 브랜드 톤으로 ── */
 $white:    #ffffff;
-$gray-50:  #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-300: #c4c4c4;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-700: #3d3d3d;
-$gray-900: #141414;
-$blue:     #141414;
-$navy:     #141414;
-$red:      #141414;
-$amber:    #141414;
+$gray-50:  #FFFDF5;
+$gray-100: #F3EAD2;
+$gray-200: #EFE2BC;
+$gray-300: #EAD9A6;
+$gray-400: #9A8C7E;
+$gray-500: #6B5B4E;
+$gray-700: #4A3628;
+$gray-900: #2B1D14;
+$blue:     #7A4423;
+$navy:     #7A4423;
+$red:      #C8282A;
+$amber:    #A0662F;
 
 /* ── 기본 레이아웃 ── */
 #stock-analysis {
@@ -680,11 +670,12 @@ $amber:    #141414;
     gap: 16px;
 }
 
-/* ── 공통: 섹션 헤더 ── */
+/* ── 공통: 섹션 헤더 — 제목은 한 줄 유지, 공간이 모자라면 업데이트 시각·버튼이 다음 줄로 ── */
 .section-header {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 4px 8px;
     margin-bottom: 12px;
 
     .section-icon {
@@ -693,10 +684,11 @@ $amber:    #141414;
 
     .section-title {
         text-align: start;
-        font-size: 0.95rem;
+        font-size: 17px;
         font-weight: 700;
         color: $gray-900;
-        flex: 1;
+        flex: 1 0 auto;
+        white-space: nowrap;
     }
 
     .section-badge {
@@ -710,13 +702,9 @@ $amber:    #141414;
     }
 
     .token-info {
-        font-size: 0.65rem;
+        font-size: 12px;
         font-weight: 500;
         color: $gray-400;
-        background: $gray-50;
-        border: 1px solid $gray-100;
-        padding: 2px 7px;
-        border-radius: 0;
         white-space: nowrap;
         font-variant-numeric: tabular-nums;
     }
@@ -728,11 +716,14 @@ $amber:    #141414;
 
     .ai-refresh-btn {
         flex-shrink: 0;
-        padding: 4px 10px;
-        border: 1px solid $gray-200;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 1px solid $gray-300;
+        border-radius: 8px;
         background: $white;
-        color: $gray-700;
-        font-size: 0.72rem;
+        color: $blue;
+        font-family: inherit;
+        font-size: 12px;
         font-weight: 600;
         cursor: pointer;
         white-space: nowrap;
@@ -908,7 +899,7 @@ $amber:    #141414;
                 width: 8px;
                 height: 8px;
                 background: $blue;
-                border-radius: 0;
+                border-radius: 4px;
                 animation: bounce 1.2s infinite ease-in-out;
 
                 &:nth-child(2) { animation-delay: 0.2s; }
@@ -993,18 +984,14 @@ $amber:    #141414;
 }
 
 .rec-date-badge {
-    font-size: 0.72rem;
+    font-size: 12px;
     color: $gray-500;
-    background: $gray-100;
-    border: 1px solid $gray-200;
-    padding: 2px 8px;
-    border-radius: 0;
 }
 
+// 세 값은 박스 없이 세로 구분선으로만 나눈다
 .rec-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
 }
 
 .rec-card {
@@ -1012,20 +999,11 @@ $amber:    #141414;
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    padding: 14px 8px;
-    border-radius: 0;
-    border: 1px solid $gray-100;
-    background: $gray-50;
+    padding: 6px 8px;
     text-align: center;
+    border-left: 1px solid $gray-200;
 
-    &.base-card {
-        border-color: $gray-200;
-    }
-
-    &.high-card {
-        border-color: #c4c4c4;
-        background: #fafafa;
-    }
+    &:first-child { border-left: 0; }
 
     .rec-label {
         font-size: 0.68rem;
@@ -1051,14 +1029,12 @@ $amber:    #141414;
 }
 
 .rec-rate-badge {
-    font-size: 0.72rem;
+    font-size: 13px;
     font-weight: 700;
-    padding: 3px 8px;
-    border-radius: 0;
 
-    &.neutral  { background: $gray-100; color: $gray-500; }
-    &.rate-up  { background: #efefef; color: $red; }
-    &.rate-down{ background: #efefef; color: $navy; }
+    &.neutral  { color: $gray-500; }
+    &.rate-up  { color: #C8282A; }
+    &.rate-down{ color: #1F5BD1; }
 }
 
 /* ── 전환 애니메이션 ── */
@@ -1105,21 +1081,29 @@ $yb-down:   #1F5BD1;
     border-radius: 14px;
     border-color: $yb-line-2;
     background: #fff;
+    box-shadow: none;
 }
+#stock-analysis :deep(.search-bar .search-icon) { display: none; }   // 돋보기 이모지는 다른 화면과 맞춰 숨긴다
+#stock-analysis :deep(.search-bar input) { font-size: 16px; }         // iOS 포커스 확대 방지
 
 #stock-analysis {
-    background: $yb-bg;
+    background: #fff;
     color: $yb-ink;
     font-variant-numeric: tabular-nums;
     text-align: left;
 }
 .contents { padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
 
-.ai-result-section {
-    border: 1px solid $yb-line;
-    border-radius: 16px;
+// 섹션은 카드 없이 위쪽 구분선 + 제목으로만 나눈다(홈·트레이드와 같은 방식)
+.ai-result-section,
+.rec-section {
+    background: transparent;
+    border: 0;
+    border-top: 1px solid $yb-line;
+    border-radius: 0;
     box-shadow: none;
-    margin-bottom: 12px;
+    padding: 16px 0 4px;
+    margin: 0;
 }
 .section-header .section-title { color: $yb-ink; }
 .ai-refresh-btn { border-radius: 8px; }
@@ -1184,59 +1168,52 @@ $yb-down:   #1F5BD1;
     }
 }
 .tab-panel { display: flex; flex-direction: column; gap: 12px; }
+// 탭 밑줄 바로 아래라 첫 섹션의 위쪽 구분선은 겹쳐 보인다 — 빼고 간격만 둔다
+.tab-panel > section:first-child { border-top: 0; padding-top: 6px; }
 
-/* ── 신호 칩 · 가격 범위 ── */
-.signal-section .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
-.chip {
-    padding: 5px 11px;
-    border-radius: 999px;
-    background: $yb-bar;
-    border: 1px solid $yb-line-2;
-    color: #5C3118;
-    font-size: 13px;
-    font-weight: 600;
-}
 .muted { margin: 0; font-size: 13px; color: $yb-sub; line-height: 1.5; }
-.card-empty { background: #fff; border: 1px solid $yb-line; border-radius: 16px; padding: 28px 16px; text-align: center; }
+.card-empty { padding: 28px 0; text-align: center; }
 
-.range {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    .range-title { font-size: 13px; font-weight: 700; color: $yb-ink; }
-    .range-labels { display: flex; justify-content: space-between; font-size: 12px; color: $yb-sub; }
-    .range-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: $yb-sub; }
+/* ── 봉 모양: DayCandle 의 자체 테두리 박스는 이 화면에서만 걷어낸다(카드 최소화) ── */
+// 루트 요소에는 부모 scope 속성이 붙으므로 :deep 없이 잡힌다. 섹션 클래스를 앞에 둬 DayCandle 자체 규칙보다 우선.
+.ai-result-section .flat-candle { border: 0; border-radius: 0; padding: 0; background: transparent; }
+
+/* ── 충족한 신호: 체크 + 이름 + 한 줄 설명 ── */
+.sig-count {
+    font-size: 14px;
+    color: $yb-sub;
+    b { font-size: 20px; font-weight: 700; color: $yb-brown; margin-right: 1px; }
 }
-.track {
-    position: relative;
-    height: 8px;
-    margin: 4px 0 8px;
-    border-radius: 4px;
-    background: #F1E6C8;
-    .op-tick { position: absolute; top: -3px; width: 2px; height: 14px; background: #8A7A6A; }
-    .cur-dot {
-        position: absolute; top: -4px; width: 16px; height: 16px; margin-left: -8px;
-        border-radius: 8px; border: 3px solid #fff; box-shadow: 0 0 0 1px #D9C8A0; background: $yb-sub;
-        &.up { background: $yb-up; }
-        &.down { background: $yb-down; }
+.sig-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr);
+        gap: 10px;
+        padding: 10px 0;
+        border-top: 1px solid $yb-line;
+        &:first-child { border-top: 0; padding-top: 2px; }
     }
-}
-.legend-dot {
-    display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 4px; background: $yb-sub;
-    &.up { background: $yb-up; }
-    &.down { background: $yb-down; }
+    .sig-mark {
+        width: 22px; height: 22px; margin-top: 1px; border-radius: 11px;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: $yb-yellow; color: $yb-brown-d; font-size: 12px; font-weight: 700;
+    }
+    .sig-name { font-size: 15px; font-weight: 700; color: $yb-ink; }
+    .sig-desc { margin-top: 2px; font-size: 13px; line-height: 1.5; color: $yb-sub; }
 }
 
 /* ── 재무 탭: 2열 지표 카드 ── */
-.fin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.fin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 20px; }   // 위쪽 선은 탭 밑줄이 대신한다
 .fin-card {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 14px;
-    background: #fff;
-    border: 1px solid $yb-line;
-    border-radius: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid $yb-line;
 
     .fin-label { font-size: 12px; font-weight: 700; color: $yb-sub; }
     .fin-value { font-size: 20px; font-weight: 700; }
@@ -1260,10 +1237,7 @@ $yb-down:   #1F5BD1;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 14px;
-    background: #fff;
-    border: 1px solid $yb-line;
-    border-radius: 14px;
+    padding: 4px 0 2px;
     strong { font-size: 15px; }
     .cond-bar { height: 8px; border-radius: 4px; background: #F1E6C8; overflow: hidden;
         span { display: block; height: 100%; background: $yb-yellow; } }
@@ -1272,12 +1246,9 @@ $yb-down:   #1F5BD1;
     margin: 0;
     padding: 0;
     list-style: none;
-    background: #fff;
-    border: 1px solid $yb-line;
-    border-radius: 14px;
-    overflow: hidden;
+    border-top: 1px solid $yb-line;
 
-    li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 14px; border-bottom: 1px solid #F3EAD2; &:last-child { border-bottom: 0; } }
+    li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 14px 0; border-bottom: 1px solid $yb-line; }
     .mark {
         width: 24px; height: 24px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
         background: #F1ECE2; color: $yb-sub; font-weight: 700; font-size: 13px;
@@ -1313,7 +1284,6 @@ $yb-down:   #1F5BD1;
         font-family: inherit;
         cursor: pointer;
         &.primary { border: 0; background: $yb-yellow; color: #3A200F; }
-        &.outline { border: 1.5px solid $yb-brown; background: transparent; color: $yb-brown; }
     }
 
     // 데스크톱: 하단 탭바가 없으므로 화면 맨 아래, 내용 폭에 맞춘다

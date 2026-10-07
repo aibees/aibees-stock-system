@@ -2,6 +2,10 @@
   "appId": "com.aibeesworld.stocks",
   "appName": "AIbees Trading",
   "webDir": "dist",
+  "server": {
+    "url": "http://localhost:19010",
+    "cleartext": true
+  },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 1500,

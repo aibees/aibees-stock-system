@@ -1,125 +1,71 @@
 <template>
     <div id="batch-setting">
-        <Headers :prop_title="title" />
+        <BrandHeader :title="title" back="/menu" />
 
         <div class="contents">
 
-            <!-- ── 상단 타이틀 + 추가 버튼 ── -->
-            <section class="head-desc">
-                <div class="head-left">
-                    <h2 style="text-align: left;">배치 작업 설정</h2>
-                </div>
+            <!-- ── 요약 + 상단 버튼 ── -->
+            <section class="toolbar">
+                <p class="summary">사용 중 <b>{{ groups[0].rows.length }}</b> · 중지 {{ groups[1].rows.length }}</p>
                 <div class="head-actions">
-                    <button class="btn-reload" @click="reloadScheduler" :disabled="isReloading">
+                    <button type="button" class="btn-ghost" @click="reloadScheduler" :disabled="isReloading">
                         <svg :class="{ spinning: isReloading }" xmlns="http://www.w3.org/2000/svg" width="14"
                             height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                            stroke-linecap="round" stroke-linejoin="round">
+                            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <polyline points="23 4 23 10 17 10" />
                             <polyline points="1 20 1 14 7 14" />
                             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                         </svg>
                         {{ isReloading ? '갱신 중…' : '스케줄러 새로고침' }}
                     </button>
-                    <button class="btn-add" @click="openAdd">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
-                        배치 추가
-                    </button>
+                    <button type="button" class="btn-primary" @click="openAdd">+ 배치 추가</button>
                 </div>
             </section>
 
-            <!-- ── 데스크탑 테이블 ── -->
-            <section class="table-section">
-                <div v-if="isLoading" class="loader-rows">
-                    <div v-for="n in 6" :key="n" class="skeleton-row"></div>
-                </div>
+            <div v-if="isLoading" class="loader-rows">
+                <div v-for="n in 5" :key="n" class="skeleton-row"></div>
+            </div>
 
-                <table v-else class="batch-table">
-                    <thead>
-                        <tr>
-                            <th class="col-id">JOB ID</th>
-                            <th class="col-name">배치명</th>
-                            <th class="col-module">모듈</th>
-                            <th class="col-class">클래스</th>
-                            <th class="col-cron">CRON (분/시/요일)</th>
-                            <th class="col-flag">사용</th>
-                            <th class="col-action"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="row in batchList" :key="row.job_id"
-                            :class="{ 'row-disabled': row.enabled_flag === 'N' }">
-                            <td class="col-id"><span class="code-chip">{{ row.job_id }}</span></td>
-                            <td class="col-name">{{ row.job_name }}</td>
-                            <td class="col-module"><span class="path-text">{{ row.module_name }}</span></td>
-                            <td class="col-class"><span class="comp-text">{{ row.class_name }}</span></td>
-                            <td class="col-cron">
-                                <span class="cron-chip">{{ row.cron_minute }} {{ row.cron_hour }} {{
-                                    row.cron_day_of_week }}</span>
-                            </td>
-                            <td class="col-flag">
-                                <button :class="['toggle-btn', row.enabled_flag === 'Y' ? 'active' : 'inactive']"
+            <template v-else>
+                <!-- 사용 중 / 중지 그룹, 각 그룹은 실행 시각 순. 카드 없이 구분선 목록 -->
+                <section v-for="g in groups" v-show="g.rows.length" :key="g.key" class="job-group">
+                    <h2 class="group-title">{{ g.label }} <span class="count">{{ g.rows.length }}</span></h2>
+                    <ul class="job-list">
+                        <li v-for="row in g.rows" :key="row.job_id" class="job" :class="{ off: row.enabled_flag === 'N' }">
+                            <div class="job-top">
+                                <div class="job-title">
+                                    <span class="job-name">{{ row.job_name }}</span>
+                                    <span class="job-when">{{ cronLabel(row) }}</span>
+                                </div>
+                                <button type="button" :class="['toggle-btn', row.enabled_flag === 'Y' ? 'active' : 'inactive']"
+                                    role="switch" :aria-checked="row.enabled_flag === 'Y' ? 'true' : 'false'"
+                                    :aria-label="`${row.job_name} 사용`"
                                     @click="toggleEnabled(row)" :disabled="togglingId === row.job_id">
                                     <span class="toggle-knob"></span>
                                 </button>
-                            </td>
-                            <td class="col-action">
-                                <div class="action-group">
-                                    <button class="btn-run" @click="openRun(row)">단독실행</button>
-                                    <button class="btn-edit" @click="openEdit(row)">수정</button>
-                                    <button class="btn-delete" @click="removeBatch(row)">삭제</button>
+                            </div>
+
+                            <!-- 최근 실행: 상태는 점 + 글자로(색만으로 구분하지 않는다) -->
+                            <div class="job-last" :class="lastRun(row).cls">
+                                <i class="dot" aria-hidden="true"></i>
+                                <span class="lr-state">{{ lastRun(row).label }}</span>
+                                <span v-if="lastRun(row).meta" class="lr-meta">{{ lastRun(row).meta }}</span>
+                            </div>
+                            <p v-if="row.last_run && row.last_run.desc" class="job-desc">{{ row.last_run.desc }}</p>
+
+                            <div class="job-foot">
+                                <span class="job-tech">{{ row.job_id }} · {{ row.cron_minute }} {{ row.cron_hour }} {{ row.cron_day_of_week }}</span>
+                                <div class="job-actions">
+                                    <button type="button" class="act" @click="openRun(row)">실행</button>
+                                    <button type="button" class="act" @click="openEdit(row)">수정</button>
+                                    <button type="button" class="act danger" @click="removeBatch(row)">삭제</button>
                                 </div>
-                            </td>
-                        </tr>
-                        <tr v-if="!isLoading && batchList.length === 0">
-                            <td colspan="7" class="empty-cell">등록된 배치가 없습니다.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </section>
-
-            <!-- ── 모바일 리스트 (ul/li) ── -->
-            <section class="mobile-list">
-                <div v-if="isLoading" class="loader-rows">
-                    <div v-for="n in 4" :key="n" class="skeleton-row"></div>
-                </div>
-
-                <ul v-else class="batch-ul">
-                    <li v-for="row in batchList" :key="row.job_id" class="batch-li"
-                        :class="{ 'li-disabled': row.enabled_flag === 'N' }">
-                        <div class="li-top">
-                            <span class="code-chip">{{ row.job_id }}</span>
-                            <button :class="['toggle-btn', row.enabled_flag === 'Y' ? 'active' : 'inactive']"
-                                @click="toggleEnabled(row)" :disabled="togglingId === row.job_id">
-                                <span class="toggle-knob"></span>
-                            </button>
-                        </div>
-                        <div class="li-name">{{ row.job_name }}</div>
-                        <div class="li-row">
-                            <span class="li-label">모듈</span>
-                            <span class="path-text">{{ row.module_name }}</span>
-                        </div>
-                        <div class="li-row">
-                            <span class="li-label">클래스</span>
-                            <span class="comp-text">{{ row.class_name }}</span>
-                        </div>
-                        <div class="li-row">
-                            <span class="li-label">CRON</span>
-                            <span class="cron-chip">{{ row.cron_minute }} {{ row.cron_hour }} {{
-                                row.cron_day_of_week }}</span>
-                        </div>
-                        <div class="li-actions">
-                            <button class="btn-run" @click="openRun(row)">단독실행</button>
-                            <button class="btn-edit" @click="openEdit(row)">수정</button>
-                            <button class="btn-delete" @click="removeBatch(row)">삭제</button>
-                        </div>
-                    </li>
-                    <li v-if="batchList.length === 0" class="empty-cell">등록된 배치가 없습니다.</li>
-                </ul>
-            </section>
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+                <p v-if="!batchList.length" class="empty">등록된 배치가 없습니다.</p>
+            </template>
         </div>
 
         <!-- ── 추가/수정 팝업 ── -->
@@ -186,6 +132,11 @@
                                     <label>CRON 요일 <span class="req">*</span></label>
                                     <input v-model="form.cron_day_of_week" placeholder="예) mon-fri 또는 *" maxlength="45" />
                                 </div>
+
+                                <!-- 입력한 CRON 이 실제로 언제 도는지 바로 보여준다 -->
+                                <p v-if="form.cron_minute && form.cron_hour" class="cron-preview full">
+                                    실행 주기 <b>{{ cronLabel(form) }}</b>
+                                </p>
 
                                 <!-- 사용 여부 -->
                                 <div class="form-field full">
@@ -260,7 +211,7 @@
 <script setup>
 import aibeesApi, { batchApi } from '@scripts/aibeesApi.js';
 
-const title = ref('배치 설정');
+const title = ref('배치 관리');
 
 /* ── 목록 ── */
 const batchList = ref([]);
@@ -280,6 +231,93 @@ const fetchBatchList = async () => {
 onMounted(async () => {
     await fetchBatchList();
 });
+
+// ── 실행 주기: CRON(분/시/요일) → 사람이 읽는 말 ──
+// 실제 등록된 패턴(0 20 mon-fri, */30 9-16 mon-fri, 0 2 sat, */30 * * …)을 다룬다. 모르는 형식은 원문을 그대로 보여준다.
+const DOW = { mon: '월', tue: '화', wed: '수', thu: '목', fri: '금', sat: '토', sun: '일' };
+const pad2 = (v) => String(v).padStart(2, '0');
+const isNum = (v) => /^\d+$/.test(v);
+
+const dowLabel = (raw) => {
+    const d = String(raw ?? '*').trim().toLowerCase();
+    if (d === '*' || d === '') return '매일';
+    if (d === 'mon-fri') return '평일';
+    if (['sat,sun', 'sun,sat', 'sat-sun'].includes(d)) return '주말';
+    if (DOW[d]) return `${DOW[d]}요일`;
+    const range = d.match(/^([a-z]{3})-([a-z]{3})$/);
+    if (range && DOW[range[1]] && DOW[range[2]]) return `${DOW[range[1]]}~${DOW[range[2]]}`;
+    if (d.split(',').every(x => DOW[x])) return d.split(',').map(x => DOW[x]).join('·');
+    return d;
+};
+
+const timeLabel = (rawM, rawH) => {
+    const m = String(rawM ?? '').trim();
+    const h = String(rawH ?? '').trim();
+    const every = m.match(/^\*\/(\d+)$/);
+    const hRange = h.match(/^(\d+)-(\d+)$/);
+    if (isNum(m) && isNum(h)) return `${pad2(h)}:${pad2(m)}`;
+    if (isNum(m) && /^\d+(,\d+)+$/.test(h)) return h.split(',').map(x => `${pad2(x)}:${pad2(m)}`).join(', ');
+    if (every && h === '*') return `${every[1]}분마다`;
+    if (every && hRange) return `${+hRange[1]}~${+hRange[2]}시 ${every[1]}분마다`;
+    if (isNum(m) && h === '*') return `매시 ${pad2(m)}분`;
+    if (isNum(m) && hRange) return `${+hRange[1]}~${+hRange[2]}시 매시 ${pad2(m)}분`;
+    return `${m} ${h}`;
+};
+
+const cronLabel = (row) => `${dowLabel(row.cron_day_of_week)} ${timeLabel(row.cron_minute, row.cron_hour)}`;
+
+// 정렬 키: 하루 중 첫 실행 시각(분). 매시/분 단위 반복은 0시 취급으로 맨 앞.
+const firstRunMinute = (row) => {
+    const h = String(row.cron_hour ?? '');
+    const m = String(row.cron_minute ?? '');
+    const hh = isNum(h) ? +h : (h.match(/^(\d+)/) ? +h.match(/^(\d+)/)[1] : 0);
+    const mm = isNum(m) ? +m : 0;
+    return hh * 60 + mm;
+};
+
+const groups = computed(() => {
+    const sorted = [...batchList.value].sort((a, b) => firstRunMinute(a) - firstRunMinute(b));
+    return [
+        { key: 'on',  label: '사용 중', rows: sorted.filter(r => r.enabled_flag === 'Y') },
+        { key: 'off', label: '중지',    rows: sorted.filter(r => r.enabled_flag !== 'Y') },
+    ];
+});
+
+/* ── 최근 실행 결과(last_run: API 가 stock_batch_log 최신 1건을 붙여준다) ── */
+const parseTime = (v) => (v ? new Date(String(v).replace(' ', 'T')) : null);   // 서버 값은 KST tz 없는 문자열
+
+const whenLabel = (d) => {
+    const now = new Date();
+    const sameDay = (a, b) => a.toDateString() === b.toDateString();
+    const yest = new Date(now); yest.setDate(now.getDate() - 1);
+    const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    if (sameDay(d, now)) return `오늘 ${hm}`;
+    if (sameDay(d, yest)) return `어제 ${hm}`;
+    return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${hm}`;
+};
+
+const durationLabel = (start, end) => {
+    if (!start || !end) return '';
+    const sec = Math.max(0, Math.round((end - start) / 1000));
+    if (sec < 60) return `${sec}초`;
+    if (sec < 3600) return `${Math.floor(sec / 60)}분${sec % 60 ? ` ${sec % 60}초` : ''}`;
+    return `${Math.floor(sec / 3600)}시간 ${Math.floor((sec % 3600) / 60)}분`;
+};
+
+const lastRun = (row) => {
+    const lr = row.last_run;
+    if (!lr) return { cls: 'none', label: '실행 기록 없음', meta: '' };
+    const st = String(lr.status ?? '').toUpperCase();
+    const start = parseTime(lr.start_time);
+    const end = parseTime(lr.end_time);
+    const running = !end || ['RUNNING', 'START', 'STARTED'].includes(st);
+    const [cls, label] = running ? ['run', '실행 중']
+        : st === 'SUCCESS' ? ['ok', '성공']
+        : ['FAIL', 'FAILED', 'ERROR'].includes(st) ? ['fail', '실패']
+        : ['none', lr.status || '알 수 없음'];
+    const meta = [start ? whenLabel(start) : '', running ? '' : durationLabel(start, end)].filter(Boolean).join(' · ');
+    return { cls, label, meta };
+};
 
 /* ── 스케줄러 새로고침 (배치 서버의 job 재등록) ── */
 const isReloading = ref(false);
@@ -410,437 +448,268 @@ const executeBatch = async () => {
 </script>
 
 <style scoped lang="scss">
-$white: #ffffff;
-$gray-50: #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-300: #c4c4c4;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-700: #3d3d3d;
-$gray-900: #141414;
-$blue: #141414;
-$navy: #141414;
-$red: #141414;
-$amber: #141414;
-$green: #141414;
+// 양봉상회 토큰(홈·매수추천과 동일). 기존 변수명은 팝업 스타일이 쓰고 있어 값만 브랜드 톤으로 바꿔 둔다.
+$white:    #ffffff;
+$line:     #EFE2BC;
+$line-2:   #EAD9A6;
+$chip:     #F6EBC8;
+$hero:     #74462A;
+$brown:    #7A4423;
+$ink:      #2B1D14;
+$sub:      #6B5B4E;
+$sub-2:    #7A6B5D;
+$cream:    #FFF8E1;
+$ok:       #2E9E5B;
+$fail:     #C8282A;
+$run:      #E07A00;
+
+$gray-50:  #FFFDF5;
+$gray-100: #F3EAD2;
+$gray-200: $line-2;
+$gray-300: $line-2;
+$gray-400: #9A8C7E;
+$gray-500: $sub;
+$gray-700: #4A3628;
+$gray-900: $ink;
+$blue:     $brown;
+$navy:     $hero;
+$red:      $fail;
 
 #batch-setting {
     min-height: 100vh;
-    background: $gray-50;
-    color: $gray-900;
-    font-family: 'Pretendard', -apple-system, sans-serif;
+    background: $white;
+    color: $ink;
+    text-align: left;
+    font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
+    font-variant-numeric: tabular-nums;
 }
 
 .contents {
-    max-width: 1200px;
+    max-width: 760px;
     margin: 0 auto;
-    padding: 28px 16px 100px;
+    padding: 16px 16px calc(96px + env(safe-area-inset-bottom, 0px));
 }
 
-/* ── Head ── */
-.head-desc {
+/* ── 요약 + 상단 버튼 ── */
+.toolbar {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: space-between;
-    align-items: flex-end;
-    margin-bottom: 20px;
+    gap: 10px;
+    margin-bottom: 8px;
 
-    h2 {
-        font-size: 1.4rem;
-        font-weight: 700;
-        margin: 0;
-        color: $gray-900;
-    }
+    .summary { margin: 0; font-size: 14px; color: $sub; b { color: $ink; font-size: 16px; } }
+}
+.head-actions { display: flex; gap: 8px; }
 
-    .sub-text {
-        font-size: 0.82rem;
-        color: $gray-500;
-        margin: 4px 0 0;
-    }
+.btn-ghost,
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.btn-ghost {
+    border: 1px solid $line-2;
+    background: $white;
+    color: $brown;
+    &:disabled { color: $sub-2; cursor: default; }
+}
+.btn-primary { border: 0; background: $hero; color: $cream; }
+.btn-ghost:focus-visible,
+.btn-primary:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+
+.spinning { animation: spin 0.9s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ── 그룹 ── */
+.job-group { margin-top: 18px; }
+.group-title {
+    margin: 0 0 4px;
+    font-size: 17px;
+    font-weight: 700;
+    color: $ink;
+    .count { color: #A0662F; margin-left: 2px; }
 }
 
-.head-actions {
+/* ── 배치 목록: 카드 없이 구분선 ── */
+.job-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid $line;
+}
+
+.job {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 0;
+    border-bottom: 1px solid $line;
+
+    &.off .job-title,
+    &.off .job-last,
+    &.off .job-desc { opacity: .55; }
+}
+
+.job-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+.job-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.job-name { font-size: 16px; font-weight: 700; color: $ink; word-break: keep-all; }
+.job-when { font-size: 14px; font-weight: 600; color: $brown; }
+
+// 최근 실행: 점 + 글자
+.job-last {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 8px;
+    font-size: 13px;
+
+    .dot { width: 8px; height: 8px; border-radius: 4px; background: $sub-2; flex-shrink: 0; }
+    .lr-state { font-weight: 700; color: $sub; }
+    .lr-meta { color: $sub; }
+
+    &.ok   { .dot { background: $ok; }   .lr-state { color: #23784A; } }
+    &.fail { .dot { background: $fail; } .lr-state { color: $fail; } }
+    &.run  { .dot { background: $run; }  .lr-state { color: #B05F00; } }
+    &.none { .lr-state { font-weight: 500; color: $sub-2; } }
+}
+.job-desc {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: $sub;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+}
+
+// 기술 정보(JOB ID · 원본 CRON)는 한 줄로 줄이고 버튼은 같은 줄 오른쪽에 둔다
+.job-foot {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-shrink: 0;
-
-    @media (max-width: 520px) {
-        flex-direction: column;
-        align-items: stretch;
-    }
+    margin-top: 2px;
 }
-
-.btn-reload {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 8px 14px;
-    background: $white;
-    color: $gray-700;
-    border: 1px solid $gray-200;
-    border-radius: 0;
-    font-size: 0.84rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
+.job-tech {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    font-size: 11.5px;
+    color: $sub-2;
     white-space: nowrap;
-    transition: border-color .12s, color .12s;
-
-    &:hover:not(:disabled) {
-        border-color: $blue;
-        color: $blue;
-    }
-
-    &:disabled {
-        opacity: .55;
-        cursor: not-allowed;
-    }
-
-    .spinning {
-        animation: spin 0.9s linear infinite;
-    }
-}
-
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.btn-add {
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    background: $navy;
-    color: $white;
-    border: none;
-    border-radius: 0;
-    font-size: 0.84rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background .15s;
-
-    &:hover {
-        background: #000000;
-    }
-}
-
-/* ── Table (Desktop) ── */
-.table-section {
-    background: $white;
-    border: 1px solid $gray-200;
-    border-radius: 0;
     overflow: hidden;
-    overflow-x: auto;
-
-    @media (max-width: 860px) {
-        display: none;
-    }
+    text-overflow: ellipsis;
 }
-
-.batch-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.83rem;
-
-    thead tr {
-        background: $gray-50;
-        border-bottom: 1px solid $gray-200;
-    }
-
-    th {
-        padding: 10px 12px;
-        text-align: left;
-        font-size: 0.72rem;
-        font-weight: 700;
-        color: $gray-500;
-        letter-spacing: .04em;
-        text-transform: uppercase;
-        white-space: nowrap;
-    }
-
-    td {
-        padding: 10px 12px;
-        border-bottom: 1px solid $gray-100;
-        vertical-align: middle;
-        color: $gray-700;
-    }
-
-    tbody tr:last-child td {
-        border-bottom: none;
-    }
-
-    tbody tr:hover td {
-        background: $gray-50;
-    }
-
-    .row-disabled td {
-        opacity: .45;
-    }
-}
-
-/* column widths */
-.col-id {
-    width: 170px;
-}
-
-.col-name {
-    min-width: 160px;
-}
-
-.col-module {
-    min-width: 220px;
-}
-
-.col-class {
-    width: 150px;
-}
-
-.col-cron {
-    width: 160px;
-}
-
-.col-flag {
-    width: 60px;
-    text-align: center;
-}
-
-.col-action {
-    width: 200px;
-    text-align: right;
-}
-
-.action-group {
-    display: flex;
-    gap: 6px;
-    justify-content: flex-end;
-}
-
-/* chips */
-.code-chip {
-    font-size: 0.72rem;
+.job-actions { display: flex; gap: 0; flex-shrink: 0; }
+.act {
+    min-height: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: $brown;
+    font-size: 13px;
     font-weight: 600;
-    background: $gray-100;
-    color: $gray-700;
-    padding: 2px 7px;
-    border-radius: 0;
-    border: 1px solid $gray-200;
-    word-break: break-all;
+    font-family: inherit;
+    cursor: pointer;
+
+    &:hover { background: rgba(239, 226, 188, .4); }
+    &:focus-visible { outline: 2px solid $brown; outline-offset: 0; }
+    &.danger { color: $fail; }
 }
 
-.cron-chip {
-    font-size: 0.72rem;
-    background: #efefef;
-    color: $navy;
-    padding: 2px 7px;
-    border-radius: 0;
-    border: 1px solid #c4c4c4;
-    font-family: 'SFMono-Regular', Consolas, monospace;
-    white-space: nowrap;
-}
-
-.path-text,
-.comp-text {
-    font-family: 'SFMono-Regular', Consolas, monospace;
-    font-size: 0.78rem;
-    color: $gray-700;
-    word-break: break-all;
-}
-
-/* toggle */
+/* ── 사용 스위치 ── */
 .toggle-btn {
     position: relative;
-    width: 36px;
-    height: 20px;
-    border-radius: 0;
-    border: none;
-    cursor: pointer;
-    transition: background .2s;
-    padding: 0;
     flex-shrink: 0;
+    width: 44px;
+    height: 26px;
+    border: 0;
+    border-radius: 13px;
+    cursor: pointer;
+    transition: background .15s;
 
-    &.active {
-        background: $green;
-    }
-
-    &.inactive {
-        background: $gray-200;
-    }
-
-    &:disabled {
-        opacity: .5;
-        cursor: not-allowed;
-    }
+    &.active   { background: $hero; }
+    &.inactive { background: $line-2; }
+    &:disabled { opacity: .6; cursor: default; }
+    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
 
     .toggle-knob {
         position: absolute;
         top: 3px;
-        width: 14px;
-        height: 14px;
-        border-radius: 0;
-        background: $white;
-        transition: left .2s;
-    }
-
-    &.active .toggle-knob {
-        left: 19px;
-    }
-
-    &.inactive .toggle-knob {
         left: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        background: $white;
+        box-shadow: 0 1px 2px rgba(74, 40, 20, .25);
+        transition: transform .15s;
     }
+    &.active .toggle-knob { transform: translateX(18px); }
 }
 
-.btn-edit,
-.btn-run,
-.btn-delete {
-    padding: 4px 10px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    border: 1px solid $gray-200;
-    border-radius: 0;
-    background: $white;
-    color: $gray-700;
-    cursor: pointer;
-    font-family: inherit;
-    transition: border-color .12s, color .12s;
-    white-space: nowrap;
-
-    &:hover {
-        border-color: $blue;
-        color: $blue;
-    }
-}
-
-.btn-run:hover {
-    border-color: $green;
-    color: $green;
-}
-
-.btn-delete:hover {
-    border-color: $red;
-    color: $red;
-}
-
-/* skeleton */
-.loader-rows {
-    padding: 8px;
-}
-
+/* ── 로딩 / 빈 상태 ── */
+.loader-rows { display: flex; flex-direction: column; margin-top: 18px; border-top: 1px solid $line; }
 .skeleton-row {
-    height: 42px;
-    background: $gray-100;
-    border-radius: 0;
-    margin-bottom: 6px;
+    height: 96px;
+    border-bottom: 1px solid $line;
+    background: rgba(239, 226, 188, .3);
     animation: pulse 1.6s infinite ease-in-out;
 }
-
-.empty-cell {
-    text-align: center;
-    padding: 60px 0;
-    color: $gray-400;
-    font-size: 0.88rem;
-}
-
-/* ── Mobile List (ul/li) ── */
-.mobile-list {
-    display: none;
-
-    @media (max-width: 860px) {
-        display: block;
-    }
-}
-
-.batch-ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.batch-li {
-    background: $white;
-    border: 1px solid $gray-200;
-    border-radius: 0;
-    padding: 14px;
-
-    &.li-disabled {
-        opacity: .55;
-    }
-}
-
-.li-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-}
-
-.li-name {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: $gray-900;
-    margin-bottom: 8px;
-}
-
-.li-row {
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
-    font-size: 0.8rem;
-    margin-bottom: 4px;
-
-    .li-label {
-        flex-shrink: 0;
-        width: 44px;
-        color: $gray-500;
-        font-weight: 600;
-    }
-}
-
-.li-actions {
-    display: flex;
-    gap: 6px;
-    margin-top: 10px;
-
-    button {
-        flex: 1;
-        text-align: center;
-    }
-}
+.empty { padding: 48px 0; text-align: center; color: $sub; font-size: 14px; }
 
 /* ── Popup ── */
 .popup-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, .45);
+    background: rgba(43, 29, 20, .45);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 2000;
     padding: 16px;
+
+    // 모바일: 화면 아래에서 올라오는 시트(전체 폭, 위만 둥글게, 하단 세이프 에어리어 포함)
+    @media (max-width: 600px) {
+        align-items: flex-end;
+        padding: 0;
+    }
 }
 
 .popup-panel {
     background: $white;
-    border-radius: 0;
+    border-radius: 16px;
     width: 100%;
     max-width: 560px;
     max-height: 90vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, .18);
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(74, 40, 20, .2);
+
+    @media (max-width: 600px) {
+        max-width: none;
+        max-height: 88vh;
+        border-radius: 16px 16px 0 0;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
 }
 
 .run-panel {
@@ -881,15 +750,25 @@ $green: #141414;
 }
 
 .popup-body {
-    padding: 20px;
+    padding: 16px 20px 20px;
     overflow-y: auto;
+    overflow-x: hidden;   // 입력칸이 넘쳐도 가로로 밀리지 않게
     flex: 1;
 }
 
 .form-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px 16px;
+    // minmax(0, …) 이 핵심 — 1fr 은 입력칸의 최소 폭 아래로 못 줄어 좁은 화면에서 팝업 밖으로 넘친다
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px 12px;
+
+    .cron-preview {
+        grid-column: 1 / -1;
+        margin: -4px 0 0;
+        font-size: 13px;
+        color: $sub;
+        b { color: $brown; margin-left: 4px; }
+    }
 
     .form-field {
         display: flex;
@@ -914,10 +793,14 @@ $green: #141414;
         input[type="text"],
         input[type="number"],
         input:not([type="radio"]) {
-            padding: 8px 10px;
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            min-height: 42px;
+            padding: 0 12px;
             border: 1px solid $gray-200;
-            border-radius: 0;
-            font-size: 0.84rem;
+            border-radius: 10px;
+            font-size: 16px;
             color: $gray-900;
             font-family: inherit;
             background: $white;
@@ -964,10 +847,12 @@ $green: #141414;
 /* raw json textarea */
 .form-field.full {
     .json-area {
+        width: 100%;
+        box-sizing: border-box;
         padding: 10px;
         border: 1px solid $gray-200;
-        border-radius: 0;
-        font-size: 0.82rem;
+        border-radius: 10px;
+        font-size: 14px;
         font-family: 'SFMono-Regular', Consolas, monospace;
         color: $gray-900;
         background: $gray-50;
@@ -995,9 +880,10 @@ $green: #141414;
     border-top: 1px solid $gray-100;
 
     .btn-cancel {
-        padding: 8px 18px;
+        min-height: 42px;
+        padding: 0 18px;
         border: 1px solid $gray-200;
-        border-radius: 0;
+        border-radius: 10px;
         background: $white;
         color: $gray-700;
         font-size: 0.84rem;
@@ -1012,11 +898,12 @@ $green: #141414;
     }
 
     .btn-save {
-        padding: 8px 20px;
+        min-height: 42px;
+        padding: 0 20px;
         border: none;
-        border-radius: 0;
+        border-radius: 10px;
         background: $navy;
-        color: $white;
+        color: $cream;
         font-size: 0.84rem;
         font-weight: 700;
         cursor: pointer;
@@ -1024,7 +911,7 @@ $green: #141414;
         transition: background .15s;
 
         &:hover {
-            background: #000000;
+            background: $brown;
         }
 
         &:disabled {

@@ -2,7 +2,7 @@
 user_login_type — DB(stock) 스키마 기준 자동 생성 모델.
 ※ 스키마 변경 시 이 파일을 DB 기준으로 재생성할 것.
 """
-from sqlalchemy import Column, Integer, PrimaryKeyConstraint, String, text
+from sqlalchemy import Column, DateTime, Integer, PrimaryKeyConstraint, String, text
 
 from stock_shared.base import Base
 
@@ -15,10 +15,15 @@ class UserLoginType(Base):
     user_id = Column(Integer, nullable=False)
     login_type = Column(String(45), nullable=False)
     enabled_flag = Column(String(1), nullable=False, server_default=text("Y"))
+    # 소셜 계정 고유 ID(네이버 id) / 연결 시각 — sql/26_naver_login_link.sql
+    provider_uid = Column(String(128), nullable=True)
+    linked_date = Column(DateTime, nullable=True)
 
     def to_dict(self):
         return {
             "user_id": self.user_id,
             "login_type": self.login_type,
             "enabled_flag": self.enabled_flag,
+            "provider_uid": self.provider_uid,
+            "linked_date": self.linked_date,
         }

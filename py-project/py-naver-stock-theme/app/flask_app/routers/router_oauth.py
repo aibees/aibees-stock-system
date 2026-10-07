@@ -10,6 +10,7 @@ router_oauth.py — OAuth / 이메일 인증 라우터
     - [신규] require_auth    : Bearer 토큰 검증 decorator (인증 필요 API에 적용)
 """
 
+import logging
 import os
 from functools import wraps
 
@@ -17,7 +18,7 @@ import jwt  # PyJWT
 
 from flask import Blueprint, request, g
 
-from app.services.common.authService import AuthService, JWT_SECRET, JWT_ALGORITHM
+from app.services.common.authService import AuthService, JWT_SECRET, JWT_ALGORITHM, NaverLoginError
 from app.exceptions import ResetRequiredException  # 단일 출처 임포트
 from app.domains.dao.masterInfoDao import MasterInfosDao
 from app.flask_app.utils.apiResponse import ApiResponse
@@ -94,25 +95,56 @@ def require_auth(f):
 # 기존 라우트 (유지)
 # ════════════════════════════════════════════════════════════════════
 
-# OAUTH :: KAKAO
-@oauth_bp.route("/login", methods=['POST'])
-def oauth_login_process():
-    data = request.get_json()
-    try:
-        results = authServiceImpl.oAuthProcess(g.db, data)
-        return ApiResponse.success(results)
-    except Exception as e:
-        return ApiResponse.error(str(e))
+# 소셜 로그인 공개 키 조회 (인가 URL 을 만들 client ID 만)
+#   보안: 비로그인 공개 API 라 client ID(*_ID)만 돌려준다. 예전에는 카테고리 전체를 반환해
+#   NAVER_AUTH_SECRET 까지 노출됐다(→ 네이버 개발자센터에서 secret 재발급 필요).
+#   type 도 허용 목록으로 제한해 다른 카테고리(*_AUTH)의 값을 조회할 수 없게 한다.
+#   (휴대폰 번호만으로 사용자를 찾던 POST /oauth/login 은 검증 없이 계정 정보를 내줘 삭제했다)
+SOCIAL_PROVIDERS = {'NAVER', 'KAKAO'}
 
 
-# OAUTH :: NAVER or KAKAO info
 @oauth_bp.route("/infos/<type>")
 def oauth_key_info_naver(type):
-    type_upper = type.upper()
+    type_upper = str(type).upper()
+    if type_upper not in SOCIAL_PROVIDERS:
+        return ApiResponse.error("지원하지 않는 로그인 방식입니다.", status=404)
     try:
-        return ApiResponse.success(masterInfosDaoImpl.select_master_key_by_category(g.db, type_upper + '_AUTH'))
+        rows = masterInfosDaoImpl.select_master_key_by_category(g.db, type_upper + '_AUTH')
+        public = [
+            {'key_type': r['key_type'], 'key_value': r['key_value']}
+            for r in rows if str(r.get('key_type', '')).upper().endswith('_ID')
+        ]
+        return ApiResponse.success(public)
     except Exception as e:
-        return ApiResponse.error(str(e))
+        logging.exception(e)
+        return ApiResponse.error("로그인 정보를 불러오지 못했습니다.")
+
+
+# ── 네이버 로그인 ────────────────────────────────────────────────────
+@oauth_bp.route("/naver", methods=['POST'])
+def oauth_login_naver():
+    """
+    POST /api/oauth/naver
+
+    Request : { "code": "<네이버 인가 코드>", "state": "<인가 요청 때 보낸 state>" }
+    Response: 이메일 로그인과 같은 형식 + "naverResult": "login" | "linked" | "created"
+        login   이미 연결된 네이버 계정
+        linked  이메일이 같은 기존 계정에 이번에 연결됨
+        created 일치하는 계정이 없어 신규 가입(STOCK_USER)
+
+    사용자 정보는 서버가 네이버에서 직접 받는다(클라이언트가 보낸 값은 쓰지 않는다).
+    실패하면 가입 도중 만든 행이 남지 않게 롤백한다(요청 종료 시 자동 commit 되므로 반드시 필요).
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        return ApiResponse.success(authServiceImpl.naverProcess(g.db, data))
+    except NaverLoginError as e:
+        g.db.rollback()
+        return ApiResponse.error(str(e), status=400)
+    except Exception as e:
+        g.db.rollback()
+        logging.exception(e)
+        return ApiResponse.error("네이버 로그인 중 오류가 발생했습니다.")
 
 
 # ── 이메일 로그인 ────────────────────────────────────────────────────

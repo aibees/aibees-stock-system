@@ -36,6 +36,13 @@ def batches_index():
 def select_batch_job_list():
     try:
         results = batchJobMasterDaoImpl.select_all(g.db)
+        # 최근 실행 결과(last_run): 로그의 batch_code 가 job_id 또는 class_name 이라 둘 다 찾아 최신 것을 쓴다.
+        logs = batchLogDaoImpl.select_latest_by_codes(
+            g.db, [r['job_id'] for r in results] + [r.get('class_name') for r in results])
+        for r in results:
+            cands = [logs.get(r['job_id']), logs.get(r.get('class_name'))]
+            cands = [c for c in cands if c]
+            r['last_run'] = max(cands, key=lambda c: c['batch_seq']) if cands else None
         return ApiResponse.success(sorted(results, key=lambda x: x['job_id']))
     except Exception as e:
         logging.exception(e)

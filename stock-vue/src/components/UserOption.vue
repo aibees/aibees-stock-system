@@ -31,8 +31,9 @@
                     </div>
                 </section>
 
-                <!-- ════════════ 연동 키 (user_detail) ════════════ -->
-                <section class="setting-card">
+                <!-- ════════════ 연동 키 (user_detail) — 매매 사용자(WORKER_USER)만 ════════════
+                     숨겨도 저장은 바뀐 항목만 보내므로 기존 키 값이 비워지지 않는다. -->
+                <section v-if="isWorker" class="setting-card">
                     <header class="card-head">
                         <h3>API / 알림 연동 키</h3>
                     </header>
@@ -148,6 +149,7 @@
 <script setup>
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores';
+import { hasRole, WORKER_ROLE } from '@scripts/useAccess.js';
 
 const title = ref('계정 설정');
 
@@ -182,6 +184,9 @@ const isLoading = ref(true);
 const isSaving = ref(false);
 
 /* ── 조회 ── */
+// API / 알림 연동 키는 매매 사용자(WORKER_USER)에게만 보여준다(홈 최우선 타겟과 같은 기준)
+const isWorker = computed(() => hasRole(WORKER_ROLE));
+
 const fetchOptions = async () => {
     isLoading.value = true;
     try {

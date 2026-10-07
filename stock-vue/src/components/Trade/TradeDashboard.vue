@@ -320,7 +320,7 @@ $down:    #1F5BD1;
 
 #trade-dashboard {
     min-height: 100vh;
-    background: $bg;
+    background: #fff;
     color: $ink;
     text-align: left;
     font-family: 'Pretendard', -apple-system, sans-serif;
@@ -394,22 +394,24 @@ $down:    #1F5BD1;
     }
 }
 
-/* ── 하위 메뉴 바로가기 ── */
+/* ── 하위 메뉴 바로가기: 카드 타일 대신 구분선 목록 ── */
 .quick-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    column-gap: 20px;
+    border-top: 1px solid $line;
 }
 .quick-tile {
-    min-height: 52px;
-    padding: 0 14px;
+    min-height: 48px;
+    padding: 0 2px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    background: #fff;
-    border: 1px solid $line;
-    border-radius: 14px;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid $line;
+    border-radius: 0;
     cursor: pointer;
     font-family: inherit;
     color: $ink;
@@ -417,33 +419,37 @@ $down:    #1F5BD1;
 
     .qt-label { font-size: 14px; font-weight: 600; }
     .qt-arrow { font-size: 18px; color: #A0662F; }
-    &:active { background: #FFFDF5; }
+    &:active { background: rgba(239, 226, 188, .3); }
+    &:focus-visible { outline: 2px solid $brown; outline-offset: -2px; }
 }
-.quick-empty { margin: 0; padding: 14px; text-align: center; font-size: 13px; color: $sub; background: #fff; border: 1px solid $line; border-radius: 14px; }
+.quick-empty { margin: 0; padding: 14px 0; text-align: center; font-size: 13px; color: $sub; }
 
-/* ── 요약 카드 ── */
+/* ── 요약 섹션: 카드 없이 위쪽 구분선 + 제목으로만 나눈다(홈 추천 목록과 같은 방식) ── */
 .card-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 14px;
+    column-gap: 24px;
 }
 
+// 섹션 경계: 흰 배경 위 두꺼운 크림 띠. 모바일은 본문 좌우 여백(16px)을 넘어 화면 끝까지 늘린다.
 .d-card {
-    background: #fff;
-    border: 1px solid $line;
-    border-radius: 16px;
-    padding: 16px;
+    border-top: 8px solid $bg;
+    margin: 0 -16px;
+    padding: 14px 16px 18px;
     display: flex;
     flex-direction: column;
+}
+@media (min-width: 768px) {
+    .d-card { margin: 0; padding: 14px 0 18px; }
 }
 
 .d-card-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
 
-    h3 { font-size: 15px; font-weight: 700; margin: 0; color: $ink; }
+    h3 { font-size: 17px; font-weight: 700; margin: 0; color: $ink; }
 }
 
 .d-link {
@@ -481,7 +487,7 @@ $down:    #1F5BD1;
     justify-content: space-between;
     align-items: center;
     min-height: 40px;
-    border-top: 1px solid #F3EAD2;
+    border-top: 1px solid $line;
     font-size: 14px;
 
     &:first-child { border-top: none; }
@@ -501,7 +507,7 @@ $down:    #1F5BD1;
         justify-content: space-between;
         align-items: center;
         min-height: 40px;
-        border-top: 1px solid #F3EAD2;
+        border-top: 1px solid $line;
         font-size: 14px;
         &:first-child { border-top: none; }
     }
@@ -531,7 +537,7 @@ $down:    #1F5BD1;
 .d-msg {
     margin: 4px 0 0;
     padding-top: 10px;
-    border-top: 1px solid #F3EAD2;
+    border-top: 1px solid $line;
     font-size: 12px;
     color: $sub;
     line-height: 1.5;

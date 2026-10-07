@@ -1,3 +1,4 @@
+import re
 import threading
 import datetime
 from datetime import datetime
@@ -211,6 +212,56 @@ def select_my_menu_list():
 @require_admin
 def select_role_list():
     return ApiResponse.success(roleMenuDaoImpl.select_role_list(g.db))
+
+
+# 권한 ID 는 코드·SQL·환경변수에서 그대로 쓰이므로 대문자 식별자로 제한한다.
+AUTH_ID_PATTERN = re.compile(r'^[A-Z][A-Z0-9_]{1,63}$')
+
+
+@master_bp.route("/roles", methods=['POST'])
+@require_admin
+def insert_role():
+    """권한 생성. body: { "auth_id": "TRADE_USER", "auth_nm": "자동매매 사용자" }"""
+    body = request.get_json(silent=True) or {}
+    auth_id = str(body.get('auth_id') or '').strip().upper()
+    auth_nm = str(body.get('auth_nm') or '').strip()
+    if not AUTH_ID_PATTERN.match(auth_id):
+        return ApiResponse.error("권한 ID 는 영문 대문자로 시작하고 대문자·숫자·_ 만 쓸 수 있습니다(2~64자).", status=400)
+    if not auth_nm or len(auth_nm) > 200:
+        return ApiResponse.error("권한 이름(1~200자)이 필요합니다.", status=400)
+    if roleMenuDaoImpl.role_exists(g.db, auth_id):
+        return ApiResponse.error("이미 있는 권한 ID 입니다.", status=409)
+    roleMenuDaoImpl.insert_role(g.db, auth_id, auth_nm)
+    return ApiResponse.success({'auth_id': auth_id, 'auth_nm': auth_nm, 'user_count': 0})
+
+
+@master_bp.route("/roles/<auth_id>", methods=['PUT'])
+@require_admin
+def update_role(auth_id):
+    """권한 이름 변경. ID 는 매핑/부여의 키라 바꾸지 않는다. body: { "auth_nm": "..." }"""
+    if not roleMenuDaoImpl.role_exists(g.db, auth_id):
+        return ApiResponse.error("존재하지 않는 권한입니다.", status=404)
+    auth_nm = str((request.get_json(silent=True) or {}).get('auth_nm') or '').strip()
+    if not auth_nm or len(auth_nm) > 200:
+        return ApiResponse.error("권한 이름(1~200자)이 필요합니다.", status=400)
+    roleMenuDaoImpl.update_role_name(g.db, auth_id, auth_nm)
+    return ApiResponse.success(None)
+
+
+@master_bp.route("/roles/<auth_id>", methods=['DELETE'])
+@require_admin
+def delete_role(auth_id):
+    """권한 삭제. ADMIN 은 불가, 부여 중인 사용자가 있으면 먼저 회수해야 한다
+    (사용자의 메뉴가 예고 없이 사라지는 것을 막는다)."""
+    if auth_id == ADMIN_AUTH_ID:
+        return ApiResponse.error("ADMIN 권한은 삭제할 수 없습니다.", status=400)
+    if not roleMenuDaoImpl.role_exists(g.db, auth_id):
+        return ApiResponse.error("존재하지 않는 권한입니다.", status=404)
+    users = roleMenuDaoImpl.count_role_users(g.db, auth_id)
+    if users:
+        return ApiResponse.error(f"이 권한을 가진 사용자가 {users}명 있습니다. 사용자 권한 부여 화면에서 먼저 회수하세요.", status=409)
+    roleMenuDaoImpl.delete_role(g.db, auth_id)
+    return ApiResponse.success(None)
 
 
 @master_bp.route("/roles/<auth_id>/menus")
