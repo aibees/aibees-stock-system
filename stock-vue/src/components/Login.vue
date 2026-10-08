@@ -251,7 +251,9 @@ const naverlogin = async () => {
         const { data } = await aibeesApi.get(naver_info_url)
         let naver_key_id = ''
         const redirectURI = encodeURIComponent(naver_callback_url)
-        const state = StrUtils.createStatusKey()
+        // state 는 URL 에서 변형되지 않는 16진수 난수로 만든다. (예전 createStatusKey 는 AES Base64 라
+        // '+' 가 섞이고, 콜백에서 Vue Router 가 '+' 를 공백으로 바꿔 state 비교가 실패했다)
+        const state = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('')
         // 콜백에서 같은 state 인지 확인한다(다른 곳에서 만든 인가 응답으로 로그인되는 것 방지)
         sessionStorage.setItem('naverState', state)
 

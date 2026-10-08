@@ -196,7 +196,8 @@ class AuthService:
         if not client_id or not client_secret:
             raise NaverLoginError("네이버 로그인 설정이 없습니다. 관리자에게 문의해 주세요.")
 
-        token = requests.post(NAVER_TOKEN_URL, data={
+        # 네이버 가이드(접근 토큰 발급 요청) 예시와 같이 쿼리 파라미터로 보낸다.
+        token = requests.post(NAVER_TOKEN_URL, params={
             'grant_type': 'authorization_code', 'client_id': client_id, 'client_secret': client_secret,
             'code': code, 'state': state,
         }, timeout=10).json()

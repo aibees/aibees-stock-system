@@ -549,10 +549,11 @@ class Repository:
         """감시중(ARMED) + 활성(enabled_flag='Y') 수기등록 전체(종목당 여러 건 포함).
         sell_executor 가 주기적으로 재적재해 종목코드별 리스트(가격 오름차순)로
         메모리에 들고 있는다."""
+        # SELECT * — 컬럼을 나열하면 sql/27 (trigger_type) 미적용 DB 에서 조회 자체가 실패해
+        # 등록된 지정가가 통째로 무시되고 자동 rule 이 대신 팔아버린다. *, 로 읽고
+        # trigger_type 이 없으면 소비측(sell_executor)이 'UP' 으로 간주한다.
         sql = text(
-            "SELECT id, user_id, stock_code, stock_name, sell_price, qty_ratio, "
-            "       base_qty, filled_qty, state, enabled_flag, memo "
-            "  FROM trade_worker_manual_sell "
+            "SELECT * FROM trade_worker_manual_sell "
             " WHERE user_id = :uid AND state = 'ARMED' AND enabled_flag = 'Y'"
         )
         with get_session() as s:
@@ -586,7 +587,8 @@ class Repository:
     def insert_manual_sell(self, user_id: int, stock_code: str, stock_name: str,
                            sell_price: Decimal, qty_ratio: Decimal = Decimal("1"),
                            memo: str | None = None, enabled_flag: str = "Y",
-                           base_qty: Decimal | None = None) -> int:
+                           base_qty: Decimal | None = None,
+                           trigger_type: str = "UP") -> int:
         """신규 등록 — 항상 새 행을 만든다(종목당 여러 건 허용). 반환값은 새 id.
 
         base_qty: 등록 시점 보유수량 스냅샷(user_holdings.qty 또는
@@ -595,27 +597,56 @@ class Repository:
         종목에 여러 티어를 등록해도(예 30%/30%/40%) 먼저 체결된 티어 때문에
         다음 티어의 비율 기준(잔여 보유수량)이 줄어드는 문제가 없다.
         None 이면(호출측이 보유수량을 못 구한 경우) sell_executor 가 매도 시점
-        실보유 대비 비율로 폴백한다(구 단일슬롯 동작과 동일)."""
+        실보유 대비 비율로 폴백한다(구 단일슬롯 동작과 동일).
+
+        trigger_type: 'UP'(체결가 >= sell_price 이면 매도, 익절·기본) /
+        'DOWN'(체결가 <= sell_price 이면 매도, 손절). sql/27 미적용 DB 에서는 UP 등록만
+        기존 방식으로 허용하고 DOWN 은 ValueError — 손절 의도의 지정가가 조용히 UP
+        으로 저장되면 오늘 같은 사고가 그대로 난다."""
+        trigger_type = (trigger_type or "UP").upper()
+        if trigger_type not in ("UP", "DOWN"):
+            raise ValueError("trigger_type 은 UP 또는 DOWN 이어야 합니다.")
+        has_col = self.manual_sell_has_trigger_column()
+        if trigger_type == "DOWN" and not has_col:
+            raise ValueError(
+                "손절(DOWN) 지정가를 쓰려면 DB 마이그레이션 sql/27_manual_sell_trigger_ddl.sql 을 "
+                "먼저 적용해야 합니다.")
         now = datetime.now()
-        sql = text(
-            """
-            INSERT INTO trade_worker_manual_sell
-                (user_id, stock_code, stock_name, sell_price, qty_ratio, base_qty,
-                 state, enabled_flag, memo, created_at, updated_at)
-            VALUES
-                (:uid, :code, :name, :price, :ratio, :base_qty,
-                 'ARMED', :flag, :memo, :now, :now)
-            """
-        )
+        cols = ("user_id, stock_code, stock_name, sell_price, "
+                + ("trigger_type, " if has_col else "")
+                + "qty_ratio, base_qty, state, enabled_flag, memo, created_at, updated_at")
+        vals = (":uid, :code, :name, :price, "
+                + (":trigger, " if has_col else "")
+                + ":ratio, :base_qty, 'ARMED', :flag, :memo, :now, :now")
+        sql = text(f"INSERT INTO trade_worker_manual_sell ({cols}) VALUES ({vals})")
+        params = {
+            "uid": user_id, "code": stock_code, "name": stock_name or "",
+            "price": str(sell_price), "ratio": str(qty_ratio),
+            "base_qty": str(base_qty) if base_qty is not None else None,
+            "memo": memo, "flag": (enabled_flag or "Y"), "now": now,
+        }
+        if has_col:
+            params["trigger"] = trigger_type
         with get_session() as s:
-            result = s.execute(sql, {
-                "uid": user_id, "code": stock_code, "name": stock_name or "",
-                "price": str(sell_price), "ratio": str(qty_ratio),
-                "base_qty": str(base_qty) if base_qty is not None else None,
-                "memo": memo, "flag": (enabled_flag or "Y"), "now": now,
-            })
+            result = s.execute(sql, params)
             s.commit()
             return result.lastrowid
+
+    def manual_sell_has_trigger_column(self) -> bool:
+        """sql/27(trigger_type) 적용 여부. 한 번 True 가 되면 캐시한다(컬럼은 사라지지 않는다).
+        False 는 캐시하지 않는다 — 운영 중에 마이그레이션을 적용하면 재기동 없이 바로 반영돼야 한다."""
+        if getattr(self, "_trigger_col_ok", False):
+            return True
+        sql = text(
+            "SELECT COUNT(*) FROM information_schema.columns "
+            " WHERE table_schema = DATABASE() AND table_name = 'trade_worker_manual_sell' "
+            "   AND column_name = 'trigger_type'"
+        )
+        with get_session() as s:
+            ok = (s.execute(sql).scalar() or 0) > 0
+        if ok:
+            self._trigger_col_ok = True
+        return ok
 
     def cancel_manual_sell(self, user_id: int, manual_sell_id: int) -> None:
         """사용자 취소. 체결 이력을 남기기 위해 삭제 대신 상태만 바꾼다.

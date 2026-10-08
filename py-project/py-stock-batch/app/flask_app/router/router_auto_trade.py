@@ -141,14 +141,23 @@ def save_manual_sell():
             "지금 보유 수량이 없는 종목은 등록할 수 없습니다.", status=400)
     base_qty = Decimal(str(holding["qty"]))
 
+    # 방향: UP=지정가 이상이면 매도(익절·기본), DOWN=지정가 이하이면 매도(손절).
+    # 값이 없으면 UP — 구버전 화면/호출과 호환. 잘못된 값은 조용히 UP 으로 바꾸지 않고 거절한다
+    # (손절 의도가 익절로 저장되면 아무 때도 팔리지 않는 사고가 난다).
+    trigger_type = str(body.get("trigger_type") or "UP").upper()
+    if trigger_type not in ("UP", "DOWN"):
+        return ApiResponse.error("trigger_type 은 UP(익절) 또는 DOWN(손절) 이어야 합니다.", status=400)
+
     try:
         new_id = _repo.insert_manual_sell(
             uid, code, body.get("stock_name") or holding.get("stock_name"),
             sell_price_dec, body.get("qty_ratio") or 1,
             body.get("memo"), body.get("enabled_flag") or "Y",
-            base_qty=base_qty,
+            base_qty=base_qty, trigger_type=trigger_type,
         )
         row = _repo.get_manual_sell_by_id(uid, new_id)
+    except ValueError as e:   # DOWN 인데 sql/27 미적용 등 — 사용자가 고칠 수 있는 오류
+        return ApiResponse.error(str(e), status=400)
     except Exception as e:  # noqa: BLE001
         return ApiResponse.error(str(e), status=500)
     return ApiResponse.success(_jsonable(row))

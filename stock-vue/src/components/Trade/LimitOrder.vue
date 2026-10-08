@@ -25,11 +25,28 @@
                         </div>
 
                         <div class="holding-expand" v-if="expanded === h.stock_code">
+                            <!-- 기준 가격: 지정가 %는 매입가(평단) 대비로 표시한다 -->
+                            <p class="base-line">
+                                매입가 {{ formatNumber(h.avg_price) }}원
+                                <template v-if="Number(h.cur_price) > 0">
+                                    · 현재가 {{ formatNumber(h.cur_price) }}원
+                                    <span class="pct" :class="pctClass(pctVs(h.cur_price, h.avg_price))">
+                                        ({{ formatPct(pctVs(h.cur_price, h.avg_price)) }})
+                                    </span>
+                                </template>
+                            </p>
+
                             <!-- 이미 등록된 티어들 -->
                             <ul class="tier-list" v-if="tiersOf(h.stock_code).all.length">
                                 <li v-for="t in tiersOf(h.stock_code).all" :key="t.id"
                                     class="tier-row" :class="tierStateClass(t)">
+                                    <span class="tier-dir" :class="triggerOf(t).toLowerCase()"
+                                          :title="TRIGGER_DESC[triggerOf(t)]">{{ TRIGGER_LABEL[triggerOf(t)] }}</span>
                                     <span class="tier-price">{{ formatNumber(t.sell_price) }}원</span>
+                                    <span v-if="formatPct(pctVs(t.sell_price, h.avg_price))" class="pct"
+                                          :class="pctClass(pctVs(t.sell_price, h.avg_price))">
+                                        {{ formatPct(pctVs(t.sell_price, h.avg_price)) }}
+                                    </span>
                                     <span class="tier-ratio">{{ pctOf(t.qty_ratio) }}%</span>
                                     <span class="tier-state" :class="tierStateClass(t)">{{ stateLabel(t) }}</span>
                                     <span class="tier-memo" v-if="t.memo">{{ t.memo }}</span>
@@ -43,9 +60,30 @@
 
                             <!-- 신규 티어 추가 폼 -->
                             <div class="tier-form">
-                                <div class="tier-form-row">
+                                <div class="tier-form-row full">
+                                    <label>방향</label>
+                                    <div class="dir-toggle" role="group" aria-label="지정가 방향">
+                                        <button type="button" :class="['dir-btn', 'up', { active: form.trigger_type === 'UP' }]"
+                                                @click="pickTrigger('UP')">
+                                            익절 <small>이상이면 매도</small>
+                                        </button>
+                                        <button type="button" :class="['dir-btn', 'down', { active: form.trigger_type === 'DOWN' }]"
+                                                @click="pickTrigger('DOWN')">
+                                            손절 <small>이하이면 매도</small>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="tier-form-row full">
                                     <label>지정 매도가</label>
-                                    <input type="number" v-model.number="form.sell_price" placeholder="0" />
+                                    <div class="input-with-hint">
+                                        <input type="number" inputmode="decimal" v-model.number="form.sell_price" placeholder="0" />
+                                        <span v-if="formPct" class="pct hint" :class="pctClass(formPctRaw)"
+                                              title="매입가 대비">{{ formPct }}</span>
+                                    </div>
+                                </div>
+                                <div class="tier-form-row full" v-if="formDesc.sentence">
+                                    <p class="form-sentence">{{ formDesc.sentence }}</p>
+                                    <p v-for="w in formDesc.warnings" :key="w" class="form-warning">{{ w }}</p>
                                 </div>
                                 <div class="tier-form-row">
                                     <label>비율(%)</label>
@@ -79,6 +117,10 @@ import {
     fetchHoldings, fetchManualSells, addManualSell, cancelManualSell,
     MANUAL_SELL_STATE_LABEL, formatNumber, formatDateTime,
 } from '@scripts/useAutoTrade.js';
+import {
+    TRIGGER_LABEL, TRIGGER_DESC, triggerOf, pctVs, formatPct, pctClass,
+    suggestTrigger, describeTier, firesImmediately,
+} from '@scripts/sellPrice.js';
 
 const holdings = ref([]);
 const manualSells = ref([]);   // 유저의 수기등록 전체(모든 종목·모든 상태)
@@ -87,8 +129,32 @@ const isBusy = ref(false);
 const busyId = ref(null);
 const expanded = ref(null);
 
-const defaultForm = () => ({ sell_price: null, qty_ratio_pct: 100, memo: '', enabled_flag: 'Y' });
+const defaultForm = () => ({ sell_price: null, trigger_type: 'UP', qty_ratio_pct: 100, memo: '', enabled_flag: 'Y' });
 const form = reactive(defaultForm());
+
+// 사용자가 방향 버튼을 직접 눌렀는가. 누르기 전에는 가격을 입력하는 대로 방향을 제안한다
+// (현재가보다 낮으면 손절, 높으면 익절 — sellPrice.suggestTrigger). 직접 고른 뒤에는 건드리지 않는다.
+const triggerTouched = ref(false);
+const pickTrigger = (t) => { form.trigger_type = t; triggerTouched.value = true; };
+
+const expandedHolding = computed(() => holdings.value.find(h => h.stock_code === expanded.value) ?? null);
+
+// 입력 중인 가격의 매입가 대비 %(옆 칩) / 한 줄 설명·경고
+const formPctRaw = computed(() => pctVs(form.sell_price, expandedHolding.value?.avg_price));
+const formPct = computed(() => formatPct(formPctRaw.value));
+const formDesc = computed(() => describeTier({
+    trigger: form.trigger_type,
+    price: form.sell_price,
+    avg: expandedHolding.value?.avg_price,
+    cur: expandedHolding.value?.cur_price,
+}));
+
+watch(() => form.sell_price, (price) => {
+    if (triggerTouched.value) return;
+    const h = expandedHolding.value;
+    if (!h) return;
+    form.trigger_type = suggestTrigger(price, h.cur_price, h.avg_price);
+});
 
 const load = async () => {
     loadingHoldings.value = true;
@@ -134,6 +200,7 @@ const tierStateClass = (t) => ({
 const toggleExpand = (code) => {
     expanded.value = expanded.value === code ? null : code;
     Object.assign(form, defaultForm());
+    triggerTouched.value = false;
 };
 
 const onAdd = async (holding) => {
@@ -147,17 +214,28 @@ const onAdd = async (holding) => {
         return;
     }
 
+    // 등록 즉시 체결되는 설정(현재가가 이미 조건을 만족)은 의도한 것인지 한 번 더 확인한다.
+    if (form.enabled_flag === 'Y'
+        && firesImmediately(form.trigger_type, form.sell_price, holding.cur_price)
+        && !confirm(`현재가(${formatNumber(holding.cur_price)}원)가 이미 `
+            + `${formatNumber(form.sell_price)}원 ${TRIGGER_DESC[form.trigger_type]} 조건을 만족해 `
+            + `등록 즉시 매도됩니다. 계속할까요?`)) {
+        return;
+    }
+
     isBusy.value = true;
     try {
         await addManualSell({
             stock_code: holding.stock_code,
             stock_name: holding.stock_name,
             sell_price: Number(form.sell_price),
+            trigger_type: form.trigger_type,
             qty_ratio: pct / 100,
             enabled_flag: form.enabled_flag,
             memo: form.memo,
         });
         Object.assign(form, defaultForm());
+        triggerTouched.value = false;
         await load();
     } finally {
         isBusy.value = false;
@@ -325,6 +403,23 @@ $green: #1F7A3E;
     padding: 0 4px 14px;
 }
 
+.base-line {
+    margin: 0 0 10px;
+    font-size: .8rem;
+    color: $gray-500;
+}
+
+// 지정가 %(매입가 대비). 한국 시장 관례: 상승 적색 / 하락 청색
+.pct {
+    font-weight: 700;
+    font-size: .76rem;
+    white-space: nowrap;
+
+    &.up { color: $red; }
+    &.down { color: $blue; }
+    &.flat { color: $gray-500; }
+}
+
 .tier-list {
     list-style: none;
     margin: 0 0 10px;
@@ -350,6 +445,18 @@ $green: #1F7A3E;
     &.cancelled {
         opacity: .45;
         text-decoration: line-through;
+    }
+
+    .tier-dir {
+        flex: 0 0 auto;
+        font-size: .72rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 12px;
+        border: 1px solid;
+
+        &.up { color: $red; border-color: $red; }
+        &.down { color: $blue; border-color: $blue; }
     }
 
     .tier-price {
@@ -465,6 +572,62 @@ $green: #1F7A3E;
         font-size: .84rem;
         background: $white;
     }
+}
+
+.dir-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.dir-btn {
+    border-radius: 12px;
+    height: 40px;
+    border: 1px solid $gray-300;
+    background: $white;
+    color: $gray-700;
+    font-size: .84rem;
+    font-weight: 700;
+    cursor: pointer;
+
+    small {
+        font-size: .68rem;
+        font-weight: 500;
+        margin-left: 4px;
+        opacity: .8;
+    }
+
+    &.up.active { background: $red; border-color: $red; color: $white; }
+    &.down.active { background: $blue; border-color: $blue; color: $white; }
+}
+
+.input-with-hint {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    input { flex: 1 1 auto; min-width: 0; }
+
+    .pct.hint {
+        flex: 0 0 auto;
+        font-size: .86rem;
+        min-width: 56px;
+        text-align: right;
+    }
+}
+
+.form-sentence {
+    margin: 0;
+    font-size: .8rem;
+    font-weight: 600;
+    color: $gray-700;
+}
+
+.form-warning {
+    margin: 2px 0 0;
+    font-size: .76rem;
+    color: $red;
+    line-height: 1.4;
 }
 
 .toggle-btn {

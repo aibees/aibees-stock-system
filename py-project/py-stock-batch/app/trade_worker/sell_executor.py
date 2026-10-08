@@ -55,6 +55,15 @@
   등록 시점 보유수량 스냅샷(base_qty)에 그 티어의 qty_ratio 를 곱한 절대수량으로
   고정된다(repository.insert_manual_sell 참고) — 그래야 먼저 체결된 티어 때문에
   다음 티어의 비율 기준(실보유)이 줄어들어 의도한 수량보다 적게 팔리는 일이 없다.
+
+  방향(trigger_type, sql/27, 2026-10-08): 지정가는 두 종류다.
+    UP   : 체결가 >= sell_price 이면 매도 — 익절(기존 동작, 컬럼이 없으면 전부 UP)
+    DOWN : 체결가 <= sell_price 이면 매도 — 손절
+  손절 의도로 낮은 가격을 UP 으로 등록하면 "그 가격 이상으로 오를 때"만 팔리고(내려갈
+  땐 안 팔림), 지정가가 걸린 종목은 모드 자동 손절도 꺼지기 때문에 손실을 막지 못한다
+  (2026-10-08 user_id=3 위메이드맥스: 5120 지정 후 4860 까지 하락, 미매도).
+  한 틱에 여러 티어가 도달하면 DOWN(손절)을 먼저 처리하고(가장 높은 가격부터 =
+  하락 중 먼저 닿는 순서), 그다음 UP(가장 낮은 가격부터)을 처리한다 — pick_manual_tier.
 """
 import threading
 import time
@@ -66,6 +75,43 @@ from app.trade_worker.config import WorkerConfig
 from app.trade_worker.repository import Repository
 from app.trade_worker.wallet_sync import reconcile_wallet
 from app.trade_worker.worklog import WorkerLogger
+
+def tier_trigger(tier: dict) -> str:
+    """티어 방향. sql/27 미적용 DB 의 행에는 trigger_type 이 없다 → UP(기존 동작)."""
+    return "DOWN" if str(tier.get("trigger_type") or "UP").upper() == "DOWN" else "UP"
+
+
+def tier_hit(tier: dict, price) -> bool:
+    """이 가격에서 티어가 도달(매도 조건 충족)했는가. UP: 이상, DOWN: 이하."""
+    px = Decimal(str(price))
+    target = Decimal(str(tier["sell_price"]))
+    return px <= target if tier_trigger(tier) == "DOWN" else px >= target
+
+
+def tier_label(tier: dict) -> str:
+    """로그용 표기. 예) 5120↓손절 / 7000↑익절"""
+    sell_price = tier.get("sell_price")
+    try:
+        sell_price = f"{Decimal(str(sell_price)).normalize():f}"
+    except Exception:  # noqa: BLE001
+        pass
+    return f"{sell_price}↓손절" if tier_trigger(tier) == "DOWN" else f"{sell_price}↑익절"
+
+
+def pick_manual_tier(tiers: list[dict], price) -> dict | None:
+    """이 틱에서 매도할 티어 1건(없으면 None).
+
+    도달한 티어가 여럿이면 손실 방어가 먼저다: DOWN 은 가장 높은 가격부터(하락하며 먼저
+    닿는 순서), 그다음 UP 은 가장 낮은 가격부터. 틱당 1건만 처리하고 나머지는 다음
+    틱에서 마저 처리한다(무한루프 방지 — 기존 사다리 매도와 동일)."""
+    hit = [t for t in tiers if tier_hit(t, price)]
+    if not hit:
+        return None
+    down = [t for t in hit if tier_trigger(t) == "DOWN"]
+    if down:
+        return max(down, key=lambda t: Decimal(str(t["sell_price"])))
+    return min(hit, key=lambda t: Decimal(str(t["sell_price"])))
+
 
 # Decimal 로 변경
 def _toDecimal(v):
@@ -119,8 +165,8 @@ class BaseSellExecutor(ABC):
         같이 불려 화면에서 등록/취소한 내역을 반영한다.
 
         종목당 여러 티어(사다리 매도)를 지원하므로 symbol → 리스트로 묶고,
-        가격 오름차순으로 정렬해둔다 — on_price 가 "가장 낮은 미도달 티어"부터
-        순서대로 확인할 수 있게 하기 위함이다.
+        가격 오름차순으로 정렬해둔다(로그 가독성용). 어떤 티어를 먼저 처리할지는
+        정렬이 아니라 pick_manual_tier 가 방향(UP/DOWN)까지 보고 정한다.
         """
         try:
             rows = self.repo.get_active_manual_sells(self.cfg.user_id)
@@ -144,7 +190,7 @@ class BaseSellExecutor(ABC):
                 self.wlog.warn("[매도] %s 수기등록됐지만 아직 worker 편입 전 → 다음 계좌 동기화 후 감시 시작",
                                code)
                 continue
-            prices = ", ".join(str(t.get("sell_price")) for t in fresh[code])
+            prices = ", ".join(tier_label(t) for t in fresh[code])
             self.wlog.info("[매도] %s 수기등록 감지 @[%s] → 이후 자동 rule 대신 지정가만 감시",
                            code, prices)
         for code in removed:
@@ -284,8 +330,8 @@ class BaseSellExecutor(ABC):
         # (틱당 1건. 가격이 여러 티어를 한 번에 건너뛰어도 다음 틱에서 마저 처리).
         tiers = self._manual_sells.get(symbol)
         if tiers:
-            tier = tiers[0]   # 가격 오름차순 정렬 → 첫 원소가 가장 낮은(=가장 먼저 도달할) 티어
-            if Decimal(str(price)) < Decimal(str(tier["sell_price"])):
+            tier = pick_manual_tier(tiers, price)   # UP: 이상 / DOWN: 이하. 도달 티어가 여럿이면 손절 먼저
+            if tier is None:
                 return   # 아직 지정가 미도달 — 모드 rule 로 넘어가지 않고 계속 대기
             manual = tier
             reason = "MANUAL_SELL"
@@ -301,8 +347,8 @@ class BaseSellExecutor(ABC):
             self._warn_untradable(symbol, reason, sess)
             return
         if manual is not None:
-            self.wlog.info("[매도] 수기등록 지정가 도달 %s @%s (목표=%s · %s)",
-                           symbol, price, manual["sell_price"], sess.name)
+            self.wlog.info("[매도] 수기등록 지정가 도달 %s @%s (%s · %s)",
+                           symbol, price, tier_label(manual), sess.name)
         else:
             self.wlog.info("[매도] 라인 돌파 %s @%s (%s · %s)", symbol, price, reason, sess.name)
         self._do_sell(symbol, pos, price, reason, sess, manual=manual)
@@ -580,7 +626,7 @@ class BaseSellExecutor(ABC):
                 # 매도 수기등록 종목(티어 1개 이상) — 모드 전략의 일봉 신호(OBV
                 # 데드크로스·타임스탑 등)도 보지 않는다. 실시간 지정가 감시(on_price)만
                 # 이 종목을 판정한다.
-                prices = ", ".join(str(t.get("sell_price")) for t in self._manual_sells[code])
+                prices = ", ".join(tier_label(t) for t in self._manual_sells[code])
                 self.wlog.info("[매도] %s 수기등록됨(@[%s]) → 모드 전략 평가 skip", code, prices)
                 continue
             try:
