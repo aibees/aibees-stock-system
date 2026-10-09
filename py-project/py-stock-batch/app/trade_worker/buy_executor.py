@@ -155,6 +155,13 @@ class BaseBuyExecutor(ABC):
         """premarket=False: 정규장 · 시장가 / True: NXT 프리마켓 · 지정가."""
         uid = self.cfg.user_id
         tag = "NXT프리마켓" if premarket else "정규장"
+
+        # 매매정지(M0): 라운드 자체를 열지 않는다. try/finally(_finalize_round) **앞**에서 빠져야
+        # 최우선타겟 1회성 소비 같은 라운드 종료 처리도 일어나지 않는다(매수를 안 했으니 소비도 없다).
+        if self.strategy is not None and getattr(self.strategy, "halted", False):
+            self.wlog.info("[매수] 매매정지(M0) → %s 라운드 skip", tag)
+            return
+
         self.wlog.info("[매수] 시작 user_id=%s (%s)", uid, tag)
 
         # try/finally 로 감싸 아래 어느 지점에서 return 하든(매수 skip/실패/성공 무관)

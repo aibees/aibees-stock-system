@@ -23,6 +23,7 @@
  * 네이버가 붙여 보낸 code/state 를 서버(POST /api/oauth/naver)로 넘기면, 서버가 네이버에서 사용자 정보를
  * 직접 받아 ① 이미 연결된 계정이면 로그인 ② 이메일이 같은 기존 계정이면 연결 후 로그인
  * ③ 없으면 신규 가입(STOCK_USER) 후 로그인한다. 응답 형식은 이메일 로그인과 같다.
+ * 단, 개인정보 처리방침 동의가 없으면(신규 가입 등) 토큰 대신 consentRequired 가 오고 → 동의 화면으로 보낸다.
  * state 는 로그인 화면에서 만든 값과 같아야 한다(다른 곳에서 만든 인가 응답 재사용 방지).
  */
 import aibeesApi from '@scripts/aibeesApi.js';
@@ -56,6 +57,16 @@ onMounted(async () => {
     try {
         const { data } = await aibeesApi.post('/api/oauth/naver', { code, state: returnedState });
         if (!data?.success) return fail(data?.error?.message ?? '네이버 로그인에 실패했어요.');
+
+        if (data.data.consentRequired) {
+            // 회원정보는 저장됨. 동의해야 로그인 토큰을 받는다. 토큰은 URL 에 싣지 않는다.
+            sessionStorage.setItem('naverConsent', JSON.stringify({
+                consentToken: data.data.consentToken,
+                naverResult: data.data.naverResult,
+                profile: data.data.profile,
+            }));
+            return router.replace({ name: 'signup-consent' });
+        }
 
         userSession.loginUser(data.data, localStorage.getItem('autoLogin') === 'true');
         if (data.data.naverResult === 'linked') alert('기존 계정에 네이버 로그인을 연결했어요.');

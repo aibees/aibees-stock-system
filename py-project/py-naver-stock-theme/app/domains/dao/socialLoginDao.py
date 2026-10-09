@@ -12,6 +12,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 
 from stock_shared.models.userAuth import UserAuth
+from stock_shared.models.userConsent import UserConsent
 from stock_shared.models.userDetail import UserDetail
 from stock_shared.models.userLoginType import UserLoginType
 from stock_shared.models.userMaster import UserMaster
@@ -56,6 +57,15 @@ class SocialLoginDao:
             select(UserMaster.user_id).where(UserMaster.user_phone == phone)
         ).first() is not None
 
+    def select_consent(self, session, user_id, consent_type):
+        """동의 기록(UserConsent) 또는 None."""
+        return session.execute(
+            select(UserConsent).where(
+                UserConsent.user_id == user_id,
+                UserConsent.consent_type == consent_type,
+            )
+        ).scalars().first()
+
     # 연결 / 가입
     # ================================================================
     def link(self, session, user_id, login_type, provider_uid):
@@ -91,3 +101,17 @@ class SocialLoginDao:
                              created_date=now, updated_date=now))
         session.flush()
         return new_id
+
+    # 동의
+    # ================================================================
+    def save_consent(self, session, user_id, consent_type, version):
+        """동의 기록 저장(행이 있으면 version/시각 갱신 — 처리방침 개정 후 재동의)."""
+        now = datetime.now()
+        row = self.select_consent(session, user_id, consent_type)
+        if row is None:
+            session.add(UserConsent(user_id=user_id, consent_type=consent_type,
+                                    version=version, agreed_date=now))
+        else:
+            row.version = version
+            row.agreed_date = now
+        session.flush()

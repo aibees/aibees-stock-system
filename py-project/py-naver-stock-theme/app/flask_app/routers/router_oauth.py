@@ -147,6 +147,29 @@ def oauth_login_naver():
         return ApiResponse.error("네이버 로그인 중 오류가 발생했습니다.")
 
 
+@oauth_bp.route("/naver/consent", methods=['POST'])
+def oauth_naver_consent():
+    """
+    POST /api/oauth/naver/consent — 개인정보 처리방침 동의 후 로그인
+
+    /naver 응답이 consentRequired 일 때(신규 가입·미동의 사용자) 동의 화면에서 호출한다.
+    Request : { "consentToken": "<naver 응답의 consentToken>", "policyVersion": "...", "agreePrivacy": true }
+    Response: 이메일 로그인과 같은 형식 + "naverResult"
+
+    실패는 401 이 아니라 400 — 401 이면 프런트 interceptor 가 refresh/강제 로그아웃을 시도한다.
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        return ApiResponse.success(authServiceImpl.naverConsentProcess(g.db, data))
+    except NaverLoginError as e:
+        g.db.rollback()
+        return ApiResponse.error(str(e), status=400)
+    except Exception as e:
+        g.db.rollback()
+        logging.exception(e)
+        return ApiResponse.error("가입 처리 중 오류가 발생했습니다.")
+
+
 # ── 이메일 로그인 ────────────────────────────────────────────────────
 # [수정] 내부적으로 authService.emailProcess() 가 실제 JWT + refreshToken 발급으로 변경됨
 # 라우트 자체는 기존 그대로 유지

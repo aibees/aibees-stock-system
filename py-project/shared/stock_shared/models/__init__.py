@@ -14,6 +14,7 @@ from stock_shared.models.userMaster import UserMaster
 from stock_shared.models.userOptions import UserOptions
 from stock_shared.models.userWallet import UserWallet
 from stock_shared.models.userAuth import UserAuth
+from stock_shared.models.userConsent import UserConsent
 from stock_shared.models.userLoginType import UserLoginType
 from stock_shared.models.userRole import UserRole
 
@@ -32,6 +33,7 @@ __all__ = [
     "UserOptions",
     "UserWallet",
     "UserAuth",
+    "UserConsent",
     "UserLoginType",
     "UserRole",
 ]

@@ -2,9 +2,9 @@
  * 자동매매(AutoTrade) 공통 API 래퍼
  *  - 화면 3종(ModeSetting / LimitOrder / RunStatus)에서 공유
  *
- * ⚠ USE_MOCK
- *  모드 설정/운용 상태/이력은 이 저장소 밖(ROOT 서버, VITE_SERVER_URL)이 구현할
- *  예정이라 아직 mock 이다. API 가 준비되면 아래 상수만 false 로 바꾸면 된다.
+ * 모드/상태/이력: ROOT 서버(py-naver-stock-theme router_auto_trade.py, WORKER_USER 전용).
+ *  전환은 항상 즉시 적용 — worker 에 보유분 청산 후 승계(pending) 로직이 없어 예약/전원 API 는 두지 않는다.
+ *  USE_MOCK=true 로 되돌리면 autoTradeMock 데모 데이터로 화면만 볼 수 있다.
  *
  * ⚠ 매도 수기등록(fetchHoldings/fetchManualSells/addManualSell/cancelManualSell)만은
  *  예외다. 이 기능은 이 저장소(py-stock-batch, app/trade_worker)에 이미 완전히
@@ -15,7 +15,7 @@ import aibeesApi, { batchApi } from './aibeesApi.js';
 import { assUserSession } from './stores/user-stores.js';
 import * as mock from './autoTradeMock.js';
 
-export const USE_MOCK = true;   // TODO: 백엔드 연동 후 false (모드/상태/이력 전용)
+export const USE_MOCK = false;
 
 const BASE = '/api/v1/auto-trade';
 
@@ -43,24 +43,12 @@ export const fetchState = async () => {
 };
 
 /**
- * 모드 변경 요청
- * @returns {{applied:'NOW'|'RESERVED', run_state:string, message:string}}
+ * 운용모드 즉시 전환 (M0 = 매매정지)
+ * @returns {{applied:'NOW'|'NONE', active_mode:string, message:string}}
  */
-export const saveState = async (mode_code, config) => {
-    if (USE_MOCK) return mock.mockSaveState(mode_code, config);
-    const { data } = await aibeesApi.put(`${BASE}/state`, { mode_code, config });
-    return data.data ?? {};
-};
-
-export const cancelPending = async () => {
-    if (USE_MOCK) return mock.mockCancelPending();
-    const { data } = await aibeesApi.delete(`${BASE}/state/pending`);
-    return data.data ?? {};
-};
-
-export const setPower = async (enabled) => {
-    if (USE_MOCK) return mock.mockSetPower(enabled);
-    const { data } = await aibeesApi.post(`${BASE}/power`, { enabled });
+export const saveState = async (mode_code) => {
+    if (USE_MOCK) return mock.mockSaveState(mode_code, {});
+    const { data } = await aibeesApi.put(`${BASE}/state`, { mode_code });
     return data.data ?? {};
 };
 

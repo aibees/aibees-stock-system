@@ -150,11 +150,15 @@ class KisEngine:
         raw_df: pd.DataFrame = chart.df().tail(350)
 
         df = raw_df.rename(columns={'time': 'datetime'})
-        df[Literal.YMD] = (
-            pd.to_datetime(df['datetime'], unit='ms')
-            .dt.tz_convert('Asia/Seoul')
-            .dt.strftime('%Y-%m-%d %H:%M:%S')
-        )
+        # pykis 의 time 은 보통 KST tz-aware 지만 tz 없이 오는 경우가 있다 — naive 에 tz_convert 하면
+        # "Cannot convert tz-naive timestamps" 로 터지므로, naive 는 KST 로 보고 tz 를 붙인다.
+        # (epoch ms 숫자로 오면 UTC 기준이라 utc=True)
+        if pd.api.types.is_numeric_dtype(df['datetime']):
+            ts = pd.to_datetime(df['datetime'], unit='ms', utc=True)
+        else:
+            ts = pd.to_datetime(df['datetime'])
+        ts = ts.dt.tz_localize('Asia/Seoul') if ts.dt.tz is None else ts.dt.tz_convert('Asia/Seoul')
+        df[Literal.YMD] = ts.dt.strftime('%Y-%m-%d %H:%M:%S')
         df['open'] = df['open'].astype(int)
         df['high'] = df['high'].astype(int)
         df['low'] = df['low'].astype(int)

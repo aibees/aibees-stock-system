@@ -34,6 +34,21 @@
 
         <main class="home-main">
 
+            <!-- ── 시장 요약: 코스피 / 코스닥 / 원달러 (선택 날짜와 무관하게 '지금' 값. 야후 시세라 수 분 지연될 수 있다) ── -->
+            <ul class="market-strip" aria-label="시장 요약">
+                <li v-for="m in marketItems" :key="m.key" class="ms-item">
+                    <span class="ms-label">{{ m.label }}</span>
+                    <span class="ms-price">{{ m.priceText }}</span>
+                    <span class="ms-chg" :class="m.cls">{{ m.chgText }}</span>
+                </li>
+            </ul>
+
+            <!-- 광고(WORKER_USER 가 아닌 사용자): 시장 요약 아래, 날짜 네비게이터 위.
+                 AD_FREE 면 자리째 비어 있고, 앱은 하단 배너가 맡는다. -->
+            <section v-if="heroAdVisible" class="hero-ad" aria-label="광고">
+                <AdSlot placement="homeHero" />
+            </section>
+
             <!-- ── 날짜 네비게이터: ‹ 날짜(요일) › + 장 상태 ── -->
             <div class="date-nav">
                 <button type="button" class="nav-btn" aria-label="이전 영업일" @click="stepSelectedDate(-1)">‹</button>
@@ -51,11 +66,7 @@
             </div>
 
             <!-- ── 최우선 타겟 히어로: WORKER_USER(매매 사용자)에게만 ──
-                 그 외 사용자는 같은 자리에 광고가 들어간다(AD_FREE 면 자리째 비어 있음, 앱은 하단 배너가 맡는다). -->
-            <section v-if="heroAdVisible" class="hero-ad" aria-label="광고">
-                <AdSlot placement="homeHero" />
-            </section>
-
+                 그 외 사용자는 대신 날짜 네비게이터 위에 광고가 들어간다. -->
             <section v-if="isWorker" class="priority-hero" aria-label="오늘의 최우선 타겟">
                 <div class="ph-top">
                     <span class="ph-label">오늘의 최우선 타겟</span>
@@ -352,15 +363,50 @@ onMounted(async () => {
     document.addEventListener('keydown', onKeyDown);
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
+    loadMarketSnapshot();
+    marketTimer = setInterval(loadMarketSnapshot, 60 * 1000);
     await getStockMainData();
     loadPriorityTarget();
 });
 onBeforeUnmount(() => {
     clearInterval(clock);
+    clearInterval(marketTimer);
     document.removeEventListener('click', onDocClick, true);
     document.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('scroll', onScroll);
 });
+
+/* ── 시장 요약(코스피·코스닥·환율) ──
+ * 서버가 1분 캐시하므로 화면도 1분마다 다시 부른다. 실패하면 직전 값을 그대로 둔다. */
+const MARKET_PLACEHOLDER = [
+    { key: 'kospi', label: '코스피' }, { key: 'kosdaq', label: '코스닥' }, { key: 'usdkrw', label: '원/달러' },
+];
+const marketData = ref(MARKET_PLACEHOLDER);
+let marketTimer = null;
+
+const loadMarketSnapshot = async () => {
+    try {
+        const { data } = await aibeesApi.get('/api/v1/indicators/market-snapshot');
+        if (Array.isArray(data?.data) && data.data.length) marketData.value = data.data;
+    } catch (e) {
+        // 홈 본문과 무관한 보조 정보라 조용히 무시.
+    }
+};
+
+const marketItems = computed(() => marketData.value.map(m => {
+    const price = numOrNull(m.price);
+    const rate = numOrNull(m.rate);
+    const change = numOrNull(m.change);
+    const dir = rate > 0 ? 1 : (rate < 0 ? -1 : 0);
+    const mark = dir > 0 ? '▲' : (dir < 0 ? '▼' : '–');
+    return {
+        key: m.key,
+        label: m.label,
+        priceText: price === null ? '–' : price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        chgText: rate === null ? '' : `${mark}${change !== null && dir !== 0 ? ` ${Math.abs(change).toFixed(2)}` : ''} ${dir > 0 ? '+' : (dir < 0 ? '−' : '')}${Math.abs(rate).toFixed(2)}%`,
+        cls: dir > 0 ? 'up' : (dir < 0 ? 'down' : 'flat'),
+    };
+}));
 
 const getStockMainData = async () => {
     isLoading.value = true;
@@ -730,6 +776,36 @@ $down:     #1F5BD1;
     height: 1px;
     opacity: 0;
     pointer-events: none;
+}
+
+/* ── 시장 요약 띠: 카드 없이 위아래 1px 선 + 3칸 ── */
+.market-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    padding: 10px 0;
+    list-style: none;
+    border-top: 1px solid $line-2;
+    border-bottom: 1px solid $line-2;
+}
+.ms-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    & + & { border-left: 1px solid $line-2; }
+}
+.ms-label { font-size: 12px; color: $sub; }
+.ms-price { font-size: 15px; font-weight: 700; color: $ink; font-variant-numeric: tabular-nums; }
+.ms-chg {
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    &.up   { color: $up; }
+    &.down { color: $down; }
+    &.flat { color: $sub; }
 }
 
 /* ── 최우선 타겟 히어로 ── */

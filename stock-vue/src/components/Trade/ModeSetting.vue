@@ -1,292 +1,162 @@
 <template>
     <div id="auto-trade-mode">
-        <BrandHeader :title="'자동매매'" back="/trade" />
+        <BrandHeader :title="'운용모드'" back="/trade" />
 
         <div class="contents">
-
-            <!-- ── 현재 운용 상태 배너 ── -->
-            <section class="state-banner" :class="stateClass">
-                <div class="state-left">
-                    <span class="state-badge">{{ runStateLabel }}</span>
-                    <div class="state-text">
-                        <p class="state-mode">{{ activeModeName }}</p>
-                        <p class="state-sub">{{ activeSummary }}</p>
-                    </div>
-                </div>
-                <div class="state-right">
-                    <span class="power-label">{{ state.enabled_flag === 'Y' ? '운용중' : '정지' }}</span>
-                    <button :class="['toggle-btn', state.enabled_flag === 'Y' ? 'active' : 'inactive']"
-                        @click="togglePower" :disabled="isBusy">
-                        <span class="toggle-knob"></span>
-                    </button>
-                </div>
-            </section>
-
-            <!-- ── 전환 예약 배너 ── -->
-            <section v-if="state.pending_mode" class="pending-banner">
-                <div>
-                    <strong>전환 예약됨</strong>
-                    <p>보유 종목 매도 체결 시 <b>{{ modeName(state.pending_mode) }}</b> 로 자동 전환됩니다.</p>
-                    <p class="pending-detail">{{ configSummary(state.pending_mode, state.pending_config) }}</p>
-                </div>
-                <button class="btn-cancel" @click="onCancelPending" :disabled="isBusy">예약 취소</button>
-            </section>
-
-            <!-- ── 잠금 안내 ── -->
-            <p v-if="isLocked" class="lock-note">
-                보유 중에는 방식·종목을 즉시 변경할 수 없습니다. 저장하면 <b>전환 예약</b>으로 등록되고, 현재 보유 종목이 매도되면 적용됩니다.
-            </p>
-
-            <!-- ── 모드 카드 ── -->
-            <section class="mode-cards">
-                <div v-if="isLoading" class="loader-rows">
-                    <div v-for="n in 4" :key="n" class="skeleton-row"></div>
-                </div>
-
-                <article v-for="m in modes" v-else :key="m.mode_code"
-                    :class="['mode-card', { selected: form.mode_code === m.mode_code, current: state.active_mode === m.mode_code }]"
-                    @click="selectMode(m)">
-                    <div class="card-head">
-                        <span class="radio" :class="{ on: form.mode_code === m.mode_code }"></span>
-                        <h3>{{ m.mode_name }}</h3>
-                        <span v-if="state.active_mode === m.mode_code" class="chip-current">현재</span>
-                    </div>
-                    <p class="card-desc" v-html="m.mode_desc"></p>
-                </article>
-            </section>
-
-            <!-- ── 모드별 상세 설정 ── -->
-            <section v-if="selectedMode" class="mode-config">
-                <h4>{{ selectedMode.mode_name }} 설정</h4>
-
-                <!-- M1 : 추천매수 -->
-                <p v-if="form.mode_code === 'M1'" class="config-none">
-                    별도 설정이 없습니다. 매일 20시 추천 배치 결과의 1순위 종목을 익일 전량 매수합니다.
-                </p>
-
-                <!-- M2 : ETF 교대 -->
-                <div v-else-if="form.mode_code === 'M2'" class="form-grid">
-                    <div class="form-field">
-                        <label>정방향 ETF <span class="req">*</span></label>
-                        <div class="stock-picker">
-                            <input readonly :value="display(form.config.long_code, form.config.long_name)"
-                                placeholder="예: KODEX 200" />
-                            <button class="btn-pick" @click="openPicker('long')">선택</button>
-                        </div>
-                    </div>
-                    <div class="form-field">
-                        <label>인버스 ETF <span class="req">*</span></label>
-                        <div class="stock-picker">
-                            <input readonly :value="display(form.config.short_code, form.config.short_name)"
-                                placeholder="예: KODEX 인버스" />
-                            <button class="btn-pick" @click="openPicker('short')">선택</button>
-                        </div>
-                    </div>
-                    <div class="form-field">
-                        <label>진입 연속 확인 (30분봉)</label>
-                        <div class="stepper">
-                            <button @click="step('confirm_bars', -1, 1, 6)">−</button>
-                            <span>{{ form.config.confirm_bars }}봉</span>
-                            <button @click="step('confirm_bars', 1, 1, 6)">＋</button>
-                        </div>
-                    </div>
-                    <div class="form-field">
-                        <label>RSI 과매수 차단</label>
-                        <div class="stepper">
-                            <button @click="step('rsi_overbought', -5, 50, 90)">−</button>
-                            <span>{{ form.config.rsi_overbought }}</span>
-                            <button @click="step('rsi_overbought', 5, 50, 90)">＋</button>
-                        </div>
-                    </div>
-                    <div class="form-field">
-                        <label>손절</label>
-                        <div class="stepper">
-                            <button @click="step('stop_loss_pct', -0.005, 0.005, 0.1)">−</button>
-                            <span>-{{ (form.config.stop_loss_pct * 100).toFixed(1) }}%</span>
-                            <button @click="step('stop_loss_pct', 0.005, 0.005, 0.1)">＋</button>
-                        </div>
-                    </div>
-                    <p class="hint full">
-                        정방향·인버스 ETF 를 각각 독립적으로 운용합니다. MACD↑·OBV↑·MA20↑ 이면서 RSI 가 기준 미만인 상태가
-                        연속 {{ form.config.confirm_bars }}봉 이어지면 진입하고, 신호가 없으면 현금으로 대기합니다.
-                        청산은 손절·익절·트레일링 또는 모멘텀 이탈(MACD↓·OBV↓·RSI↓)입니다.
-                    </p>
-                </div>
-
-            </section>
-
-            <!-- ── 매도 수기 등록 (모드 무관) ──
-                 위에서 어떤 방식을 고르든, 보유 종목 하나에 지정가를 걸어두면
-                 그 종목만은 이 방식의 자동 매도 판정 대신 지정가로 감시된다.
-                 지정가 감시는 별도 모드가 아니라 모드 무관 기능이다. -->
-            <section class="config-link">
-                <p>보유 종목에 <b>지정 매도가</b>를 걸어두면, 선택한 방식과 무관하게 그 종목만 지정가로 매도됩니다.</p>
-                <button class="btn-link" @click="goManualSell">매도 수기 등록 화면으로 이동</button>
-            </section>
-
-            <!-- ── 저장 ── -->
-            <div class="action-bar">
-                <button class="btn-save" @click="onSave" :disabled="isBusy || !form.mode_code">
-                    {{ isLocked ? '전환 예약 저장' : '저장하고 적용' }}
-                </button>
+            <div v-if="isLoading" class="loader-rows">
+                <div v-for="n in 4" :key="n" class="skeleton-row"></div>
             </div>
+
+            <p v-else-if="loadError" class="empty">{{ loadError }}</p>
+
+            <template v-else>
+                <!-- ── 현재 상태 ── -->
+                <section class="sec now" :class="{ halted: !state.trading }">
+                    <div class="now-line">
+                        <span class="dot"></span>
+                        <strong>{{ state.trading ? '자동매매 중' : '매매 정지' }}</strong>
+                    </div>
+                    <p class="now-mode">{{ modeName(state.active_mode) }}</p>
+                    <p class="now-sub">{{ state.active_from ? `${formatDateTime(state.active_from)}부터` : '적용 기록 없음' }}</p>
+                    <p v-if="state.last_message" class="now-msg">{{ state.last_message }}</p>
+                </section>
+
+                <!-- ── 보유 포지션 ── -->
+                <section class="sec">
+                    <h3 class="sec-title">자동매매 보유 <span class="count">{{ positions.length }}</span></h3>
+                    <ul v-if="positions.length" class="rows">
+                        <li v-for="p in positions" :key="p.stock_code" class="pos">
+                            <div class="pos-top">
+                                <b>{{ p.stock_name }}</b>
+                                <span class="code">{{ p.stock_code }}</span>
+                                <span class="qty">{{ formatNumber(p.qty) }}주</span>
+                            </div>
+                            <dl class="pos-lines">
+                                <div><dt>진입</dt><dd>{{ won(p.entry_price) }}</dd></div>
+                                <div><dt>손절</dt><dd class="down">{{ won(p.stop_price) }}</dd></div>
+                                <div><dt>익절</dt><dd class="up">{{ won(p.target_price) }}</dd></div>
+                            </dl>
+                        </li>
+                    </ul>
+                    <p v-else class="empty-row">보유 중인 종목이 없습니다.</p>
+                </section>
+
+                <!-- ── 모드 선택 ── -->
+                <section class="sec">
+                    <h3 class="sec-title">운용모드 선택</h3>
+                    <button type="button" class="btn-apply" :class="{ danger: selectedIsHalt }"
+                        :disabled="isBusy || !changed" @click="apply">
+                        {{ applyLabel }}
+                    </button>
+                    <ul class="rows modes" role="radiogroup">
+                        <li v-for="m in modes" :key="m.mode_code"
+                            :class="['mode', { on: selected === m.mode_code, off: !m.selectable }]"
+                            role="radio" :aria-checked="selected === m.mode_code" :aria-disabled="!m.selectable"
+                            :tabindex="m.selectable ? 0 : -1"
+                            @click="pick(m)" @keydown.enter.space.prevent="pick(m)">
+                            <span class="radio"></span>
+                            <div class="mode-body">
+                                <div class="mode-head">
+                                    <b>{{ m.mode_name }}</b>
+                                    <span v-if="state.active_mode === m.mode_code" class="tag cur">현재</span>
+                                    <span v-else-if="!m.selectable" class="tag">준비 중</span>
+                                </div>
+                                <p class="mode-desc" v-html="m.mode_desc"></p>
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+
+                <!-- ── 변경 이력 ── -->
+                <section class="sec">
+                    <h3 class="sec-title">변경 이력</h3>
+                    <ul v-if="history.length" class="rows">
+                        <li v-for="h in history" :key="h.log_id" class="log">
+                            <span class="log-time">{{ formatDateTime(h.created_at) }}</span>
+                            <span class="log-move">{{ modeName(h.from_mode) }} → <b>{{ modeName(h.to_mode) }}</b></span>
+                            <span v-if="h.reason" class="log-reason">{{ h.reason }}</span>
+                        </li>
+                    </ul>
+                    <p v-else class="empty-row">아직 변경 이력이 없습니다.</p>
+                </section>
+
+                <!-- ── 매도 수기 등록 ── -->
+                <button type="button" class="link-row" @click="goManualSell">
+                    <span>보유 종목에 지정 매도가 걸기</span>
+                    <span aria-hidden="true">›</span>
+                </button>
+            </template>
         </div>
 
-        <StockPickerModal :visible="picker.visible" :title="picker.title" @pick="onPick"
-            @close="picker.visible = false" />
     </div>
 </template>
 
 <script setup>
-import StockPickerModal from './StockPickerModal.vue';
 import {
-    fetchModes, fetchState, saveState, cancelPending, setPower,
-    RUN_STATE_LABEL,
+    fetchModes, fetchState, saveState, fetchHistory, formatNumber, formatDateTime,
 } from '@scripts/useAutoTrade.js';
 
 const router = useRouter();
 
 const isLoading = ref(true);
 const isBusy = ref(false);
+const loadError = ref('');
 const modes = ref([]);
-const state = reactive({
-    enabled_flag: 'N',
-    run_state: 'IDLE',
-    active_mode: null,
-    active_config: {},
-    pending_mode: null,
-    pending_config: null,
-    position: null,
-});
+const history = ref([]);
+const state = reactive({ active_mode: null, active_from: null, trading: false, last_message: null, positions: [] });
+const selected = ref('');
 
-const DEFAULT_CONFIG = {
-    M1: () => ({}),
-    M2: () => ({
-        long_code: '', long_name: '', short_code: '', short_name: '',
-        confirm_bars: 3, rsi_overbought: 70, stop_loss_pct: 0.02,
-    }),
-    // 지정가 감시는 운용모드가 아니라 매도 수기 등록(모드 무관, 위 config-link 참고).
-};
+const errMsg = (e, fallback) => e?.response?.data?.error?.message || e?.response?.data?.message || fallback;
 
-const form = reactive({ mode_code: '', config: {} });
-
-/* ── 조회 ── */
 const load = async () => {
-    isLoading.value = true;
     try {
-        const [modeList, st] = await Promise.all([fetchModes(), fetchState()]);
+        const [modeList, st, hs] = await Promise.all([fetchModes(), fetchState(), fetchHistory(30)]);
         modes.value = modeList;
-        if (st) Object.assign(state, st);
-
-        // 편집 기준: 예약이 있으면 예약값, 없으면 현재값
-        const baseMode = state.pending_mode ?? state.active_mode ?? 'M1';
-        const baseConfig = state.pending_mode ? state.pending_config : state.active_config;
-        form.mode_code = baseMode;
-        form.config = { ...DEFAULT_CONFIG[baseMode]?.() ?? {}, ...(baseConfig ?? {}) };
+        Object.assign(state, st ?? {});
+        history.value = hs;
+        selected.value = state.active_mode ?? '';
+        loadError.value = '';
+    } catch (e) {
+        loadError.value = errMsg(e, '운용모드 정보를 불러오지 못했습니다.');
     } finally {
         isLoading.value = false;
     }
 };
 onMounted(load);
 
-/* ── 파생 ── */
-const isLocked = computed(() => ['HOLDING', 'SWITCH_PENDING'].includes(state.run_state));
-const runStateLabel = computed(() => RUN_STATE_LABEL[state.run_state] ?? state.run_state);
-const stateClass = computed(() => `st-${(state.run_state ?? 'IDLE').toLowerCase()}`);
-const selectedMode = computed(() => modes.value.find(m => m.mode_code === form.mode_code) ?? null);
-const modeName = (code) => modes.value.find(m => m.mode_code === code)?.mode_name ?? code ?? '-';
-const activeModeName = computed(() => state.active_mode ? modeName(state.active_mode) : '운용 방식 미설정');
-
-const display = (code, name) => code ? `${name || ''} (${code})` : '';
-
-const configSummary = (code, cfg) => {
-    const c = cfg ?? {};
-    if (code === 'M2') return `${c.long_name || c.long_code || '-'} · ${c.short_name || c.short_code || '-'}`;
-    return '추천매수 자동매매';
-};
-
-const activeSummary = computed(() => {
-    if (state.position) {
-        return `보유: ${state.position.stock_name} (${state.position.stock_code}) · ${state.position.profit_pct ?? '-'}`;
-    }
-    return configSummary(state.active_mode, state.active_config);
+const positions = computed(() => state.positions ?? []);
+const modeName = (code) => code ? (modes.value.find(m => m.mode_code === code)?.mode_name ?? code) : '미설정';
+const selectedMode = computed(() => modes.value.find(m => m.mode_code === selected.value) ?? null);
+const selectedIsHalt = computed(() => !!selectedMode.value?.is_halt);
+const changed = computed(() => !!selected.value && selected.value !== state.active_mode);
+const applyLabel = computed(() => {
+    if (!changed.value) return '현재 적용 중인 모드입니다';
+    return selectedIsHalt.value ? '매매 정지하기' : `'${selectedMode.value?.mode_name}'로 전환`;
 });
 
-/* ── 입력 ── */
-const selectMode = (m) => {
-    if (form.mode_code === m.mode_code) return;
-    form.mode_code = m.mode_code;
-    form.config = DEFAULT_CONFIG[m.mode_code]?.() ?? {};
-};
+const won = (v) => (v === null || v === undefined) ? '-' : `${Math.round(Number(v)).toLocaleString()}원`;
 
-const step = (key, delta, min, max) => {
-    const next = Number(((form.config[key] ?? min) + delta).toFixed(2));
-    form.config[key] = Math.min(max, Math.max(min, next));
-};
+const pick = (m) => { if (m.selectable) selected.value = m.mode_code; };
 
-const picker = reactive({ visible: false, target: '', title: '' });
-const openPicker = (target) => {
-    picker.target = target;
-    picker.title = target === 'long' ? '정방향 ETF 선택'
-        : '인버스 ETF 선택';
-    picker.visible = true;
-};
-const onPick = ({ stock_code, stock_name }) => {
-    form.config[`${picker.target}_code`] = stock_code;
-    form.config[`${picker.target}_name`] = stock_name;
-    picker.visible = false;
-};
-
-/* ── 검증 ── */
-const validate = () => {
-    const c = form.config;
-    if (form.mode_code === 'M2') {
-        if (!c.long_code || !c.short_code) return '정방향/인버스 ETF를 모두 선택해 주세요.';
-        if (c.long_code === c.short_code) return '정방향과 인버스 ETF는 서로 달라야 합니다.';
-    }
-    return null;
-};
-
-/* ── 저장 ── */
-const onSave = async () => {
-    const err = validate();
-    if (err) { alert(err); return; }
-
-    const confirmMsg = isLocked.value
-        ? '보유 중이므로 전환 예약으로 저장됩니다. 계속할까요?'
-        : `운용 방식을 '${modeName(form.mode_code)}' 로 즉시 적용합니다. 계속할까요?`;
-    if (!confirm(confirmMsg)) return;
+const apply = async () => {
+    const name = selectedMode.value?.mode_name;
+    const held = positions.value.length;
+    const msg = selectedIsHalt.value
+        ? `매매를 정지합니다.\n\n신규 매수뿐 아니라 손절·익절·지정가 매도도 모두 멈춥니다.`
+          + (held ? `\n보유 중인 ${held}종목은 손절선에 닿아도 팔지 않습니다.` : '')
+          + `\n\n계속할까요?`
+        : `운용모드를 '${name}'로 바로 전환합니다.`
+          + (held ? `\n보유 중인 ${held}종목은 새 모드의 매도 기준으로 관리됩니다.` : '')
+          + `\n\n계속할까요?`;
+    if (!confirm(msg)) return;
 
     isBusy.value = true;
     try {
-        const res = await saveState(form.mode_code, form.config);
-        alert(res.message ?? (res.applied === 'RESERVED' ? '전환 예약되었습니다.' : '적용되었습니다.'));
+        const res = await saveState(selected.value);
+        if (res?.message) alert(res.message);
         await load();
-    } finally {
-        isBusy.value = false;
-    }
-};
-
-const onCancelPending = async () => {
-    if (!confirm('전환 예약을 취소할까요? 현재 운용 방식이 그대로 유지됩니다.')) return;
-    isBusy.value = true;
-    try {
-        await cancelPending();
-        await load();
-    } finally {
-        isBusy.value = false;
-    }
-};
-
-const togglePower = async () => {
-    const next = state.enabled_flag === 'Y' ? 'N' : 'Y';
-    if (next === 'N' && state.run_state === 'HOLDING'
-        && !confirm('보유 중입니다. 운용을 정지하면 신규 매수는 중단되지만 보유 종목 매도 감시는 계속됩니다. 계속할까요?')) return;
-
-    isBusy.value = true;
-    try {
-        await setPower(next);
-        await load();
+    } catch (e) {
+        alert(errMsg(e, '운용모드를 바꾸지 못했습니다.'));
     } finally {
         isBusy.value = false;
     }
@@ -296,470 +166,185 @@ const goManualSell = () => router.push({ path: '/auto-trade/limit-order' });
 </script>
 
 <style scoped lang="scss">
-/* ── 무채색 팔레트 (/trade 대시보드와 동일) ── */
-$white:    #ffffff;
-$gray-50:  #FFFBEA;
-$gray-100: #F3EAD2;
-$gray-200: #EFE2BC;
-$gray-300: #E3D3A8;
-$gray-400: #9A8C7E;
-$gray-500: #6B5B4E;
-$gray-700: #4A3628;
-$gray-900: #2B1D14;
-$black:    #2B1D14;
+// 양봉상회 토큰(홈·배치관리와 동일)
+$white:  #ffffff;
+$line:   #EFE2BC;
+$line-2: #EAD9A6;
+$chip:   #F6EBC8;
+$hero:   #74462A;
+$brown:  #7A4423;
+$ink:    #2B1D14;
+$sub:    #6B5B4E;
+$sub-2:  #7A6B5D;
+$cream:  #FFF8E1;
+$up:     #C8282A;
+$down:   #1F5FBF;
+$ok:     #2E9E5B;
 
 #auto-trade-mode {
     min-height: 100vh;
     background: $white;
-    color: $gray-900;
-    font-family: 'Pretendard', -apple-system, sans-serif;
+    color: $ink;
+    text-align: left;
+    font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
+    font-variant-numeric: tabular-nums;
 }
 
 .contents {
-    max-width: 1000px;
+    max-width: 760px;
     margin: 0 auto;
-    padding: 24px 16px 120px;
+    padding: 16px 16px calc(96px + env(safe-area-inset-bottom, 0px));
 }
 
-/* ── 상태 배너 ── */
-.state-banner {
-    border-radius: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    background: $white;
-    border: 1px solid $gray-200;
-    border-left: 4px solid $gray-300;
-    padding: 16px 18px;
-    margin-bottom: 14px;
+/* ── 섹션: 카드 없이 구분선 ── */
+.sec { padding: 18px 0; border-bottom: 1px solid $line; }
+.sec-title {
+    margin: 0 0 6px;
+    font-size: 17px;
+    font-weight: 700;
+    white-space: nowrap;
+    .count { color: #A0662F; margin-left: 2px; }
+}
+.rows { margin: 0; padding: 0; list-style: none; }
+.rows > li { border-bottom: 1px solid $line; &:last-child { border-bottom: 0; } }
+.empty-row { margin: 6px 0 0; font-size: 14px; color: $sub-2; }
+.empty { padding: 40px 0; text-align: center; color: $sub; }
 
-    &.st-holding {
-        border-left-color: $gray-900;
-    }
-
-    &.st-armed {
-        border-left-color: $gray-500;
-    }
-
-    &.st-switch_pending {
-        border-left-color: $gray-400;
-    }
-
-    .state-left {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-    }
-
-    .state-badge {
-        border-radius: 12px;
-        font-size: .72rem;
-        font-weight: 700;
-        padding: 4px 10px;
-        border: 1px solid $gray-300;
-        color: $gray-900;
-        white-space: nowrap;
-        letter-spacing: .02em;
-    }
-
-    .state-mode {
-        margin: 0;
-        font-size: 1.02rem;
-        font-weight: 700;
-    }
-
-    .state-sub {
-        margin: 3px 0 0;
-        font-size: .8rem;
-        color: $gray-500;
-    }
-
-    .state-right {
+/* ── 현재 상태 ── */
+.now {
+    padding-top: 8px;
+    .now-line {
         display: flex;
         align-items: center;
         gap: 8px;
+        font-size: 15px;
+        color: $ok;
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
     }
-
-    .power-label {
-        font-size: .8rem;
-        color: $gray-500;
-    }
-
-    @media (max-width: 600px) {
-        flex-direction: column;
-        align-items: flex-start;
-    }
+    &.halted .now-line { color: $up; }
+    .now-mode { margin: 6px 0 2px; font-size: 22px; font-weight: 800; }
+    .now-sub { margin: 0; font-size: 13px; color: $sub-2; }
+    .now-msg { margin: 10px 0 0; font-size: 13px; color: $sub; line-height: 1.5; }
 }
 
-.toggle-btn {
-    border-radius: 12px;
-    width: 44px;
-    height: 24px;
-    border: 1px solid $gray-300;
-    position: relative;
-    cursor: pointer;
-    background: $white;
-    transition: background .18s, border-color .18s;
-
-    &.active {
-        background: #74462A;
-        border-color: $gray-900;
-    }
-
-    &.inactive {
-        background: $white;
-    }
-
-    .toggle-knob {
-        position: absolute;
-        top: 2px;
-        left: 2px;
-        width: 18px;
-        height: 18px;
-        background: $gray-300;
-        transition: transform .18s, background .18s;
-    }
-
-    &.active .toggle-knob {
-        transform: translateX(18px);
-        background: $white;
-    }
-}
-
-/* ── 예약 배너 ── */
-.pending-banner {
-    border-radius: 12px;
+/* ── 보유 포지션 ── */
+.pos { padding: 12px 0; }
+.pos-top {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    align-items: baseline;
+    gap: 6px;
+    b { font-size: 16px; }
+    .code { font-size: 12px; color: $sub-2; }
+    .qty { margin-left: auto; font-size: 14px; color: $sub; }
+}
+.pos-lines {
+    display: flex;
+    gap: 16px;
+    margin: 6px 0 0;
+    font-size: 13px;
+    div { display: flex; gap: 4px; }
+    dt { color: $sub-2; }
+    dd { margin: 0; font-weight: 600; }
+    .up { color: $up; }
+    .down { color: $down; }
+}
+
+/* ── 모드 목록 ── */
+.mode {
+    display: flex;
     gap: 12px;
-    background: $gray-50;
-    border: 1px solid $gray-300;
-    padding: 14px 18px;
-    margin-bottom: 14px;
-
-    strong {
-        font-size: .86rem;
-        color: $gray-900;
-    }
-
-    p {
-        margin: 4px 0 0;
-        font-size: .82rem;
-        color: $gray-900;
-    }
-
-    .pending-detail {
-        color: $gray-500;
-        font-size: .78rem;
-    }
-
-    .btn-cancel {
-        border-radius: 12px;
-        border: 1px solid $gray-300;
-        background: $white;
-        color: $gray-700;
-        padding: 8px 14px;
-        font-size: .8rem;
-        font-weight: 600;
-        cursor: pointer;
-        white-space: nowrap;
-
-        &:hover { background: #74462A; color: $white; border-color: #74462A; }
-    }
-}
-
-.lock-note {
-    border-radius: 12px;
-    font-size: .8rem;
-    color: $gray-500;
-    background: $white;
-    border: 1px dashed $gray-300;
-    padding: 10px 14px;
-    margin: 0 0 16px;
-}
-
-/* ── 모드 카드 ── */
-.mode-cards {
-    border-radius: 12px;
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1px;
-    background: $gray-200;
-    border: 1px solid $gray-200;
-    margin-bottom: 18px;
-
-    @media (max-width: 700px) {
-        grid-template-columns: 1fr;
-    }
-}
-
-.mode-card {
-    background: $white;
-    padding: 16px 18px;
+    padding: 14px 0;
     cursor: pointer;
-    transition: background .12s;
-
-    &:hover {
-        background: $gray-50;
-    }
-
-    &.selected {
-        box-shadow: inset 0 0 0 1px $gray-900;
-    }
-
-    .card-head {
-        display: flex;
-        align-items: center;
-        gap: 9px;
-
-        h3 {
-            margin: 0;
-            font-size: .95rem;
-            font-weight: 700;
-            flex: 1;
-        }
-    }
+    outline: none;
 
     .radio {
-        border-radius: 12px;
-        width: 14px;
-        height: 14px;
-        border: 1.5px solid $gray-300;
-        flex: 0 0 auto;
-
-        &.on {
-            border-color: $gray-900;
-            background: #74462A;
-            box-shadow: inset 0 0 0 2px $white;
-        }
+        flex: none;
+        width: 20px;
+        height: 20px;
+        margin-top: 1px;
+        border: 2px solid $line-2;
+        border-radius: 50%;
+        box-sizing: border-box;
     }
-
-    .chip-current {
-        font-size: .66rem;
-        font-weight: 700;
-        color: $white;
-        background: #74462A;
-        padding: 3px 8px;
-    }
-
-    .card-desc {
-        margin: 10px 0 0;
-        font-size: .8rem;
-        line-height: 1.55;
-        color: $gray-500;
-    }
+    &.on .radio { border: 6px solid $hero; }
+    &:focus-visible .mode-head b { text-decoration: underline; }
+    &.off { cursor: default; .mode-body, .radio { opacity: .45; } }
 }
-
-/* ── 상세 설정 ── */
-.mode-config {
-    border-radius: 12px;
-    background: $white;
-    border: 1px solid $gray-200;
-    padding: 18px;
-
-    h4 {
-        margin: 0 0 14px;
-        font-size: .82rem;
-        font-weight: 700;
-        color: $gray-500;
-        letter-spacing: .03em;
-        text-transform: uppercase;
-    }
-
-    .config-none {
-        margin: 0;
-        font-size: .82rem;
-        color: $gray-500;
-    }
-}
-
-/* ── 매도 수기 등록 안내 (모드 무관, mode-config 밖의 독립 섹션) ── */
-.config-link {
-    border-radius: 12px;
-    background: $white;
-    border: 1px solid $gray-200;
-    padding: 16px 18px;
-    margin-top: 14px;
+.mode-body { min-width: 0; }
+.mode-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 14px;
     flex-wrap: wrap;
-
-    p {
-        margin: 0;
-        font-size: .82rem;
-        color: $gray-500;
-        line-height: 1.5;
-
-        b { color: $gray-900; }
-    }
-
-    .btn-link {
-        border-radius: 12px;
-        border: 1px solid $gray-300;
-        color: $gray-700;
-        background: $white;
-        padding: 8px 14px;
-        font-size: .82rem;
-        font-weight: 600;
-        cursor: pointer;
-        white-space: nowrap;
-        flex: 0 0 auto;
-
-        &:hover { background: #74462A; color: $white; border-color: #74462A; }
-    }
-}
-
-.form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
-
-    @media (max-width: 700px) {
-        grid-template-columns: 1fr;
-    }
-
-    .full {
-        grid-column: 1 / -1;
-    }
-}
-
-.form-field {
-    display: flex;
-    flex-direction: column;
     gap: 6px;
+    b { font-size: 16px; }
+}
+.tag {
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: $chip;
+    color: $sub;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    &.cur { background: $hero; color: $cream; }
+}
+.mode-desc { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: $sub; :deep(b) { color: $ink; } }
 
-    label {
-        font-size: .78rem;
-        font-weight: 600;
-        color: $gray-500;
-    }
-
-    .req {
-        color: $gray-900;
-        font-weight: 700;
-    }
-
-    input,
-    select {
-        border-radius: 12px;
-        height: 38px;
-        border: 1px solid $gray-300;
-        padding: 0 10px;
-        font-size: .85rem;
-        background: $white;
-        color: $gray-900;
-    }
+/* ── 이력 ── */
+.log {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 2px 12px;
+    padding: 10px 0;
+    font-size: 14px;
+    .log-time { grid-row: span 2; color: $sub-2; font-size: 12px; white-space: nowrap; }
+    .log-reason { grid-column: 2; color: $sub; font-size: 12px; }
 }
 
-.stock-picker {
+.link-row {
     display: flex;
-    gap: 8px;
-
-    input {
-        flex: 1;
-        background: $gray-50;
-    }
-
-    .btn-pick {
-        border-radius: 12px;
-        height: 38px;
-        padding: 0 14px;
-        border: 1px solid $gray-300;
-        color: $gray-700;
-        background: $white;
-        font-size: .8rem;
-        font-weight: 600;
-        cursor: pointer;
-        white-space: nowrap;
-
-        &:hover { background: #74462A; color: $white; border-color: #74462A; }
-
-        &:disabled {
-            opacity: .45;
-            cursor: not-allowed;
-        }
-    }
-}
-
-.stepper {
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
     justify-content: space-between;
-    height: 38px;
-    border: 1px solid $gray-300;
-    padding: 0 6px;
-
-    button {
-        border-radius: 12px;
-        width: 28px;
-        height: 26px;
-        border: 1px solid $gray-300;
-        background: $white;
-        font-size: .95rem;
-        cursor: pointer;
-
-        &:hover { background: #74462A; color: $white; border-color: #74462A; }
-    }
-
-    span {
-        font-size: .85rem;
-        font-weight: 600;
-        font-variant-numeric: tabular-nums;
-    }
+    width: 100%;
+    padding: 16px 0;
+    border: 0;
+    border-bottom: 1px solid $line;
+    background: none;
+    color: $brown;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
 }
 
-.hint {
-    font-size: .76rem;
-    color: $gray-400;
-    line-height: 1.5;
-    margin: 0;
-}
-
-/* ── 저장 ── */
-.action-bar {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 18px;
-}
-
-.btn-save {
+/* ── 적용 버튼: 모드 선택 제목 바로 아래 ── */
+.btn-apply {
+    display: block;
+    width: 100%;
+    min-height: 50px;
+    margin: 8px 0 4px;
+    border: 0;
     border-radius: 12px;
-    height: 42px;
-    padding: 0 26px;
-    border: 1px solid $gray-900;
-    background: #74462A;
-    color: $white;
-    font-size: .88rem;
+    background: $hero;
+    color: $cream;
+    font: inherit;
+    font-size: 16px;
     font-weight: 700;
     cursor: pointer;
-
-    &:hover:not(:disabled) { background: #74462A; border-color: #74462A; }
-
-    &:disabled {
-        opacity: .4;
-        cursor: not-allowed;
-    }
+    &.danger { background: $up; color: $white; }
+    &:disabled { background: $chip; color: $sub-2; cursor: default; }
+    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
 }
 
 /* ── 스켈레톤 ── */
-.loader-rows {
-    grid-column: 1 / -1;
-}
-
+.loader-rows { padding-top: 8px; }
 .skeleton-row {
-    height: 84px;
-    background: $gray-100;
-    animation: pulse 1.6s infinite ease-in-out;
+    height: 64px;
     margin-bottom: 10px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #F6EFD9 25%, #FBF6E6 50%, #F6EFD9 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
 }
-
-@keyframes pulse {
-    0%, 100% { opacity: .55; }
-    50%      { opacity: .9; }
-}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 </style>

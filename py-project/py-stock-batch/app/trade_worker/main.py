@@ -250,6 +250,18 @@ def main():
             pass
         return
 
+    # 매매정지(M0) 안전망: 전략의 현재 모드를 Broker 주문 경로에 연결한다(장중 전환도 즉시 반영).
+    broker.set_trading_gate(lambda: not strategy.halted)
+    if strategy.halted:
+        log.warning("[main] 매매정지(M0) 상태로 기동 — 주문 없이 계좌 조회·보유 동기화만 수행")
+        try:
+            repo.insert_worker_log(cfg.user_id, "boot", "INFO", "매매정지(M0) 상태로 기동 — 계좌 조회만")
+            notifier.send("[worker 기동] 매매정지(M0)",
+                          "⏸ 매매정지 상태로 worker 가 시작됐습니다.\n"
+                          "매수·매도 주문을 내지 않고 계좌 조회만 합니다.")
+        except Exception:  # noqa: BLE001  (알림 실패로 기동을 막지 않는다)
+            pass
+
     # 7. 모드별 executor. 현재는 M1 고정 —
     #    다음 단계에서 RUNNER_BY_MODE[strategy.mode] 팩토리로 대체한다.
     buy = BuyExecutor1(cfg, broker, repo, notifier, strategy=strategy)

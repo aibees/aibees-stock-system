@@ -30,6 +30,11 @@ log = logging.getLogger("trade_worker.strategy")
 #: user_trade_mode 행이 없거나 조회에 실패해도 worker 가 죽지 않고 현행 전략으로 돈다.
 DEFAULT_MODE = "M1"
 
+#: 매매정지 모드. worker 는 떠 있고 계좌 조회·보유 동기화·라인 계산은 계속하지만 **주문은 내지 않는다.**
+#: 전략 자체가 없는 모드라, 라인(손절/익절 표시) 계산에는 DEFAULT_MODE 전략을 빌려 쓴다.
+#: 실제 차단 지점: BuyExecutor.run / SellExecutor._do_sell 진입부 + Broker._order_rest(안전망).
+HALT_MODE = "M0"
+
 
 class UnsupportedModeError(RuntimeError):
     """전략이 아직 구현되지 않은 운용모드. (스켈레톤 = NotImplementedError 를 던지는 클래스)"""
@@ -46,7 +51,11 @@ def build_strategy(mode: str, user_meta):
     STRATEGY_BY_MODE 가 모드↔전략의 유일한 정본이다. 여기서 클래스를 직접 import 하지 않는다.
     미등록 모드는 기본 모드로 떨어뜨리고(경고), 스켈레톤이면 UnsupportedModeError 를 올린다.
     """
-    cls = STRATEGY_BY_MODE.get(mode)
+    if mode == HALT_MODE:
+        # 매매정지: 주문은 막히고, 보유 종목 라인 표시용으로만 기본 전략을 쓴다(경고 아님).
+        cls = STRATEGY_BY_MODE.get(DEFAULT_MODE)
+    else:
+        cls = STRATEGY_BY_MODE.get(mode)
     if cls is None:
         log.warning("알 수 없는 운용모드 %s → 기본 모드 %s 로 대체 "
                     "(STRATEGY_BY_MODE 에 등록되지 않음)", mode, DEFAULT_MODE)
@@ -98,6 +107,11 @@ class SellStrategy:
         self.strategy = build_strategy(self.mode, self.user_meta)
         self._fingerprint = _s1_fingerprint(self.user_meta)
         log.info("전략 초기화: mode=%s → %s", self.mode, type(self.strategy).__name__)
+
+    @property
+    def halted(self) -> bool:
+        """매매정지(M0)면 True — 매수·매도 주문을 내지 않는다."""
+        return self.mode == HALT_MODE
 
     # ── 현재 운용모드 조회 ───────────────────────────────────────────
     def _read_mode(self) -> str:

@@ -7,6 +7,7 @@ import { consumeAdPass } from "./useAdGate.js";
 import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
 import AdGate from '@/components/AdGate.vue';
 import NaverCallback from '@/components/NaverCallback.vue';
+import SignupConsent from '@/components/SignupConsent.vue';
 
 // ----- import components -----
 import Home from '@/components/Home.vue'
@@ -50,6 +51,12 @@ const routes = [
         path: "/oauth/naver",
         name: "naver-callback",
         component: NaverCallback
+    },
+    {
+        // 네이버 가입 — 개인정보 처리방침 동의(동의해야 토큰 발급). 비로그인 공개 경로.
+        path: "/oauth/naver/consent",
+        name: "signup-consent",
+        component: SignupConsent
     },
     {
         path: "/user-option",
@@ -145,7 +152,7 @@ const getRouteList = async () => {
 
 // 로그인 없이 접근 가능한 화이트리스트
 // /ad-gate: 비로그인도 광고 게이트를 거쳐 공개 메뉴로 갈 수 있어야 한다(이동 대상의 접근 가능 여부는 다시 검사된다).
-const PUBLIC_PATHS = ['/login', '/', '/home', '/ad-gate', '/oauth/naver'];
+const PUBLIC_PATHS = ['/login', '/', '/home', '/ad-gate', '/oauth/naver', '/oauth/naver/consent'];
 
 export const setRouterToApp = async () => {
     const dynamicRoutes = await getRouteList();

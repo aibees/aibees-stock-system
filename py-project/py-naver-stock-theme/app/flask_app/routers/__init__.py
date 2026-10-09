@@ -13,6 +13,7 @@ from app.flask_app.routers.router_strategy import strategy_bp
 from app.flask_app.routers.router_account_trade import account_trade_bp
 from app.flask_app.routers.router_indicators import indicators_bp
 from app.flask_app.routers.router_profit import profit_bp
+from app.flask_app.routers.router_auto_trade import auto_trade_bp
 
 def register_blueprints(app: Flask):
     
@@ -35,3 +36,4 @@ def register_blueprints(app: Flask):
     app.register_blueprint(account_trade_bp, url_prefix="/api/v1/users")
     app.register_blueprint(indicators_bp, url_prefix="/api/v1/indicators")
     app.register_blueprint(profit_bp, url_prefix="/api/v1/profit")
+    app.register_blueprint(auto_trade_bp, url_prefix="/api/v1/auto-trade")

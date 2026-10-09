@@ -43,6 +43,15 @@ DEFAULT_SIGNUP_ROLE = 'STOCK_USER'                # 네이버로 신규 가입�
 NAVER_TOKEN_URL = 'https://nid.naver.com/oauth2.0/token'
 NAVER_PROFILE_URL = 'https://openapi.naver.com/v1/nid/me'
 
+# ── 개인정보 처리방침 동의 ─────────────────────────────────────────────
+# 프런트(stock-vue src/scripts/privacyPolicy.js)의 PRIVACY_POLICY_VERSION 과 같아야 한다.
+# 처리방침 문구를 고치면 양쪽 버전을 함께 올린다 → 다음 네이버 로그인 때 재동의를 받는다.
+CONSENT_PRIVACY = 'PRIVACY'                        # user_consent.consent_type 값
+PRIVACY_POLICY_VERSION = '2026-10-10'
+# 동의 화면용 임시 토큰. accessToken 과 다른 키로 서명해 require_auth 를 통과하지 못하게 한다.
+CONSENT_TOKEN_SECRET = JWT_SECRET + ':naver-consent'
+CONSENT_TOKEN_EXPIRE_MINUTES = 10
+
 
 class NaverLoginError(Exception):
     """사용자에게 그대로 보여줄 수 있는 네이버 로그인 실패 사유."""
@@ -140,6 +149,7 @@ class AuthService:
             ② 네이버가 준 이메일과 user_master.email 이 정확히 1명 일치 → 그 사용자에 연결 후 로그인
             ③ 일치하는 사용자가 없음 → 신규 가입(기본 권한 STOCK_USER) 후 로그인
         반환: 이메일 로그인과 같은 형식 + 'naverResult': 'login' | 'linked' | 'created'
+              단, 현재 처리방침 동의가 없으면 토큰 대신 consentRequired/consentToken (→ _naver_result)
         Raises: NaverLoginError(사용자에게 보여줄 메시지)
         """
         code, state = (data or {}).get('code'), (data or {}).get('state')
@@ -160,7 +170,7 @@ class AuthService:
             if row.enabled_flag != 'Y':
                 raise NaverLoginError("네이버 로그인이 비활성화된 계정입니다. 관리자에게 문의해 주세요.")
             user = dao.select_user(session, row.user_id)
-            return {**self._login_result(session, user.user_id, user.user_name), 'naverResult': 'login'}
+            return self._naver_result(session, user.user_id, user.user_name, 'login')
 
         if not email:
             raise NaverLoginError("네이버 이메일 제공에 동의해야 로그인할 수 있어요.")
@@ -177,16 +187,75 @@ class AuthService:
             if existing is not None and existing.provider_uid and existing.provider_uid != naver_id:
                 raise NaverLoginError("이 계정에는 다른 네이버 계정이 이미 연결돼 있습니다.")
             dao.link(session, user.user_id, NAVER, naver_id)
-            return {**self._login_result(session, user.user_id, user.user_name), 'naverResult': 'linked'}
+            return self._naver_result(session, user.user_id, user.user_name, 'linked')
 
-        # ③ 신규 가입
+        # ③ 신규 가입 — 회원정보를 저장한 뒤 개인정보 처리방침 동의 화면으로 보낸다
         name = (profile.get('name') or profile.get('nickname') or email.split('@')[0])[:45]
         phone = (profile.get('mobile') or '').strip() or None
         if phone and (len(phone) > 13 or dao.phone_in_use(session, phone)):
             phone = None   # user_phone 은 UNIQUE — 다른 계정이 쓰는 번호면 비워 둔다
         new_id = dao.create_user(session, user_name=name, email=email, phone=phone,
                                  login_type=NAVER, provider_uid=naver_id, auth_id=DEFAULT_SIGNUP_ROLE)
-        return {**self._login_result(session, new_id, name), 'naverResult': 'created'}
+        return self._naver_result(session, new_id, name, 'created')
+
+    def _naver_result(self, session, user_id, user_name, naver_result):
+        """
+        네이버 로그인 응답. 현재 버전의 개인정보 처리방침 동의가 있으면 바로 로그인(토큰 발급),
+        없으면 토큰 대신 동의 화면용 consentToken 을 준다(→ POST /api/oauth/naver/consent).
+        가입 직후뿐 아니라 동의 화면에서 이탈한 사용자·처리방침 개정 후 첫 로그인도 여기서 걸린다.
+        """
+        consent = self.socialLoginDaoImpl.select_consent(session, user_id, CONSENT_PRIVACY)
+        if consent is not None and consent.version == PRIVACY_POLICY_VERSION:
+            return {**self._login_result(session, user_id, user_name), 'naverResult': naver_result}
+
+        now = datetime.now(tz=timezone.utc)
+        consent_token = jwt.encode({
+            'sub': str(user_id),
+            'nres': naver_result,
+            'iat': now,
+            'exp': now + timedelta(minutes=CONSENT_TOKEN_EXPIRE_MINUTES),
+        }, CONSENT_TOKEN_SECRET, algorithm=JWT_ALGORITHM)
+        user = self.socialLoginDaoImpl.select_user(session, user_id)
+        return {
+            'consentRequired': True,
+            'consentToken': consent_token,
+            'policyVersion': PRIVACY_POLICY_VERSION,
+            'naverResult': naver_result,
+            'profile': {'user_name': user_name, 'email': user.email if user else None},
+        }
+
+    def naverConsentProcess(self, session, data):
+        """
+        개인정보 처리방침 동의 → 동의 기록 저장 → 로그인(토큰 발급).
+
+        Request : { "consentToken": "...", "policyVersion": "...", "agreePrivacy": true }
+        반환: 이메일 로그인과 같은 형식 + 'naverResult'(네이버 로그인 때 결정된 값)
+        Raises: NaverLoginError(사용자에게 보여줄 메시지)
+        """
+        data = data or {}
+        if data.get('agreePrivacy') is not True:
+            raise NaverLoginError("개인정보 처리방침에 동의해야 가입할 수 있어요.")
+        if data.get('policyVersion') != PRIVACY_POLICY_VERSION:
+            # 화면이 오래된 처리방침을 보여준 경우 — 새로 받은 문구로 다시 동의받는다
+            raise NaverLoginError("개인정보 처리방침이 변경됐어요. 화면을 새로고침한 뒤 다시 로그인해 주세요.")
+        try:
+            payload = jwt.decode(data.get('consentToken') or '', CONSENT_TOKEN_SECRET,
+                                 algorithms=[JWT_ALGORITHM])
+        except jwt.ExpiredSignatureError:
+            raise NaverLoginError("동의 시간이 지났어요. 네이버로 다시 로그인해 주세요.")
+        except jwt.InvalidTokenError:
+            raise NaverLoginError("가입 정보가 올바르지 않아요. 네이버로 다시 로그인해 주세요.")
+
+        user_id = int(payload['sub'])
+        dao = self.socialLoginDaoImpl
+        user = dao.select_user(session, user_id)
+        login_type = dao.select_login_type(session, user_id, NAVER)
+        if user is None or login_type is None or login_type.enabled_flag != 'Y':
+            raise NaverLoginError("가입 정보를 찾을 수 없어요. 네이버로 다시 로그인해 주세요.")
+
+        dao.save_consent(session, user_id, CONSENT_PRIVACY, PRIVACY_POLICY_VERSION)
+        return {**self._login_result(session, user_id, user.user_name),
+                'naverResult': payload.get('nres', 'login')}
 
     def _naver_profile(self, session, code, state):
         """code → 네이버 access token → 회원 프로필(/v1/nid/me). client secret 은 서버에만 있다."""

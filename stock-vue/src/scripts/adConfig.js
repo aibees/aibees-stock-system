@@ -10,15 +10,19 @@
 //   실제 광고가 준비되지 않았다면 false 로 두는 편이 낫다.
 export const AD_ENABLED = true;
 
-// 광고 제공자. 계정/승인이 나오기 전까지 'placeholder' (자리표시 박스만 그린다).
-//   'placeholder' | 'adsense' | 'adfit'
-export const AD_PROVIDER = 'placeholder';
+// 광고 제공자. 빌드 모드별 .env 의 VITE_AD_PROVIDER 로 고른다(없으면 'placeholder' = 자리표시 박스만).
+//   'placeholder' | 'gpt-test' | 'adsense' | 'adfit'
+//   'gpt-test' : 구글이 문서용으로 공개한 Ad Manager 샘플 광고 단위로 "진짜 광고처럼" 그린다.
+//                계정·승인 없이 어느 도메인에서나 나오며 수익은 없다. 실광고 연동 전 웹 배포 확인용.
+export const AD_PROVIDER = import.meta.env.VITE_AD_PROVIDER || 'placeholder';
 
 export const AD_CONFIG = {
     // AdSense: client='ca-pub-XXXXXXXXXXXXXXXX', slots 는 광고 단위 ID.
     adsense: { client: '', slots: { side: '', gate: '', homeHero: '', mobileInline: '', mobileBottom: '' } },
     // Kakao AdFit: 광고단위 ID('DAN-...'). 단위 생성 시 정한 크기와 아래 SIZES 가 같아야 한다.
     adfit: { units: { side: '', gate: '', homeHero: '', mobileInline: '', mobileBottom: '' } },
+    // Google Ad Manager(GPT) 공개 샘플 단위 — 테스트 크리에이티브만 나온다.
+    gptTest: { unit: '/6355419/Travel/Europe/France/Paris' },
 };
 
 // 슬롯별 크기(px)
