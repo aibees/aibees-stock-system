@@ -36,12 +36,9 @@
             <SortChips v-if="!isLoading && resultData.length > 0" v-model="sortKey" :options="SORT_OPTIONS" @change="onSortKeyChange" />
 
             <section class="buy-target reco">
-                <!-- 열 머리글: 아래 줄과 같은 칸 나눔(종목 | 7개 조건 | 현재가 | 봉) -->
+                <!-- 열 머리글: 아래 윗줄과 같은 칸 나눔(종목 | 현재가 | 봉) -->
                 <div v-if="!isLoading && sortedData.length" class="reco-cols" aria-hidden="true">
                     <span class="c-who"></span>
-                    <span class="c-conds">
-                        <span v-for="c in CONDITION_COLUMNS" :key="c.label" class="c-head">{{ c.head }}</span>
-                    </span>
                     <span class="c-px">{{ priceLabel }}</span>
                     <span class="c-candle"></span>
                 </div>
@@ -56,12 +53,8 @@
                                     <span class="rank">{{ String(rankNumber(idx)).padStart(2, '0') }}</span>
                                     <span class="name">{{ r.item.stock_name }}</span>
                                 </span>
-                                <span class="code">{{ r.item.stock_code }}</span>
-                            </span>
-                            <!-- 7개 조건 충족 여부 — 열 머리글과 같은 순서 -->
-                            <span class="conds" :aria-label="`조건 ${r.summary.pass}/${r.summary.total} 충족`">
-                                <span v-for="c in r.summary.rows" :key="c.key" class="cond" :class="{ on: c.pass }"
-                                    :title="`${c.label}: ${c.pass ? '충족' : '미충족'}`">{{ c.pass ? '✓' : '–' }}</span>
+                                <!-- 시가총액은 코드 옆에 짧게(펼치면 정확한 값·수급) -->
+                                <span class="code">{{ r.item.stock_code }}<template v-if="r.capShort"> · {{ r.capShort }}</template></span>
                             </span>
                             <span class="px">
                                 <span class="price">{{ formatNumber(r.item.close) }}</span>
@@ -72,15 +65,54 @@
                             </span>
                             <DayCandle mini class="candle" :open="r.item.open" :high="r.item.high" :low="r.item.low"
                                 :close="r.item.close" :close-label="priceLabel" />
+                            <!-- 7개 조건: 윗줄 아래 전체 폭 한 줄로 "이름 + 충족/미달" (✓ 기호 대신 글자 — 가독성 피드백 2026-10-11) -->
+                            <span class="conds" :aria-label="`조건 ${r.summary.pass}/${r.summary.total} 충족`">
+                                <span v-for="c in r.summary.rows" :key="c.key" class="cond" :class="{ on: c.pass }">
+                                    <span class="cond-name">{{ COND_NAMES[c.key] ?? c.head }}</span>
+                                    <span class="cond-state">{{ c.pass ? '충족' : '미달' }}</span>
+                                </span>
+                            </span>
+                            <!-- 펼침 안내: 누르면 아래에 수급·밸류·조건 상세가 열린다(줄 전체가 버튼) -->
+                            <span class="more-hint" aria-hidden="true">
+                                {{ expandedCode === r.item.stock_code ? '접기' : '상세보기' }}
+                                <svg class="more-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+                            </span>
                         </button>
 
                         <div v-if="expandedCode === r.item.stock_code" class="reco-detail">
+                            <!-- 수급·밸류 요약(펼침 맨 위): 조건 줄과 같은 칸 모양. 수급은 추천일 이하 최근 영업일, PER/PBR 은 추천일 배치 시점 -->
+                            <div class="facts">
+                                <span v-for="f in r.facts" :key="f.name" class="fact">
+                                    <span class="cond-name">{{ f.name }}</span>
+                                    <span class="fact-value" :class="f.cls">{{ f.value }}</span>
+                                </span>
+                            </div>
+                            <!-- 시가총액 · 수급: 추천일 이하 가장 최근 영업일 기준. 순매수=빨강 / 순매도=파랑 -->
+                            <div v-if="r.market" class="mk">
+                                <div class="mk-head">
+                                    <span class="mk-title">시가총액 · 수급</span>
+                                    <span v-if="r.market.dateLabel" class="mk-date">{{ r.market.dateLabel }} 종가·순매수 기준</span>
+                                </div>
+                                <ul class="mk-list">
+                                    <li v-if="r.item.market_cap != null" class="mk-row">
+                                        <span class="mk-label">시가총액</span>
+                                        <span class="mk-value">{{ formatEok(r.item.market_cap) }}</span>
+                                    </li>
+                                    <li v-for="f in r.market.flows" :key="f.label" class="mk-row">
+                                        <span class="mk-label">{{ f.label }}</span>
+                                        <span class="mk-value" :class="signClass(f.amt)">
+                                            {{ formatNetAmt(f.amt) }}<span v-if="f.qty != null" class="mk-qty">{{ formatNetQty(f.qty) }}</span>
+                                        </span>
+                                    </li>
+                                </ul>
+                            </div>
                             <!-- 조건 목록(홈과 같은 모양): 거래량 두 줄은 실제 수치 -->
                             <ul class="cs-list">
                                 <li v-for="c in r.summary.rows" :key="c.key" class="cs-row" :class="{ off: !c.pass }">
-                                    <span class="cs-mark" aria-hidden="true">{{ c.pass ? '✓' : '–' }}</span>
-                                    <span class="cs-label">{{ c.label }}</span>
-                                    <span class="cs-value">{{ c.value }}</span>
+                                    <span class="cs-label">{{ detailLabel(c.label) }}</span>
+                                    <span class="cs-value">{{ isStatusText(c.value) ? '' : c.value }}</span>
+                                    <span class="cs-state">{{ c.pass ? '충족' : '미달' }}</span>
                                 </li>
                             </ul>
                             <!-- 점수가 아직 없으면(장 마감 후 산출) 칸 자체를 숨긴다 -->
@@ -129,9 +161,12 @@ import CandlestickChart from '../common/comp/CandlestickChart.vue';
 import { buyTargetCandleData, miniCandleOptions } from '@scripts/miniCandle.js';
 import aibeesApi from '@scripts/aibeesApi.js';
 import {
-    numOrNull, formatNumber, hasValue, changeInfo, conditionSummary, CONDITION_COLUMNS,
+    numOrNull, formatNumber, hasValue, changeInfo, conditionSummary,
     kstNowParts, isMarketOpenNow, weekdayKo, toYmdString, getLatestBatchDate,
 } from '@scripts/stockSignals.js';
+import {
+    formatEok, formatCapShort, formatNetAmt, formatNetAmtShort, formatNetQty, formatRatio, signClass, shortYmd,
+} from '@scripts/marketFormat.js';
 
 const router = useRouter();
 const title = ref('매수추천');
@@ -203,6 +238,10 @@ const SORT_OPTIONS = [
     { key: 'score',       label: '점수',         dir: 'desc', ascLabel: '낮은 점수 먼저', descLabel: '높은 점수 먼저' },
     { key: 'volume',      label: '거래량',       dir: 'desc', ascLabel: '적은 순',        descLabel: '많은 순' },
     { key: 'shape_proba', label: '급등패턴 순위', dir: 'desc', ascLabel: '낮은 확률 먼저', descLabel: '높은 확률 먼저' },
+    // 시가총액·수급(/buy-target 응답의 market_cap, frgn_amt, orgn_amt — StockService.attach_market_info)
+    { key: 'market_cap',  label: '시가총액',     dir: 'desc', ascLabel: '작은 순',        descLabel: '큰 순' },
+    { key: 'frgn_amt',    label: '외국인 순매수', dir: 'desc', ascLabel: '순매도 큰 순',   descLabel: '순매수 큰 순' },
+    { key: 'orgn_amt',    label: '기관 순매수',   dir: 'desc', ascLabel: '순매도 큰 순',   descLabel: '순매수 큰 순' },
 ];
 
 // 2026-09 세션 후속: watch 게이트와 병행하는 2단계(top10→모멘텀 재정렬) 방식이 실전
@@ -253,10 +292,40 @@ const shortChange = (chg) => {
     return `${mark}${Math.abs(chg.pct).toFixed(2)}%`;
 };
 
+// 펼침 영역 '시가총액 · 수급' — 값이 하나도 없으면(수급 배치 전 등) 블록을 숨긴다
+const marketInfo = (item) => {
+    const flows = [
+        { label: '외국인', amt: item.frgn_amt, qty: item.frgn_qty },
+        { label: '기관',   amt: item.orgn_amt, qty: item.orgn_qty },
+        { label: '개인',   amt: item.prsn_amt, qty: item.prsn_qty },
+    ].filter(f => f.amt != null);
+    if (item.market_cap == null && !flows.length) return null;
+    return { flows, dateLabel: shortYmd(item.investor_ymd) };
+};
+
+// 목록 줄 조건 이름 — 열 머리글 줄임말(거래/급증/BB …)보다 알아보기 쉬운 이름. 키는 conditionSummary rows.key
+const COND_NAMES = {
+    '거래제한': '거래량', '거래급등': '거래급증', 'MACD 크로스': 'MACD', 'OBV 크로스': 'OBV',
+    'BB중심돌파': 'BB돌파', 'BB상단아래': '비과열', '중심선위': '20일선',
+};
+// conditionSummary 의 value 는 거래량 두 줄만 실제 수치, 나머지는 '충족'/'미충족' 문구 — 상태 칸과 겹치므로 숨긴다
+const isStatusText = (v) => v === '충족' || v === '미충족';
+// 상세 라벨 "거래량 기준 충족" 처럼 끝에 '충족'이 붙은 이름은 상태 칸(충족/미달)과 겹쳐 떼어 낸다
+const detailLabel = (label) => String(label ?? '').replace(/\s*충족$/, '');
+
 const rows = computed(() =>
     sortedData.value.map(item => {
         const chg = changeInfo(item);
-        return { item, chg, chgShort: shortChange(chg), summary: conditionSummary(item) };
+        return {
+            item, chg, chgShort: shortChange(chg), summary: conditionSummary(item),
+            capShort: formatCapShort(item.market_cap), market: marketInfo(item),
+            facts: [
+                { name: '외국인', value: formatNetAmtShort(item.frgn_amt), cls: signClass(item.frgn_amt) },
+                { name: '기관',   value: formatNetAmtShort(item.orgn_amt), cls: signClass(item.orgn_amt) },
+                { name: 'PER',    value: formatRatio(item.per, { lossLabel: '적자' }), cls: '' },
+                { name: 'PBR',    value: formatRatio(item.pbr), cls: '' },
+            ],
+        };
     }));
 
 /* ── 아코디언: 한 번에 하나만 펼침 ── */
@@ -383,21 +452,19 @@ $blue:     #7A4423;
 }
 .reco-item { border-bottom: 1px solid $line; }
 
-/* 줄 칸 나눔: 종목 | 7개 조건 | 현재가 | 작은 봉. 머리글(.reco-cols)도 같은 값을 쓴다. */
+/* 줄 칸 나눔: 윗줄 = 종목 | 현재가 | 작은 봉, 아랫줄 = 7개 조건(전체 폭). 머리글(.reco-cols)은 윗줄과 같은 값. */
 .reco {
-    --cond-w: 22px;          // 조건 한 칸
-    --px-w: 60px;            // 현재가 칸(좁은 화면: 등락은 퍼센트만)
+    --px-w: 96px;            // 현재가 칸(좁은 화면: 등락은 퍼센트만)
     --candle-w: 10px;
-    --gap: 6px;
+    --gap: 10px;
     @media (min-width: 640px) {
-        --cond-w: 40px;
-        --px-w: 116px;       // 넓은 화면: 등락 절대값까지
+        --px-w: 132px;       // 넓은 화면: 등락 절대값까지
         --gap: 14px;
     }
 }
 .reco-row, .reco-cols {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) calc(var(--cond-w) * 7) var(--px-w) var(--candle-w);
+    grid-template-columns: minmax(0, 1fr) var(--px-w) var(--candle-w);
     column-gap: var(--gap);
     align-items: center;
 }
@@ -407,8 +474,6 @@ $blue:     #7A4423;
     font-size: 9px;
     font-weight: 600;
     color: $sub;
-    .c-conds { display: grid; grid-template-columns: repeat(7, var(--cond-w)); }
-    .c-head { text-align: center; white-space: nowrap; letter-spacing: -.5px; }
     .c-px { text-align: right; }
     @media (min-width: 640px) { font-size: 12px; }
 }
@@ -441,15 +506,50 @@ $blue:     #7A4423;
     }
     .code { font-size: 11px; color: $sub-2; }
 
-    .conds { display: grid; grid-template-columns: repeat(7, var(--cond-w)); }
-    .cond {
-        text-align: center;
-        font-size: 13px;
-        font-weight: 700;
-        line-height: 1;
-        color: #C9BCA8;              // 미충족: 옅은 –
-        &.on { color: $up; }         // 충족: ✓
+    // 7개 조건 — 윗줄 아래 전체 폭, 항상 7칸 1줄. 칸마다 이름 위 / 상태 아래, 칸 사이 옅은 세로선
+    .conds {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        margin-top: 10px;
     }
+    .cond {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        min-width: 0;
+        padding: 2px 0;
+        line-height: 1.2;
+        text-align: center;
+        & + .cond { border-left: 1px solid #F3EAD2; }                    // 칸 사이 옅은 구분선
+    }
+    .cond-name {
+        max-width: 100%;
+        font-size: 11px;
+        letter-spacing: -.3px;
+        color: $sub-2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        @media (max-width: 359px) { font-size: 10px; letter-spacing: -.5px; }
+    }
+    // 펼침 안내 — 조건 줄 아래 오른쪽. 펼치면 '접기' + 화살표 뒤집힘
+    .more-hint {
+        grid-column: 1 / -1;
+        justify-self: end;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: $brown;
+    }
+    .more-chev { transition: transform .15s ease; }
+    &.open .more-chev { transform: rotate(180deg); }
+    .cond-state { font-size: 13px; font-weight: 400; color: #A89A8A; }    // 미달: 회색 보통
+    .cond.on .cond-state { color: $up; font-weight: 700; }               // 충족: 빨강 볼드
 
     .px { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; min-width: 0; }
     .price { font-size: 15px; font-weight: 700; }
@@ -481,18 +581,82 @@ $blue:     #7A4423;
 
 .score-line { font-size: 12px; color: $sub; b { color: $ink; } }
 
-// 조건 목록 (홈과 같은 모양)
-.cs-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid $line; }
-.cs-row {
+// 수급·밸류 요약 — 펼침 영역 맨 위. 조건 줄과 같은 칸 모양(4칸), 아래쪽에 옅은 가로선
+.facts {
     display: grid;
-    grid-template-columns: 16px auto minmax(0, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding-bottom: 10px;
+    border-bottom: 1px solid #F3EAD2;
+}
+.fact {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    padding: 2px 0;
+    line-height: 1.2;
+    & + .fact { border-left: 1px solid #F3EAD2; }
+}
+.fact-value {
+    max-width: 100%;
+    font-size: 13px;
+    font-weight: 600;
+    color: $ink;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    &.up   { color: $up; }      // 순매수
+    &.down { color: $down; }    // 순매도
+}
+.facts .cond-name { font-size: 11px; letter-spacing: -.3px; color: $sub-2; white-space: nowrap; }
+
+// 시가총액 · 수급 — 조건 목록과 같은 줄 리스트(카드·칩 없음). 등락은 글자색으로만
+.mk {
+    .mk-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        padding-bottom: 6px;
+    }
+    .mk-title { font-size: 13px; font-weight: 700; color: $ink; }
+    .mk-date  { font-size: 11px; color: $sub-2; }
+}
+.mk-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid $line; }
+.mk-row {
+    display: flex;
     align-items: baseline;
-    column-gap: 6px;
+    justify-content: space-between;
+    gap: 12px;
     padding: 9px 0;
     border-bottom: 1px solid $line;
     font-size: 13px;
 
-    .cs-mark { font-weight: 700; color: $up; }
+    .mk-label { color: $sub; white-space: nowrap; }
+    .mk-value {
+        font-weight: 600;
+        color: $ink;
+        text-align: right;
+        white-space: nowrap;
+        &.up   { color: $up; }
+        &.down { color: $down; }
+    }
+    .mk-qty { margin-left: 6px; font-size: 11px; font-weight: 400; color: $sub-2; }
+}
+
+// 조건 목록 (홈과 같은 모양)
+.cs-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid $line; }
+.cs-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: baseline;
+    column-gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid $line;
+    font-size: 13px;
+
+    .cs-state { font-weight: 700; color: $up; white-space: nowrap; }      // 충족: 빨강 볼드
     .cs-label { font-weight: 600; color: $ink; white-space: nowrap; }
     .cs-value {
         justify-self: end;
@@ -504,7 +668,7 @@ $blue:     #7A4423;
         text-overflow: ellipsis;
         max-width: 100%;
     }
-    &.off { .cs-mark, .cs-label, .cs-value { color: $sub; font-weight: 400; } }
+    &.off { .cs-label, .cs-value { color: $sub; font-weight: 400; } .cs-state { color: #A89A8A; font-weight: 400; } }
 }
 
 .rd-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

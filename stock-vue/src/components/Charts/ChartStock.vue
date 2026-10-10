@@ -103,6 +103,7 @@ import Lnb from '../common/Lnb.vue';
 import SAutoInput from '../common/comp/SAutoInput.vue';
 import CandlestickChart from '../common/comp/CandlestickChart.vue';
 import aibeesApi from '@scripts/aibeesApi.js';
+import { formatEok, formatNetAmt, signClass, shortYmd } from '@scripts/marketFormat.js';
 
 const route = useRoute();
 const title = '주식 차트';
@@ -170,7 +171,7 @@ const setSummary = (d) => {
         code: d.stock_code,
         marketCap: d.market_cap ?? null,
         investor: inv ? {
-            dateLabel: `${Number(inv.ymd.slice(4, 6))}/${Number(inv.ymd.slice(6, 8))}`,
+            dateLabel: shortYmd(inv.ymd),
             rows: [
                 { label: '외국인', amt: inv.frgn_amt },
                 { label: '기관',   amt: inv.orgn_amt },
@@ -192,25 +193,6 @@ const loadSummary = async (code) => {
     }
 };
 
-// 억원 → "15조 6,973억" / "3,479억"
-const formatEok = (eok) => {
-    const v = Math.round(Math.abs(eok));
-    const jo = Math.floor(v / 10000);
-    const rest = v % 10000;
-    if (jo === 0) return `${rest.toLocaleString()}억`;
-    return rest ? `${jo.toLocaleString()}조 ${rest.toLocaleString()}억` : `${jo.toLocaleString()}조`;
-};
-
-// 순매수 대금(백만원) → "+3,479억" / "−4,800만". 1억 미만은 만원 단위
-const formatNetAmt = (mil) => {
-    if (!mil) return '0';
-    const sign = mil > 0 ? '+' : '−';
-    const eok = Math.abs(mil) / 100;
-    const body = eok >= 1 ? formatEok(eok) : `${(Math.abs(mil) * 100).toLocaleString()}만`;
-    return sign + body;
-};
-
-const signClass = (v) => (v > 0 ? 'up' : v < 0 ? 'down' : '');
 
 const fetchChart = async () => {
     if (!searchParam.code) return;

@@ -169,12 +169,8 @@ def select_stocks_by_id(stock_code):
             # 시가총액(억원) = 상장주식수 × 수급과 같은 날 종가. 둘 중 하나라도 없으면 None.
             inv = results['investor']
             shares = results.get('listed_shares')
-            if inv and inv.get('close_price') and shares:
-                results['market_cap'] = round(shares * inv['close_price'] / 100_000_000)
-                results['market_cap_ymd'] = inv['ymd']
-            else:
-                results['market_cap'] = None
-                results['market_cap_ymd'] = None
+            results['market_cap'] = (round(shares * inv['close_price'] / 100_000_000)
+                                     if inv and inv.get('close_price') and shares else None)
         return ApiResponse.success(results)
     except Exception as e:
         print(str(e))

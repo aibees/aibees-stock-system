@@ -40,6 +40,28 @@ class StockInvestorDailyDao:
         result = session.execute(delete(StockInvestorDaily).where(StockInvestorDaily.ymd < floor))
         return result.rowcount or 0
 
+    def select_latest_by_codes(self, session, stock_codes: list, max_ymd: str = None,
+                               lookback_days: int = 14) -> dict:
+        """종목별로 max_ymd(포함) 이하 가장 최근 영업일 행 → {stock_code: dict}.
+        max_ymd 미지정이면 오늘. 연휴·배치 누락을 감안해 lookback_days 안에서만 찾는다."""
+        if not stock_codes:
+            return {}
+        end = datetime.strptime(max_ymd, "%Y%m%d") if max_ymd else datetime.now()
+        floor = (end - timedelta(days=lookback_days)).strftime("%Y%m%d")
+        rows = session.execute(
+            select(StockInvestorDaily)
+            .where(
+                StockInvestorDaily.stock_code.in_(stock_codes),
+                StockInvestorDaily.ymd <= end.strftime("%Y%m%d"),
+                StockInvestorDaily.ymd >= floor,
+            )
+            .order_by(StockInvestorDaily.ymd.desc())
+        ).scalars().all()
+        latest = {}
+        for r in rows:
+            latest.setdefault(r.stock_code, r.to_dict())   # ymd 내림차순이라 첫 행이 최신
+        return latest
+
     def select_latest(self, session, stock_code: str):
         """종목의 가장 최근 영업일 행(dict) 또는 None."""
         row = session.execute(

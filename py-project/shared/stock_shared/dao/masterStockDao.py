@@ -40,6 +40,16 @@ class MasterStockDao(BaseDao):
         result = session.execute(stmt).scalars().first()
         return result.to_dict() if result else None
 
+    def select_listed_shares(self, session, stock_codes: list) -> dict:
+        """{stock_code: 상장주식수(주)} — 값이 없는 종목은 빠진다."""
+        if not stock_codes:
+            return {}
+        rows = session.execute(
+            select(MasterStock.stock_code, MasterStock.listed_shares)
+            .where(MasterStock.stock_code.in_(stock_codes))
+        ).all()
+        return {code: shares for code, shares in rows if shares}
+
     def select_all_stocks(self, session) -> list:
         """전체 종목 조회 (stock_code 오름차순)."""
         stmt = select(MasterStock).order_by(MasterStock.stock_code)

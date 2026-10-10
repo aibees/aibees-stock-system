@@ -3,6 +3,8 @@ import pandas as pd
 from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
 from stock_shared.dao.tradeBuyTargetChartDao import TradeBuyTargetChartDao
 from stock_shared.dao.tradeBuyTargetPriorityDao import TradeBuyTargetPriorityDao
+from stock_shared.dao.masterStockDao import MasterStockDao
+from stock_shared.dao.stockInvestorDailyDao import StockInvestorDailyDao
 from app.ext_services.kis.KisEngine import KisEngine
 from app.services.stocks.StockModService import StockModService
 from app.utils.constants.Literal import Literal
@@ -15,6 +17,8 @@ class StockService:
         self.buyTargetStockDaoImpl = TradeBuyTargetStockDao()
         self.buyTargetChartDaoImpl = TradeBuyTargetChartDao()
         self.buyTargetPriorityDaoImpl = TradeBuyTargetPriorityDao()
+        self.masterStockDaoImpl = MasterStockDao()
+        self.investorDaoImpl = StockInvestorDailyDao()
         self.modService = StockModService()
         self.kis = KisEngine(virtual=False)
 
@@ -29,7 +33,44 @@ class StockService:
         chart_map = self.buyTargetChartDaoImpl.select_by_ymd(session, resolved_ymd)
         for item in results:
             item["chart_data"] = chart_map.get(item["stock_code"], [])
+
+        # 시가총액·투자자 수급 — 추천일 이하 가장 최근 영업일 기준(20:00 추천 → 다음 날 07:10 그날 수급 적재).
+        # 부가 정보라 실패해도 추천 목록은 그대로 내려준다.
+        try:
+            self.attach_market_info(session, results, resolved_ymd)
+        except Exception as e:
+            print(f"[buy-target] 시가총액·수급 조회 실패: {e}", flush=True)
         return results
+
+    def attach_market_info(self, session, items: list, max_ymd: str = None) -> None:
+        """
+        items(각 dict 에 stock_code) 에 시가총액·투자자 순매수를 붙인다(제자리 수정).
+          investor_ymd                 : 수급·종가 기준 영업일 (YYYYMMDD)
+          frgn_amt / orgn_amt / prsn_amt : 외국인 / 기관계 / 개인 순매수 대금(백만원)
+          frgn_qty / orgn_qty / prsn_qty : 순매수 수량(주)
+          market_cap                   : 시가총액(억원) = 상장주식수 × investor_ymd 종가
+        데이터가 없으면 None. 매수추천 목록(/buy-target)·종목 단건(/id/<code>) 공용.
+        """
+        codes = [it["stock_code"] for it in items if it.get("stock_code")]
+        inv_map = self.investorDaoImpl.select_latest_by_codes(session, codes, max_ymd)
+        shares_map = self.masterStockDaoImpl.select_listed_shares(session, codes)
+        for it in items:
+            inv = inv_map.get(it.get("stock_code"))
+            shares = shares_map.get(it.get("stock_code"))
+            it["investor_ymd"] = inv["ymd"] if inv else None
+            for k in ("frgn_amt", "orgn_amt", "prsn_amt", "frgn_qty", "orgn_qty", "prsn_qty"):
+                it[k] = inv.get(k) if inv else None
+            # 종가는 수급과 같은 날 값 우선. 수급이 아직 없으면(배치 전·신규 종목) 행 자신의 종가(매수추천 close)로.
+            close = (inv.get("close_price") if inv else None) or self._to_number(it.get("close"))
+            it["market_cap"] = round(shares * close / 100_000_000) if shares and close else None
+
+    @staticmethod
+    def _to_number(v):
+        try:
+            n = float(v)
+            return n if n > 0 else None
+        except (TypeError, ValueError):
+            return None
 
     # ────────────────────────────────────────────────────────────────
     # 최우선타겟 (Home.vue 매수추천 카드 select) — 유저당 1건, 날짜 무관.

@@ -191,6 +191,15 @@ class StockBuyCheckJob(Job):
             composite_top10 = self._compute_composite_top10(composite_pool, ymd)
             if composite_top10:
                 empty_fin = {'eps': None, 'pbr': None, 'per': None, 'roe': None, 'peg': None}
+                # 재무(PER/PBR 등) — watch 게이트 종목만 스레드에서 조회해 왔기 때문에 2단계로만 뽑힌 종목은
+                # 비어 있었다(2026-10-11: 기본 정렬 top10 중 8종목 PER/PBR 공란). 10종목뿐이라 여기서 직렬 조회.
+                fin_engine = engines[0][1]
+                fin_map = {}
+                for item in composite_top10:
+                    try:
+                        fin_map[item['stock_code']] = fin_engine.get_finance_info(item['stock_code']) or empty_fin
+                    except Exception as e:
+                        print(f"[2단계 재무 조회 실패] {item['stock_code']}: {e}", flush=True)
                 full_rows = [
                     {
                         'ymd': item['ymd'],
@@ -199,7 +208,7 @@ class StockBuyCheckJob(Job):
                         'action_type': item['action_type'],
                         'todayStock': item['todayStock'],
                         'indicator': item['indicator'],
-                        'fin': empty_fin,
+                        'fin': fin_map.get(item['stock_code'], empty_fin),
                         'chart_data': item['chart_data'],
                         'shape_proba': item['shape_proba'],
                     }
