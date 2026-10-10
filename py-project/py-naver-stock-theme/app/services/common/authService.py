@@ -10,6 +10,9 @@ AuthService — 이메일 로그인 / 토큰 재발급 / 로그아웃 비즈니�
 """
 
 import os
+import re
+import hmac
+import time
 import secrets
 import hashlib
 from datetime import datetime, timedelta, timezone
@@ -21,6 +24,7 @@ from app.domains.dao.userRefreshTokenDao import UserRefreshTokenDao  # [신규] 
 from app.exceptions import ResetRequiredException  # 단일 출처 임포트 — 이 파일에서 직접 정의하지 않음
 from app.domains.dao.masterInfoDao import MasterInfosDao
 from app.domains.dao.socialLoginDao import SocialLoginDao
+from app.utils import mailer
 
 import requests
 
@@ -43,18 +47,70 @@ DEFAULT_SIGNUP_ROLE = 'STOCK_USER'                # 네이버로 신규 가입�
 NAVER_TOKEN_URL = 'https://nid.naver.com/oauth2.0/token'
 NAVER_PROFILE_URL = 'https://openapi.naver.com/v1/nid/me'
 
-# ── 개인정보 처리방침 동의 ─────────────────────────────────────────────
-# 프런트(stock-vue src/scripts/privacyPolicy.js)의 PRIVACY_POLICY_VERSION 과 같아야 한다.
-# 처리방침 문구를 고치면 양쪽 버전을 함께 올린다 → 다음 네이버 로그인 때 재동의를 받는다.
+# ── 가입 동의 (이용약관 / 개인정보 수집·이용 / 만 14세 이상) — 항목별로 따로 받아 따로 기록한다 ──
+# 버전은 프런트(stock-vue src/scripts/termsOfService.js, privacyPolicy.js)와 같아야 한다.
+# 문구를 고치면 양쪽 버전을 함께 올린다 → 다음 네이버 로그인 때 재동의를 받는다.
 CONSENT_PRIVACY = 'PRIVACY'                        # user_consent.consent_type 값
-PRIVACY_POLICY_VERSION = '2026-10-10'
+CONSENT_TERMS = 'TERMS'
+CONSENT_AGE14 = 'AGE14'
+PRIVACY_POLICY_VERSION = '2026-10-10.2'   # .2: 휴대전화번호 수집 항목 삭제 (프런트 privacyPolicy.js 와 같아야 함)
+TERMS_VERSION = '2026-10-10'              # 프런트 termsOfService.js 와 같아야 함
+AGE14_VERSION = '1'
+# 로그인에 필요한 동의 {consent_type: 현재 버전}
+REQUIRED_CONSENTS = {CONSENT_TERMS: TERMS_VERSION, CONSENT_PRIVACY: PRIVACY_POLICY_VERSION, CONSENT_AGE14: AGE14_VERSION}
 # 동의 화면용 임시 토큰. accessToken 과 다른 키로 서명해 require_auth 를 통과하지 못하게 한다.
 CONSENT_TOKEN_SECRET = JWT_SECRET + ':naver-consent'
 CONSENT_TOKEN_EXPIRE_MINUTES = 10
 
 
+# ── 이메일 회원가입 (인증코드) ─────────────────────────────────────────
+EMAIL = 'EMAIL'
+# 인증코드 토큰: DB 테이블 없이 서명 토큰에 "이메일 + 코드의 HMAC" 을 담아 돌려준다(코드 자체는 메일로만 간다).
+SIGNUP_TOKEN_SECRET = JWT_SECRET + ':email-signup'
+SIGNUP_CODE_EXPIRE_MINUTES = 10
+SIGNUP_CODE_MAX_ATTEMPTS = 5        # 토큰 1개당 틀릴 수 있는 횟수
+SIGNUP_CODE_RESEND_SECONDS = 60     # 같은 이메일로 다시 보내기까지 대기
+EMAIL_REGEX = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+# 비밀번호 규칙: 비밀번호 재설정 화면(Login.vue PASSWORD_REGEX)과 같다 — 8자 이상, 대/소문자·숫자·특수문자 각 1자 이상
+PASSWORD_REGEX = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$')
+# 시도 횟수·재발송 시각·사용 완료 토큰은 프로세스 메모리에 둔다(워커가 여럿이면 워커별 — 코드 공간 10^6 대비 무시 가능).
+_signup_attempts = {}   # {jti: (틀린 횟수, 기록 시각)}
+_signup_sent_at = {}    # {email: 보낸 시각}
+_signup_used = {}       # {jti: 사용 시각}
+
+
+def _prune_signup_state(now: float) -> None:
+    ttl = SIGNUP_CODE_EXPIRE_MINUTES * 60 + 60
+    for d in (_signup_sent_at, _signup_used):
+        for k in [k for k, t in d.items() if now - t > ttl]:
+            d.pop(k, None)
+    for k in [k for k, (_, t) in _signup_attempts.items() if now - t > ttl]:
+        _signup_attempts.pop(k, None)
+
+
+def _code_mac(jti: str, code: str) -> str:
+    return hmac.new(SIGNUP_TOKEN_SECRET.encode(), f'{jti}:{code}'.encode(), hashlib.sha256).hexdigest()
+
+
 class NaverLoginError(Exception):
     """사용자에게 그대로 보여줄 수 있는 네이버 로그인 실패 사유."""
+
+
+class SignupError(Exception):
+    """사용자에게 그대로 보여줄 수 있는 회원가입 실패 사유."""
+
+
+def _check_consents(data: dict, error_cls) -> None:
+    """가입 동의 3항목이 모두 체크됐고, 화면이 보여준 문구가 현재 버전인지 확인."""
+    if data.get('agreeAge14') is not True:
+        raise error_cls("만 14세 이상만 가입할 수 있어요.")
+    if data.get('agreeTerms') is not True:
+        raise error_cls("이용약관에 동의해야 가입할 수 있어요.")
+    if data.get('agreePrivacy') is not True:
+        raise error_cls("개인정보 수집·이용에 동의해야 가입할 수 있어요.")
+    if data.get('termsVersion') != TERMS_VERSION or data.get('policyVersion') != PRIVACY_POLICY_VERSION:
+        # 화면이 오래된 문구를 보여준 경우 — 새로 받은 문구로 다시 동의받는다
+        raise error_cls("약관 또는 개인정보 처리방침이 변경됐어요. 화면을 새로고침한 뒤 다시 시도해 주세요.")
 
 
 class AuthService:
@@ -191,10 +247,8 @@ class AuthService:
 
         # ③ 신규 가입 — 회원정보를 저장한 뒤 개인정보 처리방침 동의 화면으로 보낸다
         name = (profile.get('name') or profile.get('nickname') or email.split('@')[0])[:45]
-        phone = (profile.get('mobile') or '').strip() or None
-        if phone and (len(phone) > 13 or dao.phone_in_use(session, phone)):
-            phone = None   # user_phone 은 UNIQUE — 다른 계정이 쓰는 번호면 비워 둔다
-        new_id = dao.create_user(session, user_name=name, email=email, phone=phone,
+        # 휴대전화번호는 받지 않는다(2026-10-10 처리방침에서 수집 항목 삭제) — 네이버가 mobile 을 줘도 저장하지 않는다.
+        new_id = dao.create_user(session, user_name=name, email=email, phone=None,
                                  login_type=NAVER, provider_uid=naver_id, auth_id=DEFAULT_SIGNUP_ROLE)
         return self._naver_result(session, new_id, name, 'created')
 
@@ -204,8 +258,7 @@ class AuthService:
         없으면 토큰 대신 동의 화면용 consentToken 을 준다(→ POST /api/oauth/naver/consent).
         가입 직후뿐 아니라 동의 화면에서 이탈한 사용자·처리방침 개정 후 첫 로그인도 여기서 걸린다.
         """
-        consent = self.socialLoginDaoImpl.select_consent(session, user_id, CONSENT_PRIVACY)
-        if consent is not None and consent.version == PRIVACY_POLICY_VERSION:
+        if self._has_required_consents(session, user_id):
             return {**self._login_result(session, user_id, user_name), 'naverResult': naver_result}
 
         now = datetime.now(tz=timezone.utc)
@@ -220,6 +273,7 @@ class AuthService:
             'consentRequired': True,
             'consentToken': consent_token,
             'policyVersion': PRIVACY_POLICY_VERSION,
+            'termsVersion': TERMS_VERSION,
             'naverResult': naver_result,
             'profile': {'user_name': user_name, 'email': user.email if user else None},
         }
@@ -228,16 +282,13 @@ class AuthService:
         """
         개인정보 처리방침 동의 → 동의 기록 저장 → 로그인(토큰 발급).
 
-        Request : { "consentToken": "...", "policyVersion": "...", "agreePrivacy": true }
+        Request : { "consentToken": "...", "termsVersion": "...", "policyVersion": "...",
+                    "agreeAge14": true, "agreeTerms": true, "agreePrivacy": true }
         반환: 이메일 로그인과 같은 형식 + 'naverResult'(네이버 로그인 때 결정된 값)
         Raises: NaverLoginError(사용자에게 보여줄 메시지)
         """
         data = data or {}
-        if data.get('agreePrivacy') is not True:
-            raise NaverLoginError("개인정보 처리방침에 동의해야 가입할 수 있어요.")
-        if data.get('policyVersion') != PRIVACY_POLICY_VERSION:
-            # 화면이 오래된 처리방침을 보여준 경우 — 새로 받은 문구로 다시 동의받는다
-            raise NaverLoginError("개인정보 처리방침이 변경됐어요. 화면을 새로고침한 뒤 다시 로그인해 주세요.")
+        _check_consents(data, NaverLoginError)
         try:
             payload = jwt.decode(data.get('consentToken') or '', CONSENT_TOKEN_SECRET,
                                  algorithms=[JWT_ALGORITHM])
@@ -253,9 +304,105 @@ class AuthService:
         if user is None or login_type is None or login_type.enabled_flag != 'Y':
             raise NaverLoginError("가입 정보를 찾을 수 없어요. 네이버로 다시 로그인해 주세요.")
 
-        dao.save_consent(session, user_id, CONSENT_PRIVACY, PRIVACY_POLICY_VERSION)
+        self._save_required_consents(session, user_id)
         return {**self._login_result(session, user_id, user.user_name),
                 'naverResult': payload.get('nres', 'login')}
+
+    def _has_required_consents(self, session, user_id) -> bool:
+        dao = self.socialLoginDaoImpl
+        for consent_type, version in REQUIRED_CONSENTS.items():
+            row = dao.select_consent(session, user_id, consent_type)
+            if row is None or row.version != version:
+                return False
+        return True
+
+    def _save_required_consents(self, session, user_id) -> None:
+        for consent_type, version in REQUIRED_CONSENTS.items():
+            self.socialLoginDaoImpl.save_consent(session, user_id, consent_type, version)
+
+    # ────────────────────────────────────────────────────────────────
+    # 이메일 회원가입: ① 인증코드 메일 발송 → ② 코드 확인 + 가입 + 동의 기록 + 로그인
+    # ────────────────────────────────────────────────────────────────
+    def signupSendCode(self, session, data):
+        """
+        Request : { "email": "..." }
+        반환    : { "verifyToken": "...", "expiresIn": 600 }
+        이미 어떤 방식으로든 가입된 이메일이면 거절한다(네이버 가입자도 포함 — 이메일이 같으면
+        네이버 자동 연결 대상이 둘이 되기 때문). 코드는 메일로만 보내고 응답에는 넣지 않는다.
+        """
+        email = ((data or {}).get('email') or '').strip().lower()
+        if not EMAIL_REGEX.match(email) or len(email) > 200:
+            raise SignupError("이메일 주소를 확인해 주세요.")
+        if self.socialLoginDaoImpl.select_users_by_email(session, email):
+            raise SignupError("이미 가입된 이메일이에요. 로그인해 주세요.")
+
+        now = time.time()
+        _prune_signup_state(now)
+        last = _signup_sent_at.get(email)
+        if last and now - last < SIGNUP_CODE_RESEND_SECONDS:
+            raise SignupError(f"인증코드는 {SIGNUP_CODE_RESEND_SECONDS}초 뒤에 다시 받을 수 있어요.")
+
+        code = f'{secrets.randbelow(10 ** 6):06d}'
+        jti = secrets.token_hex(8)
+        exp = datetime.now(tz=timezone.utc) + timedelta(minutes=SIGNUP_CODE_EXPIRE_MINUTES)
+        token = jwt.encode({'email': email, 'jti': jti, 'mac': _code_mac(jti, code), 'exp': exp},
+                           SIGNUP_TOKEN_SECRET, algorithm=JWT_ALGORITHM)
+        try:
+            mailer.send(session, email, '[양봉상회] 회원가입 인증코드',
+                        f'<p>양봉상회 회원가입 인증코드입니다.</p>'
+                        f'<p style="font-size:24px;font-weight:700;letter-spacing:4px">{code}</p>'
+                        f'<p>{SIGNUP_CODE_EXPIRE_MINUTES}분 안에 입력해 주세요. 본인이 요청하지 않았다면 이 메일을 무시하세요.</p>')
+        except mailer.MailerError as e:
+            print(f"[signupSendCode] 메일 발송 실패: {e}", flush=True)
+            raise SignupError("인증 메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요.")
+        _signup_sent_at[email] = now
+        return {'verifyToken': token, 'expiresIn': SIGNUP_CODE_EXPIRE_MINUTES * 60}
+
+    def signupProcess(self, session, data):
+        """
+        Request : { "verifyToken", "code", "userName", "password",
+                    "agreeAge14", "agreeTerms", "agreePrivacy", "termsVersion", "policyVersion" }
+        반환    : 이메일 로그인과 같은 형식(가입 즉시 로그인)
+        """
+        data = data or {}
+        _check_consents(data, SignupError)
+
+        try:
+            payload = jwt.decode(data.get('verifyToken') or '', SIGNUP_TOKEN_SECRET, algorithms=[JWT_ALGORITHM])
+        except jwt.ExpiredSignatureError:
+            raise SignupError("인증코드 유효시간이 지났어요. 코드를 다시 받아 주세요.")
+        except jwt.InvalidTokenError:
+            raise SignupError("이메일 인증을 먼저 해 주세요.")
+
+        jti, email = payload['jti'], payload['email']
+        now = time.time()
+        _prune_signup_state(now)
+        if jti in _signup_used:
+            raise SignupError("이미 사용한 인증코드예요. 코드를 다시 받아 주세요.")
+        fails = _signup_attempts.get(jti, (0, now))[0]
+        if fails >= SIGNUP_CODE_MAX_ATTEMPTS:
+            raise SignupError("인증코드를 여러 번 틀렸어요. 코드를 다시 받아 주세요.")
+        code = str(data.get('code') or '').strip()
+        if not hmac.compare_digest(_code_mac(jti, code), payload['mac']):
+            _signup_attempts[jti] = (fails + 1, now)
+            left = SIGNUP_CODE_MAX_ATTEMPTS - fails - 1
+            raise SignupError(f"인증코드가 맞지 않아요. ({left}번 남음)" if left else "인증코드를 여러 번 틀렸어요. 코드를 다시 받아 주세요.")
+
+        user_name = (data.get('userName') or '').strip()
+        if not 1 <= len(user_name) <= 45:
+            raise SignupError("이름(닉네임)을 1~45자로 입력해 주세요.")
+        password = data.get('password') or ''
+        if not PASSWORD_REGEX.match(password):
+            raise SignupError("비밀번호는 8자 이상, 대문자·소문자·숫자·특수문자를 각 1자 이상 포함해야 해요.")
+        if self.socialLoginDaoImpl.select_users_by_email(session, email):
+            raise SignupError("이미 가입된 이메일이에요. 로그인해 주세요.")
+
+        new_id = self.socialLoginDaoImpl.create_user(
+            session, user_name=user_name, email=email, phone=None,
+            login_type=EMAIL, provider_uid=None, auth_id=DEFAULT_SIGNUP_ROLE, password=password)
+        self._save_required_consents(session, new_id)
+        _signup_used[jti] = now
+        return self._login_result(session, new_id, user_name)
 
     def _naver_profile(self, session, code, state):
         """code → 네이버 access token → 회원 프로필(/v1/nid/me). client secret 은 서버에만 있다."""

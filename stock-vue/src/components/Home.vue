@@ -34,19 +34,78 @@
 
         <main class="home-main">
 
-            <!-- ── 시장 요약: 코스피 / 코스닥 / 원달러 (선택 날짜와 무관하게 '지금' 값. 야후 시세라 수 분 지연될 수 있다) ── -->
-            <ul class="market-strip" aria-label="시장 요약">
-                <li v-for="m in marketItems" :key="m.key" class="ms-item">
-                    <span class="ms-label">{{ m.label }}</span>
-                    <span class="ms-price">{{ m.priceText }}</span>
-                    <span class="ms-chg" :class="m.cls">{{ m.chgText }}</span>
-                </li>
-            </ul>
+            <!-- ── 시장 요약: 코스피 / 코스닥 카드(현재가 + 5일·20일 수익률 + 20일 스파크라인) + 원달러 한 줄 ──
+                 선택 날짜와 무관하게 '지금' 값. 야후 시세라 수 분 지연될 수 있다. -->
+            <section class="market" aria-label="시장 요약">
+                <div class="mk-cards">
+                    <article v-for="m in indexCards" :key="m.key" class="mk-card">
+                        <div class="mk-top">
+                            <span class="mk-code">{{ m.code }}</span>
+                            <svg v-if="m.sparkPoints" class="mk-spark" :class="m.sparkCls" viewBox="0 0 64 24" preserveAspectRatio="none" aria-hidden="true">
+                                <polyline :points="m.sparkPoints" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                            </svg>
+                        </div>
+                        <div class="mk-price">{{ m.priceText }}</div>
+                        <div class="mk-rates">
+                            <span v-for="p in m.periods" :key="p.label" class="mk-rate">
+                                {{ p.label }} <b :class="p.cls">{{ p.text }}</b>
+                            </span>
+                        </div>
+                    </article>
+                </div>
+                <div v-if="fxItem" class="mk-fx">
+                    <span class="mk-fx-label">원/달러</span>
+                    <b class="mk-fx-price">{{ fxItem.priceText }}</b>
+                    <span class="mk-fx-chg" :class="fxItem.cls">{{ fxItem.chgText }}</span>
+                </div>
+            </section>
 
-            <!-- 광고(WORKER_USER 가 아닌 사용자): 시장 요약 아래, 날짜 네비게이터 위.
+            <!-- 광고(WORKER_USER 가 아닌 사용자): 시장 요약 아래, 추천 성과 위.
                  AD_FREE 면 자리째 비어 있고, 앱은 하단 배너가 맡는다. -->
             <section v-if="heroAdVisible" class="hero-ad" aria-label="광고">
                 <AdSlot placement="homeHero" />
+            </section>
+
+            <!-- ── 전월 추천 성과: 종목당 첫 추천 기준, 추천일 종가 → 5거래일 내 최고가 ── -->
+            <section v-if="perf && perf.evaluated_count" class="perf" aria-label="전월 추천 성과">
+                <div class="list-head">
+                    <h2>{{ perfMonthLabel }} 추천 성과</h2>
+                    <span class="perf-basis">{{ perf.hold_days }}거래일 내 최고가 기준</span>
+                </div>
+
+                <div class="perf-kpi">
+                    <div class="kpi">
+                        <span class="kpi-label">상위 {{ perf.top_pct }}% 평균</span>
+                        <b class="kpi-val" :class="clsOf(perf.top_avg_return)">{{ pctText(perf.top_avg_return) }}</b>
+                        <span class="kpi-sub">{{ perf.top_count }}종목</span>
+                    </div>
+                    <div class="kpi">
+                        <span class="kpi-label">전체 평균</span>
+                        <b class="kpi-val" :class="clsOf(perf.avg_return)">{{ pctText(perf.avg_return) }}</b>
+                        <span class="kpi-sub">{{ perf.evaluated_count }}종목</span>
+                    </div>
+                </div>
+
+                <ol class="perf-list">
+                    <li v-for="(p, i) in perf.top_list" :key="p.stock_code">
+                        <button type="button" class="perf-row" @click="goToChart(p.stock_code)">
+                            <span class="who">
+                                <span class="name-line">
+                                    <span class="rank">{{ String(i + 1).padStart(2, '0') }}</span>
+                                    <span class="name">{{ p.stock_name }}</span>
+                                </span>
+                                <span class="perf-meta">{{ mdText(p.ymd) }} 추천 {{ formatNumber(p.entry_price) }} → {{ mdText(p.peak_ymd) }} {{ formatNumber(p.peak_price) }}</span>
+                            </span>
+                            <b class="perf-ret" :class="clsOf(p.max_return)">{{ pctText(p.max_return) }}</b>
+                        </button>
+                    </li>
+                </ol>
+                <p class="perf-note">추천일 종가 대비 이후 {{ perf.hold_days }}거래일 중 가장 높았던 가격 기준이며, 실제 매도 수익과 다를 수 있습니다. 같은 종목은 그 달 첫 추천 1건만 셉니다.</p>
+            </section>
+
+            <!-- 두 번째 광고 띠(추천 성과 아래, 날짜·추천 종목 위). 조건은 첫 번째 광고와 같다. -->
+            <section v-if="heroAdVisible" class="hero-ad" aria-label="광고">
+                <AdSlot placement="homeMid" />
             </section>
 
             <!-- ── 날짜 네비게이터: ‹ 날짜(요일) › + 장 상태 ── -->
@@ -66,7 +125,7 @@
             </div>
 
             <!-- ── 최우선 타겟 히어로: WORKER_USER(매매 사용자)에게만 ──
-                 그 외 사용자는 대신 날짜 네비게이터 위에 광고가 들어간다. -->
+                 그 외 사용자는 위쪽(시장 요약 아래·추천 성과 아래) 광고 띠 두 개를 본다. -->
             <section v-if="isWorker" class="priority-hero" aria-label="오늘의 최우선 타겟">
                 <div class="ph-top">
                     <span class="ph-label">오늘의 최우선 타겟</span>
@@ -150,9 +209,8 @@
                                     <span class="rank">{{ String(idx + 1).padStart(2, '0') }}</span>
                                     <span class="name">{{ r.item.stock_name }}</span>
                                     <span class="code">{{ r.item.stock_code }}</span>
-                                    <span v-if="r.item.stock_code === priorityTarget" class="pri-chip">최우선</span>
+                                    <span v-if="r.item.stock_code === priorityTarget" class="pri-mark">· 최우선</span>
                                 </span>
-                                <span class="reason">{{ r.reason }}</span>
                             </span>
                             <span class="px">
                                 <span class="price">{{ formatNumber(r.item.close) }}</span>
@@ -161,24 +219,16 @@
                         </button>
 
                         <div v-if="expandedCode === r.item.stock_code" class="reco-detail">
-                            <!-- 시/고/저/종 + 거래량 표 (장중에는 '종가' 대신 '현재가') -->
-                            <table class="ohlc">
-                                <thead>
-                                    <tr><th>시가</th><th>고가</th><th>저가</th><th>{{ priceLabel }}</th></tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>{{ formatNumber(r.item.open) }}</td>
-                                        <td class="hi">{{ formatNumber(r.item.high) }}</td>
-                                        <td class="lo">{{ formatNumber(r.item.low) }}</td>
-                                        <td class="cl">{{ formatNumber(r.item.close) }}</td>
-                                    </tr>
-                                    <tr class="vol">
-                                        <th colspan="2" scope="row">거래량</th>
-                                        <td colspan="2">{{ formatNumber(r.item.volume) }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                            <!-- 조건 요약: 7개 조건 목록(거래량 두 줄은 실제 수치) -->
+                            <div class="cond-sum">
+                                <ul class="cs-list">
+                                    <li v-for="c in r.summary.rows" :key="c.label" class="cs-row" :class="{ off: !c.pass }">
+                                        <span class="cs-mark" aria-hidden="true">{{ c.pass ? '✓' : '–' }}</span>
+                                        <span class="cs-label">{{ c.label }}</span>
+                                        <span class="cs-value">{{ c.value }}</span>
+                                    </li>
+                                </ul>
+                            </div>
                             <!-- 점수가 아직 없으면(장 마감 후 산출) 칸 자체를 숨긴다 -->
                             <div v-if="hasValue(r.item.score)" class="score-line">종합 점수 <b>{{ numOrNull(r.item.score) }}</b> / 100</div>
 
@@ -220,6 +270,7 @@
                     <p>분석된 데이터가 없습니다. 날짜를 변경해 보세요.</p>
                 </div>
             </section>
+
 
             <p class="disclaimer">본 정보는 투자 권유가 아니며, 투자 판단의 책임은 투자자 본인에게 있습니다.</p>
         </main>
@@ -265,9 +316,9 @@ import { hasRole, WORKER_ROLE } from '@scripts/useAccess.js';
 import { useShowAds } from '@scripts/useAds.js';
 import { isNativeAdsEnabled } from '@scripts/useAdMob.js';
 import {
-    numOrNull, formatNumber, hasValue, changeInfo, reasonLine,
+    numOrNull, formatNumber, hasValue, changeInfo,
     kstNowParts, isMarketOpenNow, weekdayKo, toYmdString, shiftDate, getLatestBatchDate,
-    technicalRows, conditionCount,
+    technicalRows, conditionCount, conditionSummary,
 } from '@scripts/stockSignals.js';
 
 const router = useRouter();
@@ -355,7 +406,6 @@ const statusLabel = computed(() => {
     const [, m, d] = selectedDate.value.split('-');
     return `종가 · ${m}/${d} 마감`;
 });
-const priceLabel = computed(() => (marketState.value === 'live' ? '현재가' : '종가'));
 
 onMounted(async () => {
     clock = setInterval(() => { nowKst.value = kstNowParts(); }, 30 * 1000);
@@ -365,6 +415,7 @@ onMounted(async () => {
     onScroll();
     loadMarketSnapshot();
     marketTimer = setInterval(loadMarketSnapshot, 60 * 1000);
+    loadPerformance();
     await getStockMainData();
     loadPriorityTarget();
 });
@@ -379,7 +430,9 @@ onBeforeUnmount(() => {
 /* ── 시장 요약(코스피·코스닥·환율) ──
  * 서버가 1분 캐시하므로 화면도 1분마다 다시 부른다. 실패하면 직전 값을 그대로 둔다. */
 const MARKET_PLACEHOLDER = [
-    { key: 'kospi', label: '코스피' }, { key: 'kosdaq', label: '코스닥' }, { key: 'usdkrw', label: '원/달러' },
+    { key: 'kospi', label: '코스피', code: 'KOSPI' },
+    { key: 'kosdaq', label: '코스닥', code: 'KOSDAQ' },
+    { key: 'usdkrw', label: '원/달러', code: 'USD/KRW' },
 ];
 const marketData = ref(MARKET_PLACEHOLDER);
 let marketTimer = null;
@@ -393,20 +446,71 @@ const loadMarketSnapshot = async () => {
     }
 };
 
-const marketItems = computed(() => marketData.value.map(m => {
-    const price = numOrNull(m.price);
-    const rate = numOrNull(m.rate);
-    const change = numOrNull(m.change);
-    const dir = rate > 0 ? 1 : (rate < 0 ? -1 : 0);
-    const mark = dir > 0 ? '▲' : (dir < 0 ? '▼' : '–');
+const dirOf = (n) => (n > 0 ? 1 : (n < 0 ? -1 : 0));
+const clsOf = (n) => ['down', 'flat', 'up'][dirOf(n) + 1];
+const signed = (n, digits) => `${n > 0 ? '+' : (n < 0 ? '−' : '')}${Math.abs(n).toFixed(digits)}`;
+const priceText = (v) => {
+    const n = numOrNull(v);
+    return n === null ? '–' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// 스파크라인: viewBox 64×24 안에 최근 종가를 꺾은선으로. 위아래 2px 여백.
+const sparkPoints = (values) => {
+    const vs = (values || []).map(numOrNull).filter(v => v !== null);
+    if (vs.length < 2) return null;
+    const min = Math.min(...vs);
+    const span = Math.max(...vs) - min || 1;
+    return vs.map((v, i) => `${(i / (vs.length - 1) * 64).toFixed(1)},${(22 - (v - min) / span * 20).toFixed(1)}`).join(' ');
+};
+
+const indexCards = computed(() => marketData.value.filter(m => m.key !== 'usdkrw').map(m => {
+    const r5 = numOrNull(m.rate_5d);
+    const r20 = numOrNull(m.rate_20d);
     return {
         key: m.key,
-        label: m.label,
-        priceText: price === null ? '–' : price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        chgText: rate === null ? '' : `${mark}${change !== null && dir !== 0 ? ` ${Math.abs(change).toFixed(2)}` : ''} ${dir > 0 ? '+' : (dir < 0 ? '−' : '')}${Math.abs(rate).toFixed(2)}%`,
-        cls: dir > 0 ? 'up' : (dir < 0 ? 'down' : 'flat'),
+        code: m.code ?? m.label,
+        priceText: priceText(m.price),
+        sparkPoints: sparkPoints(m.spark),
+        sparkCls: clsOf(r20 ?? 0),
+        periods: [
+            { label: '5D', text: r5 === null ? '–' : `${signed(r5, 1)}%`, cls: clsOf(r5 ?? 0) },
+            { label: '20D', text: r20 === null ? '–' : `${signed(r20, 1)}%`, cls: clsOf(r20 ?? 0) },
+        ],
     };
 }));
+
+const fxItem = computed(() => {
+    const m = marketData.value.find(x => x.key === 'usdkrw');
+    if (!m) return null;
+    const rate = numOrNull(m.rate);
+    const change = numOrNull(m.change);
+    const dir = dirOf(rate ?? 0);
+    const mark = dir > 0 ? '▲' : (dir < 0 ? '▼' : '–');
+    return {
+        priceText: priceText(m.price),
+        chgText: rate === null ? '' : `${mark}${change !== null && dir !== 0 ? ` ${Math.abs(change).toFixed(2)}` : ''} ${signed(rate, 2)}%`,
+        cls: clsOf(rate ?? 0),
+    };
+});
+
+/* ── 전월 추천 성과 ──
+ * 서버가 지난달 추천 종목의 "추천일 종가 → 5거래일 내 최고가" 수익률을 계산해 준다(6시간 캐시).
+ * 보조 정보라 실패하면 섹션째 숨긴다. */
+const perf = ref(null);
+const loadPerformance = async () => {
+    try {
+        const { data } = await aibeesApi.get('/api/v1/stocks/buy-target/performance');
+        perf.value = data?.data ?? null;
+    } catch (e) {
+        perf.value = null;
+    }
+};
+const perfMonthLabel = computed(() => (perf.value ? `${Number(perf.value.ym.slice(4, 6))}월` : ''));
+const pctText = (v) => {
+    const n = numOrNull(v);
+    return n === null ? '–' : `${signed(n, 1)}%`;
+};
+const mdText = (ymd) => `${Number(String(ymd).slice(4, 6))}/${Number(String(ymd).slice(6, 8))}`;
 
 const getStockMainData = async () => {
     isLoading.value = true;
@@ -490,7 +594,7 @@ const rows = computed(() =>
     sortedData.value.slice(0, HOME_COUNT).map(item => ({
         item,
         chg: changeInfo(item),
-        reason: reasonLine(item),
+        summary: conditionSummary(item),
     })));
 
 // 정렬 기준·날짜가 바뀌면 처음 상태로. (최우선타겟은 서버 저장값이라 날짜를 넘나들어도 유지된다)
@@ -778,45 +882,58 @@ $down:     #1F5BD1;
     pointer-events: none;
 }
 
-/* ── 시장 요약 띠: 카드 없이 위아래 1px 선 + 3칸 ── */
-.market-strip {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin: 0;
-    padding: 10px 0;
-    list-style: none;
-    border-top: 1px solid $line-2;
-    border-bottom: 1px solid $line-2;
-}
-.ms-item {
+/* ── 시장 요약: 지수 카드 2장 + 원달러 한 줄 ── */
+.market { display: flex; flex-direction: column; gap: 8px; }
+.mk-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.mk-card {
+    min-width: 0;
+    padding: 12px 12px 10px;
+    background: $card;
+    border: 1px solid $line;
+    border-radius: 12px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    min-width: 0;
-    & + & { border-left: 1px solid $line-2; }
+    gap: 4px;
 }
-.ms-label { font-size: 12px; color: $sub; }
-.ms-price { font-size: 15px; font-weight: 700; color: $ink; font-variant-numeric: tabular-nums; }
-.ms-chg {
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
+.mk-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.mk-code { font-size: 12px; font-weight: 600; letter-spacing: 1px; color: $sub; }
+.mk-spark {
+    width: 64px;
+    height: 24px;
+    flex: none;
     &.up   { color: $up; }
     &.down { color: $down; }
     &.flat { color: $sub; }
 }
+.mk-price { font-size: 22px; font-weight: 700; color: $ink; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
+.mk-rates { display: flex; flex-wrap: wrap; column-gap: 12px; row-gap: 2px; }
+.mk-rate {
+    font-size: 11px;
+    color: $sub;
+    white-space: nowrap;
+    b { margin-left: 2px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .up   { color: $up; }
+    .down { color: $down; }
+    .flat { color: $sub; }
+}
+.mk-fx {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 0 4px;
+    font-size: 12px;
+    color: $sub;
+    font-variant-numeric: tabular-nums;
+    .mk-fx-price { font-size: 14px; color: $ink; }
+    .mk-fx-chg { font-weight: 600; }
+    .up   { color: $up; }
+    .down { color: $down; }
+    .flat { color: $sub; }
+}
 
 /* ── 최우선 타겟 히어로 ── */
-.hero-ad {
-    display: flex;
-    justify-content: center;
-    padding: 12px;
-    background: $card;
-    border-radius: 20px;
-    box-shadow: 0 1px 0 $line, 0 0 0 1px #F3EAD2;
-}
+// 광고 띠: 감싸는 카드 없이 광고 면이 본문 너비를 꽉 채운다(높이는 AdSlot 이 배너 비율로 정한다).
+.hero-ad { display: block; }
 
 .priority-hero {
     background: $hero;
@@ -963,7 +1080,7 @@ $down:     #1F5BD1;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;   // 순위는 종목명 줄 안에(아래 공백 없음)
     gap: 10px;
-    align-items: start;
+    align-items: center;
     text-align: left;
     cursor: pointer;
     color: $ink;
@@ -974,16 +1091,7 @@ $down:     #1F5BD1;
     .name-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; }
     .name { font-size: 16px; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
     .code { font-size: 12px; color: $sub-2; flex-shrink: 0; }
-    .pri-chip {
-        flex-shrink: 0;
-        padding: 1px 7px;
-        border-radius: 999px;
-        background: $yellow;
-        color: $brown-d;
-        font-size: 11px;
-        font-weight: 700;
-    }
-    .reason { font-size: 13px; color: $sub; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pri-mark { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #A0662F; }
     .px { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
     .price { font-size: 17px; font-weight: 700; }
 }
@@ -1007,20 +1115,38 @@ $down:     #1F5BD1;
 
 .score-line { font-size: 12px; color: $sub; b { color: $ink; } }
 
-// 시/고/저/종 + 거래량 표
-.ohlc {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
+// 조건 요약
+.cond-sum { display: flex; flex-direction: column; gap: 10px; }
+.cs-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid $line;
+}
+.cs-row {
+    display: grid;
+    grid-template-columns: 16px auto minmax(0, 1fr);
+    align-items: baseline;
+    column-gap: 6px;
+    padding: 9px 0;
+    border-bottom: 1px solid $line;
+    font-size: 13px;
 
-    th, td { padding: 8px 6px; text-align: right; font-size: 13px; border-bottom: 1px solid $line; }
-    thead th { font-size: 11px; font-weight: 600; color: $sub; }
-    tbody td { font-weight: 600; }
-    td.hi { color: $up; }
-    td.lo { color: $down; }
-    td.cl { color: $ink; font-weight: 700; }
-    tr:last-child th, tr:last-child td { border-bottom: 0; }
-    .vol th { font-size: 11px; font-weight: 600; color: $sub; text-align: left; padding-left: 0; }
+    .cs-mark { font-weight: 700; color: $up; }
+    .cs-label { font-weight: 600; color: $ink; white-space: nowrap; }
+    .cs-value {
+        justify-self: end;
+        text-align: right;
+        font-size: 12px;
+        color: $ink;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+    // 미충족: 기호·라벨·값 모두 회색으로 가라앉힌다
+    &.off { .cs-mark, .cs-label, .cs-value { color: $sub; font-weight: 400; } }
 }
 
 .rd-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -1049,6 +1175,58 @@ $down:     #1F5BD1;
 
 .skeleton-row { height: 72px; border-bottom: 1px solid $line; background: rgba(239, 226, 188, .35); animation: pulse 1.6s infinite ease-in-out; }
 .empty-box { text-align: center; padding: 56px 0; color: $sub; font-size: 14px; }
+
+/* ── 전월 추천 성과 ── */
+.perf {
+    .perf-basis { font-size: 12px; color: $sub; }
+}
+.perf-kpi {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 4px 0 14px;
+    border-bottom: 1px solid $line;
+}
+.kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    & + & { padding-left: 16px; border-left: 1px solid $line; }
+    .kpi-label { font-size: 12px; color: $sub; }
+    .kpi-val { font-size: 24px; font-weight: 700; letter-spacing: -.3px; font-variant-numeric: tabular-nums; color: $ink; }
+    .kpi-sub { font-size: 11px; color: $sub-2; }
+    .up { color: $up; }
+    .down { color: $down; }
+}
+.perf-list { margin: 0; padding: 0; list-style: none; }
+.perf-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 56px;
+    padding: 10px 0;
+    border: 0;
+    border-bottom: 1px solid $line;
+    background: transparent;
+    color: $ink;
+    text-align: left;
+    cursor: pointer;
+
+    .who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .name-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+    .rank { font-family: 'Do Hyeon', 'Pretendard', sans-serif; font-size: 18px; line-height: 1; color: #A0662F; flex-shrink: 0; }
+    .name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+.perf-meta { font-size: 12px; color: $sub; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.perf-ret {
+    flex-shrink: 0;
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+    &.up { color: $up; }
+    &.down { color: $down; }
+}
+.perf-note { margin: 10px 0 0; font-size: 11px; line-height: 1.5; color: $sub-2; }
 
 .disclaimer { margin: 0; font-size: 11px; line-height: 1.5; color: $sub-2; text-align: center; }
 

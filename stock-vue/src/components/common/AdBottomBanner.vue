@@ -1,7 +1,7 @@
 <template>
     <div v-if="active" class="ad-bottom">
         <!-- 네이티브 AdMob 이 켜져 있으면 광고는 WebView 위에 네이티브 뷰로 겹쳐 그려지므로 칸만 비워 둔다 -->
-        <AdSlot v-if="!nativeAds" placement="mobileBottom" />
+        <AdSlot v-if="!nativeAds" placement="mobileBottom" @height="onSlotHeight" />
     </div>
 </template>
 
@@ -34,8 +34,13 @@ if (nativeAds) {
     // 칸을 접은 동안에는 네이티브 배너도 숨긴다(SDK 가 나중에 재시도로 채우면 Loaded → 다시 예약).
     watch(active, (v) => { v ? showBottomBanner() : hideBottomBanner(); }, { immediate: true });
 }
+// 웹 배너는 화면 너비를 꽉 채우고 높이가 너비 비율로 정해진다 → 예약 칸 높이도 그 값으로 맞춘다.
+// (앱 AdMob 은 320×50 고정이라 이 값을 쓰지 않고 App.vue 의 기본값 50px 이 적용된다)
+const onSlotHeight = (h) => document.documentElement.style.setProperty('--ad-bottom-fill-h', `${h}px`);
+
 onBeforeUnmount(() => {
     document.documentElement.classList.remove('has-bottom-ad');
+    document.documentElement.style.removeProperty('--ad-bottom-fill-h');
     if (nativeAds) hideBottomBanner();
 });
 </script>
@@ -51,7 +56,7 @@ onBeforeUnmount(() => {
     padding-bottom: env(safe-area-inset-bottom, 0px);
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
     background: #fff;
     border-top: 1px solid #dcdcdc;
     z-index: 1001;

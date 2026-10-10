@@ -5,6 +5,7 @@ from sqlalchemy import and_, func, select, update
 from sqlalchemy.dialects.mysql import insert
 
 from stock_shared.dao.baseDao import BaseDao
+from stock_shared.models.masterStock import MasterStock
 from stock_shared.models.tradeBuyTargetStock import TradeBuyTargetStock
 
 logging.basicConfig(level=logging.ERROR)
@@ -71,6 +72,36 @@ class TradeBuyTargetStockDao(BaseDao):
             .where(TradeBuyTargetStock.ymd >= from_ymd)
             .group_by(TradeBuyTargetStock.stock_code)
             .order_by(func.count().desc(), func.max(TradeBuyTargetStock.ymd).desc())
+        )
+        return [dict(r) for r in session.execute(stmt).mappings().all()]
+
+    def select_first_targets_in_range(self, session, from_ymd: str, to_ymd: str) -> list:
+        """[from_ymd, to_ymd](양쪽 포함) 구간에서 종목별 **첫 추천** 1건씩 + 야후 시장 접미사.
+
+        홈 '전월 추천 성과' 집계용 — 같은 종목이 여러 번 추천돼도 처음 추천된 날 기준 1건만 센다.
+        반환: [{'ymd', 'stock_code', 'stock_name', 'close', 'stock_type_yf'}, …] (ymd 순)
+        """
+        first = (
+            select(
+                TradeBuyTargetStock.stock_code.label("code"),
+                func.min(TradeBuyTargetStock.ymd).label("first_ymd"),
+            )
+            .where(TradeBuyTargetStock.ymd >= from_ymd, TradeBuyTargetStock.ymd <= to_ymd)
+            .group_by(TradeBuyTargetStock.stock_code)
+            .subquery()
+        )
+        stmt = (
+            select(
+                TradeBuyTargetStock.ymd,
+                TradeBuyTargetStock.stock_code,
+                TradeBuyTargetStock.stock_name,
+                TradeBuyTargetStock.close,
+                MasterStock.stock_type_yf,
+            )
+            .join(first, and_(TradeBuyTargetStock.stock_code == first.c.code,
+                              TradeBuyTargetStock.ymd == first.c.first_ymd))
+            .outerjoin(MasterStock, MasterStock.stock_code == TradeBuyTargetStock.stock_code)
+            .order_by(TradeBuyTargetStock.ymd, TradeBuyTargetStock.stock_code)
         )
         return [dict(r) for r in session.execute(stmt).mappings().all()]
 

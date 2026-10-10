@@ -18,7 +18,7 @@ import jwt  # PyJWT
 
 from flask import Blueprint, request, g
 
-from app.services.common.authService import AuthService, JWT_SECRET, JWT_ALGORITHM, NaverLoginError
+from app.services.common.authService import AuthService, JWT_SECRET, JWT_ALGORITHM, NaverLoginError, SignupError
 from app.exceptions import ResetRequiredException  # 단일 출처 임포트
 from app.domains.dao.masterInfoDao import MasterInfosDao
 from app.flask_app.utils.apiResponse import ApiResponse
@@ -162,6 +162,47 @@ def oauth_naver_consent():
     try:
         return ApiResponse.success(authServiceImpl.naverConsentProcess(g.db, data))
     except NaverLoginError as e:
+        g.db.rollback()
+        return ApiResponse.error(str(e), status=400)
+    except Exception as e:
+        g.db.rollback()
+        logging.exception(e)
+        return ApiResponse.error("가입 처리 중 오류가 발생했습니다.")
+
+
+# ── 이메일 회원가입 ──────────────────────────────────────────────────
+@oauth_bp.route("/signup/code", methods=['POST'])
+def oauth_signup_code():
+    """
+    POST /api/oauth/signup/code — 가입 인증코드 메일 발송
+
+    Request : { "email": "..." }
+    Response: { "verifyToken": "<서명 토큰>", "expiresIn": 600 }   (코드는 메일로만 간다)
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        return ApiResponse.success(authServiceImpl.signupSendCode(g.db, data))
+    except SignupError as e:
+        return ApiResponse.error(str(e), status=400)
+    except Exception as e:
+        logging.exception(e)
+        return ApiResponse.error("인증코드를 보내지 못했어요.")
+
+
+@oauth_bp.route("/signup", methods=['POST'])
+def oauth_signup():
+    """
+    POST /api/oauth/signup — 인증코드 확인 + 이메일 가입 + 동의 기록 후 바로 로그인
+
+    Request : { "verifyToken", "code", "userName", "password",
+                "agreeAge14", "agreeTerms", "agreePrivacy", "termsVersion", "policyVersion" }
+    Response: 이메일 로그인과 같은 형식
+    실패는 400 — 401 이면 프런트 interceptor 가 refresh/강제 로그아웃을 시도한다.
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        return ApiResponse.success(authServiceImpl.signupProcess(g.db, data))
+    except SignupError as e:
         g.db.rollback()
         return ApiResponse.error(str(e), status=400)
     except Exception as e:

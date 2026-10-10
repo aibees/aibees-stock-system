@@ -2,13 +2,18 @@
 import Lnb from './common/Lnb.vue';
 import AdSideBanners from './common/AdSideBanners.vue';
 import AdBottomBanner from './common/AdBottomBanner.vue';
+import { isAuthPath } from '@scripts/authPaths.js';
+
+// 로그인·가입 화면에는 탭바(Lnb)를 그리지 않는다 — 로그인 전에는 갈 수 있는 메뉴가 없다.
+const route = useRoute();
+const showLnb = computed(() => !isAuthPath(route.path));
 </script>
 
 <template>
   <!-- app-shell: 하단 탭바 여백을 라우터 화면에만 주기 위한 앵커.
        Lnb 가 렌더하는 탭바 자체는 position:fixed 라 이 여백 대상이 아니다. -->
-  <div class="app-shell">
-    <Lnb />
+  <div class="app-shell" :class="{ 'no-lnb': !showLnb }">
+    <Lnb v-if="showLnb" />
     <AdSideBanners />
     <AdBottomBanner />
     <router-view />
@@ -38,10 +43,11 @@ import AdBottomBanner from './common/AdBottomBanner.vue';
  * 배너가 맨 아래(홈 인디케이터 포함)를 차지하고 탭바는 그 위에 얹힌다.
  *   - --lnb-total 을 "탭바 + 배너"로 재정의 → 이 값을 쓰는 하단 여백이 자동으로 늘어난다.
  *   - 탭바 자신은 높이를 --lnb-height 로 줄이고 safe-area 패딩을 버린다(배너가 대신 받는다).
- * 배너 높이는 adConfig.MOBILE_BOTTOM_BANNER_HEIGHT(50)와 같아야 한다. */
+ * 배너 높이: 앱은 adConfig.MOBILE_BOTTOM_BANNER_HEIGHT(50) 고정, 웹은 화면 너비를 꽉 채우는 배너라
+ * AdBottomBanner 가 잰 높이를 --ad-bottom-fill-h 로 넘긴다. */
 html.has-bottom-ad {
-  --ad-bottom-h: 50px;
-  --ad-bottom-total: calc(50px + env(safe-area-inset-bottom, 0px));
+  --ad-bottom-h: var(--ad-bottom-fill-h, 50px);
+  --ad-bottom-total: calc(var(--ad-bottom-h) + env(safe-area-inset-bottom, 0px));
   --lnb-total: calc(var(--lnb-height) + var(--ad-bottom-total));
 }
 html.has-bottom-ad #comm-lnb {
@@ -134,6 +140,10 @@ body {
 @media screen and (max-width: 639px) {
   .app-shell > :not(#comm-lnb):not(#comm-lnb-web):not(.ad-bottom):not(.ad-side) {
     padding-bottom: var(--lnb-total);
+  }
+  /* 로그인·가입 화면은 탭바가 없으니 여백도 없다(안전영역만) */
+  .app-shell.no-lnb > :not(#comm-lnb):not(#comm-lnb-web):not(.ad-bottom):not(.ad-side) {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 </style>

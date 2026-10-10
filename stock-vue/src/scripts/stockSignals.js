@@ -135,6 +135,72 @@ export const reasonLine = (item) => {
     return head ? `조건 ${pass}/${total} · ${head}` : `조건 ${pass}/${total} 충족`;
 };
 
+/* ── 거래량 근거 수치 (chart_data 의 일별 volume 으로 계산, 새 필드 없음) ──
+ * 기준선(최소 거래량)·급증 배수는 사용자 옵션(vol_limit / vol_surge, 기본 50만주·3배)이라
+ * 화면에서는 기준값을 단정하지 않고 실제 수치만 보여준다.
+ *   avgRatio : 기준일 거래량 / 직전 20영업일 평균
+ *   surge    : 최근 5영업일 중 "전일 대비" 배수가 가장 큰 날 {date: 'MM/DD', ratio} */
+const SURGE_LOOKBACK = 5;
+const ratioText = (r) => `${r >= 10 ? Math.round(r).toLocaleString() : r.toFixed(1)}배`;
+const AVG_WINDOW = 20;
+
+export const volumeFacts = (item) => {
+    const volume = numOrNull(item.volume);
+    // 기준일 이후 봉이 섞이지 않게 기준일까지만 쓴다.
+    const ymd = String(item.ymd || '');
+    const rows = (item.chart_data || []).filter(r => String(r.date || '').slice(0, 10).replaceAll('-', '') <= ymd);
+    const vols = rows.map(r => numOrNull(r.volume));
+
+    let avgRatio = null;
+    const past = vols.slice(-AVG_WINDOW - 1, -1).filter(v => v !== null && v > 0);
+    const today = vols.length ? vols[vols.length - 1] : null;
+    if (past.length >= 5 && today !== null) {
+        avgRatio = today / (past.reduce((a, b) => a + b, 0) / past.length);
+    }
+
+    let surge = null;
+    for (let i = Math.max(1, rows.length - SURGE_LOOKBACK); i < rows.length; i++) {
+        const prev = vols[i - 1];
+        const cur = vols[i];
+        if (!prev || cur === null) continue;
+        const ratio = cur / prev;
+        if (!surge || ratio > surge.ratio) {
+            const [, m, d] = String(rows[i].date).slice(0, 10).split('-');
+            surge = { date: `${m}/${d}`, ratio };
+        }
+    }
+    return { volume, avgRatio, surge };
+};
+
+/**
+ * 펼친 추천 종목 안의 "조건 요약".
+ *  - rows     : 7개 조건 한 줄씩 {label, pass, value}. 거래량 두 조건을 맨 앞에 두고 실제 수치를 값으로 쓴다.
+ * (칩/뱃지 없이 "기호 · 라벨 — 값" 목록으로 그린다)
+ */
+export const conditionSummary = (item) => {
+    const rows = technicalRows(item);
+    const { pass, total } = conditionCount(item);
+    const byLabel = Object.fromEntries(rows.map(r => [r.label, r]));
+    const facts = volumeFacts(item);
+
+    const limitValue = [
+        facts.volume !== null ? `${formatNumber(facts.volume)}주` : null,
+        facts.avgRatio !== null ? `평균 ${ratioText(facts.avgRatio)}` : null,
+    ].filter(Boolean).join(' · ');
+    const surgeValue = facts.surge ? `${facts.surge.date} 전일 대비 ${ratioText(facts.surge.ratio)}` : '';
+
+    const VOLUME = { '거래제한': limitValue, '거래급등': surgeValue };
+    const ordered = [byLabel['거래제한'], byLabel['거래급등'], ...rows.filter(r => !(r.label in VOLUME))];
+    return {
+        pass, total,
+        rows: ordered.map(r => ({
+            label: r.short,
+            pass: r.pass,
+            value: (r.label in VOLUME && VOLUME[r.label]) || (r.pass ? '충족' : '미충족'),
+        })),
+    };
+};
+
 /* ── 등락 ──
  * rate 는 "9.37%" 같은 문자열. 절대값(원)은 chart_data 의 전일 종가로 계산하고
  * (정확), 없으면 등락률로 역산한다(호가 단위 때문에 ±1~2원 오차 가능). */

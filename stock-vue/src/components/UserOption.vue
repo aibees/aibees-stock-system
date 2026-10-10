@@ -18,12 +18,6 @@
 
                     <div class="field-grid">
                         <div class="form-field">
-                            <label>휴대폰 번호</label>
-                            <input v-model.trim="form.user_master.user_phone" type="tel"
-                                placeholder="예) 010-1234-5678" maxlength="20" autocomplete="off" />
-                        </div>
-
-                        <div class="form-field">
                             <label>이메일</label>
                             <input v-model.trim="form.user_master.email" type="email"
                                 placeholder="예) example@gmail.com" maxlength="100" autocomplete="off" />
@@ -171,7 +165,8 @@ detailFields.forEach(f => (reveal[f.key] = false));
 
 /* ── 폼 상태: table 명을 1차 key, 컬럼을 하위 key 로 ── */
 const blankForm = () => ({
-    user_master: { user_phone: '', email: '' },
+    // 전화번호(user_phone)는 화면에서 뺐다(2026-10-10). 폼에 없으니 저장 diff 에도 안 실려 DB 값은 그대로 남는다.
+    user_master: { email: '' },
     user_detail: { kis_id: '', kis_account: '', kis_access_key: '', kis_secret_key: '', tele_bot_id: '', tele_chat_id: '' },
     // vol_limit / vol_surge 는 관리자(user_id=1) 전용 항목
     user_options: { stock_buy_target_mail_flag: 'N', vol_limit: '', vol_surge: '' },
@@ -196,7 +191,6 @@ const fetchOptions = async () => {
 
         // 서버 응답(null 안전)으로 폼 채우기
         Object.assign(form.user_master, {
-            user_phone: d.user_master?.user_phone ?? '',
             email: d.user_master?.email ?? '',
         });
         Object.assign(form.user_detail, {

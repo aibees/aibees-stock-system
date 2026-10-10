@@ -1,109 +1,91 @@
 <template>
-    <div id="login" class="auth" :aria-busy="isLoading.toString()">
-        <!-- 배경 장식 -->
-        <div class="bg">
-            <div class="blob blob-1"></div>
-            <div class="blob blob-2"></div>
-        </div>
+    <div id="login" :aria-busy="isLoading.toString()">
 
-        <main class="card" role="main" aria-labelledby="login-title">
-            <header class="brand">
-                <h1 id="login-title" class="main-title">Aibees Stock Service</h1>
-                <p class="sub-title">Aibees 주식정보WEB</p>
-            </header>
+        <!-- 상단: 홈과 같은 크림 띠 + 물결 가장자리, 가운데 브랜드 -->
+        <header class="lg-head">
+            <img class="lg-logo" src="/favicon.svg" alt="" aria-hidden="true" />
+            <h1 class="lg-name">양봉상회</h1>
+            <div class="lg-edge" aria-hidden="true"></div>
+        </header>
 
-            <section class="actions">
-                <button class="btn brand email" @click="login('email')" :disabled="isLoading">
-                    <span class="icon" aria-hidden="true">E</span>
-                    이메일로 계속하기
-                </button>
-                <div class="email-body" id="email-login-div">
-                    <div class="email-input">
-                        <div class="label">
-                            ID
-                        </div>
-                        <input type="text" id="email-input" autocomplete="off" v-model="emailData.email" />
-                    </div>
-                    <div class="email-input">
-                        <div class="label">
-                            PW
-                        </div>
-                        <input type="password" id="pswd-input" autocomplete="off" v-model="emailData.pswd"
-                            @keydown.enter="emaillogin" />
-                    </div>
-                    <!-- 아이디 기억하기 / 자동로그인 -->
-                    <div class="email-options">
-                        <label class="option-check">
-                            <input type="checkbox" v-model="rememberEmail" />
-                            <span>아이디 기억하기</span>
-                        </label>
-                        <label class="option-check">
-                            <input type="checkbox" v-model="autoLogin" />
-                            <span>자동로그인</span>
-                        </label>
-                    </div>
-                    <div class="email-input">
-                        <button @click="emaillogin">로그인</button>
-                    </div>
+        <main class="lg-main">
+            <form class="lg-form" novalidate @submit.prevent="emaillogin">
+                <div class="lg-field">
+                    <label for="lg-email">이메일</label>
+                    <input id="lg-email" v-model.trim="emailData.email" type="email" inputmode="email"
+                        autocomplete="username" />
                 </div>
-                <button class="btn brand naver" @click="login('naver')" :disabled="isLoading">
-                    <span class="icon" aria-hidden="true">N</span>
-                    네이버로 계속하기
-                </button>
+                <div class="lg-field">
+                    <label for="lg-pw">비밀번호</label>
+                    <input id="lg-pw" v-model="emailData.pswd" type="password" autocomplete="current-password" />
+                </div>
 
-                <button class="btn brand kakao" @click="login('kakao')" :disabled="isLoading">
-                    <span class="icon" aria-hidden="true">K</span>
-                    카카오로 계속하기
-                </button>
+                <div class="lg-options">
+                    <label class="lg-check">
+                        <input type="checkbox" v-model="rememberEmail" />
+                        <span>아이디 기억하기</span>
+                    </label>
+                    <label class="lg-check">
+                        <input type="checkbox" v-model="autoLogin" />
+                        <span>자동로그인</span>
+                    </label>
+                </div>
 
-                <button class="btn ghost" @click="toHome" :disabled="isLoading">
-                    홈으로
-                </button>
+                <p v-if="isResetTarget" class="lg-error" role="alert">계정 초기화 대상입니다. 관리자에게 문의하세요.</p>
+                <p v-if="errorMsg" class="lg-error" role="alert">{{ errorMsg }}</p>
 
-                <p v-if="isResetTarget" class="reset-notice" role="alert">
-                    계정 초기화 대상입니다. 관리자에게 문의하세요.
-                </p>
-                <p class="hint">
-                    로그인 시 서비스 약관 및 개인정보 처리방침에 동의합니다.
-                </p>
-            </section>
+                <button type="submit" class="btn-primary" :disabled="isLoading">
+                    {{ isLoading ? '로그인 중…' : '로그인' }}
+                </button>
+            </form>
+
+            <div class="lg-or" aria-hidden="true"><span>또는</span></div>
+
+            <button type="button" class="btn-naver" :disabled="isLoading" @click="naverlogin">
+                <span class="naver-n" aria-hidden="true">N</span>
+                네이버로 계속하기
+            </button>
+
+            <p class="lg-signup">
+                처음이신가요? <router-link to="/signup">이메일로 회원가입</router-link>
+            </p>
         </main>
-    </div>
 
-    <!-- 비밀번호 재설정 Modal -->
-    <teleport to="body">
-        <div v-if="showResetModal" class="modal-overlay" @click.self="closeResetModal">
-            <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reset-modal-title">
-                <h2 id="reset-modal-title" class="modal-title">비밀번호 재설정</h2>
-                <p class="modal-desc">{{ resetMessage }}</p>
+        <!-- 비밀번호 재설정 Modal -->
+        <teleport to="body">
+            <div v-if="showResetModal" class="lg-modal-overlay" @click.self="closeResetModal">
+                <div class="lg-modal" role="dialog" aria-modal="true" aria-labelledby="reset-modal-title">
+                    <h2 id="reset-modal-title" class="lg-modal-title">비밀번호 재설정</h2>
+                    <p class="lg-modal-desc">{{ resetMessage }}</p>
 
-                <div class="modal-field">
-                    <label class="field-label">새 비밀번호</label>
-                    <input type="password" class="field-input" v-model="resetData.newPswd"
-                        placeholder="8자 이상, 대/소문자·숫자·특수문자 포함" autocomplete="new-password" />
-                    <p v-if="resetData.newPswd && !passwordStrong" class="field-error">
-                        8자 이상, 대문자·소문자·숫자·특수문자를 각 1자 이상 포함해야 합니다.
-                    </p>
-                </div>
+                    <div class="lg-field">
+                        <label for="lg-new-pw">새 비밀번호</label>
+                        <input id="lg-new-pw" type="password" v-model="resetData.newPswd"
+                            placeholder="8자 이상, 대/소문자·숫자·특수문자 포함" autocomplete="new-password" />
+                        <p v-if="resetData.newPswd && !passwordStrong" class="lg-field-err">
+                            8자 이상, 대문자·소문자·숫자·특수문자를 각 1자 이상 포함해야 합니다.
+                        </p>
+                    </div>
 
-                <div class="modal-field">
-                    <label class="field-label">비밀번호 확인</label>
-                    <input type="password" class="field-input" v-model="resetData.confirmPswd" placeholder="비밀번호를 다시 입력하세요"
-                        autocomplete="new-password" @keydown.enter="submitReset" />
-                    <p v-if="resetData.confirmPswd && !passwordsMatch" class="field-error">
-                        비밀번호가 일치하지 않습니다.
-                    </p>
-                </div>
+                    <div class="lg-field">
+                        <label for="lg-new-pw2">비밀번호 확인</label>
+                        <input id="lg-new-pw2" type="password" v-model="resetData.confirmPswd"
+                            autocomplete="new-password" @keydown.enter="submitReset" />
+                        <p v-if="resetData.confirmPswd && !passwordsMatch" class="lg-field-err">
+                            비밀번호가 일치하지 않습니다.
+                        </p>
+                    </div>
 
-                <div class="modal-actions">
-                    <button class="modal-btn cancel" @click="closeResetModal" :disabled="isResetting">취소</button>
-                    <button class="modal-btn confirm" @click="submitReset" :disabled="!canSubmitReset || isResetting">
-                        {{ isResetting ? '저장 중…' : '저장' }}
-                    </button>
+                    <div class="lg-modal-actions">
+                        <button type="button" class="btn-ghost" @click="closeResetModal" :disabled="isResetting">취소</button>
+                        <button type="button" class="btn-primary" @click="submitReset" :disabled="!canSubmitReset || isResetting">
+                            {{ isResetting ? '저장 중…' : '저장' }}
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
-    </teleport>
+        </teleport>
+    </div>
 </template>
 
 <script setup>
@@ -116,6 +98,10 @@ const router = useRouter()
 const route = useRoute()
 const isLoading = ref(false)
 const isResetTarget = computed(() => route.query.status === 'reset')
+const errorMsg = ref('')
+
+const apiError = (err, fallback) =>
+    err?.response?.data?.error?.message ?? err?.error?.message ?? fallback
 
 // ── 비밀번호 재설정 Modal ──────────────────────────────────────
 const showResetModal = ref(false)
@@ -157,8 +143,7 @@ const submitReset = async () => {
         closeResetModal()
         alert('비밀번호가 변경되었습니다. 다시 로그인해주세요.')
     } catch (err) {
-        const msg = err?.error?.message ?? err?.message ?? '비밀번호 변경에 실패했습니다.'
-        alert(msg)
+        alert(apiError(err, '비밀번호 변경에 실패했습니다.'))
     } finally {
         isResetting.value = false
     }
@@ -192,37 +177,18 @@ watch(autoLogin, (val) => {
 })
 // ─────────────────────────────────────────────────────────────
 
-const login = (type) => {
-    if (type === 'naver') {
-        naverlogin();
-    } else if (type === 'kakao') {
-        alert('준비중입니다');
-        // kakaologin();
-    }
-    else if (type === 'email') {
-        const emailDiv = document.getElementById('email-login-div');
-        emailDiv.classList.toggle('expand')
-    }
-}
-
-// ──────────────────────────────────────────────────────────────
-// [수정] emaillogin
-// 1. isLoading 토글 추가: 기존에는 선언만 하고 실제로 쓰지 않았음
-// 2. try/catch/finally 추가: 서버 에러 발생 시 unhandled rejection 방지
-// 3. 에러 메시지 표시: 서버가 내려주는 error.message 우선, 없으면 기본 문구
-// ──────────────────────────────────────────────────────────────
 const emaillogin = async () => {
+    errorMsg.value = ''
     if (StrUtils.isEmpty(emailData.email) || StrUtils.isEmpty(emailData.pswd)) {
-        alert("제대로 입력해주세요");
+        errorMsg.value = '이메일과 비밀번호를 입력해 주세요.'
         return;
     }
 
-    isLoading.value = true; // [추가] 로딩 시작
+    isLoading.value = true;
 
     try {
         const body = { email: emailData.email, pswd: emailData.pswd };
         const { data } = await aibeesApi.post('/api/oauth/email', body);
-        console.log(data);
         if (data.success) {
             // 아이디 기억하기
             if (rememberEmail.value) {
@@ -232,16 +198,15 @@ const emaillogin = async () => {
             }
             userSession.loginUser(data.data, autoLogin.value);
             router.push({ name: 'home' });
+        } else if (data.error?.code == 'RESET_REQUIRED') {
+            openResetModal(data.error.message);
         } else {
-            if (data.error.code == 'RESET_REQUIRED') {
-                openResetModal(data.error.message);
-                return;
-            }
+            errorMsg.value = data.error?.message ?? '로그인에 실패했습니다.'
         }
     } catch (err) {
-        const msg = err?.error?.message ?? err?.message ?? '로그인에 실패했습니다.'
+        errorMsg.value = apiError(err, '로그인에 실패했습니다.')
     } finally {
-        isLoading.value = false; // [추가] 성공·실패 무관하게 로딩 종료
+        isLoading.value = false;
     }
 }
 
@@ -277,423 +242,178 @@ const naverlogin = async () => {
         alert('네이버 로그인 정보를 불러오지 못했습니다.')
     }
 }
-
-const kakaologin = () => {
-    // 필요 시 카카오 OAuth URL 구성해 연결
-    alert('카카오 로그인을 준비 중입니다.')
-}
-
-const toHome = () => {
-    router.push({ name: 'home' })
-}
-
-const keyDownEvt = () => {
-
-}
-
 </script>
 
 <style scoped lang="scss">
-/* ===== Tokens (무채색) ===== */
-$bg: #1a1a1a;
-$card: #1e1e1e;
-$text: #ececec;
-$muted: #9a9a9a;
-$border: rgba(255, 255, 255, 0.08);
+// 양봉상회 디자인 토큰(Home.vue 와 같은 값)
+$bar:       #FFF6D2;
+$line:      #EFE2BC;
+$brown:     #7A4423;
+$brown-ink: #5C3118;
+$hero:      #74462A;
+$ink:       #2B1D14;
+$sub:       #6B5B4E;
+$cream:     #FFF8E1;
+$naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
 
-/* ===== Layout ===== */
-.auth {
-    position: relative;
-    /* 화면 중앙 정렬 */
+#login {
+    min-height: 100vh;
     min-height: 100svh;
-    /* 모바일 주소창 높이 대응 */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    /* 좌우 여백 */
-    padding: 24px 20px;
-    /* <- 여기서 L/R 패딩 조절 */
-
-    /* 무채색 배경 — 컬러 그라디언트 제거, 단색 다크 그레이 */
-    background: $bg;
-    overflow: hidden;
+    background: #fff;
+    color: $ink;
+    text-align: left;
+    font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
 }
 
-/* 배경 블롭 — 컬러 제거, 무채색 음영만 */
-.bg .blob {
+/* ── 상단 브랜드 띠 ── */
+.lg-head {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: calc(env(safe-area-inset-top, 0px) + 48px) 20px 28px;
+    background: $bar;
+}
+.lg-logo { width: 64px; height: 64px; }
+.lg-name {
+    margin: 0;
+    font-family: 'Do Hyeon', 'Pretendard', sans-serif;
+    font-size: 34px;
+    font-weight: 400;
+    color: $brown-ink;
+    letter-spacing: .5px;
+}
+// 홈 헤더와 같은 물결 가장자리
+.lg-edge {
     position: absolute;
-    filter: blur(60px);
-    opacity: .25;
-    pointer-events: none;
+    left: 0;
+    right: 0;
+    bottom: -8px;
+    height: 8px;
+    background: radial-gradient(circle at 50% 0, #{$bar} 6.5px, transparent 7px) repeat-x;
+    background-size: 16px 8px;
 }
 
-.blob-1 {
-    width: 480px;
-    height: 480px;
-    border-radius: 50%;
-    background: #4a4a4a;
-    top: -120px;
-    left: -120px;
-}
-
-.blob-2 {
-    width: 520px;
-    height: 520px;
-    border-radius: 50%;
-    background: #2e2e2e;
-    bottom: -160px;
-    right: -160px;
-}
-
-/* 카드는 가로 폭을 100%로 두고 최대폭만 제한 */
-.card {
-    width: 100%;
-    max-width: 420px;
-    /* 필요시 440~480px로 넓혀도 OK */
-    margin: 0 auto;
-    /* 혹시 모를 중앙정렬 보강 */
-    background: $card;
-    border: 1px solid rgba(255, 255, 255, .08);
-    padding: 28px 24px 22px;
-    text-align: center;
-}
-
-
-/* ===== Actions ===== */
-.actions {
-    display: grid;
-    gap: 12px;
-
-    .btn {
-        width: 100%;
-        height: 48px;
-        border: 1px solid transparent;
-        font-weight: 800;
-        font-size: 0.98rem;
-        letter-spacing: 0.1px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        transition: transform 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
-        cursor: pointer;
-
-        &:hover {
-            transform: translateY(-1px);
-        }
-
-        &:active {
-            transform: translateY(0);
-        }
-
-        &:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .icon {
-            width: 22px;
-            height: 22px;
-            display: inline-grid;
-            place-items: center;
-            font-size: 0.9rem;
-            font-weight: 900;
-            background: rgba(0, 0, 0, 0.18);
-        }
-    }
-
-    /* 브랜드 버튼 — 이메일(자체 UI)은 무채색, 네이버/카카오는 플랫폼 브랜드
-       가이드라인상 고유 색상을 유지한다(회색으로 바꾸면 인지·신뢰도가 떨어짐). */
-    .brand.email {
-        background: #ebebeb;
-        color: #333333;
-        border-color: rgba(0, 0, 0, 0.08);
-
-        .icon {
-            background: rgba(0, 0, 0, 0.1);
-        }
-
-        &:hover {
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-        }
-    }
-
-    .brand.naver {
-        background: #03c75a;
-        color: #ffffff;
-        border-color: rgba(0, 0, 0, 0.08);
-
-        .icon {
-            background: rgba(255, 255, 255, 0.16);
-        }
-
-        &:hover {
-            box-shadow: 0 6px 18px rgba(3, 199, 90, 0.35);
-        }
-    }
-
-    .brand.kakao {
-        background: #fee500;
-        color: #191919;
-        border-color: rgba(0, 0, 0, 0.12);
-
-        .icon {
-            background: rgba(0, 0, 0, 0.08);
-        }
-
-        &:hover {
-            box-shadow: 0 6px 18px rgba(254, 229, 0, 0.35);
-        }
-    }
-
-    .email-body {
-        width: 100%;
-        overflow: hidden;
-        height: 0px;
-        background: #ebebeb;
-        transition: height 0.4s ease;
-        font-size: 0.9rem;
-        font-weight: 900;
-
-        .email-input {
-            margin-top: 15px;
-            display: flex;
-            justify-content: center;
-
-            .label {
-                width: 50px;
-                padding-top: 1px;
-                color: #ffffff;
-                background-color: #333333;
-            }
-
-            input {
-                width: 200px;
-                height: 20px;
-                background-color: transparent;
-                padding-left: 10px;
-                margin-left: 5px;
-                border: none;
-                font-weight: 900;
-                border-bottom: 1px solid rgb(143, 143, 143);
-
-                &:focus {
-                    outline: none;
-                    box-shadow: none;
-                    border: none;
-                    border-bottom: 2px solid black;
-                    background-color: transparent;
-                }
-            }
-
-            button {
-                padding: 4px 12px;
-                border: 1px solid rgb(231, 231, 231);
-                font-weight: 800;
-                font-size: 0.98rem;
-                letter-spacing: 0.1px;
-                background-color: #333333;
-                color: #ffffff;
-
-                &:hover {
-                    cursor: pointer;
-                    background-color: #000000;
-                    transition: background-color 0.4s ease;
-                }
-            }
-        }
-    }
-
-    .email-body.expand {
-        height: 178px;
-    }
-
-    .email-options {
-        display: flex;
-        justify-content: center;
-        gap: 16px;
-        margin-top: 10px;
-
-        .option-check {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 0.78rem;
-            font-weight: 700;
-            color: #555;
-            cursor: pointer;
-            user-select: none;
-
-            input[type='checkbox'] {
-                width: 14px;
-                height: 14px;
-                accent-color: #333333;
-                cursor: pointer;
-            }
-        }
-    }
-
-    /* 보조 버튼 */
-    .ghost {
-        height: 44px;
-        background: transparent;
-        color: $muted;
-        border: 1px solid $border;
-        font-weight: 700;
-
-        &:hover {
-            background: rgba(255, 255, 255, 0.04);
-            color: $text;
-        }
-    }
-
-    .reset-notice {
-        padding: 10px 14px;
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        border-left: 3px solid $text;
-        color: $text;
-        font-size: 13px;
-        font-weight: 700;
-    }
-
-    .hint {
-        margin: 6px 0 0;
-        font-size: 12px;
-        color: $muted;
-    }
-}
-
-/* ===== Responsive ===== */
-@media (max-width: 420px) {
-    .auth {
-        padding: 28px 16px;
-    }
-
-    .card {
-        padding: 24px 18px 18px;
-    }
-}
-
-/* ===== Password Reset Modal ===== */
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 20px;
-}
-
-.modal-card {
-    width: 100%;
+/* ── 본문 ── */
+.lg-main {
     max-width: 400px;
-    background: #1e1e1e;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 28px 24px 22px;
+    margin: 0 auto;
+    padding: 36px 20px 40px;
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
-.modal-title {
-    font-size: 1.1rem;
-    font-weight: 800;
-    color: #ececec;
-    margin: 0;
-}
+.lg-form { display: flex; flex-direction: column; gap: 14px; }
 
-.modal-desc {
-    font-size: 0.85rem;
-    color: #ececec;
-    font-weight: 700;
-    margin: 0;
-    line-height: 1.5;
-}
-
-.modal-field {
+.lg-field {
     display: flex;
     flex-direction: column;
     gap: 6px;
-}
-
-.field-label {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #9a9a9a;
-}
-
-.field-input {
-    height: 42px;
-    background: #161616;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #ececec;
-    padding: 0 12px;
-    font-size: 0.9rem;
-    transition: border-color 0.15s;
-
-    &::placeholder {
-        color: #6b6b6b;
-    }
-
-    &:focus {
-        outline: none;
-        border-color: rgba(255, 255, 255, 0.5);
+    label { font-size: 13px; font-weight: 600; color: $sub; }
+    input {
+        width: 100%;
+        min-height: 48px;
+        padding: 0 12px;
+        box-sizing: border-box;
+        border: 1px solid $line;
+        border-radius: 10px;
+        background: #fff;
+        color: $ink;
+        font-size: 16px;   // iOS 확대 방지
+        font-family: inherit;
+        &:focus { outline: none; border-color: $brown; }
     }
 }
+.lg-field-err { margin: 0; font-size: 12px; color: #C0392B; }
 
-.field-error {
-    font-size: 0.75rem;
-    color: #ececec;
-    font-weight: 700;
-    margin: 0;
+.lg-options { display: flex; gap: 18px; }
+.lg-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    font-size: 14px;
+    color: $sub;
+    cursor: pointer;
+    input { width: 18px; height: 18px; margin: 0; accent-color: $hero; }
 }
 
-.modal-actions {
+.lg-error { margin: 0; font-size: 13px; color: #C0392B; }
+
+.lg-or {
     display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: $sub;
+    &::before, &::after { content: ''; flex: 1; height: 1px; background: $line; }
+}
+
+.lg-signup {
+    margin: 4px 0 0;
+    text-align: center;
+    font-size: 14px;
+    color: $sub;
+    a { color: $brown; font-weight: 700; text-decoration: underline; }
+}
+
+/* ── 버튼 ── */
+.btn-primary, .btn-ghost, .btn-naver {
+    min-height: 50px;
+    padding: 0 20px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+    &:disabled { opacity: .45; cursor: default; }
+}
+.btn-primary { border: 0; background: $hero; color: $cream; }
+.btn-ghost { border: 1px solid $line; background: #fff; color: $sub; }
+.btn-naver {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     gap: 10px;
+    border: 0;
+    background: $naver;
+    color: #fff;
+    .naver-n { font-size: 18px; font-weight: 900; }
+}
+
+/* ── 비밀번호 재설정 모달 ── */
+.lg-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(43, 29, 20, .45);
+}
+.lg-modal {
+    width: 100%;
+    max-width: 380px;
+    padding: 22px 20px 18px;
+    border-radius: 14px;
+    background: #fff;
+    color: $ink;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
+}
+.lg-modal-title { margin: 0; font-size: 18px; font-weight: 700; }
+.lg-modal-desc { margin: 0; font-size: 14px; line-height: 1.5; color: $sub; }
+.lg-modal-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
     margin-top: 4px;
-
-    .modal-btn {
-        flex: 1;
-        height: 42px;
-        border: none;
-        font-weight: 800;
-        font-size: 0.9rem;
-        cursor: pointer;
-        transition: opacity 0.15s, transform 0.1s;
-
-        &:hover:not(:disabled) {
-            transform: translateY(-1px);
-        }
-
-        &:active:not(:disabled) {
-            transform: translateY(0);
-        }
-
-        &:disabled {
-            opacity: 0.45;
-            cursor: not-allowed;
-        }
-
-        &.cancel {
-            background: rgba(255, 255, 255, 0.06);
-            color: #9a9a9a;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        &.confirm {
-            background: #ececec;
-            color: #141414;
-
-            &:hover:not(:disabled) {
-                background: #ffffff;
-            }
-        }
-    }
-}</style>
+}
+</style>

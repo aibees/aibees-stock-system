@@ -18,9 +18,9 @@ export const AD_PROVIDER = import.meta.env.VITE_AD_PROVIDER || 'placeholder';
 
 export const AD_CONFIG = {
     // AdSense: client='ca-pub-XXXXXXXXXXXXXXXX', slots 는 광고 단위 ID.
-    adsense: { client: '', slots: { side: '', gate: '', homeHero: '', mobileInline: '', mobileBottom: '' } },
+    adsense: { client: '', slots: { side: '', gate: '', homeHero: '', homeMid: '', mobileInline: '', mobileBottom: '' } },
     // Kakao AdFit: 광고단위 ID('DAN-...'). 단위 생성 시 정한 크기와 아래 SIZES 가 같아야 한다.
-    adfit: { units: { side: '', gate: '', homeHero: '', mobileInline: '', mobileBottom: '' } },
+    adfit: { units: { side: '', gate: '', homeHero: '', homeMid: '', mobileInline: '', mobileBottom: '' } },
     // Google Ad Manager(GPT) 공개 샘플 단위 — 테스트 크리에이티브만 나온다.
     gptTest: { unit: '/6355419/Travel/Europe/France/Paris' },
 };
@@ -29,13 +29,28 @@ export const AD_CONFIG = {
 export const AD_SIZES = {
     side: { width: 160, height: 600 },
     gate: { width: 300, height: 250 },
-    homeHero: { width: 300, height: 250 },       // 홈: 최우선 타겟 카드 자리(WORKER_USER 가 아닌 사용자)
+    // fill: 부모 너비를 꽉 채우고 높이는 고른 소재(creatives)의 비율로 정한다(width/height 는 자리표시 기본값).
+    // creatives: 칸 너비가 minBoxWidth 이상인 것 중 첫 번째를 쓴다(넓은 것부터).
+    homeHero: {   // 홈: 시장 요약 아래 띠 배너(WORKER_USER 가 아닌 사용자). 375px 폭이면 높이 ≈ 54px
+        width: 320, height: 50, fill: true,
+        creatives: [{ width: 728, height: 90, minBoxWidth: 600 }, { width: 320, height: 50, minBoxWidth: 0 }],
+    },
+    homeMid: {    // 홈: 추천 성과 아래 두 번째 띠 배너
+        width: 300, height: 50, fill: true,
+        // 테스트 망은 같은 크기를 한 화면에 하나만 채워 준다 → homeHero(320×50/728×90)·하단(728×90)과 겹치지 않는 300×50.
+        creatives: [{ width: 300, height: 50, minBoxWidth: 0 }],
+    },
     mobileInline: { width: 320, height: 100 },   // 모바일 홈: 매수추천 카드 위
-    mobileBottom: { width: 320, height: 50 },    // 모바일: 하단 탭바(Lnb) 아래
+    mobileBottom: {   // 모바일 웹: 하단 탭바(Lnb) 아래. 375px 폭이면 높이 ≈ 46px
+        width: 320, height: 50, fill: true,
+        // 홈 띠 배너와 다른 소재 크기를 쓴다 — 테스트 망(gpt-test)은 같은 크기를 한 화면에 하나만 채워 준다.
+        creatives: [{ width: 728, height: 90, minBoxWidth: 0 }],
+    },
 };
 
 // 모바일 판정 폭. App.vue/Lnb 의 하단 탭바가 보이는 폭(640px 미만)과 같아야 한다.
 export const MOBILE_MAX_WIDTH = 639;
+// 앱(AdMob 320×50) 하단 배너 높이. 웹은 AdSlot 이 잰 높이를 --ad-bottom-fill-h 로 넘긴다(AdBottomBanner).
 export const MOBILE_BOTTOM_BANNER_HEIGHT = 50;
 
 // 이 메뉴들에 들어갈 때마다(AD_FREE 가 없는 사용자는) 먼저 광고를 봐야 한다.

@@ -52,11 +52,6 @@ class SocialLoginDao:
             select(UserMaster).where(UserMaster.user_id == user_id)
         ).scalars().first()
 
-    def phone_in_use(self, session, phone):
-        return session.execute(
-            select(UserMaster.user_id).where(UserMaster.user_phone == phone)
-        ).first() is not None
-
     def select_consent(self, session, user_id, consent_type):
         """동의 기록(UserConsent) 또는 None."""
         return session.execute(
@@ -80,12 +75,13 @@ class SocialLoginDao:
             row.linked_date = now
         session.flush()
 
-    def create_user(self, session, *, user_name, email, phone, login_type, provider_uid, auth_id):
-        """소셜 계정으로 신규 가입. 반환: 새 user_id.
+    def create_user(self, session, *, user_name, email, phone, login_type, provider_uid, auth_id, password=None):
+        """신규 가입(소셜 또는 이메일). 반환: 새 user_id.
 
         user_master.user_id 는 AUTO_INCREMENT 가 아니라 MAX+1 로 채번한다(기존 사용자 생성 관례).
-        user_detail 은 salt/pswd 가 NOT NULL 이라 추측 불가능한 임의 값을 넣는다 — EMAIL 로그인 행을
-        만들지 않으므로 이 값으로 로그인할 수는 없다.
+        password 가 있으면(이메일 가입) salt+password 를 SHA-256 으로 저장한다 — authService.emailProcess 의
+        검증 방식과 같다. 없으면(소셜 가입) salt/pswd 가 NOT NULL 이라 추측 불가능한 임의 값을 넣는다 —
+        EMAIL 로그인 행을 만들지 않으므로 이 값으로 로그인할 수는 없다.
         """
         now = datetime.now()
         new_id = (session.execute(select(func.max(UserMaster.user_id))).scalar() or 0) + 1
@@ -93,7 +89,8 @@ class SocialLoginDao:
         session.add(UserMaster(user_id=new_id, user_name=user_name, email=email, user_phone=phone))
         salt = secrets.token_hex(8)  # 16자 (user_detail.salt VARCHAR(16))
         session.add(UserDetail(user_id=new_id, salt=salt,
-                               pswd=hashlib.sha256((salt + secrets.token_hex(32)).encode()).hexdigest(),
+                               pswd=hashlib.sha256((salt + (password or secrets.token_hex(32))).encode()).hexdigest(),
+                               reset_flag='N',
                                created_date=now, updated_date=now))
         session.add(UserLoginType(user_id=new_id, login_type=login_type, enabled_flag='Y',
                                   provider_uid=provider_uid, linked_date=now))

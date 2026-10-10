@@ -6,6 +6,7 @@ from stock_shared.dao.masterStockDao import MasterStockDao
 from app.flask_app.routers.router_oauth import require_auth
 from app.flask_app.utils.apiResponse import ApiResponse
 from app.services.stocks.StockService import StockService
+from app.services.stocks.RecoPerformanceService import RecoPerformanceService
 from app.utils.constants.Literal import Literal
 
 stocks_bp = Blueprint("stocks", __name__)
@@ -14,6 +15,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 
 masterStockDaoImpl = MasterStockDao()
 stockServiceImpl = StockService()
+recoPerformanceServiceImpl = RecoPerformanceService()
 
 # STOCKS ROUTE :: ROOT
 # ===============================================================================
@@ -50,6 +52,22 @@ def select_buy_target_stock():
     try:
         results = stockServiceImpl.get_buy_target_stock_list(g.db, search_params)
         return ApiResponse.success(results)
+    except Exception as e:
+        logging.error(str(e))
+        traceback.print_exc()
+        return ApiResponse.error(str(e)[:255])
+
+
+# STOCKS ROUTE :: 월간 추천 성과 (홈) — 종목당 첫 추천 기준, 추천일 종가 → 5거래일 내 최고가
+#   GET /buy-target/performance?ym=YYYYMM  (ym 생략 시 전월). 로그인 없이 열린다(홈이 게스트에게도 열림).
+# ===============================================================================
+@stocks_bp.route('/buy-target/performance')
+def select_buy_target_performance():
+    ym = request.args.get('ym')
+    if ym and not (len(ym) == 6 and ym.isdigit()):
+        return ApiResponse.error("ym 은 YYYYMM 형식이어야 합니다.")
+    try:
+        return ApiResponse.success(recoPerformanceServiceImpl.get_monthly_performance(g.db, ym))
     except Exception as e:
         logging.error(str(e))
         traceback.print_exc()

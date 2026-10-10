@@ -5,9 +5,11 @@ import { assUserSession } from "./stores/user-stores";
 import { ensureAccess } from "./useAccess.js";
 import { consumeAdPass } from "./useAdGate.js";
 import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
+import { isAuthPath } from "./authPaths.js";
 import AdGate from '@/components/AdGate.vue';
 import NaverCallback from '@/components/NaverCallback.vue';
 import SignupConsent from '@/components/SignupConsent.vue';
+import Signup from '@/components/Signup.vue';
 
 // ----- import components -----
 import Home from '@/components/Home.vue'
@@ -57,6 +59,12 @@ const routes = [
         path: "/oauth/naver/consent",
         name: "signup-consent",
         component: SignupConsent
+    },
+    {
+        // 이메일 회원가입(인증코드 + 항목별 동의). 비로그인 공개 경로.
+        path: "/signup",
+        name: "signup",
+        component: Signup
     },
     {
         path: "/user-option",
@@ -150,9 +158,7 @@ const getRouteList = async () => {
   }
 }
 
-// 로그인 없이 접근 가능한 화이트리스트
-// /ad-gate: 비로그인도 광고 게이트를 거쳐 공개 메뉴로 갈 수 있어야 한다(이동 대상의 접근 가능 여부는 다시 검사된다).
-const PUBLIC_PATHS = ['/login', '/', '/home', '/ad-gate', '/oauth/naver', '/oauth/naver/consent'];
+// 로그인 없이 열 수 있는 화면은 로그인·가입 흐름뿐이다(authPaths.js). 홈을 포함한 나머지는 전부 로그인 필요.
 
 export const setRouterToApp = async () => {
     const dynamicRoutes = await getRouteList();
@@ -171,32 +177,32 @@ export const setRouterToApp = async () => {
     router.beforeEach(async (to, from) => {
         const userSession = assUserSession();
         const loggedIn = userSession.isUserSession();
-        const isPublic = PUBLIC_PATHS.includes(to.path);
+        const isAuth = isAuthPath(to.path);
         const target = normPath(to.path);
 
-        // 권한(메뉴/기능)을 먼저 받는다. 비로그인이어도 받는다 — 서버가 게스트에게는 공개 메뉴
-        // (master_menu.public_flag)만 내려주므로, 이 목록이 "로그인 없이 열 수 있는 경로"의 정본이다.
-        // Lnb 가 sessionStorage 의 menuList 를 읽는데 그 값이 권한 반영본이어야 하기도 하다.
-        // 받아 둔 권한이 로그인 상태와 어긋나면(예: 세션이 끊겼는데 이전 사용자의 권한이 남음) 다시 받는다.
+        // 비로그인: 로그인·가입 화면만 연다. 나머지는 모두 로그인 화면으로.
+        if (!loggedIn) {
+            return isAuth ? true : { path: '/login' };
+        }
+        // 로그인 상태에서 로그인·가입 화면으로 오면 홈으로(네이버 콜백·동의 화면은 흐름 중이라 그대로 둔다).
+        if (to.path === '/login' || to.path === '/signup') {
+            return { path: '/home' };
+        }
+
+        // 권한(메뉴/기능)을 받는다. Lnb 가 sessionStorage 의 menuList 를 읽는데 그 값이 권한 반영본이어야 한다.
+        // 받아 둔 권한이 로그인 상태와 어긋나면(예: 게스트 때 받은 권한이 남음) 다시 받는다.
         const stale = userSession.access.loaded && userSession.access.asGuest === loggedIn;
-        const access = to.path === '/login' ? null : await ensureAccess(stale);
+        const access = isAuth ? null : await ensureAccess(stale);
         const allowed = !!access && access.paths.includes(target);
         const isMenuPath = restrictedPaths.has(target);
 
-        if (!isPublic) {
-            // 로그인 안 했고, 공개 메뉴도 아니면 로그인 화면으로.
-            if (!loggedIn && !(isMenuPath && allowed)) {
-                alert("로그인 이후 이용 가능합니다.");
-                return { path: '/login' };
-            }
-            // 로그인했지만 권한(role_menu)에 없는 메뉴.
-            if (loggedIn && isMenuPath && !allowed) {
-                alert("접근 권한이 없는 메뉴입니다.");
-                return { path: '/home' };
-            }
+        // 로그인했지만 권한(role_menu)에 없는 메뉴.
+        if (!isAuth && isMenuPath && !allowed) {
+            alert("접근 권한이 없는 메뉴입니다.");
+            return { path: '/home' };
         }
 
-        // 광고 게이트: 접근이 허용된 게이트 대상 메뉴에 "들어올 때마다"(비로그인 포함). AD_FREE 보유자는 건너뛴다.
+        // 광고 게이트: 접근이 허용된 게이트 대상 메뉴에 "들어올 때마다". AD_FREE 보유자는 건너뛴다.
         //   같은 메뉴 안에서 쿼리만 바뀌는 이동(종목 검색·기간 변경)은 재입장이 아니라 묻지 않는다.
         //   게이트에서 광고를 다 보면 이 경로 전용 1회용 통과권이 생기고, 여기서 소모된다.
         const entering = normPath(from.path) !== target;
