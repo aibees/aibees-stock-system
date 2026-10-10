@@ -3,7 +3,7 @@ import { loadComponent } from './utils/componentLoader.js'
 import aibeesApi from './aibeesApi.js'
 import { assUserSession } from "./stores/user-stores";
 import { ensureAccess } from "./useAccess.js";
-import { consumeAdPass } from "./useAdGate.js";
+import { consumeAdPass, countGateEntry, gateInterval } from "./useAdGate.js";
 import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
 import { isAuthPath } from "./authPaths.js";
 import AdGate from '@/components/AdGate.vue';
@@ -202,12 +202,14 @@ export const setRouterToApp = async () => {
             return { path: '/home' };
         }
 
-        // 광고 게이트: 접근이 허용된 게이트 대상 메뉴에 "들어올 때마다". AD_FREE 보유자는 건너뛴다.
+        // 광고 게이트: 접근이 허용된 게이트 대상 메뉴에 들어올 때. AD_FREE 보유자는 건너뛴다.
         //   같은 메뉴 안에서 쿼리만 바뀌는 이동(종목 검색·기간 변경)은 재입장이 아니라 묻지 않는다.
         //   게이트에서 광고를 다 보면 이 경로 전용 1회용 통과권이 생기고, 여기서 소모된다.
         const entering = normPath(from.path) !== target;
+        //   N번에 한 번만: 진입마다 사용자별로 세고 N 에 닿았을 때만 게이트로(광고 보고 돌아온 진입은 세지 않는다).
         if (AD_ENABLED && access?.loaded && allowed && adGatedPaths.has(target) && entering
-            && !access.features.includes('AD_FREE') && !consumeAdPass(target)) {
+            && !access.features.includes('AD_FREE') && !consumeAdPass(target)
+            && countGateEntry(userSession.user.loginInfo.user_id, gateInterval(access.settings))) {
             return { path: '/ad-gate', query: { next: to.fullPath } };
         }
     });

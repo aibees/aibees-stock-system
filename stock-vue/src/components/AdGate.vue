@@ -26,7 +26,8 @@
 <script setup>
 import AdSlot from './common/AdSlot.vue';
 import { AD_GATE_SECONDS } from '@scripts/adConfig.js';
-import { adPassPath, grantAdPass } from '@scripts/useAdGate.js';
+import { adPassPath, grantAdPass, resetGateCount } from '@scripts/useAdGate.js';
+import { assUserSession } from '@scripts/stores/user-stores';
 import { hasFeature } from '@scripts/useAccess.js';
 import { isNativeAdsEnabled, loadRewardedAd, showRewardedAd } from '@scripts/useAdMob.js';
 
@@ -74,7 +75,9 @@ const prepareAd = async () => {
     }
 };
 
+const userSession = assUserSession();
 const pass = () => {
+    resetGateCount(userSession.user.loginInfo.user_id);   // 광고를 다 봤으니 N번 카운트를 처음부터
     grantAdPass(adPassPath(next.value));   // 이동할 경로 하나에만 쓰는 1회용 통과권
     router.replace(next.value);
 };

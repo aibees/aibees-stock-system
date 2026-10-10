@@ -69,6 +69,20 @@
                             <span class="leg-item leg-bar" style="--c:rgba(100,100,100,0.35)">Vol</span>
                         </div>
                     </div>
+                    <!-- 시가총액(상장주식수 × 직전 영업일 종가) + 같은 날 투자자별 순매수. 순매수=빨강, 순매도=파랑 -->
+                    <dl v-if="summary" class="stock-summary">
+                        <div v-if="summary.marketCap != null">
+                            <dt>시가총액</dt>
+                            <dd>{{ formatEok(summary.marketCap) }}</dd>
+                        </div>
+                        <template v-if="summary.investor">
+                            <div v-for="row in summary.investor.rows" :key="row.label">
+                                <dt>{{ row.label }}</dt>
+                                <dd :class="signClass(row.amt)">{{ formatNetAmt(row.amt) }}</dd>
+                            </div>
+                        </template>
+                        <p v-if="summary.investor" class="summary-note">{{ summary.investor.dateLabel }} 종가·순매수 기준</p>
+                    </dl>
                     <div class="chart-scroll" ref="chartScroll">
                         <div class="chart-wrap" :style="{ width: dynamicWidth }">
                             <CandlestickChart :chartData="chartData" :extraOptions="chartOptions" />
@@ -141,10 +155,66 @@ const setStockInfo = async (code) => {
     const { data } = await aibeesApi.get('/api/v1/stocks/id/' + code);
     searchParam.code = data.data.stock_code;
     searchParam.name = data.data.stock_name;
+    setSummary(data.data);
 };
+
+// ── 시가총액 · 전일 수급 ─────────────────────────────────────────────
+// /stocks/id 응답: market_cap(억원, API 가 상장주식수 × investor.close_price 로 계산),
+//                  investor{ ymd, close_price, prsn_amt, frgn_amt, orgn_amt(백만원) } — 배치가 매일 07:00/07:10 갱신
+const summary = ref(null);
+
+const setSummary = (d) => {
+    if (!d) { summary.value = null; return; }
+    const inv = d.investor;
+    summary.value = {
+        code: d.stock_code,
+        marketCap: d.market_cap ?? null,
+        investor: inv ? {
+            dateLabel: `${Number(inv.ymd.slice(4, 6))}/${Number(inv.ymd.slice(6, 8))}`,
+            rows: [
+                { label: '외국인', amt: inv.frgn_amt },
+                { label: '기관',   amt: inv.orgn_amt },
+                { label: '개인',   amt: inv.prsn_amt },
+            ].filter(r => r.amt != null),
+        } : null,
+    };
+    if (summary.value.marketCap == null && !summary.value.investor) summary.value = null;
+};
+
+// 검색으로 종목을 바꾼 경우(마운트 때 setStockInfo 를 안 탄 경우)에만 다시 받는다
+const loadSummary = async (code) => {
+    if (summary.value?.code === code) return;
+    try {
+        const { data } = await aibeesApi.get('/api/v1/stocks/id/' + code);
+        setSummary(data?.data);
+    } catch {
+        summary.value = null;   // 부가 정보라 실패해도 차트는 그대로
+    }
+};
+
+// 억원 → "15조 6,973억" / "3,479억"
+const formatEok = (eok) => {
+    const v = Math.round(Math.abs(eok));
+    const jo = Math.floor(v / 10000);
+    const rest = v % 10000;
+    if (jo === 0) return `${rest.toLocaleString()}억`;
+    return rest ? `${jo.toLocaleString()}조 ${rest.toLocaleString()}억` : `${jo.toLocaleString()}조`;
+};
+
+// 순매수 대금(백만원) → "+3,479억" / "−4,800만". 1억 미만은 만원 단위
+const formatNetAmt = (mil) => {
+    if (!mil) return '0';
+    const sign = mil > 0 ? '+' : '−';
+    const eok = Math.abs(mil) / 100;
+    const body = eok >= 1 ? formatEok(eok) : `${(Math.abs(mil) * 100).toLocaleString()}만`;
+    return sign + body;
+};
+
+const signClass = (v) => (v > 0 ? 'up' : v < 0 ? 'down' : '');
 
 const fetchChart = async () => {
     if (!searchParam.code) return;
+    loadSummary(searchParam.code);
     isLoading.value  = true;
     chartData.value  = null;
 
@@ -441,6 +511,33 @@ $cream:   #FFF8E1;
             gap: 12px;
             flex-wrap: wrap;
         }
+    }
+
+    // 시가총액 · 전일 수급 — 칩 없이 한 줄 텍스트(라벨 + 값), 등락은 글자색으로만
+    .stock-summary {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        column-gap: 16px;
+        row-gap: 4px;
+        margin: 0 0 10px;
+        font-size: 13px;
+
+        > div { display: flex; gap: 6px; }
+        dt { color: $sub-2; }
+        dd { margin: 0; font-weight: 600; color: $ink; }
+        dd.up   { color: #C8282A; }
+        dd.down { color: #1F5BD1; }
+
+        .summary-note {
+            flex-basis: 100%;
+            margin: 0;
+            font-size: 12px;
+            color: $sub-2;
+        }
+    }
+
+    .chart-header {
 
         .leg-item {
             font-size: 12px;

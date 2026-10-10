@@ -184,12 +184,6 @@
                 <div class="list-head">
                     <h2>추천 종목 <span class="count">{{ sortedData.length }}</span></h2>
                     <div class="list-tools">
-                        <label class="sort-btn">
-                            <select v-model="sortKey" @change="onSortKeyChange" aria-label="정렬 기준">
-                                <option v-for="o in SORT_OPTIONS" :key="o.key" :value="o.key">{{ o.label }}</option>
-                            </select>
-                            <span class="sort-text" aria-hidden="true">{{ currentSort.label }} ▾</span>
-                        </label>
                         <button type="button" class="dir-btn" @click="toggleSortDir"
                             :aria-label="`정렬 방향: ${sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel}`"
                             :title="sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel">
@@ -198,6 +192,8 @@
                         </button>
                     </div>
                 </div>
+                <!-- 정렬 기준: 가로로 넘기는 칩(방향은 위 ↑ 버튼) -->
+                <SortChips v-model="sortKey" :options="SORT_OPTIONS" @change="onSortKeyChange" />
 
                 <div v-if="!isLoading && rows.length" class="reco-list">
                     <div v-for="(r, idx) in rows" :key="r.item.stock_code ?? idx" class="reco-item">
@@ -1031,26 +1027,6 @@ $down:     #1F5BD1;
 }
 .list-tools { display: flex; align-items: center; gap: 4px; }
 
-// 정렬 기준: 테두리 없는 글자 버튼(실제 선택은 투명 select 가 받는다)
-.sort-btn {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    min-height: 40px;
-    padding: 0 8px;
-    font-size: 14px;
-    color: #4A3628;
-
-    select {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        opacity: 0;
-        cursor: pointer;
-        font-size: 16px;   // iOS 포커스 확대 방지
-    }
-}
 .dir-btn {
     width: 40px;
     height: 40px;

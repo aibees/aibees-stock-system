@@ -103,6 +103,48 @@ class KisEngine:
         return None
 
     # ──────────────────────────────────────────────────────────────────
+    # 주식현재가 투자자 — inquire-investor (FHKST01010900)
+    #   종목당 1회 호출로 최근 약 30영업일의 일별 개인/외국인/기관계 순매수를 받는다.
+    #   StockInvestorJob(07:10) 의 종목 화면 '전일 수급' 적재용.
+    #   장중에는 당일 행이 빈 값으로 오므로 순매수 값이 없는 행은 버린다.
+    #   반환: [{ymd, close_price, prsn_qty, frgn_qty, orgn_qty, prsn_amt, frgn_amt, orgn_amt}] 최신순.
+    #         실패 시 None. (수량=주, 대금=백만원)
+    # ──────────────────────────────────────────────────────────────────
+    def get_investor_daily(self, code: str):
+        try:
+            resp = self.kis.request(
+                "/uapi/domestic-stock/v1/quotations/inquire-investor",
+                method="GET",
+                params={"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code},
+                headers={"tr_id": "FHKST01010900", "custtype": "P"},
+                appkey_location="header", auth=True,
+            )
+            j = resp.json()
+        except Exception as e:
+            print(f"[get_investor_daily] {code} 요청 실패: {e}", flush=True)
+            return None
+        if j.get("rt_cd") != "0":
+            print(f"[get_investor_daily] {code} rt_cd={j.get('rt_cd')} msg={j.get('msg1')}", flush=True)
+            return None
+
+        rows = []
+        for r in (j.get("output") or []):
+            ymd = (r.get("stck_bsop_date") or "").strip()
+            if not ymd or not str(r.get("frgn_ntby_qty") or "").strip():
+                continue   # 장중 당일 행 등 — 아직 확정 전
+            rows.append({
+                "ymd": ymd,
+                "close_price": _safe_int(r.get("stck_clpr"), None),
+                "prsn_qty": _safe_int(r.get("prsn_ntby_qty"), None),
+                "frgn_qty": _safe_int(r.get("frgn_ntby_qty"), None),
+                "orgn_qty": _safe_int(r.get("orgn_ntby_qty"), None),
+                "prsn_amt": _safe_int(r.get("prsn_ntby_tr_pbmn"), None),
+                "frgn_amt": _safe_int(r.get("frgn_ntby_tr_pbmn"), None),
+                "orgn_amt": _safe_int(r.get("orgn_ntby_tr_pbmn"), None),
+            })
+        return rows
+
+    # ──────────────────────────────────────────────────────────────────
     # 타임프레임(FID_PERIOD_DIV_CODE)별 조회 파라미터.
     #   이 API 는 1회 100행 제한이라, 윈도우 폭을 '봉 100개 이내'가 되는
     #   캘린더일로 잡아야 한다. 봉 1개가 덮는 기간이 D/W/M 마다 달라서 상수도 갈린다.

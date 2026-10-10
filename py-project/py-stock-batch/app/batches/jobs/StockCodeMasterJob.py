@@ -81,6 +81,26 @@ class StockCodeMasterJob(Job):
 
         return code_list
 
+    # KOSDAQ 종목마스터(kosdaq_code.mst) 뒷부분 222자 레이아웃.
+    #   KOSPI 와 앞쪽 지수·섹터 플래그 개수가 달라 이후 필드 위치가 전부 다르다. 기준가 이후 필드명은
+    #   KOSPI 와 같게 맞춰(market_stop=거래정지, 정리매매, 관리종목, 상장주수 …) 아래 공통 처리를 그대로 탄다.
+    #   검증(2026-10-11): 상장일자(알테오젠 20141212), 상장주수(에코프로비엠 97,830천주 = KIS 97,830,434주),
+    #   관리종목 Y/N 6종목 표본이 KIS 현재가 API(mang_issu_cls_code)와 일치.
+    #   앞쪽 플래그(flag01~22)는 쓰지 않아 이름을 붙이지 않았다.
+    KOSDAQ_FIELD_SPECS = ([2, 1, 4, 4, 4] + [1] * 22 +
+                          [9, 5, 5, 1, 1, 1, 2, 1, 1, 1, 2, 2, 2, 3, 1, 3, 12, 12, 8, 15, 21, 2, 7,
+                           1, 1, 1, 1, 9, 9, 9, 5, 9, 8, 9, 3, 1, 1, 1])
+    KOSDAQ_PART2_COLUMNS = (['group_code', 'market_capital', 'cls_first', 'cls_mid', 'cls_last'] +
+                            [f'flag{i:02d}' for i in range(1, 23)] +
+                            ['기준가', '매매수량단위', '시간외수량단위', 'market_stop', '정리매매',
+                             '관리종목', '시장경고', '경고예고', '불성실공시', '우회상장',
+                             '락구분', '액면변경', '증자구분', '증거금비율', '신용가능',
+                             '신용기간', '전일거래량', '액면가', '상장일자', '상장주수',
+                             '자본금', '결산월', '공모가', '우선주', '공매도과열',
+                             '이상급등', 'KRX300', '매출액', '영업이익', '경상이익',
+                             '당기순이익', 'ROE', '기준년월', '시가총액', '그룹사코드',
+                             '회사신용한도초과', '담보대출가능', '대주가능'])
+
     """
     .mst 파일에서 row read -> list(dict)로 추출
     """
@@ -88,6 +108,11 @@ class StockCodeMasterJob(Job):
         self.download_and_extract(name + '.zip')
 
         file_name = self.static_path + name
+        is_kosdaq = stock_type.upper() == 'KOSDAQ'
+        # 행 뒷부분(고정폭 필드) 길이 = 데이터 + 줄바꿈 1자. KOSPI 227+1 / KOSDAQ 222+1.
+        #   ※ 2026-10-11 전까지 KOSDAQ 도 KOSPI 길이·필드로 읽어서 KOSDAQ 의 거래정지/정리매매/관리종목이
+        #     한 칸씩 밀려 저장됐다(market_stop 이 전부 '1', 거래정지가 trading_halt 로, 정리매매가 admin_issue 로).
+        tail_len = 223 if is_kosdaq else 228
         tmp1_path = self.static_path + name + '1.tmp'
         tmp2_path = self.static_path + name + '2.tmp'
 
@@ -100,13 +125,13 @@ class StockCodeMasterJob(Job):
                 open(tmp1_path, mode='w', encoding='utf-8') as tmp1, \
                 open(tmp2_path, mode='w', encoding='utf-8') as tmp2:
             for row in f:
-                rf1 = row[0:len(row) - 228]
+                rf1 = row[0:len(row) - tail_len]
                 rf1_1 = rf1[0:9].rstrip()
                 rf1_2 = rf1[9:21].rstrip()
                 rf1_3 = rf1[21:].strip()
                 tmp1.write(rf1_1 + ',' + rf1_2 + ',' + rf1_3 + '\n')
 
-                rf2 = row[-228:]
+                rf2 = row[-tail_len:]
                 tmp2.write(rf2)
 
             tmp1.close()
@@ -149,6 +174,8 @@ class StockCodeMasterJob(Job):
                          '시가총액', '그룹사코드', '회사신용한도초과', '담보대출가능', '대주가능'
                          ]
 
+        if is_kosdaq:
+            field_specs, part2_columns = self.KOSDAQ_FIELD_SPECS, self.KOSDAQ_PART2_COLUMNS
         df2 = pd.read_fwf(tmp2_path, widths=field_specs, names=part2_columns)
         df = pd.merge(df1, df2, how='outer', left_index=True, right_index=True)
         df['group_code'] = df['group_code'].fillna('')
@@ -170,6 +197,13 @@ class StockCodeMasterJob(Job):
         df['admin_issue'] = df['관리종목']
         df['trading_halt'] = df['정리매매']
 
+        # 상장주식수(주) — .mst '상장주수'는 천주 단위라 ×1000. 종목 화면 시가총액 계산용
+        #   (시가총액 = 상장주식수 × 직전 영업일 종가, API 에서 계산). 값이 없으면 NULL.
+        #   ※ .mst 의 '시가총액'/'기준가'는 하루 늦게 갱신되는 경우가 있어 쓰지 않는다.
+        shares = pd.to_numeric(df['상장주수'], errors='coerce')
+        df['listed_shares'] = [int(v) * 1000 if pd.notna(v) and v > 0 else None for v in shares]
+
         return df[['corp_code', 'stock_code', 'stock_name', 'stock_type', 'stock_type_yf',
-                   'group_code', 'market_stop', 'admin_issue', 'trading_halt']].to_dict('records')
+                   'group_code', 'market_stop', 'admin_issue', 'trading_halt',
+                   'listed_shares']].to_dict('records')
 

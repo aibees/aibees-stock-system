@@ -69,7 +69,8 @@ export const assUserSession = defineStore('user', () => {
         asGuest: true,  // 이 권한을 받을 때 토큰이 없었는가(게스트 권한인가)
         roles: [],      // 사용자의 권한 ID(auth_id). 예) ['STOCK_USER', 'WORKER_USER']
         paths: [],      // 이동 허용 경로(부모 + 리프, 선행 '/' 포함)
-        features: []    // AD_FREE 등
+        features: [],   // AD_FREE 등
+        settings: {}    // 공통코드 화면 설정값 {code: desc}. 예) { GATE_INTERVAL: '5' }
     });
 
     const resetAccess = () => {
@@ -78,6 +79,7 @@ export const assUserSession = defineStore('user', () => {
         access.roles = [];
         access.paths = [];
         access.features = [];
+        access.settings = {};
     };
 
     const getUserInfo = computed(() => user.loginInfo.user_name);

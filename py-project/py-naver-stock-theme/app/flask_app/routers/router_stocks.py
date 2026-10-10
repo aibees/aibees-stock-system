@@ -3,6 +3,7 @@ import traceback, pprint
 from flask import Blueprint, request, g
 
 from stock_shared.dao.masterStockDao import MasterStockDao
+from stock_shared.dao.stockInvestorDailyDao import StockInvestorDailyDao
 from app.flask_app.routers.router_oauth import require_auth
 from app.flask_app.utils.apiResponse import ApiResponse
 from app.services.stocks.StockService import StockService
@@ -14,6 +15,7 @@ stocks_bp = Blueprint("stocks", __name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 masterStockDaoImpl = MasterStockDao()
+stockInvestorDaoImpl = StockInvestorDailyDao()
 stockServiceImpl = StockService()
 recoPerformanceServiceImpl = RecoPerformanceService()
 
@@ -156,6 +158,23 @@ def select_stocks_by_id(stock_code):
     
     try:
         results = masterStockDaoImpl.select_master_stock_by_id(g.db, param);
+        if results is not None:
+            # 종목 화면 '전일 수급' — 가장 최근 영업일의 투자자별 순매수(StockInvestorJob 07:10 적재).
+            # 수급 조회가 실패해도 종목 정보(차트 화면)는 그대로 내려준다.
+            try:
+                results['investor'] = stockInvestorDaoImpl.select_latest(g.db, stock_code)
+            except Exception as e:
+                logging.warning(f"[stocks/id] {stock_code} 투자자 수급 조회 실패: {e}")
+                results['investor'] = None
+            # 시가총액(억원) = 상장주식수 × 수급과 같은 날 종가. 둘 중 하나라도 없으면 None.
+            inv = results['investor']
+            shares = results.get('listed_shares')
+            if inv and inv.get('close_price') and shares:
+                results['market_cap'] = round(shares * inv['close_price'] / 100_000_000)
+                results['market_cap_ymd'] = inv['ymd']
+            else:
+                results['market_cap'] = None
+                results['market_cap_ymd'] = None
         return ApiResponse.success(results)
     except Exception as e:
         print(str(e))

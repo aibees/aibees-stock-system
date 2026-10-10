@@ -1,3 +1,4 @@
+import logging
 import re
 import threading
 import datetime
@@ -9,6 +10,7 @@ from functools import wraps
 
 from app.domains.dao.masterMenuDao import MasterInfosDao
 from app.domains.dao.roleMenuDao import RoleMenuDao, ADMIN_AUTH_ID, is_super_user
+from app.domains.dao.masterCodesDao import MasterCodesDao
 from app.flask_app.routers.router_oauth import require_auth
 from app.flask_app.utils.apiResponse import ApiResponse
 
@@ -16,6 +18,21 @@ master_bp = Blueprint("master", __name__)
 masterMenuDaoImpl = MasterInfosDao()
 masterStockDaoImpl = MasterStockDao()
 roleMenuDaoImpl = RoleMenuDao()
+masterCodesDaoImpl = MasterCodesDao()
+
+# 화면 설정값(공통코드). master_codes system=stock / source=setting / category=ad 의 {code: desc} 를
+# /menus/my 응답의 settings 로 같이 내려 준다 — 화면이 따로 요청하지 않아도 권한과 함께 받는다.
+#   GATE_INTERVAL : 광고 게이트를 N번 진입마다 1번 보여준다(프런트 useAdGate.js, 기본 5)
+_APP_SETTING_KEY = {'system': 'stock', 'source': 'setting', 'category': 'ad'}
+
+
+def _app_settings(session) -> dict:
+    try:
+        return {r['code']: r['desc'] for r in masterCodesDaoImpl.select_master_code(session, _APP_SETTING_KEY)}
+    except Exception as e:
+        # 설정값을 못 읽어도 메뉴/권한 응답은 내보낸다(프런트가 기본값으로 동작)
+        logging.warning(f"[menus/my] app settings 조회 실패: {e}")
+        return {}
 
 
 def require_admin(f):
@@ -205,6 +222,7 @@ def select_my_menu_list():
         'menus': sorted(tree, key=lambda x: x['sort']),
         'features': roleMenuDaoImpl.select_features_for_user(g.db, auth_ids),
         'roles': auth_ids,
+        'settings': _app_settings(g.db),
     })
 
 

@@ -1,5 +1,14 @@
 <template>
-    <div class="day-candle">
+    <!-- mini: 목록 줄 안에 들어가는 작은 봉(라벨·거래량·테두리 없이 꼬리+몸통만) -->
+    <svg v-if="mini" class="day-candle-mini" :viewBox="`0 0 ${MW} ${MH}`" role="img"
+        :aria-label="ok ? `시가 ${fmt(open)} 고가 ${fmt(high)} 저가 ${fmt(low)} ${closeLabel} ${fmt(close)}` : '봉 정보 없음'">
+        <template v-if="ok">
+            <line :x1="MW / 2" :x2="MW / 2" :y1="yOfMini(high)" :y2="yOfMini(low)" :stroke="color" stroke-width="1.5" stroke-linecap="round" />
+            <rect x="1" :y="miniBodyTop" :width="MW - 2" :height="miniBodyH" rx="1.5" :fill="color" />
+        </template>
+    </svg>
+
+    <div v-else class="day-candle">
         <svg v-if="ok" :viewBox="`0 0 ${W} ${H}`" role="img"
             :aria-label="`시가 ${fmt(open)} 고가 ${fmt(high)} 저가 ${fmt(low)} ${closeLabel} ${fmt(close)}`">
             <!-- 꼬리(고가~저가) + 몸통(시가~종가) -->
@@ -22,6 +31,10 @@
  * 하루치 봉(시/고/저/종)을 봉 모양으로 보여준다. 장중에는 종가 자리가 현재가다.
  * 가격 위치(세로)는 실제 값에 비례하고, 한국식 색(상승 빨강 · 하락 파랑)을 쓴다.
  */
+/**
+ * mini 모드: 폭 12px 정도의 작은 봉. 몸통·꼬리 길이는 그날 고가~저가 안에서의 비율이라
+ * 종목끼리 크기를 비교하는 용도가 아니라 "그날 봉 모양(양봉/음봉·꼬리)"을 보는 용도다.
+ */
 const props = defineProps({
     open: { type: [Number, String], default: null },
     high: { type: [Number, String], default: null },
@@ -29,6 +42,7 @@ const props = defineProps({
     close: { type: [Number, String], default: null },
     volume: { type: [Number, String], default: null },
     closeLabel: { type: String, default: '종가' },
+    mini: { type: Boolean, default: false },
 });
 
 const W = 320, H = 132, CX = 38, LX = 96, PAD = 12, GAP = 22;
@@ -50,6 +64,15 @@ const yOf = (v) => {
     if (!span) return H / 2;
     return PAD + ((high.value - v) / span) * (H - PAD * 2);
 };
+const MW = 10, MH = 40, MPAD = 2;
+const yOfMini = (v) => {
+    const span = high.value - low.value;
+    if (!span) return MH / 2;
+    return MPAD + ((high.value - v) / span) * (MH - MPAD * 2);
+};
+const miniBodyTop = computed(() => Math.min(yOfMini(open.value), yOfMini(close.value)));
+const miniBodyH = computed(() => Math.max(1.5, Math.abs(yOfMini(open.value) - yOfMini(close.value))));
+
 const bodyTop = computed(() => Math.min(yOf(open.value), yOf(close.value)));
 const bodyH = computed(() => Math.max(3, Math.abs(yOf(open.value) - yOf(close.value))));
 
@@ -85,7 +108,8 @@ const labels = computed(() => {
     padding: 10px 14px 8px;
     font-variant-numeric: tabular-nums;
 }
-svg { display: block; width: 100%; height: auto; max-height: 150px; }
+.day-candle svg { display: block; width: 100%; height: auto; max-height: 150px; }
+.day-candle-mini { display: block; width: 10px; height: 40px; }
 .lab { font-size: 11px; fill: #6B5B4E; font-weight: 600; }
 .val { font-size: 13px; fill: #2B1D14; font-weight: 600; }
 .val.up { fill: #C8282A; }

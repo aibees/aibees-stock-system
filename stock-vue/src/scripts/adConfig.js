@@ -57,7 +57,7 @@ export const MOBILE_BOTTOM_BANNER_HEIGHT = 50;
 export const AD_GATE_MENU_CODES = ['StockBuyTarget', 'StockInfo', 'ChartStock'];
 // 게이트에서 "계속하기"가 열리기까지 대기 시간(초)
 export const AD_GATE_SECONDS = 5;
-// 시간 기반 면제는 없다 — 게이트 대상 메뉴는 들어갈 때마다 광고를 본다(useAdGate.js 의 1회용 통과권).
+// 시간 기반 면제는 없다 — 게이트 대상 메뉴 진입 N번(공통코드 GATE_INTERVAL, 기본 5)마다 한 번 광고를 본다(useAdGate.js).
 
 // 사이드 배너는 콘텐츠(최대 1200px) 양옆에 겹치지 않을 만큼 넓은 화면에서만 보인다.
 //   1200 + 2 × (배너 160 + 여백 12) = 1544 → 여유를 두어 1560.

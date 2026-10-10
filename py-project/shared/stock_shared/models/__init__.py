@@ -4,6 +4,7 @@ from stock_shared.models.batchJobMaster import BatchJobMaster
 from stock_shared.models.devicePushToken import DevicePushToken
 from stock_shared.models.masterStock import MasterStock
 from stock_shared.models.nStockBatchLog import NStockBatchLog
+from stock_shared.models.stockInvestorDaily import StockInvestorDaily
 from stock_shared.models.tradeBuyTargetStock import TradeBuyTargetStock
 from stock_shared.models.tradeCandleData import TradeCandleData
 from stock_shared.models.tradeShapeTrainDaily import TradeShapeTrainDaily
@@ -23,6 +24,7 @@ __all__ = [
     "DevicePushToken",
     "MasterStock",
     "NStockBatchLog",
+    "StockInvestorDaily",
     "TradeBuyTargetStock",
     "TradeCandleData",
     "TradeShapeTrainDaily",

@@ -47,6 +47,7 @@ export const ensureAccess = async (force = false) => {
             store.access.paths    = collectPaths(menus);
             store.access.features = data.data?.features ?? [];
             store.access.roles    = data.data?.roles ?? [];
+            store.access.settings = data.data?.settings ?? {};
             // Lnb / TradeDashboard 가 sessionStorage 의 menuList 를 읽으므로 권한이 반영된
             // 트리로 덮어쓴다(전체 목록은 router.js 가 따로 들고 있다).
             store.setMenuList(menus);
@@ -57,6 +58,7 @@ export const ensureAccess = async (force = false) => {
             store.access.paths    = [];
             store.access.features = [];
             store.access.roles    = [];
+            store.access.settings = {};
             store.access.loaded   = false; // 다음 이동 때 재시도
             store.setMenuList([]);         // 전체 목록이 메뉴에 노출되지 않게 비운다
         } finally {

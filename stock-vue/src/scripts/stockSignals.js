@@ -172,6 +172,15 @@ export const volumeFacts = (item) => {
     return { volume, avgRatio, surge };
 };
 
+/* ── 조건 열(매수추천 목록의 가운데 칸) ──
+ * conditionSummary().rows 와 같은 순서(거래량 두 조건 먼저). head 는 좁은 열 머리글용 줄임말. */
+const CONDITION_ORDER = ['거래제한', '거래급등', 'MACD 크로스', 'OBV 크로스', 'BB중심돌파', 'BB상단아래', '중심선위'];
+const CONDITION_HEADS = {
+    '거래제한': '거래', '거래급등': '급증', 'MACD 크로스': 'MACD', 'OBV 크로스': 'OBV',
+    'BB중심돌파': 'BB', 'BB상단아래': '비과열', '중심선위': '20선',
+};
+export const CONDITION_COLUMNS = CONDITION_ORDER.map(label => ({ label, head: CONDITION_HEADS[label] }));
+
 /**
  * 펼친 추천 종목 안의 "조건 요약".
  *  - rows     : 7개 조건 한 줄씩 {label, pass, value}. 거래량 두 조건을 맨 앞에 두고 실제 수치를 값으로 쓴다.
@@ -190,10 +199,12 @@ export const conditionSummary = (item) => {
     const surgeValue = facts.surge ? `${facts.surge.date} 전일 대비 ${ratioText(facts.surge.ratio)}` : '';
 
     const VOLUME = { '거래제한': limitValue, '거래급등': surgeValue };
-    const ordered = [byLabel['거래제한'], byLabel['거래급등'], ...rows.filter(r => !(r.label in VOLUME))];
+    const ordered = CONDITION_ORDER.map(label => byLabel[label]);
     return {
         pass, total,
         rows: ordered.map(r => ({
+            key: r.label,
+            head: CONDITION_HEADS[r.label],
             label: r.short,
             pass: r.pass,
             value: (r.label in VOLUME && VOLUME[r.label]) || (r.pass ? '충족' : '미충족'),

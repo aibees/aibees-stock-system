@@ -93,7 +93,7 @@ class MasterStockDao(BaseDao):
         """
         bulk insert.
         dict 키: corp_code, stock_code, stock_name, stock_type,
-                 stock_type_yf, group_code, market_stop
+                 stock_type_yf, group_code, market_stop, admin_issue, trading_halt, listed_shares
         """
         if not data:
             return 0
