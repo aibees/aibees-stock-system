@@ -18,7 +18,7 @@ export const AD_PROVIDER = import.meta.env.VITE_AD_PROVIDER || 'placeholder';
 
 export const AD_CONFIG = {
     // AdSense: client='ca-pub-XXXXXXXXXXXXXXXX', slots 는 광고 단위 ID.
-    adsense: { client: '', slots: { side: '', gate: '', homeHero: '', homeMid: '', mobileInline: '', mobileBottom: '' } },
+    adsense: { client: 'ca-pub-5330672724286218', slots: { side: '', gate: '', homeHero: '', homeMid: '', mobileInline: '', mobileBottom: '' } },
     // Kakao AdFit: 광고단위 ID('DAN-...'). 단위 생성 시 정한 크기와 아래 SIZES 가 같아야 한다.
     adfit: { units: { side: '', gate: '', homeHero: '', homeMid: '', mobileInline: '', mobileBottom: '' } },
     // Google Ad Manager(GPT) 공개 샘플 단위 — 테스트 크리에이티브만 나온다.

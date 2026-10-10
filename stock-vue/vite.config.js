@@ -16,8 +16,20 @@ const REQUIRED_ENV = [
   'VITE_BATCH_SERVER_URL',
 ];
 
+// AdSense 스크립트(index.html 의 adsense:start ~ adsense:end)는 웹 운영 빌드에만 남긴다.
+//   - dev 서버: 필요 없음(앱 cap:dev 도 dev 서버 화면을 그대로 띄운다)
+//   - 앱 빌드(BUILD_TARGET=app, npm run build:app / cap:prod): 앱 WebView 안 AdSense 는 정책 위반 → 제거
+const ADSENSE_BLOCK = /[ \t]*<!-- adsense:start[\s\S]*?<!-- adsense:end -->\n?/;
+const adsenseWebOnly = (command) => ({
+  name: 'adsense-web-only',
+  transformIndexHtml(html) {
+    const keep = command === 'build' && process.env.BUILD_TARGET !== 'app';
+    return keep ? html : html.replace(ADSENSE_BLOCK, '');
+  },
+});
+
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   // [수정] loadEnv('') → loadEnv(mode)
   //   '' 를 넘기면 .env 하나만 읽혀서 .env.dev / .env.prd 는 **전혀 반영되지 않았다**.
   //   그래서 iOS 빌드 결과가 "그 순간 .env 에 무엇이 들어 있었는지"에 좌우됐고,
@@ -41,7 +53,7 @@ export default defineConfig(({ mode }) => {
 
   // 어떤 환경으로 구워졌는지 빌드 로그에 남긴다 — 잘못된 서버로 TestFlight 에
   // 올라가는 사고를 이 한 줄만 보고도 잡을 수 있다.
-  console.log(`[vite] mode=${mode} | API=${env.VITE_SERVER_URL} | BATCH=${env.VITE_BATCH_SERVER_URL}`);
+  console.log(`[vite] mode=${mode} | API=${env.VITE_SERVER_URL} | BATCH=${env.VITE_BATCH_SERVER_URL} | target=${process.env.BUILD_TARGET || 'web'}`);
 
   return {
   define: {
@@ -94,6 +106,7 @@ export default defineConfig(({ mode }) => {
     }
   },
   plugins: [
+    adsenseWebOnly(command),
     vue(),
     AutoImport({
       imports: [

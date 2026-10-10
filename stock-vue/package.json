@@ -8,9 +8,10 @@
     "build": "vite build",
     "build:dev": "vite build --mode dev",
     "build:prd": "vite build --mode prd",
+    "build:app": "BUILD_TARGET=app vite build --mode prd",
     "preview": "vite preview --port 7077",
     "cap:dev": "cp capacitor.config.dev.json capacitor.config.json && npx cap sync ios",
-    "cap:prod": "cp capacitor.config.prod.json capacitor.config.json && npm run build:prd && npx cap sync ios",
+    "cap:prod": "cp capacitor.config.prod.json capacitor.config.json && npm run build:app && npx cap sync ios",
     "ios:archive": "./ios/archive.sh",
     "ios:release": "./ios/archive.sh --upload"
   },
