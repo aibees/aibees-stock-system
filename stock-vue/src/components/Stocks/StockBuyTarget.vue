@@ -63,7 +63,9 @@
                                     <span class="chg-short">{{ r.chgShort }}</span>
                                 </span>
                             </span>
-                            <DayCandle mini class="candle" :open="r.item.open" :high="r.item.high" :low="r.item.low"
+                            <!-- 최근 5개 봉(chart_data 마지막 5개, 맨 오른쪽 = 추천일). 차트 데이터가 없으면 그날 봉 1개 -->
+                            <MiniCandles v-if="r.recentBars.length" class="candle" :bars="r.recentBars" />
+                            <DayCandle v-else mini class="candle" :open="r.item.open" :high="r.item.high" :low="r.item.low"
                                 :close="r.item.close" :close-label="priceLabel" />
                             <!-- 7개 조건: 윗줄 아래 전체 폭 한 줄로 "이름 + 충족/미달" (✓ 기호 대신 글자 — 가독성 피드백 2026-10-11) -->
                             <span class="conds" :aria-label="`조건 ${r.summary.pass}/${r.summary.total} 충족`">
@@ -303,6 +305,9 @@ const marketInfo = (item) => {
     return { flows, dateLabel: shortYmd(item.investor_ymd) };
 };
 
+// 목록 줄 오른쪽 미니 봉 개수 — chart_data(최근 120영업일)의 마지막 N개. 마지막 봉 = 추천일 봉
+const RECENT_BARS = 5;
+
 // 목록 줄 조건 이름 — 열 머리글 줄임말(거래/급증/BB …)보다 알아보기 쉬운 이름. 키는 conditionSummary rows.key
 const COND_NAMES = {
     '거래제한': '거래량', '거래급등': '거래급증', 'MACD 크로스': 'MACD', 'OBV 크로스': 'OBV',
@@ -319,6 +324,7 @@ const rows = computed(() =>
         return {
             item, chg, chgShort: shortChange(chg), summary: conditionSummary(item),
             capShort: formatCapShort(item.market_cap), market: marketInfo(item),
+            recentBars: (item.chart_data || []).slice(-RECENT_BARS),
             facts: [
                 { name: '외국인', value: formatNetAmtShort(item.frgn_amt), cls: signClass(item.frgn_amt) },
                 { name: '기관',   value: formatNetAmtShort(item.orgn_amt), cls: signClass(item.orgn_amt) },
@@ -455,7 +461,7 @@ $blue:     #7A4423;
 /* 줄 칸 나눔: 윗줄 = 종목 | 현재가 | 작은 봉, 아랫줄 = 7개 조건(전체 폭). 머리글(.reco-cols)은 윗줄과 같은 값. */
 .reco {
     --px-w: 96px;            // 현재가 칸(좁은 화면: 등락은 퍼센트만)
-    --candle-w: 10px;
+    --candle-w: 35px;        // 미니 봉 5개(MiniCandles: 봉 4px, 간격 7px)
     --gap: 10px;
     @media (min-width: 640px) {
         --px-w: 132px;       // 넓은 화면: 등락 절대값까지

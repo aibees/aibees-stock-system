@@ -16,6 +16,7 @@ declare module 'vue' {
     DayCandle: typeof import('./components/common/comp/DayCandle.vue')['default']
     Headers: typeof import('./components/common/comp/Headers.vue')['default']
     IndicatorMiniChart: typeof import('./components/common/comp/IndicatorMiniChart.vue')['default']
+    MiniCandles: typeof import('./components/common/comp/MiniCandles.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SAutoInput: typeof import('./components/common/comp/SAutoInput.vue')['default']
