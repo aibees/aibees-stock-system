@@ -10,8 +10,8 @@ router_auto_trade.py — 운용모드 관리 (Blueprint url_prefix = /api/v1/aut
     - user_id 는 JWT 에서만 얻는다. 매매 사용자(WORKER_USER) 권한이 있어야 한다.
     - worker 는 active_mode 만 읽는다(평일 08~20시 설정 폴링 60초, 그 외엔 다음 개장 루틴 직전 반영).
       보유분 청산 후 승계(pending)는 worker 에 구현이 없어 쓰지 않는다 — 전환은 항상 즉시.
-    - M0 = 매매정지(worker 는 켜둔 채 주문만 차단, sql/27). enabled_flag 는 worker 가 읽지 않지만
-      화면 표시(운용 중/정지)가 실제와 맞도록 M0 이면 'N', 그 외 'Y' 로 함께 맞춘다.
+    - M0 = 매매정지(sql/27, 2026-10-11 개정): 신규 매수만 멈추고 보유분 매도(손절·익절·트레일링)는 계속한다.
+      worker 가 여전히 돌고 매도도 하므로 enabled_flag 는 모드와 무관하게 'Y' 로 둔다(worker 는 이 값을 읽지 않는다).
     - SELECTABLE_MODES: worker 에 실행기가 구현된 모드만. M2~M4 는 화면에 "준비 중"으로만 보인다.
       worker 에 모드가 추가되면 여기에도 추가한다(py-stock-batch trade_worker/modes, position_strategy).
 """
@@ -102,13 +102,13 @@ def put_state():
             return ApiResponse.success({'applied': 'NONE', 'active_mode': mode_code,
                                         'message': f"이미 '{name}' 모드입니다."})
 
-        enabled = 'N' if mode_code == HALT_MODE else 'Y'
-        tradeModeDaoImpl.apply_mode(g.db, g.current_user_id, mode_code, enabled)
+        # M0 도 보유분 매도는 계속 돌므로 '운용 중'(Y) 이다.
+        tradeModeDaoImpl.apply_mode(g.db, g.current_user_id, mode_code, 'Y')
         reason = ('매매정지' if mode_code == HALT_MODE
                   else ('매매 재개' if from_mode == HALT_MODE else '운용모드 전환'))
         tradeModeDaoImpl.insert_change_log(g.db, g.current_user_id, 'APPLY_NOW',
                                            from_mode, mode_code, reason)
-        message = (f"'{name}'로 전환했어요. 1분 안에 주문이 멈추고, 계좌 조회만 계속합니다."
+        message = (f"'{name}'로 전환했어요. 1분 안에 신규 매수가 멈추고, 보유 종목 매도는 계속합니다."
                    if mode_code == HALT_MODE else
                    f"'{name}'로 전환했어요. 1분 안에 자동매매에 반영됩니다.")
         return ApiResponse.success({'applied': 'NOW', 'active_mode': mode_code, 'message': message})

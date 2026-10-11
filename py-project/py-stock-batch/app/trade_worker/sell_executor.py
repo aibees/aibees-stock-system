@@ -458,7 +458,7 @@ class BaseSellExecutor(ABC):
                 self.notifier.send(
                     f"[매매정지] {old_mode} → {new_mode}",
                     f"⏸ 매매정지(<b>{new_mode}</b>)로 전환됐습니다.\n"
-                    f"이후 매수·매도 주문을 내지 않습니다(손절/익절 포함). 계좌 조회만 계속합니다.")
+                    f"이후 신규 매수를 하지 않습니다. 보유 종목의 손절·익절·트레일링 매도는 계속합니다.")
             else:
                 self.notifier.send(
                     f"[운용모드 전환] {old_mode} → {new_mode}",
@@ -711,11 +711,8 @@ class BaseSellExecutor(ABC):
                 manual: dict | None = None):
         # manual: MANUAL_SELL 이면 이번에 체결하는 **단일 티어**(trade_worker_manual_sell
         # 행 1건, 종목당 여러 티어 중 하나) — id/sell_price/qty_ratio/base_qty 를 담고 있다.
-        # 매매정지(M0): 손절·익절·트레일링·즉시매도·수기등록 지정가 등 모든 매도가 여기를 지난다.
-        #   조용히 건너뛴다 — 실패로 세지 않고 알림도 보내지 않는다(틱마다 들어와서 알림이 폭주한다).
-        #   정지 사실은 모드 전환 알림과 부팅 알림으로 이미 알린다.
-        if self.strategy is not None and getattr(self.strategy, "halted", False):
-            return
+        # 매매정지(M0)여도 매도는 막지 않는다(2026-10-11) — M0 는 신규 매수만 멈추고,
+        # 보유분의 손절·익절·트레일링·수기등록 지정가 매도는 평소대로 추적·실행한다.
         # 동시성 가드: 소켓 콜백이 여러 틱 동시 진입해도 종목당 1건만 진행.
         with self._lock:
             if symbol in self._sold or symbol in self._inflight or symbol in self._disabled:

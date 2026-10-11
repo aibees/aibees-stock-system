@@ -162,7 +162,7 @@ class OrderWatch:
 
 
 class TradingHaltedError(RuntimeError):
-    """매매정지(M0) 상태에서 주문을 시도했다(Broker 안전망)."""
+    """매매정지(M0) 상태에서 매수 주문을 시도했다(Broker 안전망). 매도는 막지 않는다."""
 
 
 class Broker:
@@ -180,11 +180,12 @@ class Broker:
         self._unknown_cb: Optional[Callable[[str, str, Decimal, Decimal], None]] = None
         self._lock = threading.Lock()
         self._exec_ticket = None
-        # 주문 허용 여부(매매정지 M0 안전망). main 이 set_trading_gate 로 전략의 halted 를 연결한다.
-        # 실행기가 먼저 건너뛰므로 정상이라면 여기까지 오지 않는다 — 놓친 경로가 있어도 주문이 나가지 않게.
-        self._trading_allowed: Callable[[], bool] = lambda: True
+        # 주문 허용 여부(매매정지 M0 안전망). 인자는 주문 방향("BUY"/"SELL").
+        # main 이 set_trading_gate 로 "M0 면 BUY 거부" 를 연결한다 — 매도(보유분 청산)는 M0 에서도 허용.
+        # 매수 실행기가 먼저 건너뛰므로 정상이라면 여기까지 오지 않는다 — 놓친 경로가 있어도 매수가 나가지 않게.
+        self._trading_allowed: Callable[[str], bool] = lambda side: True
 
-    def set_trading_gate(self, allowed: Callable[[], bool]) -> None:
+    def set_trading_gate(self, allowed: Callable[[str], bool]) -> None:
         self._trading_allowed = allowed
 
     # ── 시세 ────────────────────────────────────────────────────────
@@ -655,7 +656,7 @@ class Broker:
         pykis 의 인증/토큰/hashkey/도메인 파이프라인(kis.fetch)을 그대로 재사용하고,
         body 에 거래소 구분만 추가한다.
         기본 시장가(ORD_DVSN='01', ORD_UNPR='0'), 지정가는 '00' + 실제 가격."""
-        if not self._trading_allowed():
+        if not self._trading_allowed(side):
             log.warning("[매매정지] %s %s qty=%s 주문 차단(M0)", side, symbol, qty)
             raise TradingHaltedError(f"매매정지(M0) 상태라 {side} 주문을 내지 않습니다: {symbol}")
         from pykis.api.account.order import KisDomesticOrder

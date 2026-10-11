@@ -251,14 +251,15 @@ def main():
         return
 
     # 매매정지(M0) 안전망: 전략의 현재 모드를 Broker 주문 경로에 연결한다(장중 전환도 즉시 반영).
-    broker.set_trading_gate(lambda: not strategy.halted)
+    #   M0 는 신규 매수만 막는다 — 보유분 매도(손절·익절·트레일링·수기 지정가)는 허용.
+    broker.set_trading_gate(lambda side: side != "BUY" or not strategy.halted)
     if strategy.halted:
-        log.warning("[main] 매매정지(M0) 상태로 기동 — 주문 없이 계좌 조회·보유 동기화만 수행")
+        log.warning("[main] 매매정지(M0) 상태로 기동 — 신규 매수 없이 보유분 매도 감시만 수행")
         try:
-            repo.insert_worker_log(cfg.user_id, "boot", "INFO", "매매정지(M0) 상태로 기동 — 계좌 조회만")
+            repo.insert_worker_log(cfg.user_id, "boot", "INFO", "매매정지(M0) 상태로 기동 — 신규 매수 정지, 보유분 매도 감시")
             notifier.send("[worker 기동] 매매정지(M0)",
                           "⏸ 매매정지 상태로 worker 가 시작됐습니다.\n"
-                          "매수·매도 주문을 내지 않고 계좌 조회만 합니다.")
+                          "신규 매수는 하지 않고, 보유 종목의 손절·익절·트레일링 매도만 계속합니다.")
         except Exception:  # noqa: BLE001  (알림 실패로 기동을 막지 않는다)
             pass
 

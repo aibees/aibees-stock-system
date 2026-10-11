@@ -30,9 +30,10 @@ log = logging.getLogger("trade_worker.strategy")
 #: user_trade_mode 행이 없거나 조회에 실패해도 worker 가 죽지 않고 현행 전략으로 돈다.
 DEFAULT_MODE = "M1"
 
-#: 매매정지 모드. worker 는 떠 있고 계좌 조회·보유 동기화·라인 계산은 계속하지만 **주문은 내지 않는다.**
-#: 전략 자체가 없는 모드라, 라인(손절/익절 표시) 계산에는 DEFAULT_MODE 전략을 빌려 쓴다.
-#: 실제 차단 지점: BuyExecutor.run / SellExecutor._do_sell 진입부 + Broker._order_rest(안전망).
+#: 매매정지 모드(2026-10-11 개정): **신규 매수만 멈춘다.** 이미 보유한 종목은 손절·익절·트레일링·
+#: 타임스탑·수기등록 지정가 매도를 평소대로 추적·실행한다(보유분을 무방비로 두지 않는다).
+#: 전략 자체가 없는 모드라, 매도 라인 계산에는 DEFAULT_MODE 전략을 빌려 쓴다.
+#: 실제 차단 지점: BuyExecutor.run 진입부 + Broker._order_rest(BUY 안전망). 매도 경로는 막지 않는다.
 HALT_MODE = "M0"
 
 
@@ -110,7 +111,7 @@ class SellStrategy:
 
     @property
     def halted(self) -> bool:
-        """매매정지(M0)면 True — 매수·매도 주문을 내지 않는다."""
+        """매매정지(M0)면 True — 신규 매수를 내지 않는다(보유분 매도는 계속)."""
         return self.mode == HALT_MODE
 
     # ── 현재 운용모드 조회 ───────────────────────────────────────────
