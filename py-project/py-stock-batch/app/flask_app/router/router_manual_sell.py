@@ -1,25 +1,23 @@
 """
-자동매매(AutoTrade) 화면 연동 — 매도 수기등록 전용 (2026-08-20, 2026-08-21 다건화).
+매도 수기등록 API — py-stock-batch 쪽 전담 (2026-08-20, 2026-08-21 다건화, 2026-10-11 prefix 분리).
 
-stock-vue 의 `/api/v1/auto-trade/*` 는 원래 이 저장소에 없는 별도 백엔드(ROOT
-서버, VITE_SERVER_URL)가 담당할 예정이었다(모드 설정·운용 상태·이력 등). 그중
-"매도 수기등록"만은 이미 이 저장소(app/trade_worker)에 완전히 구현돼 있어서
-(trade_worker_manual_sell, repository.py) ROOT 서버를 기다릴 이유가 없다 —
-그래서 이 블루프린트만 먼저 이 앱(py-stock-batch)에 실제로 얹는다.
-나머지 auto-trade 엔드포인트(모드/상태/이력)는 여전히 이 저장소 밖(ROOT)
-소관이라 stock-vue 는 그쪽은 계속 USE_MOCK=true 로 둔다(useAutoTrade.js 참고).
+운용모드·운용상태·변경이력(`/api/v1/auto-trade/*`)은 ROOT 서버(py-naver-stock-theme
+router_auto_trade.py)가 담당한다. 이 파일은 "매도 수기등록"만 맡는다 — 그 기능은
+이 저장소(app/trade_worker: trade_worker_manual_sell, repository.py)에 이미 완전히
+구현돼 있어서 ROOT 를 기다릴 이유가 없었다.
 
-2026-08-21 변경 2가지:
-  1) 등록 가능 조건을 "worker 가 직접 매수해 trade_worker_position 에 있는 종목"
-     에서 "계좌 실보유(user_holdings)에 있는 종목"으로 넓혔다 — HTS/MTS 로 직접
-     산 종목도 worker 가 편입(wallet_sync 주기 폴링)하기 전에 바로 등록할 수 있다.
-     실시간 감시 시작은 여전히 wallet_sync.reconcile_wallet 편입에 달려 있다
-     (등록 자체를 막지는 않는다 — sell_executor.reload_manual_sells 참고).
-  2) 종목당 1건(유저+종목 upsert)이었던 제약을 풀어 종목당 여러 지정가(사다리
-     매도)와 여러 종목 동시 등록을 허용했다(sql/09_manual_sell_multi_ddl.sql).
-     그래서 GET 은 이제 "지금 등록된 것 1건"이 아니라 유저의 등록 전체 목록을,
-     POST 는 upsert 가 아니라 매번 새 티어 생성을, cancel 은 stock_code 대신
-     manual_sell_id 로 특정 티어 하나만 취소한다.
+⚠ 2026-10-11 prefix 를 `/api/v1/auto-trade` → `/api/v1/manual-sell` 로 옮겼다.
+  두 앱이 **같은 prefix 에 blueprint 를 등록**해 놔서, nginx 가
+  `location ^~ /api/v1/auto-trade` 로 이 앱(5557)에 직결하는 순간 ROOT 앱의
+  `/modes`·`/state`·`/history` 가 전부 404 가 됐다. 그 결과 운용방식 설정·운용 현황
+  화면이 통째로 죽었다(원인 파악이 오래 걸렸다 — 매도 수기등록만 멀쩡해서
+  "서버는 살아있는데 두 화면만 안 된다"로 보였다). prefix 가 겹치지 않으면
+  프록시 규칙이 어느 쪽을 가리켜도 서로를 가리지 못한다.
+
+  구 경로(`/manual-sell`, `/manual-sell/cancel`)는 **deprecated alias 로 함께
+  등록해 둔다**. 앱(Capacitor)은 스토어 업데이트 전까지 구 번들이 기기에 남아
+  있어서, 서버만 바꾸면 기존 설치본의 매도 수기등록이 깨진다. 전체 사용자가
+  새 번들을 받은 뒤 alias 와 __init__.py 의 legacy 등록을 함께 지운다.
 
 인증 관련 주의:
   이 Flask 앱(runner.py)에는 JWT 디코드/사용자 식별 미들웨어가 전혀 없다
@@ -33,6 +31,18 @@ CORS 주의:
   runner.py 의 CORS 설정이 methods=['GET','POST','OPTIONS'] 뿐이라(PUT/DELETE
   없음) 여기서는 저장/취소도 모두 POST 로 받는다(REST 정석은 PUT/DELETE 지만
   이 앱 전체 CORS 설정을 건드리지 않기 위한 선택).
+
+2026-08-21 변경 2가지:
+  1) 등록 가능 조건을 "worker 가 직접 매수해 trade_worker_position 에 있는 종목"
+     에서 "계좌 실보유(user_holdings)에 있는 종목"으로 넓혔다 — HTS/MTS 로 직접
+     산 종목도 worker 가 편입(wallet_sync 주기 폴링)하기 전에 바로 등록할 수 있다.
+     실시간 감시 시작은 여전히 wallet_sync.reconcile_wallet 편입에 달려 있다
+     (등록 자체를 막지는 않는다 — sell_executor.reload_manual_sells 참고).
+  2) 종목당 1건(유저+종목 upsert)이었던 제약을 풀어 종목당 여러 지정가(사다리
+     매도)와 여러 종목 동시 등록을 허용했다(sql/09_manual_sell_multi_ddl.sql).
+     그래서 GET 은 이제 "지금 등록된 것 1건"이 아니라 유저의 등록 전체 목록을,
+     POST 는 upsert 가 아니라 매번 새 티어 생성을, cancel 은 stock_code 대신
+     manual_sell_id 로 특정 티어 하나만 취소한다.
 """
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -42,7 +52,7 @@ from flask import Blueprint, request
 from app.flask_app.utils.apiResponse import ApiResponse
 from app.trade_worker.repository import Repository
 
-auto_trade_bp = Blueprint("auto_trade", __name__)
+manual_sell_bp = Blueprint("manual_sell", __name__)
 _repo = Repository()
 
 
@@ -77,7 +87,7 @@ def _resolve_user_id():
         return None
 
 
-@auto_trade_bp.route("/holdings", methods=["GET"])
+@manual_sell_bp.route("/holdings", methods=["GET"])
 def get_holdings():
     """계좌 실보유(user_holdings) 목록 — LimitOrder.vue 의 "종목 선택"이 이 목록에서
     고르게 한다. worker 가 직접 매수한 것(trade_worker_position)으로 좁히지 않는다 —
@@ -92,7 +102,8 @@ def get_holdings():
     return ApiResponse.success(_jsonable(rows))
 
 
-@auto_trade_bp.route("/manual-sell", methods=["GET"])
+@manual_sell_bp.route("/orders", methods=["GET"])
+@manual_sell_bp.route("/manual-sell", methods=["GET"])   # deprecated alias (구 번들용)
 def get_manual_sell():
     """수기등록 전체 목록 조회 — LimitOrder.vue 가 화면을 채울 때 부른다.
     2026-08-21 다건화 이후로는 "지금 등록된 것 1건"이 아니라 유저의 등록 전체
@@ -108,7 +119,8 @@ def get_manual_sell():
     return ApiResponse.success(_jsonable(rows))
 
 
-@auto_trade_bp.route("/manual-sell", methods=["POST"])
+@manual_sell_bp.route("/orders", methods=["POST"])
+@manual_sell_bp.route("/manual-sell", methods=["POST"])   # deprecated alias (구 번들용)
 def save_manual_sell():
     """신규 티어 등록. LimitOrder.vue 의 저장 버튼 — 같은 종목이라도 항상 새 행을
     만든다(종목당 여러 지정가 허용). 등록 가능 조건은 계좌 실보유(user_holdings)
@@ -163,7 +175,8 @@ def save_manual_sell():
     return ApiResponse.success(_jsonable(row))
 
 
-@auto_trade_bp.route("/manual-sell/cancel", methods=["POST"])
+@manual_sell_bp.route("/orders/cancel", methods=["POST"])
+@manual_sell_bp.route("/manual-sell/cancel", methods=["POST"])   # deprecated alias (구 번들용)
 def cancel_manual_sell():
     """사용자 취소 — 종목당 여러 티어가 있을 수 있으므로 반드시 manual_sell_id 로
     특정 행 하나만 취소한다(같은 종목의 다른 티어는 건드리지 않는다)."""

@@ -94,6 +94,7 @@
 <script setup>
 import {
     fetchModes, fetchState, saveState, fetchHistory, formatNumber, formatDateTime,
+    apiErrorMessage,
 } from '@scripts/useAutoTrade.js';
 
 const router = useRouter();
@@ -106,7 +107,6 @@ const history = ref([]);
 const state = reactive({ active_mode: null, active_from: null, trading: false, last_message: null, positions: [] });
 const selected = ref('');
 
-const errMsg = (e, fallback) => e?.response?.data?.error?.message || e?.response?.data?.message || fallback;
 
 const load = async () => {
     try {
@@ -117,7 +117,7 @@ const load = async () => {
         selected.value = state.active_mode ?? '';
         loadError.value = '';
     } catch (e) {
-        loadError.value = errMsg(e, '운용모드 정보를 불러오지 못했습니다.');
+        loadError.value = apiErrorMessage(e, '운용모드 정보를 불러오지 못했습니다.');
     } finally {
         isLoading.value = false;
     }
@@ -141,9 +141,13 @@ const pick = (m) => { if (m.selectable) selected.value = m.mode_code; };
 const apply = async () => {
     const name = selectedMode.value?.mode_name;
     const held = positions.value.length;
+    // M0 안내는 sql/33(2026-10-11) 개정 내용을 따른다 — 신규 매수만 멈추고 보유분
+    // 매도(손절·익절·트레일링·수기등록 지정가)는 계속 돈다. 예전 문구는 "매도도 모두
+    // 멈춘다 / 손절선에 닿아도 팔지 않는다"로 정반대를 경고하고 있어서, 같은 화면
+    // 위쪽의 mode_desc 와 한 화면에서 서로 모순됐다.
     const msg = selectedIsHalt.value
-        ? `매매를 정지합니다.\n\n신규 매수뿐 아니라 손절·익절·지정가 매도도 모두 멈춥니다.`
-          + (held ? `\n보유 중인 ${held}종목은 손절선에 닿아도 팔지 않습니다.` : '')
+        ? `매매를 정지합니다.\n\n신규 매수만 멈춥니다. 보유 종목의 손절·익절·트레일링과 수기등록 지정가 매도는 그대로 계속됩니다.`
+          + (held ? `\n보유 중인 ${held}종목은 계속 감시·매도 대상입니다.` : '')
           + `\n\n계속할까요?`
         : `운용모드를 '${name}'로 바로 전환합니다.`
           + (held ? `\n보유 중인 ${held}종목은 새 모드의 매도 기준으로 관리됩니다.` : '')
@@ -156,13 +160,18 @@ const apply = async () => {
         if (res?.message) alert(res.message);
         await load();
     } catch (e) {
-        alert(errMsg(e, '운용모드를 바꾸지 못했습니다.'));
+        alert(apiErrorMessage(e, '운용모드를 바꾸지 못했습니다.'));
     } finally {
         isBusy.value = false;
     }
 };
 
-const goManualSell = () => router.push({ path: '/auto-trade/limit-order' });
+/* master_menu 에 등록된 실제 경로는 `/trade/limit-order` 다(menu_parents=Trade).
+ * 예전에는 `/auto-trade/limit-order` 로 보내고 있었는데 그 경로를 등록한 메뉴 행이
+ * 없어서 catchAll → NotFound 로 떨어졌다(2026-10-11). 같은 이유로
+ * components/AutoTrade/AutoTradeView.vue 는 어느 메뉴에도 매달려 있지 않은
+ * 사문화된 파일이고, 그 안의 탭 경로 3개도 전부 죽은 경로다. */
+const goManualSell = () => router.push({ path: '/trade/limit-order' });
 </script>
 
 <style scoped lang="scss">

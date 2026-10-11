@@ -4,6 +4,13 @@
 
         <div class="contents">
 
+            <!-- 조회 실패를 반드시 화면에 띄운다. 예전에는 load() 에 try/catch 가 없어
+                 403·404·500 이 나도 unhandled rejection 으로 조용히 끝나고, 모든 칸이
+                 초기값(-, 정지, 없음, 기록 없음)에 머물러 "데이터가 없는 화면"과
+                 구분되지 않았다 — 운용모드 API 가 프록시 설정 때문에 404 이던 기간
+                 동안 이 화면은 원인 단서를 전혀 보여주지 못했다(2026-10-11). -->
+            <p v-if="loadError" class="load-error">{{ loadError }}</p>
+
             <!-- ── 요약 ── -->
             <section class="summary">
                 <div class="sum-item">
@@ -98,7 +105,7 @@
 <script setup>
 import {
     fetchState, fetchHistory, simulateSell, resetPosition,
-    USE_MOCK, RUN_STATE_LABEL, formatNumber, formatDateTime,
+    USE_MOCK, RUN_STATE_LABEL, formatNumber, formatDateTime, apiErrorMessage,
 } from '@scripts/useAutoTrade.js';
 
 const ACTION_LABEL = {
@@ -116,11 +123,18 @@ const state = reactive({
 });
 const history = ref([]);
 const isBusy = ref(false);
+const loadError = ref('');
 
 const load = async () => {
-    const [st, hs] = await Promise.all([fetchState(), fetchHistory(30)]);
-    if (st) Object.assign(state, st);
-    history.value = hs;
+    try {
+        const [st, hs] = await Promise.all([fetchState(), fetchHistory(30)]);
+        if (st) Object.assign(state, st);
+        history.value = hs;
+        loadError.value = '';
+    } catch (e) {
+        console.error('[RunStatus] 운용 상태 조회 실패', e);
+        loadError.value = apiErrorMessage(e, '운용 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    }
 };
 onMounted(load);
 
@@ -181,6 +195,17 @@ $green: #1F7A3E;
     max-width: 900px;
     margin: 0 auto;
     padding: 24px 16px 120px;
+}
+
+.load-error {
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    background: $white;
+    border: 1px solid $gray-200;
+    border-left: 3px solid $red;
+    color: $gray-700;
+    font-size: .86rem;
+    line-height: 1.5;
 }
 
 .summary {

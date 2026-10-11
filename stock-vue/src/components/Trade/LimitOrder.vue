@@ -5,6 +5,9 @@
         <div class="contents">
             <section class="card">
                 <p v-if="loadingHoldings" class="empty-msg">불러오는 중...</p>
+                <!-- 조회 실패를 "보유 종목 없음"으로 보여주면 안 된다. 엔드포인트가
+                     404·500 이어도 예전에는 try/finally 만 있어서 빈 목록과 구분이 안 됐다. -->
+                <p v-else-if="loadError" class="empty-msg error">{{ loadError }}</p>
                 <p v-else-if="holdings.length === 0" class="empty-msg">계좌에 보유 중인 종목이 없습니다.</p>
 
                 <ul v-else class="holding-list">
@@ -115,7 +118,7 @@
 <script setup>
 import {
     fetchHoldings, fetchManualSells, addManualSell, cancelManualSell,
-    MANUAL_SELL_STATE_LABEL, formatNumber, formatDateTime,
+    MANUAL_SELL_STATE_LABEL, formatNumber, formatDateTime, apiErrorMessage,
 } from '@scripts/useAutoTrade.js';
 import {
     TRIGGER_LABEL, TRIGGER_DESC, triggerOf, pctVs, formatPct, pctClass,
@@ -125,6 +128,7 @@ import {
 const holdings = ref([]);
 const manualSells = ref([]);   // 유저의 수기등록 전체(모든 종목·모든 상태)
 const loadingHoldings = ref(false);
+const loadError = ref('');
 const isBusy = ref(false);
 const busyId = ref(null);
 const expanded = ref(null);
@@ -162,6 +166,10 @@ const load = async () => {
         const [h, m] = await Promise.all([fetchHoldings(), fetchManualSells()]);
         holdings.value = h ?? [];
         manualSells.value = m ?? [];
+        loadError.value = '';
+    } catch (e) {
+        console.error('[LimitOrder] 보유 종목·수기등록 조회 실패', e);
+        loadError.value = apiErrorMessage(e, '보유 종목을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
         loadingHoldings.value = false;
     }
@@ -315,6 +323,11 @@ $green: #1F7A3E;
     color: $gray-500;
     font-size: .84rem;
     padding: 16px 0;
+
+    &.error {
+        color: $red;
+        line-height: 1.5;
+    }
 }
 
 .holding-list {

@@ -37,7 +37,7 @@
   (reload_manual_sells 참고). 사용자가 "이 종목은 자동 rule 대신 이 가격에
   팔아달라"고 등록해두면 모드 전략보다 우선한다는 뜻. 등록 자체는 계좌 실보유
   (user_holdings)만 있으면 worker 자기매수 여부와 무관하게 할 수 있다
-  (router_auto_trade.py 참고) — 다만 실시간 판정 대상은 self.positions
+  (router_manual_sell.py 참고) — 다만 실시간 판정 대상은 self.positions
   (trade_worker_position HOLDING)에 있는 종목뿐이다. worker 가 직접 산 게
   아니어도(HTS/MTS 등 타채널 매수) wallet_sync.reconcile_wallet 이 주기적으로
   (WALLET_POLL_SEC, 기본 30초) 계좌 실보유를 대조해 자동 편입하므로(2026-08-21,

@@ -2,7 +2,7 @@
 푸시 디바이스 토큰 등록/해제 — Capacitor 앱이 FCM 토큰을 발급받으면 이
 엔드포인트로 올린다(usePushNotifications.js 참고).
 
-인증 관련 주의 (router_auto_trade.py 와 동일):
+인증 관련 주의 (router_manual_sell.py 와 동일):
   이 Flask 앱에는 JWT 디코드/사용자 식별 미들웨어가 전혀 없다. user_id/roles 는
   프런트가 로그인 세션에서 그대로 실어보낸다 — 이 앱의 기존 보안 수준(무인증
   내부망 batch-admin 서비스)을 그대로 따른다. 비로그인 상태(user_id=null)로도

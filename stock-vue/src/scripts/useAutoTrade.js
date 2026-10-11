@@ -17,9 +17,17 @@ import * as mock from './autoTradeMock.js';
 
 export const USE_MOCK = false;
 
+/* 모드·상태·이력 — ROOT 서버(py-naver-stock-theme). */
 const BASE = '/api/v1/auto-trade';
 
-/* 매도 수기등록은 py-stock-batch(app/flask_app/router/router_auto_trade.py)가
+/* 매도 수기등록 — py-stock-batch.
+ * 2026-10-11 까지 이쪽도 '/api/v1/auto-trade' 였다. 두 앱이 같은 prefix 를 쓰는 바람에
+ * nginx 가 그 prefix 를 batch 앱으로 직결하자 ROOT 의 /modes·/state·/history 가 전부
+ * 404 가 되어 운용방식 설정·운용 현황 화면이 죽었다. prefix 를 분리해 다시 겹치지
+ * 않게 한다(batch 쪽 라우트도 /manual-sell → /orders 로 바뀌었다). */
+const SELL_BASE = '/api/v1/manual-sell';
+
+/* 매도 수기등록은 py-stock-batch(app/flask_app/router/router_manual_sell.py)가
  * 직접 처리한다 — 이 앱 Flask 에는 JWT 인증 미들웨어가 없어(job_bp 포함 기존
  * 라우트 전부 무인증) user_id 를 프런트가 세션에서 직접 실어보낸다. */
 const currentUserId = () => {
@@ -69,21 +77,21 @@ export const saveState = async (mode_code) => {
 export const fetchHoldings = async () => {
     const user_id = currentUserId();
     if (!user_id) return [];   // 로그인 세션 없음 — 화면은 빈 목록으로 표시됨
-    const { data } = await batchApi.get(`${BASE}/holdings`, { params: { user_id } });
+    const { data } = await batchApi.get(`${SELL_BASE}/holdings`, { params: { user_id } });
     return data.data ?? [];
 };
 
 export const fetchManualSells = async () => {
     const user_id = currentUserId();
     if (!user_id) return [];   // 로그인 세션 없음 — 화면은 "미등록"으로 표시됨
-    const { data } = await batchApi.get(`${BASE}/manual-sell`, { params: { user_id } });
+    const { data } = await batchApi.get(`${SELL_BASE}/orders`, { params: { user_id } });
     return data.data ?? [];
 };
 
 export const addManualSell = async (payload) => {
     const user_id = currentUserId();
     if (!user_id) throw new Error('로그인 세션이 없습니다.');
-    const { data } = await batchApi.post(`${BASE}/manual-sell`, { ...payload, user_id });
+    const { data } = await batchApi.post(`${SELL_BASE}/orders`, { ...payload, user_id });
     return data.data ?? {};
 };
 
@@ -91,7 +99,7 @@ export const cancelManualSell = async (manual_sell_id) => {
     const user_id = currentUserId();
     if (!user_id) throw new Error('로그인 세션이 없습니다.');
     if (!manual_sell_id) throw new Error('취소할 등록 건을 찾을 수 없습니다.');
-    await batchApi.post(`${BASE}/manual-sell/cancel`, { user_id, manual_sell_id });
+    await batchApi.post(`${SELL_BASE}/orders/cancel`, { user_id, manual_sell_id });
 };
 
 /* ── 변경 이력 ── */
@@ -113,6 +121,23 @@ export const searchStocks = async (searchTxt) => {
 /* ── [MOCK 전용] 데모 조작 ── */
 export const simulateSell = async () => (USE_MOCK ? mock.mockSimulateSell() : null);
 export const resetPosition = async () => (USE_MOCK ? mock.mockResetPosition() : null);
+
+/**
+ * 에러 메시지 추출 — 화면 3종이 공유한다.
+ *
+ * aibeesApi/batchApi 의 response interceptor 는 `error.response?.data ?? error` 로
+ * **reject 한다**(aibeesApi.js). 즉 호출부가 받는 값은 axios 에러가 아니라 서버
+ * 본문 `{ success:false, error:{ message } }` 그 자체다. 그런데 화면들은
+ * `e.response.data.error.message` 를 보고 있어서 **항상 undefined → 기본 문구**로
+ * 떨어졌다. 그래서 403("자동매매 사용자만 이용할 수 있습니다.") 같은 서버 메시지가
+ * 한 번도 화면에 안 나왔다. 두 모양을 모두 받는다 — 404 처럼 본문이 HTML 인
+ * 경우에는 꺼낼 게 없으므로 fallback 을 쓴다.
+ */
+export const apiErrorMessage = (e, fallback) =>
+    e?.error?.message            // interceptor 가 벗겨서 준 서버 본문
+    || e?.response?.data?.error?.message   // 혹시 raw axios 에러로 온 경우
+    || e?.response?.data?.message
+    || fallback;
 
 /* ── 표시 헬퍼 ── */
 export const RUN_STATE_LABEL = {

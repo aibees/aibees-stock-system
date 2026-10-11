@@ -6,6 +6,16 @@ router_auto_trade.py — 운용모드 관리 (Blueprint url_prefix = /api/v1/aut
     PUT /state     운용모드 즉시 전환        body: { "mode_code": "M0" }
     GET /history   운용모드 변경 이력        ?limit=30
 
+⚠ 프록시 주의 (2026-10-11):
+    py-stock-batch 도 매도 수기등록 blueprint 를 갖고 있다. 그 쪽이 이 prefix
+    (`/api/v1/auto-trade`)에 등록돼 있던 동안, nginx 의
+    `location ^~ /api/v1/auto-trade { proxy_pass ...stock-batch-flask-app:5557; }`
+    가 `^~ /api/` 보다 우선해서 아래 3개 엔드포인트가 전부 404 였다 — 앱의
+    "운용방식 설정"·"운용 현황" 화면이 통째로 죽어 있었는데, 매도 수기등록만
+    batch 소관이라 정상이어서 서버 장애로 보이지 않았다.
+    batch 쪽을 `/api/v1/manual-sell` 로 옮겨 해결했다(stock-vue/conf.d/http.conf).
+    **이 prefix 를 batch 앱으로 보내는 location 블록을 다시 만들지 말 것.**
+
 설계 메모:
     - user_id 는 JWT 에서만 얻는다. 매매 사용자(WORKER_USER) 권한이 있어야 한다.
     - worker 는 active_mode 만 읽는다(평일 08~20시 설정 폴링 60초, 그 외엔 다음 개장 루틴 직전 반영).
