@@ -11,7 +11,7 @@ def _safe_int(v, default=0):
 
 from app.ext_services.kis.keyLoader import resolve_kis_creds
 from stock_shared.kis.client import create_pykis
-
+from stock_shared.kis.finance import build_fundamentals, fetch_annual_ratios, pick_settled_annual, to_db_strings
 
 class KisEngine:
     """KIS 실전투자 전용 엔진. (모의투자 미지원)"""
@@ -58,20 +58,13 @@ class KisEngine:
         })
 
     def get_finance_info(self, code: str):
-        """재무지표(eps/per/pbr/roe/peg) 조회 — 통합(UN) 우선, KRX(J) fallback."""
+        """재무지표(eps/per/pbr/roe/peg) 조회 — 현재가는 통합(UN) 우선, KRX(J) fallback.
+        ROE·PEG 는 재무비율(연간 확정 결산)에서 계산한다(stock_shared.kis.finance — 이전 계산 오류 수정)."""
         o = self._inquire_price(code)
         if o is None:
             return None
-        eps = float(o.get("eps") or 0)
-        per = float(o.get("per") or 0)
-        pbr = float(o.get("pbr") or 0)
-        return {
-            'eps': str(eps),
-            'per': str(per),
-            'pbr': str(pbr),
-            'roe': str(round(pbr / per, 2)) if per else '0',
-            'peg': str(round(per / eps, 2)) if eps else '0',
-        }
+        ratio = pick_settled_annual(fetch_annual_ratios(self.kis, code))
+        return to_db_strings(build_fundamentals(o.get("per"), o.get("pbr"), o.get("eps"), o.get("bps"), ratio))
 
     # ──────────────────────────────────────────────────────────────────
     # 현재가 조회 공용 헬퍼 (통합 우선 → KRX fallback).

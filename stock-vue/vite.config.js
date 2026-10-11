@@ -101,7 +101,9 @@ export default defineConfig(({ mode, command }) => {
   css: {
     preprocessorOptions: {
       scss: {
-        api: 'modern'
+        // Vite 4 는 Sass 의 구 JS API(render)로만 컴파일한다 — 'api: modern' 옵션은 Vite 5.4+ 에서만 먹고
+        // 여기서는 무시된다. Vite 를 올리기 전까지 구 API 경고만 끈다(다른 Sass 경고는 그대로 보인다).
+        silenceDeprecations: ['legacy-js-api']
       }
     }
   },

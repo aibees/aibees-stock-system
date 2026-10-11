@@ -27,37 +27,42 @@ export const fundamentalRows = (item) => {
     const roe = numOrNull(item.roe);
     const eps = numOrNull(item.eps);
     const peg = numOrNull(item.peg);
+    const growth = numOrNull(item.ntin_growth);   // 순이익 증가율(%) — 재무 탭(KIS 조회)에만 있다
 
     return [
         {
             label: 'PER', value: per === null ? null : `${per}배`,
             pass: per === null ? null : (per > 0 && per <= 15),
-            verdict: per === null ? '확인불가' : (per <= 0 ? '적자' : (per <= 15 ? '적합' : '높음')),
-            desc: per === null ? '주가수익비율 정보가 없습니다.' : `주가수익비율 ${per}배 · 15배 이하를 저평가 참고 기준으로 봅니다.`,
+            // 초보자용 표현: 기준선 이하 = 저평가, 초과 = 고평가
+            verdict: per === null ? '확인불가' : (per <= 0 ? '적자' : (per <= 15 ? '저평가' : '고평가')),
+            desc: per === null ? '주가수익비율 정보가 없습니다.' : '15배 이하를 저평가 참고 기준으로 봅니다.',
         },
         {
             label: 'PBR', value: pbr === null ? null : `${pbr}배`,
             pass: pbr === null ? null : (pbr > 0 && pbr <= 1),
-            verdict: pbr === null ? '확인불가' : (pbr <= 0 ? '확인불가' : (pbr <= 1 ? '적합' : '높음')),
-            desc: pbr === null ? '주가순자산비율 정보가 없습니다.' : `주가순자산비율 ${pbr}배 · 1배 이하를 저평가 참고 기준으로 봅니다.`,
+            verdict: pbr === null ? '확인불가' : (pbr <= 0 ? '확인불가' : (pbr <= 1 ? '저평가' : '고평가')),
+            desc: pbr === null ? '주가순자산비율 정보가 없습니다.' : '1배 이하를 저평가 참고 기준으로 봅니다.',
         },
         {
             label: 'ROE', value: roe === null ? null : `${roe}%`,
             pass: roe === null ? null : roe > 0,
             verdict: roe === null ? '확인불가' : (roe > 0 ? '적합' : '부적합'),
-            desc: roe === null ? '자기자본이익률 정보가 없습니다.' : `자기자본이익률 ${roe} · ${roe > 0 ? '이익을 내고 있습니다.' : '손실 상태입니다.'}`,
+            desc: roe === null ? '자기자본이익률 정보가 없습니다.' : (roe > 0 ? '이익을 내고 있습니다.' : '손실 상태입니다.'),
         },
         {
             label: 'EPS', value: eps === null ? null : `${formatNumber(eps)}원`,
             pass: eps === null ? null : eps > 0,
             verdict: eps === null ? '확인불가' : (eps > 0 ? '적합' : '부적합'),
-            desc: eps === null ? '주당순이익 정보가 없습니다.' : `주당순이익 ${formatNumber(eps)}원 · ${eps > 0 ? '흑자 기조입니다.' : '적자 상태입니다.'}`,
+            desc: eps === null ? '주당순이익 정보가 없습니다.' : (eps > 0 ? '흑자 기조입니다.' : '적자 상태입니다.'),
         },
         {
             label: 'PEG', value: peg === null ? null : `${peg}`,
             pass: peg === null ? null : (peg > 0 && peg <= 1),
             verdict: peg === null ? '확인불가' : (peg <= 0 ? '확인불가' : (peg <= 1 ? '적합' : '높음')),
-            desc: peg === null ? '이익성장 대비 주가 정보가 없습니다.' : `PEG ${peg} · 1 이하를 이익성장 대비 저평가 참고 기준으로 봅니다.`,
+            desc: peg !== null
+                ? '1 이하를 이익성장 대비 저평가 참고 기준으로 봅니다.'
+                : (eps !== null && eps <= 0 ? '적자라 PEG 를 계산하지 않습니다.'
+                    : (growth !== null && growth <= 0 ? `순이익이 줄어(${growth}%) PEG 를 계산하지 않습니다.` : '이익성장 대비 주가 정보가 없습니다.')),
         },
     ];
 };

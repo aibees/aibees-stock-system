@@ -1,6 +1,6 @@
 {
   "appId": "com.aibeesworld.stocks",
-  "appName": "AIbees Trading",
+  "appName": "양봉상회",
   "webDir": "dist",
   "server": {
     "url": "http://localhost:19010",

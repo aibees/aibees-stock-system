@@ -88,7 +88,8 @@
 
                 <ol class="perf-list">
                     <li v-for="(p, i) in perf.top_list" :key="p.stock_code">
-                        <button type="button" class="perf-row" @click="goToChart(p.stock_code)">
+                        <!-- 종목 상세(개별종목 메뉴)로. ymd 는 그 종목이 추천된 날 — 상세가 그날 매수타겟 행(근거·조건)을 찾는다 -->
+                        <button type="button" class="perf-row" @click="goToPerfStock(p)">
                             <span class="who">
                                 <span class="name-line">
                                     <span class="rank">{{ String(i + 1).padStart(2, '0') }}</span>
@@ -337,6 +338,10 @@ const heroAdVisible = computed(() => !isWorker.value && showAds.value && !isNati
 const goToStockInfo = (stock_code, stock_name) => {
     // ymd: 상세 화면이 같은 날짜의 매수타겟 행(근거·재무·조건)을 찾는 데 쓴다.
     router.push({ path: '/stock/info', query: { stock_code, stock_name, ymd: selectedDate.value.replaceAll('-', '') } });
+};
+// 추천 성과 종목 → 종목 상세. 선택된 날짜가 아니라 그 종목이 추천된 날(p.ymd) 기준으로 연다.
+const goToPerfStock = (p) => {
+    router.push({ path: '/stock/info', query: { stock_code: p.stock_code, stock_name: p.stock_name, ymd: String(p.ymd).replaceAll('-', '') } });
 };
 const goToChart = (stock_code) => {
     router.push({ path: '/stock/chart', query: { code: stock_code } });

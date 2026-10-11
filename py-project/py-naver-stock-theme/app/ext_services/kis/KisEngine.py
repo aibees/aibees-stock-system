@@ -11,11 +11,11 @@ from pykis.api.stock.quote import KisQuoteResponse
 from app.utils.constants.Literal import Literal
 from stock_shared.kis.client import create_pykis
 from stock_shared.kis.credentials import load_creds_from_db, load_creds_from_file
+from stock_shared.kis.finance import build_fundamentals, fetch_annual_ratios, pick_settled_annual, to_db_strings
 
 # 실투자 KIS 인증정보를 조회할 기본 user_detail.user_id.
 # user_id 를 명시하지 않은 기존 호출부(KisEngine(virtual=False)) 는 계속 이 계정을 쓴다.
 _KIS_USER_ID = 1
-
 
 class KisEngine:
     # 싱글톤 인스턴스 저장. 키는 (virtual, user_id) 다.
@@ -168,17 +168,19 @@ class KisEngine:
         return df
 
     def get_finance_info(self, code: str):
+        """재무지표(eps/per/pbr/roe/peg) — 저장 형식(문자열). MCP 서버가 쓴다."""
+        return to_db_strings(self.get_fundamentals(code))
+
+    def get_fundamentals(self, code: str) -> dict:
+        """
+        종목 재무지표(숫자). PER·PBR·EPS·BPS 는 현재가 시세, ROE·증가율·부채비율·PEG 는 재무비율(연간 확정 결산).
+        계산 규칙은 stock_shared.kis.finance (배치와 공용). 반환에 현재가(price)를 더한다.
+        """
         quote: KisQuoteResponse = self.kis.stock(symbol=code, market=self._resolve_market(code)).quote()
-        fin_info = quote.indicator
-
-        result = {
-            'eps': str(fin_info.eps),
-            'per': str(fin_info.per),
-            'pbr': str(fin_info.pbr),
-            'roe': str(round(fin_info.pbr / fin_info.per, 2)),
-            'peg': str(round(fin_info.per / fin_info.eps, 2))
-        }
-
+        ind = quote.indicator
+        ratio = pick_settled_annual(fetch_annual_ratios(self.kis, code))
+        result = build_fundamentals(ind.per, ind.pbr, ind.eps, ind.bps, ratio)
+        result['price'] = float(quote.price) if quote.price is not None else None
         return result
 
     # 종합 시황/공시(제목) [국내주식-141] — 전체 시황 피드를 주므로 stock_code(iscd1)로

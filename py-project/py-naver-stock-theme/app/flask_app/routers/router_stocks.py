@@ -8,6 +8,7 @@ from app.flask_app.routers.router_oauth import require_auth
 from app.flask_app.utils.apiResponse import ApiResponse
 from app.services.stocks.StockService import StockService
 from app.services.stocks.RecoPerformanceService import RecoPerformanceService
+from app.services.stocks.FinanceService import FinanceService
 from app.utils.constants.Literal import Literal
 
 stocks_bp = Blueprint("stocks", __name__)
@@ -18,6 +19,7 @@ masterStockDaoImpl = MasterStockDao()
 stockInvestorDaoImpl = StockInvestorDailyDao()
 stockServiceImpl = StockService()
 recoPerformanceServiceImpl = RecoPerformanceService()
+financeServiceImpl = FinanceService()
 
 # STOCKS ROUTE :: ROOT
 # ===============================================================================
@@ -150,6 +152,23 @@ def select_rec_recode_stock():
 
 # STOCKS ROUTE :: SELECT BY ID
 # ===============================================================================
+# STOCKS ROUTE :: 개별종목 재무지표 (재무 탭 진입 시) — KIS 현재가 + 재무비율(연간 확정 결산)
+#   GET /id/<code>/finance → {per, pbr, eps, bps, roe, peg, ntin_growth, sales_growth, op_growth, debt_ratio, settle_ym, price}
+#   운영자 KIS 키로 조회하므로 로그인 사용자만(호출 한도 보호). 같은 종목은 서버가 10분 기억한다.
+# ===============================================================================
+@stocks_bp.route("/id/<stock_code>/finance")
+@require_auth
+def select_stock_finance(stock_code):
+    if not (len(stock_code) == 6 and stock_code.isalnum()):
+        return ApiResponse.error("종목코드 형식이 아닙니다.")
+    try:
+        return ApiResponse.success(financeServiceImpl.get_fundamentals(stock_code))
+    except Exception as e:
+        logging.error(f"[stocks/finance] {stock_code}: {e}")
+        traceback.print_exc()
+        return ApiResponse.error("재무 지표를 불러오지 못했습니다.")
+
+
 @stocks_bp.route("/id/<stock_code>")
 def select_stocks_by_id(stock_code):
     param = {

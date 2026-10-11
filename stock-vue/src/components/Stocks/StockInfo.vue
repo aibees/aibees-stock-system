@@ -30,15 +30,15 @@
                         <div v-if="item" class="sh-status" :class="status.state"><i class="dot"></i>{{ status.label }}</div>
                     </section>
 
-                    <!-- ═══ 탭: 근거 / 재무 / 조건 ═══ -->
+                    <!-- ═══ 탭: 분석내용(재무+조건) / AI 견해 ═══ -->
                     <div class="tabs" role="tablist" aria-label="종목 상세">
                         <button v-for="t in TABS" :key="t.key" type="button" role="tab" class="tab-btn"
                             :class="{ on: tab === t.key }" :aria-selected="tab === t.key ? 'true' : 'false'" @click="tab = t.key">
-                            {{ t.label }}<em v-if="t.key === 'cond' && item"> {{ cond.pass }}/{{ cond.total }}</em>
+                            {{ t.label }}
                         </button>
                     </div>
 
-                    <!-- ───────────── 근거 탭 ───────────── -->
+                    <!-- ───────────── AI 견해 탭(기업개요·테마·뉴스·추천 이력) ───────────── -->
                     <div v-show="tab === 'basis'" class="tab-panel" role="tabpanel">
 
                     <!-- ① 기업개요 + 재무현황 (버튼 갱신, 실적발표월만) -->
@@ -70,7 +70,7 @@
                             :volume="item.volume" :close-label="status.state === 'live' ? '현재가' : '종가'" />
                     </section>
 
-                    <!-- 충족한 신호: 칩 나열 대신 체크 + 이름 + 한 줄 설명의 목록(전체 조건은 조건 탭) -->
+                    <!-- 충족한 신호: 칩 나열 대신 체크 + 이름 + 한 줄 설명의 목록(전체 조건은 분석내용 탭) -->
                     <section v-if="item" class="ai-result-section">
                         <div class="section-header">
                             <span class="section-title">충족한 신호</span>
@@ -85,7 +85,7 @@
                                 </div>
                             </li>
                         </ul>
-                        <p v-else class="muted">아직 충족한 신호가 없어요. 전체 조건은 조건 탭에서 볼 수 있어요.</p>
+                        <p v-else class="muted">아직 충족한 신호가 없어요. 전체 조건은 분석내용 탭에서 볼 수 있어요.</p>
                     </section>
                     <section v-else-if="itemLoaded" class="ai-result-section">
                         <p class="muted">이 날짜의 추천 목록에 없는 종목이라 차트 모양·신호 정보가 없어요.</p>
@@ -187,47 +187,60 @@
                         </div>
                     </section>
 
-                    </div><!-- /근거 탭 -->
+                    </div><!-- /AI 견해 탭 -->
 
-                    <!-- ───────────── 재무 탭 ───────────── -->
-                    <div v-show="tab === 'fin'" class="tab-panel" role="tabpanel">
-                        <template v-if="item">
-                            <div class="fin-grid">
-                                <div v-for="r in finRows" :key="r.label" class="fin-card">
-                                    <span class="fin-label">{{ r.label }}</span>
-                                    <span class="fin-value">{{ r.value ?? '-' }}</span>
-                                    <span class="verdict" :class="r.pass === true ? 'ok' : (r.pass === false ? 'ng' : 'na')">{{ r.verdict }}</span>
-                                    <span class="fin-desc">{{ r.desc }}</span>
+                    <!-- ───────────── 분석내용 탭: 재무 + 조건 ───────────── -->
+                    <div v-show="tab === 'analysis'" class="tab-panel" role="tabpanel">
+                        <section class="an-section">
+                            <!-- 기준: PER·PBR 은 현재가 ÷ 결산 EPS/BPS, ROE·증가율은 그 결산 기준(KIS 재무비율) -->
+                            <div class="an-head">
+                                <h3 class="an-title">재무</h3>
+                                <span v-if="fin" class="an-basis">{{ fin.settle_ym || '-' }} 결산 · 한국투자증권</span>
+                            </div>
+                            <template v-if="fin">
+                                <!-- 판별조건과 같은 체크 목록 — 저평가·적합(pass)이면 노란 체크 -->
+                                <ul class="cond-list fin-list">
+                                    <li v-for="r in finRows" :key="r.label" :class="{ ok: r.pass === true }">
+                                        <span class="mark" aria-hidden="true">{{ r.pass === true ? '✓' : '–' }}</span>
+                                        <div class="fin-body">
+                                            <div class="fin-line">
+                                                <span class="fin-label">{{ r.label }}</span>
+                                                <span class="fin-right">
+                                                    <span class="fin-value">{{ r.value ?? '-' }}</span>
+                                                    <span class="verdict" :class="r.pass === true ? 'ok' : (r.pass === false ? 'ng' : 'na')">{{ r.verdict }}</span>
+                                                </span>
+                                            </div>
+                                            <span class="fin-desc">{{ r.desc }}</span>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </template>
+                            <p v-else-if="finError" class="muted card-empty">
+                                {{ finError }} <button type="button" class="link-btn" @click="loadFin(stockDetail.code, true)">다시 시도</button>
+                            </p>
+                            <p v-else class="muted card-empty">불러오는 중입니다…</p>
+                        </section>
+
+                        <section class="an-section">
+                            <h3 class="an-title">판별조건</h3>
+                            <template v-if="item">
+                                <div class="cond-head">
+                                    <strong>조건 충족 {{ cond.pass }}/{{ cond.total }}개</strong>
                                 </div>
-                            </div>
-                            <!-- TODO: 기준 분기·출처 — 현재 API(buy-target)는 재무 지표의 기준 분기/출처를 내려주지 않는다.
-                                 필드가 생기면 이 문구를 "2026 2Q · DART" 같은 실제 값으로 교체. -->
-                            <p class="basis-note">{{ itemDateLabel }} 추천 산출 시점의 재무 지표예요. 일반적인 가치투자 기준선(PER 15배↓, PBR 1배↓ 등)으로 해석한 참고용입니다.</p>
-                        </template>
-                        <p v-else class="muted card-empty">{{ itemLoaded ? '이 날짜의 추천 목록에 없는 종목이라 재무 지표가 없어요.' : '불러오는 중입니다…' }}</p>
-                    </div>
-
-                    <!-- ───────────── 조건 탭 ───────────── -->
-                    <div v-show="tab === 'cond'" class="tab-panel" role="tabpanel">
-                        <template v-if="item">
-                            <div class="cond-head">
-                                <strong>조건 충족 {{ cond.pass }}/{{ cond.total }}개</strong>
-                                <div class="cond-bar" aria-hidden="true"><span :style="{ width: (cond.pass / cond.total * 100) + '%' }"></span></div>
-                            </div>
-                            <ul class="cond-list">
-                                <li v-for="r in condRows" :key="r.label" :class="{ ok: r.pass }">
-                                    <span class="mark" aria-hidden="true">{{ r.pass ? '✓' : '–' }}</span>
-                                    <div class="cond-body">
-                                        <div class="cond-name">{{ r.label }}<span class="cond-state">{{ r.pass ? '충족' : '미충족' }}</span></div>
-                                        <div class="cond-desc">{{ r.desc }}</div>
-                                    </div>
-                                </li>
-                            </ul>
-                            <!-- 점수는 장 마감 후 산출된다 — 값이 없으면 빈칸 대신 안내 -->
-                            <p v-if="!hasValue(item.score)" class="basis-note">종합 점수는 장 마감 후 산출됩니다.</p>
-                            <p v-else class="basis-note">종합 점수 {{ numOrNull(item.score) }} / 100</p>
-                        </template>
-                        <p v-else class="muted card-empty">{{ itemLoaded ? '이 날짜의 추천 목록에 없는 종목이라 조건 정보가 없어요.' : '불러오는 중입니다…' }}</p>
+                                <ul class="cond-list">
+                                    <li v-for="r in condRows" :key="r.label" :class="{ ok: r.pass }">
+                                        <span class="mark" aria-hidden="true">{{ r.pass ? '✓' : '–' }}</span>
+                                        <div class="cond-body">
+                                            <div class="cond-name">{{ r.label }}<span class="cond-state">{{ r.pass ? '충족' : '미충족' }}</span></div>
+                                            <div class="cond-desc">{{ r.desc }}</div>
+                                        </div>
+                                    </li>
+                                </ul>
+                                <!-- 점수는 장 마감 후 산출된다 — 값이 있을 때만 보여준다 -->
+                                <p v-if="hasValue(item.score)" class="basis-note">종합 점수 {{ numOrNull(item.score) }} / 100</p>
+                            </template>
+                            <p v-else class="muted card-empty">{{ itemLoaded ? '이 날짜의 추천 목록에 없는 종목이라 판별조건 정보가 없어요.' : '불러오는 중입니다…' }}</p>
+                        </section>
                     </div>
 
                     <p class="disclaimer">본 정보는 투자 권유가 아니며, 투자 판단의 책임은 투자자 본인에게 있습니다.</p>
@@ -269,11 +282,10 @@ const userSession = assUserSession();
  * 홈에서 들어오면 query.ymd 로 같은 날짜의 행을 찾고, 직접 검색해 들어오면 최신 배치일을 쓴다.
  * 그 날짜 추천 목록에 없는 종목이면 item 이 null — 해당 탭은 안내 문구를 보여준다. */
 const TABS = [
-    { key: 'basis', label: '근거' },
-    { key: 'fin',   label: '재무' },
-    { key: 'cond',  label: '조건' },
+    { key: 'analysis', label: '분석내용' },   // 재무 + 조건
+    { key: 'basis',    label: 'AI 견해' },     // 기업개요·테마·뉴스·추천 이력
 ];
-const tab = ref('basis');
+const tab = ref('analysis');
 const item = ref(null);
 const itemLoaded = ref(false);
 
@@ -285,7 +297,25 @@ const status = computed(() => {
 const chg = computed(() => (item.value ? changeInfo(item.value) : { cls: 'flat', text: '' }));
 const cond = computed(() => (item.value ? conditionCount(item.value) : { pass: 0, total: 0 }));
 const condRows = computed(() => (item.value ? technicalRows(item.value) : []));
-const finRows = computed(() => (item.value ? fundamentalRows(item.value) : []));
+/* ── 재무 탭: 진입할 때 KIS 에서 조회(추천 목록에 없는 종목도). 종목당 한 번 — 서버도 10분 기억한다. ── */
+const fin = ref(null);
+const finError = ref('');
+let finCode = null;
+const loadFin = async (code, force = false) => {
+    if (!code || (!force && finCode === code)) return;
+    finCode = code;
+    fin.value = null;
+    finError.value = '';
+    try {
+        const { data } = await aibeesApi.get(`/api/v1/stocks/id/${encodeURIComponent(code)}/finance`);
+        if (!data?.success) throw new Error(data?.error?.message);
+        if (finCode === code) fin.value = data.data;
+    } catch (e) {
+        if (finCode === code) finError.value = e?.response?.data?.error?.message || e?.message || '재무 지표를 불러오지 못했어요.';
+    }
+};
+watch(tab, (t) => { if (t === 'analysis') loadFin(stockDetail.value?.code); });
+const finRows = computed(() => (fin.value ? fundamentalRows(fin.value) : []));
 const passedSignals = computed(() => condRows.value.filter(r => r.pass));
 const itemDateLabel = computed(() => {
     const y = item.value?.ymd;
@@ -397,7 +427,11 @@ const goToChart = () => {
 const stockSearchHandler = (code) => {
     if (!code) return;
     stockDetail.value = { code };
-    tab.value = 'basis';
+    tab.value = 'analysis';
+    finCode = null;      // 종목이 바뀌면 재무를 새로 조회(첫 탭이 분석내용이라 바로 부른다)
+    fin.value = null;
+    finError.value = '';
+    loadFin(code);
     loadItem(code);
     overview.value = null;
     theme.value = null;
@@ -1144,8 +1178,10 @@ $yb-down:   #1F5BD1;
 
 /* ── 탭 ── */
 .tabs {
+    // 탭 개수만큼 전체 폭을 똑같이 나눈다(오른쪽 빈칸 없이)
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     border-bottom: 1px solid $yb-line-2;
     margin-top: 4px;
 
@@ -1168,11 +1204,18 @@ $yb-down:   #1F5BD1;
     }
 }
 .tab-panel { display: flex; flex-direction: column; gap: 12px; }
+// 분석내용 탭: 재무 / 조건 두 묶음 — 카드 없이 소제목 + 구분선으로 나눈다
+.an-section { display: flex; flex-direction: column; gap: 10px; }
+.an-section + .an-section { margin-top: 8px; padding-top: 16px; border-top: 1px solid #EFE2BC; }
+.an-title { margin: 0; font-size: 15px; font-weight: 700; color: #2B1D14; }
+.an-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.an-basis { font-size: 11px; color: #7A6B5D; white-space: nowrap; }
 // 탭 밑줄 바로 아래라 첫 섹션의 위쪽 구분선은 겹쳐 보인다 — 빼고 간격만 둔다
 .tab-panel > section:first-child { border-top: 0; padding-top: 6px; }
 
 .muted { margin: 0; font-size: 13px; color: $yb-sub; line-height: 1.5; }
 .card-empty { padding: 28px 0; text-align: center; }
+.link-btn { margin-left: 6px; padding: 0; border: 0; background: none; color: #7A4423; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 
 /* ── 봉 모양: DayCandle 의 자체 테두리 박스는 이 화면에서만 걷어낸다(카드 최소화) ── */
 // 루트 요소에는 부모 scope 속성이 붙으므로 :deep 없이 잡힌다. 섹션 클래스를 앞에 둬 DayCandle 자체 규칙보다 우선.
@@ -1206,22 +1249,17 @@ $yb-down:   #1F5BD1;
     .sig-desc { margin-top: 2px; font-size: 13px; line-height: 1.5; color: $yb-sub; }
 }
 
-/* ── 재무 탭: 2열 지표 카드 ── */
-.fin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 20px; }   // 위쪽 선은 탭 밑줄이 대신한다
-.fin-card {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 14px 0;
-    border-bottom: 1px solid $yb-line;
-
-    .fin-label { font-size: 12px; font-weight: 700; color: $yb-sub; }
-    .fin-value { font-size: 20px; font-weight: 700; }
-    .fin-desc { font-size: 12px; line-height: 1.45; color: $yb-sub; }
-}
+/* ── 분석내용 탭 · 재무: 판별조건(.cond-list)과 같은 체크 목록. 한 줄에 "지표명 | 값 + 판정", 그 아래 작은 설명 ── */
+.fin-list li { padding: 10px 0; align-items: start; }
+.fin-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fin-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 24px; }
+.fin-label { font-size: 14px; font-weight: 700; color: $yb-ink; }
+.fin-right { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.fin-value { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fin-desc { font-size: 11px; line-height: 1.4; color: $yb-sub; }
 // 판정은 색만이 아니라 글자("적합/높음/…")로도 구분한다
 .verdict {
-    align-self: flex-start;
+    flex-shrink: 0;
     padding: 2px 8px;
     border-radius: 999px;
     font-size: 12px;
@@ -1232,15 +1270,13 @@ $yb-down:   #1F5BD1;
 }
 .basis-note { margin: 0; font-size: 12px; line-height: 1.5; color: #7A6B5D; }
 
-/* ── 조건 탭: 체크리스트 ── */
+/* ── 분석내용 탭 · 조건: 체크리스트 ── */
 .cond-head {
     display: flex;
     flex-direction: column;
     gap: 8px;
     padding: 4px 0 2px;
     strong { font-size: 15px; }
-    .cond-bar { height: 8px; border-radius: 4px; background: #F1E6C8; overflow: hidden;
-        span { display: block; height: 100%; background: $yb-yellow; } }
 }
 .cond-list {
     margin: 0;

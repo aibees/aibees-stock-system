@@ -31,13 +31,16 @@
         </div>
     </nav>
 
-    <!-- ── Mobile: 하단 탭 바 (홈 / 종목 / 차트 / [트레이드] / 메뉴) ──
+    <!-- ── Mobile: 하단 탭 바 (홈 / 분석 / 매수추천 / 차트 / [트레이드] / 메뉴) ──
          권한이 없는 탭은 그리지 않는다(access.paths — 서버가 내려준 접근 가능 경로). -->
     <nav id="comm-lnb" aria-label="주요 메뉴">
         <a v-for="t in visibleTabs" :key="t.key" class="tab" :class="{ active: isTabActive(t) }"
             :href="t.path" :aria-current="isTabActive(t) ? 'page' : undefined" @click.prevent="goPath(t.path)">
             <svg v-if="t.key === 'home'" width="24" height="24" viewBox="0 0 24 24" :fill="isTabActive(t) ? '#F6C445' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>
-            <svg v-else-if="t.key === 'stocks'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>
+            <!-- 분석: 돋보기 안에 작은 막대그래프(차트 탭의 꺾은선과 구분) -->
+            <svg v-else-if="t.key === 'stocks'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7"></circle><path d="M21 21l-5.5-5.5"></path><path d="M7.5 13v-2M10.5 13V8M13.5 13v-3" stroke-width="1.8"></path></svg>
+            <!-- 매수추천: 과녁(매수 타겟) -->
+            <svg v-else-if="t.key === 'reco'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="4.5"></circle><circle cx="12" cy="12" r="1" fill="currentColor"></circle></svg>
             <svg v-else-if="t.key === 'chart'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-5 4 3 8-8"></path><path d="M15 7h5v5"></path></svg>
             <svg v-else-if="t.key === 'menu'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
             <svg v-else-if="t.key === 'trade'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4"></path></svg>
@@ -59,7 +62,8 @@ const userSession = assUserSession();
 /* ── 하단 탭바 ── */
 const TABS = [
     { key: 'home',   label: '홈',      path: '/home',              match: ['/home'] },
-    { key: 'stocks', label: '종목',    path: '/stock/buy-target',  match: ['/stock/buy-target', '/stock/info'] },
+    { key: 'stocks', label: '분석',    path: '/stock/info',        match: ['/stock/info'] },          // 개별종목
+    { key: 'reco',   label: '매수추천', path: '/stock/buy-target',  match: ['/stock/buy-target'] },
     { key: 'chart',  label: '차트',    path: '/stock/chart',       match: ['/stock/chart'] },
     // 트레이드(매매 대시보드): WORKER_USER(매매 사용자) 전용 — 권한이 없으면 탭 자체를 그리지 않는다.
     { key: 'trade',  label: '트레이드', path: '/trade',             match: ['/trade'], role: WORKER_ROLE },

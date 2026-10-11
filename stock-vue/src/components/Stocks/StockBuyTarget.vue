@@ -565,14 +565,14 @@ $blue:     #7A4423;
 // 등락: 색뿐 아니라 ▲/▼ 기호를 함께 쓴다(넓은 화면은 절대값까지)
 .chg {
     font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
     .chg-full { display: none; }
     @media (min-width: 640px) {
         font-size: 13px;
         .chg-full { display: inline; }
         .chg-short { display: none; }
     }
-    font-weight: 600;
-    white-space: nowrap;
     &.up   { color: $up; }
     &.down { color: $down; }
     &.flat { color: $sub; }
