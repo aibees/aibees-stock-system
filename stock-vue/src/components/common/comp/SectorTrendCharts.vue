@@ -54,6 +54,11 @@ const C_GRID = '#F3EAD2';
 const C_ZERO = '#D9C9A3';
 const C_TICK = '#7A6B5D';
 
+// 순매수 막대: 두께 BAR_PX, 외국인·기관 사이 BAR_GAP_PX. 좁은 화면에선 칸에 맞춰 줄어든다.
+const BAR_PX = 24;
+const BAR_GAP_PX = 2;
+const CAT_PCT_MAX = 0.72;   // 날짜 칸에서 막대 묶음이 쓰는 최대 비율(나머지는 날짜 사이 여백)
+
 const lineRef = ref(null);
 const barRef = ref(null);
 let lineChart = null;
@@ -117,15 +122,16 @@ const render = () => {
             labels: days.value.map(shortYmd),
             datasets: [
                 { label: '외국인', data: props.trend.map(t => eok(t.frgn_amt)), raw: props.trend.map(t => t.frgn_amt),
-                  backgroundColor: C_FRGN, borderRadius: 4, maxBarThickness: 14 },
+                  backgroundColor: C_FRGN, borderRadius: 4, maxBarThickness: BAR_PX },
                 { label: '기관', data: props.trend.map(t => eok(t.orgn_amt)), raw: props.trend.map(t => t.orgn_amt),
-                  backgroundColor: C_ORGN, borderRadius: 4, maxBarThickness: 14 },
+                  backgroundColor: C_ORGN, borderRadius: 4, maxBarThickness: BAR_PX },
             ],
         },
         options: {
             responsive: true, maintainAspectRatio: false, animation: false,
             interaction: { mode: 'index', intersect: false },
-            datasets: { bar: { categoryPercentage: 0.6, barPercentage: 0.85 } },   // 막대 사이 틈
+            datasets: { bar: { categoryPercentage: CAT_PCT_MAX, barPercentage: 0.96 } },   // 실제 값은 fitBars 가 너비에 맞춰 정한다
+            onResize: () => setTimeout(fitBars, 0),   // 리사이즈 직후 Chart.js 가 레이아웃을 다시 잡은 다음에 맞춘다
             scales: { x: xScale, y: yScale(v => (Math.abs(v) >= 10000 ? `${(v / 10000).toLocaleString()}조` : `${v.toLocaleString()}억`)) },
             plugins: {
                 legend: { display: false },
@@ -133,6 +139,32 @@ const render = () => {
             },
         },
     });
+    fitBars();
+};
+
+/* 막대 간격을 화면 너비와 무관하게 유지한다.
+ *   Chart.js 는 막대 자리를 '날짜 칸 × 비율'로 잡고 두께만 maxBarThickness 로 자른다. 그래서 PC 처럼 칸이 넓으면
+ *   두께는 24px 에서 멈추는데 두 막대의 자리는 계속 벌어져 외국인·기관 사이가 20px 넘게 뜬다.
+ *   → 실제 칸 너비를 보고, 묶음 폭이 (두께×2 + 틈) 이 되도록 비율을 다시 계산한다. */
+const fitBars = () => {
+    const area = barChart?.chartArea;
+    const n = barChart?.data.labels.length;
+    if (!area || !n) return;
+    // 막대 한 개의 자리(slot) = 두께 + 틈. Chart.js 는 slot 안에서 두께 = slot × barPercentage 로 가운데 놓으므로
+    // 이웃한 외국인·기관 막대 사이 틈 = slot − 두께.
+    const catW = (area.right - area.left) / n;
+    const groupW = (BAR_PX + BAR_GAP_PX) * 2;
+    const wide = groupW / catW < CAT_PCT_MAX;
+    const slot = wide ? BAR_PX + BAR_GAP_PX : (catW * CAT_PCT_MAX) / 2;
+    const bar = barChart.options.datasets.bar;
+    const next = {
+        categoryPercentage: wide ? groupW / catW : CAT_PCT_MAX,
+        barPercentage: 1 - BAR_GAP_PX / slot,
+    };
+    if (Math.abs(bar.categoryPercentage - next.categoryPercentage) < 1e-3
+        && Math.abs(bar.barPercentage - next.barPercentage) < 1e-3) return;
+    Object.assign(bar, next);
+    barChart.update('none');
 };
 
 onMounted(render);
