@@ -50,6 +50,26 @@ class MasterStockDao(BaseDao):
         ).all()
         return {code: shares for code, shares in rows if shares}
 
+    def select_std_idst_map(self, session) -> dict:
+        """{stock_code: (std_idst_clsf_cd, std_idst_clsf_name)} — 이미 받아 둔 KSIC (종목마스터 재적재 전 보관용)."""
+        rows = session.execute(
+            select(MasterStock.stock_code, MasterStock.std_idst_clsf_cd, MasterStock.std_idst_clsf_name)
+            .where(MasterStock.std_idst_clsf_cd.isnot(None))
+        ).all()
+        return {code: (cd, name) for code, cd, name in rows}
+
+    def select_sector_stocks(self, session) -> list:
+        """업종 화면용 현물(group_code='ST') 종목 — 코드·이름·시장·상장주식수·지수업종."""
+        rows = session.execute(
+            select(MasterStock.stock_code, MasterStock.stock_name, MasterStock.stock_type,
+                   MasterStock.listed_shares,
+                   MasterStock.idx_bztp_lcls_cd, MasterStock.idx_bztp_lcls_name,
+                   MasterStock.idx_bztp_mcls_cd, MasterStock.idx_bztp_mcls_name,
+                   MasterStock.idx_bztp_src)
+            .where(MasterStock.group_code == "ST")
+        ).mappings().all()
+        return [dict(r) for r in rows]
+
     def select_all_stocks(self, session) -> list:
         """전체 종목 조회 (stock_code 오름차순)."""
         stmt = select(MasterStock).order_by(MasterStock.stock_code)
@@ -103,7 +123,8 @@ class MasterStockDao(BaseDao):
         """
         bulk insert.
         dict 키: corp_code, stock_code, stock_name, stock_type,
-                 stock_type_yf, group_code, market_stop, admin_issue, trading_halt, listed_shares
+                 stock_type_yf, group_code, market_stop, admin_issue, trading_halt, listed_shares,
+                 idx_bztp_{lcls,mcls,scls}_{cd,name}, idx_bztp_src, std_idst_clsf_cd, std_idst_clsf_name
         """
         if not data:
             return 0

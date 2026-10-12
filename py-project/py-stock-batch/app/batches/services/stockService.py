@@ -153,8 +153,12 @@ class StockService:
         return self.tradeBuyTargetStockDaoImpl.select_recent_codes(session, from_ymd, to_ymd)
 
     def evaluate_financials(self, key, value_str):
+        # 2026-10-11 재무지표 계산 수정 이후 값이 없으면 None 으로 저장된다(PEG: 순이익 증가율 ≤ 0 등).
+        #   None.replace 로 AttributeError 가 나서 10/12 StockBuyCheckJob 이 메일 단계에서 FAIL 처리됐다.
+        if value_str is None or str(value_str).strip() == '':
+            return "-"
         try:
-            val = float(value_str.replace('%', '').replace(',', ''))
+            val = float(str(value_str).replace('%', '').replace(',', ''))
             if key == 'eps':
                 is_good = val > 0
             elif key == 'per':
@@ -296,11 +300,11 @@ class StockService:
                                 <th style="border-bottom: 1px solid #eee;">PEG</th>
                             </tr>
                             <tr style="height: 30px;">
-                                <td>{fin.get('eps')}<br>{self.evaluate_financials('eps', fin.get('eps'))}</td>
-                                <td>{fin.get('per')}<br>{self.evaluate_financials('per', fin.get('per'))}</td>
-                                <td>{fin.get('pbr')}<br>{self.evaluate_financials('pbr', fin.get('pbr'))}</td>
-                                <td>{fin.get('roe')}<br>{self.evaluate_financials('roe', fin.get('roe'))}</td>
-                                <td>{fin.get('peg')}<br>{self.evaluate_financials('peg', fin.get('peg'))}</td>
+                                <td>{fin.get('eps') if fin.get('eps') is not None else '-'}<br>{self.evaluate_financials('eps', fin.get('eps'))}</td>
+                                <td>{fin.get('per') if fin.get('per') is not None else '-'}<br>{self.evaluate_financials('per', fin.get('per'))}</td>
+                                <td>{fin.get('pbr') if fin.get('pbr') is not None else '-'}<br>{self.evaluate_financials('pbr', fin.get('pbr'))}</td>
+                                <td>{fin.get('roe') if fin.get('roe') is not None else '-'}<br>{self.evaluate_financials('roe', fin.get('roe'))}</td>
+                                <td>{fin.get('peg') if fin.get('peg') is not None else '-'}<br>{self.evaluate_financials('peg', fin.get('peg'))}</td>
                             </tr>
                             <tr style="height: 30px;">
                                 <td style="border-bottom: 1px solid #eee;">주당순이익<br>00.0 이상</td>

@@ -117,10 +117,11 @@ const ICON = {
     shield:  'M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z',
     user:    'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c0-4 3.6-6 8-6s8 2 8 6',
     route:   'M6 3v12M18 9v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+    grid:    'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
     dot:     'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
 };
 const ICON_BY_CODE = {
-    StockBuyTarget: 'star', StockInfo: 'list', ChartStock: 'chart', ChartTheme: 'chart', StockThemeDetail: 'list',
+    StockBuyTarget: 'star', StockInfo: 'list', StockSector: 'grid', ChartStock: 'chart', ChartTheme: 'chart', StockThemeDetail: 'list',
     WorldIndicators: 'globe',
     AutoTradeMode: 'sliders', TradeBuySetting: 'up', TradeSetting: 'down', AutoTradeLimit: 'clock',
     AutoTradeStatus: 'pulse', TradeSimulation: 'pulse',

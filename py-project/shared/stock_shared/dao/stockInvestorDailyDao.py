@@ -3,6 +3,7 @@ stock_investor_daily DAO — 종목별 투자자 순매수(일별).
 
 적재: py-stock-batch StockInvestorJob (07:10, KIS FHKST01010900)
 조회: py-naver-stock-theme GET /api/v1/stocks/id/<code> (종목 화면의 '전일 수급')
+      py-naver-stock-theme GET /api/v1/stocks/sectors (업종 화면 — 종가 두 영업일로 등락률, 순매수 합계)
 """
 from datetime import datetime, timedelta
 
@@ -61,6 +62,22 @@ class StockInvestorDailyDao:
         for r in rows:
             latest.setdefault(r.stock_code, r.to_dict())   # ymd 내림차순이라 첫 행이 최신
         return latest
+
+    def select_recent_ymds(self, session, max_ymd: str = None, n: int = 2) -> list:
+        """max_ymd(포함, 미지정이면 전체) 이하 적재된 영업일 n 개, 최신순."""
+        stmt = select(StockInvestorDaily.ymd).distinct()
+        if max_ymd:
+            stmt = stmt.where(StockInvestorDaily.ymd <= max_ymd)
+        return list(session.execute(stmt.order_by(StockInvestorDaily.ymd.desc()).limit(n)).scalars())
+
+    def select_by_ymds(self, session, ymds: list) -> list:
+        """해당 영업일들의 전 종목 행(dict)."""
+        if not ymds:
+            return []
+        rows = session.execute(
+            select(StockInvestorDaily).where(StockInvestorDaily.ymd.in_(ymds))
+        ).scalars().all()
+        return [r.to_dict() for r in rows]
 
     def select_latest(self, session, stock_code: str):
         """종목의 가장 최근 영업일 행(dict) 또는 None."""

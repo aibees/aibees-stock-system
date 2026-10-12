@@ -28,6 +28,19 @@ class MasterStock(Base):
     # 상장주식수(주) — 같은 .mst 의 '상장주수'(천주) ×1000 (sql/31_stock_market_cap_investor.sql).
     # 시가총액은 이 값 × 직전 영업일 종가(stock_investor_daily)로 API 에서 계산한다.
     listed_shares = Column(BigInteger, nullable=True)
+    # KRX 지수업종 대/중/소분류 — 같은 .mst 에서 코드, 업종코드 마스터(idxcode.mst)에서 이름
+    #   (sql/34_master_stock_idx_bztp.sql). KIS search-stock-info 의 idx_bztp_*_cd 와 같은 값. '0000' 은 NULL.
+    #   종목 그룹핑 키: 중분류명 우선, 없으면 대분류명.
+    #   .mst 에 업종이 없는 현물은 KIS 표준산업분류(KSIC)로 매핑해 채운다(idx_bztp_src='KSIC').
+    idx_bztp_lcls_cd = Column(String(4), nullable=True)
+    idx_bztp_lcls_name = Column(String(40), nullable=True)
+    idx_bztp_mcls_cd = Column(String(4), nullable=True)
+    idx_bztp_mcls_name = Column(String(40), nullable=True)
+    idx_bztp_scls_cd = Column(String(4), nullable=True)
+    idx_bztp_scls_name = Column(String(40), nullable=True)
+    idx_bztp_src = Column(String(4), nullable=True)        # 'MST' / 'KSIC'
+    std_idst_clsf_cd = Column(String(6), nullable=True)    # KSIC 매핑 종목만 (재적재 시 재호출 방지용)
+    std_idst_clsf_name = Column(String(60), nullable=True)
 
     def to_dict(self):
         return {
@@ -44,4 +57,13 @@ class MasterStock(Base):
             "admin_issue": self.admin_issue,
             "trading_halt": self.trading_halt,
             "listed_shares": self.listed_shares,
+            "idx_bztp_lcls_cd": self.idx_bztp_lcls_cd,
+            "idx_bztp_lcls_name": self.idx_bztp_lcls_name,
+            "idx_bztp_mcls_cd": self.idx_bztp_mcls_cd,
+            "idx_bztp_mcls_name": self.idx_bztp_mcls_name,
+            "idx_bztp_scls_cd": self.idx_bztp_scls_cd,
+            "idx_bztp_scls_name": self.idx_bztp_scls_name,
+            "idx_bztp_src": self.idx_bztp_src,
+            "std_idst_clsf_cd": self.std_idst_clsf_cd,
+            "std_idst_clsf_name": self.std_idst_clsf_name,
         }

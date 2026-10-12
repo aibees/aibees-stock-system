@@ -138,6 +138,33 @@ class KisEngine:
         return rows
 
     # ──────────────────────────────────────────────────────────────────
+    # 주식기본조회(CTPF1002R, search-stock-info) — 표준산업분류(KSIC)
+    #   StockCodeMasterJob 이 .mst 에 지수업종이 비어 있는 종목(KOSDAQ IT·SW 등)을
+    #   KSIC 대분류로 KRX 업종에 맞춰 넣을 때만 쓴다.
+    #   ※ 같은 응답의 idx_bztp_*_cd 는 .mst 와 다른 옛 체계(KOSDAQ MID 300 …)이고 대부분 비어 있어 쓰지 않는다.
+    #   반환: (std_idst_clsf_cd, std_idst_clsf_cd_name) 예) ('105802', '소프트웨어 개발 및 공급업'). 실패 시 None.
+    # ──────────────────────────────────────────────────────────────────
+    def get_std_industry(self, code: str):
+        try:
+            resp = self.kis.request(
+                "/uapi/domestic-stock/v1/quotations/search-stock-info",
+                method="GET",
+                params={"PRDT_TYPE_CD": "300", "PDNO": code},
+                headers={"tr_id": "CTPF1002R", "custtype": "P"},
+                appkey_location="header", auth=True,
+            )
+            j = resp.json()
+        except Exception as e:
+            print(f"[get_std_industry] {code} 요청 실패: {e}", flush=True)
+            return None
+        if j.get("rt_cd") != "0":
+            print(f"[get_std_industry] {code} rt_cd={j.get('rt_cd')} msg={j.get('msg1')}", flush=True)
+            return None
+        o = j.get("output") or {}
+        cd = (o.get("std_idst_clsf_cd") or "").strip()
+        return (cd, (o.get("std_idst_clsf_cd_name") or "").strip()) if cd else None
+
+    # ──────────────────────────────────────────────────────────────────
     # 타임프레임(FID_PERIOD_DIV_CODE)별 조회 파라미터.
     #   이 API 는 1회 100행 제한이라, 윈도우 폭을 '봉 100개 이내'가 되는
     #   캘린더일로 잡아야 한다. 봉 1개가 덮는 기간이 D/W/M 마다 달라서 상수도 갈린다.

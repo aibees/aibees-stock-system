@@ -9,6 +9,7 @@ from app.flask_app.utils.apiResponse import ApiResponse
 from app.services.stocks.StockService import StockService
 from app.services.stocks.RecoPerformanceService import RecoPerformanceService
 from app.services.stocks.FinanceService import FinanceService
+from app.services.stocks.SectorService import SectorService, MARKETS
 from app.utils.constants.Literal import Literal
 
 stocks_bp = Blueprint("stocks", __name__)
@@ -20,6 +21,7 @@ stockInvestorDaoImpl = StockInvestorDailyDao()
 stockServiceImpl = StockService()
 recoPerformanceServiceImpl = RecoPerformanceService()
 financeServiceImpl = FinanceService()
+sectorServiceImpl = SectorService()
 
 # STOCKS ROUTE :: ROOT
 # ===============================================================================
@@ -149,6 +151,39 @@ def select_rec_recode_stock():
         logging.error(str(e))
         traceback.print_exc()
         return ApiResponse.error(str(e)[:255])
+
+# STOCKS ROUTE :: 업종 (테마 화면 대체) — KRX 지수업종별 등락률·수급 (SectorService 참고)
+#   GET /sectors?ymd=YYYYMMDD                  → {ymd, prev_ymd, sectors:[{market, sector_cd, sector_name, parent_name,
+#                                                  stock_count, chg_rate, up_count, down_count, flat_count,
+#                                                  market_cap(억), frgn_amt, orgn_amt, prsn_amt(백만원), leaders}]}
+#   GET /sectors/<KOSPI|KOSDAQ>/<sector_cd>?ymd= → {ymd, prev_ymd, sector:{…, stocks:[종목별 종가·등락률·시총·순매수]}}
+#   ymd 생략 시 수급이 적재된 가장 최근 영업일. 미분류 업종 코드는 '0000'.
+# ===============================================================================
+@stocks_bp.route('/sectors')
+def select_sectors():
+    try:
+        return ApiResponse.success(sectorServiceImpl.get_sectors(g.db, request.args.get(Literal.YMD) or None))
+    except Exception as e:
+        logging.error(f"[stocks/sectors] {e}")
+        traceback.print_exc()
+        return ApiResponse.error("업종 정보를 불러오지 못했습니다.")
+
+
+@stocks_bp.route('/sectors/<market>/<sector_cd>')
+def select_sector_detail(market, sector_cd):
+    market = market.upper()
+    if market not in MARKETS or not (len(sector_cd) == 4 and sector_cd.isdigit()):
+        return ApiResponse.error("업종 코드 형식이 아닙니다.")
+    try:
+        result = sectorServiceImpl.get_sector_detail(g.db, market, sector_cd, request.args.get(Literal.YMD) or None)
+        if result is None:
+            return ApiResponse.error("해당 업종이 없습니다.")
+        return ApiResponse.success(result)
+    except Exception as e:
+        logging.error(f"[stocks/sectors] {market}/{sector_cd}: {e}")
+        traceback.print_exc()
+        return ApiResponse.error("업종 정보를 불러오지 못했습니다.")
+
 
 # STOCKS ROUTE :: SELECT BY ID
 # ===============================================================================
