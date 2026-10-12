@@ -40,6 +40,16 @@ class StockService:
             self.attach_market_info(session, results, resolved_ymd)
         except Exception as e:
             print(f"[buy-target] 시가총액·수급 조회 실패: {e}", flush=True)
+
+        # 업종명(홈 추천 목록·매수추천 종목명 옆) — master_stock.idx_bztp_* (sql/34). 없으면 None.
+        try:
+            sector_map = self.masterStockDaoImpl.select_sector_names(
+                session, [it["stock_code"] for it in results if it.get("stock_code")])
+        except Exception as e:
+            print(f"[buy-target] 업종 조회 실패: {e}", flush=True)
+            sector_map = {}
+        for item in results:
+            item["sector_name"] = sector_map.get(item.get("stock_code"))
         return results
 
     def attach_market_info(self, session, items: list, max_ymd: str = None) -> None:

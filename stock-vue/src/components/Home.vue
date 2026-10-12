@@ -206,6 +206,7 @@
                                     <span class="rank">{{ String(idx + 1).padStart(2, '0') }}</span>
                                     <span class="name">{{ r.item.stock_name }}</span>
                                     <span class="code">{{ r.item.stock_code }}</span>
+                                    <span v-if="r.item.sector_name" class="sector">{{ r.item.sector_name }}</span>
                                     <span v-if="r.item.stock_code === priorityTarget" class="pri-mark">· 최우선</span>
                                 </span>
                             </span>
@@ -1072,6 +1073,7 @@ $down:     #1F5BD1;
     .name-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; }
     .name { font-size: 16px; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
     .code { font-size: 12px; color: $sub-2; flex-shrink: 0; }
+    .sector { font-size: 12px; color: $sub-2; flex-shrink: 0; white-space: nowrap; }   // 업종(지수업종 중분류)
     .pri-mark { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #A0662F; }
     .px { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
     .price { font-size: 17px; font-weight: 700; }

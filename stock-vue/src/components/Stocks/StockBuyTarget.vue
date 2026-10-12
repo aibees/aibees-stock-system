@@ -52,6 +52,7 @@
                                 <span class="name-line">
                                     <span class="rank">{{ String(rankNumber(idx)).padStart(2, '0') }}</span>
                                     <span class="name">{{ r.item.stock_name }}</span>
+                                    <span v-if="r.item.sector_name" class="sector">{{ r.item.sector_name }}</span>
                                 </span>
                                 <!-- 시가총액은 코드 옆에 짧게(펼치면 정확한 값·수급) -->
                                 <span class="code">{{ r.item.stock_code }}<template v-if="r.capShort"> · {{ r.capShort }}</template></span>
@@ -511,6 +512,7 @@ $blue:     #7A4423;
         overflow: hidden;
     }
     .code { font-size: 11px; color: $sub-2; }
+    .sector { font-size: 11px; color: $sub-2; white-space: nowrap; flex-shrink: 0; }   // 업종(지수업종 중분류)
 
     // 7개 조건 — 윗줄 아래 전체 폭, 항상 7칸 1줄. 칸마다 이름 위 / 상태 아래, 칸 사이 옅은 세로선
     .conds {

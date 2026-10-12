@@ -58,6 +58,16 @@ class MasterStockDao(BaseDao):
         ).all()
         return {code: (cd, name) for code, cd, name in rows}
 
+    def select_sector_names(self, session, stock_codes: list) -> dict:
+        """{stock_code: 업종명} — 지수업종 중분류명 우선, 없으면 대분류명. 업종 없는 종목은 빠진다."""
+        if not stock_codes:
+            return {}
+        rows = session.execute(
+            select(MasterStock.stock_code, MasterStock.idx_bztp_mcls_name, MasterStock.idx_bztp_lcls_name)
+            .where(MasterStock.stock_code.in_(stock_codes))
+        ).all()
+        return {code: mcls or lcls for code, mcls, lcls in rows if mcls or lcls}
+
     def select_sector_stocks(self, session) -> list:
         """업종 화면용 현물(group_code='ST') 종목 — 코드·이름·시장·상장주식수·지수업종."""
         rows = session.execute(
