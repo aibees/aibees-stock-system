@@ -21,6 +21,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SAutoInput: typeof import('./components/common/comp/SAutoInput.vue')['default']
     SButton: typeof import('./components/common/comp/SButton.vue')['default']
+    SectorTrendCharts: typeof import('./components/common/comp/SectorTrendCharts.vue')['default']
     SGridInput: typeof import('./components/common/comp/SGridInput.vue')['default']
     SGridSelect: typeof import('./components/common/comp/SGridSelect.vue')['default']
     SLabelInput: typeof import('./components/common/comp/SLabelInput.vue')['default']

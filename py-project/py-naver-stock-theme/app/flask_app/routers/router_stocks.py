@@ -153,10 +153,13 @@ def select_rec_recode_stock():
         return ApiResponse.error(str(e)[:255])
 
 # STOCKS ROUTE :: 업종 (테마 화면 대체) — KRX 지수업종별 등락률·수급 (SectorService 참고)
-#   GET /sectors?ymd=YYYYMMDD                  → {ymd, prev_ymd, sectors:[{market, sector_cd, sector_name, parent_name,
+#   GET /sectors?ymd=YYYYMMDD                  → {ymd, prev_ymd, base_ymd, days, markets:{KOSPI|KOSDAQ:{trend}},
+#                                                  sectors:[{market, sector_cd, sector_name, parent_name,
 #                                                  stock_count, chg_rate, up_count, down_count, flat_count,
-#                                                  market_cap(억), frgn_amt, orgn_amt, prsn_amt(백만원), leaders}]}
-#   GET /sectors/<KOSPI|KOSDAQ>/<sector_cd>?ymd= → {ymd, prev_ymd, sector:{…, stocks:[종목별 종가·등락률·시총·순매수]}}
+#                                                  market_cap(억), frgn_amt, orgn_amt, prsn_amt(백만원),
+#                                                  chg_rate_5d, frgn_amt_5d, orgn_amt_5d, prsn_amt_5d, trend, leaders}]}
+#     trend = 최근 5영업일 [{ymd, chg_rate, cum_rate, frgn_amt, orgn_amt, prsn_amt}] (cum_rate 는 base_ymd 종가 대비)
+#   GET /sectors/<KOSPI|KOSDAQ>/<sector_cd>?ymd= → {…, market_trend, sector:{…, stocks:[종목별 종가·등락률(1일·5일)·시총·순매수]}}
 #   ymd 생략 시 수급이 적재된 가장 최근 영업일. 미분류 업종 코드는 '0000'.
 # ===============================================================================
 @stocks_bp.route('/sectors')

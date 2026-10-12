@@ -13,6 +13,12 @@
 
             <div v-if="!isLoading && marketSectors.length" class="list-head">
                 <h2>업종 <span class="count">{{ marketSectors.length }}</span></h2>
+                <!-- 기간: 열 값(등락률·순매수)을 기준일 하루 / 최근 5영업일 누적·합계로 바꾼다 -->
+                <div class="period" role="group" aria-label="기간">
+                    <button v-for="p in PERIODS" :key="p.key" type="button" class="period-btn"
+                        :class="{ on: period === p.key }" :aria-pressed="period === p.key ? 'true' : 'false'"
+                        @click="period = p.key">{{ p.label }}</button>
+                </div>
             </div>
 
             <section class="sector">
@@ -35,16 +41,26 @@
                                     <span v-if="s.parent_name" class="parent">{{ s.parent_name }}</span>
                                 </span>
                                 <span class="sub">
-                                    {{ s.stock_count }}종목 · <span class="up">상승 {{ s.up_count }}</span>
-                                    · <span class="down">하락 {{ s.down_count }}</span>
+                                    {{ s.stock_count }}종목 · <span class="up">상승 {{ pv(s, 'up_count') }}</span>
+                                    · <span class="down">하락 {{ pv(s, 'down_count') }}</span>
                                 </span>
                             </span>
-                            <span class="v chg" :class="signClass(s.chg_rate)">{{ formatRate(s.chg_rate) }}</span>
-                            <span class="v flow" :class="signClass(s.frgn_amt)">{{ formatNetAmtShort(s.frgn_amt) }}</span>
-                            <span class="v flow" :class="signClass(s.orgn_amt)">{{ formatNetAmtShort(s.orgn_amt) }}</span>
+                            <span class="v chg">
+                                <span :class="signClass(pv(s, 'chg_rate'))">{{ formatRate(pv(s, 'chg_rate')) }}</span>
+                                <!-- 최근 5영업일 누적 등락 미니 추이(기준일 0% → 마지막 날) -->
+                                <svg v-if="s.trend?.length" class="spark" :class="signClass(s.chg_rate_5d)"
+                                    viewBox="0 0 48 16" width="48" height="16" aria-hidden="true">
+                                    <line x1="0" x2="48" :y1="spark(s.trend).zeroY" :y2="spark(s.trend).zeroY" class="spark-zero" />
+                                    <polyline :points="spark(s.trend).points" />
+                                </svg>
+                            </span>
+                            <span class="v flow" :class="signClass(pv(s, 'frgn_amt'))">{{ formatNetAmtShort(pv(s, 'frgn_amt')) }}</span>
+                            <span class="v flow" :class="signClass(pv(s, 'orgn_amt'))">{{ formatNetAmtShort(pv(s, 'orgn_amt')) }}</span>
                         </button>
 
                         <div v-if="openCd === s.sector_cd" class="sector-detail">
+                            <SectorTrendCharts :sector-name="s.sector_name" :market="s.market" :base-ymd="baseYmd"
+                                :trend="s.trend ?? []" :market-trend="marketTrends[s.market] ?? []" />
                             <div class="facts">
                                 <span class="fact">
                                     <span class="fact-name">시가총액</span>
@@ -52,15 +68,15 @@
                                 </span>
                                 <span class="fact">
                                     <span class="fact-name">외국인</span>
-                                    <span class="fact-value" :class="signClass(s.frgn_amt)">{{ formatNetAmtShort(s.frgn_amt) }}</span>
+                                    <span class="fact-value" :class="signClass(pv(s, 'frgn_amt'))">{{ formatNetAmtShort(pv(s, 'frgn_amt')) }}</span>
                                 </span>
                                 <span class="fact">
                                     <span class="fact-name">기관</span>
-                                    <span class="fact-value" :class="signClass(s.orgn_amt)">{{ formatNetAmtShort(s.orgn_amt) }}</span>
+                                    <span class="fact-value" :class="signClass(pv(s, 'orgn_amt'))">{{ formatNetAmtShort(pv(s, 'orgn_amt')) }}</span>
                                 </span>
                                 <span class="fact">
                                     <span class="fact-name">개인</span>
-                                    <span class="fact-value" :class="signClass(s.prsn_amt)">{{ formatNetAmtShort(s.prsn_amt) }}</span>
+                                    <span class="fact-value" :class="signClass(pv(s, 'prsn_amt'))">{{ formatNetAmtShort(pv(s, 'prsn_amt')) }}</span>
                                 </span>
                             </div>
 
@@ -78,7 +94,7 @@
                                         </span>
                                         <span class="px">
                                             <span class="price">{{ st.close != null ? formatNumber(st.close) : '–' }}</span>
-                                            <span class="chg-sm" :class="signClass(st.chg_rate)">{{ formatRate(st.chg_rate) }}</span>
+                                            <span class="chg-sm" :class="signClass(pv(st, 'chg_rate'))">{{ formatRate(pv(st, 'chg_rate')) }}</span>
                                         </span>
                                     </button>
                                 </li>
@@ -98,11 +114,13 @@
 
 <script setup>
 /**
- * 업종 — 테마 화면 대체. KRX 지수업종(중분류 우선, 없으면 대분류)별 전일 등락률·순매수.
- *   목록 : GET /api/v1/stocks/sectors                    (시장별 업종 요약, 등락률 = 시가총액 가중)
+ * 업종 — 테마 화면 대체. KRX 지수업종(중분류 우선, 없으면 대분류)별 등락률·순매수 + 최근 5영업일 추이.
+ *   목록 : GET /api/v1/stocks/sectors                    (시장별 업종 요약·추이, 등락률 = 시가총액 가중)
+ *   기간 : 1일 = 기준일 하루, 5일 = 최근 5영업일 누적 등락률·순매수 합계(*_5d 필드)
  *   펼침 : GET /api/v1/stocks/sectors/<market>/<cd>      (업종 내 종목, 시가총액 큰 순)
  * 서버 단위: 시가총액 = 억원, 순매수 = 백만원 (marketFormat.js 와 같음).
  */
+import SectorTrendCharts from '../common/comp/SectorTrendCharts.vue';
 import aibeesApi from '@scripts/aibeesApi.js';
 import { formatNumber } from '@scripts/stockSignals.js';
 import { formatCapShort, formatNetAmtShort, signClass, shortYmd } from '@scripts/marketFormat.js';
@@ -116,13 +134,23 @@ const SORT_COLS = [
     { key: 'frgn_amt', label: '외국인' },
     { key: 'orgn_amt', label: '기관' },
 ];
+const PERIODS = [
+    { key: '1d', label: '1일' },
+    { key: '5d', label: '5일' },
+];
 const STOCK_PAGE = 20;
 const UNCLASSIFIED_CD = '0000';
 
 const market = ref('KOSPI');
 const sectors = ref([]);
 const ymd = ref(null);
+const baseYmd = ref(null);
+const marketTrends = ref({});
 const isLoading = ref(true);
+const period = ref('1d');
+
+// 기간에 맞는 값: 5일이면 같은 이름의 *_5d 필드
+const pv = (row, key) => row[period.value === '5d' ? `${key}_5d` : key];
 
 const sortKey = ref('chg_rate');
 const sortDir = ref('desc');
@@ -132,7 +160,12 @@ const detailStocks = ref([]);
 const detailLoading = ref(false);
 const showAll = ref(false);
 
-const basisLabel = computed(() => (ymd.value ? `${shortYmd(ymd.value)} 종가 · 전일 대비` : ''));
+const basisLabel = computed(() => {
+    if (!ymd.value) return '';
+    return period.value === '5d' && baseYmd.value
+        ? `${shortYmd(baseYmd.value)} → ${shortYmd(ymd.value)} 누적`
+        : `${shortYmd(ymd.value)} 종가 · 전일 대비`;
+});
 const marketSectors = computed(() => sectors.value.filter(s => s.market === market.value));
 
 // 값 없는 업종과 '미분류'는 정렬과 무관하게 항상 뒤
@@ -141,7 +174,7 @@ const sortedSectors = computed(() => {
     return [...marketSectors.value].sort((a, b) => {
         const ua = a.sector_cd === UNCLASSIFIED_CD, ub = b.sector_cd === UNCLASSIFIED_CD;
         if (ua !== ub) return ua ? 1 : -1;
-        const va = a[sortKey.value], vb = b[sortKey.value];
+        const va = pv(a, sortKey.value), vb = pv(b, sortKey.value);
         if (va == null || vb == null) return va == null ? (vb == null ? 0 : 1) : -1;
         return (va - vb) * sign || a.sector_name.localeCompare(b.sector_name);
     });
@@ -155,6 +188,9 @@ const getSectors = async () => {
         const { data } = await aibeesApi.get('/api/v1/stocks/sectors');
         sectors.value = data.data?.sectors ?? [];
         ymd.value = data.data?.ymd ?? null;
+        baseYmd.value = data.data?.base_ymd ?? null;
+        marketTrends.value = Object.fromEntries(
+            Object.entries(data.data?.markets ?? {}).map(([m, v]) => [m, v.trend ?? []]));
     } catch (e) {
         console.error(e);
         sectors.value = [];
@@ -193,6 +229,16 @@ const toggleSector = async (s) => {
 
 const goToStockInfo = (st) => {
     router.push({ path: '/stock/info', query: { stock_code: st.stock_code, stock_name: st.stock_name } });
+};
+
+// 미니 추이선 좌표: [기준일 0%, 누적 등락률…] 을 48×16 안에 맞춘다(0% 가로선 포함)
+const spark = (trend) => {
+    const vals = [0, ...trend.map(t => t.cum_rate ?? 0)];   // 48×16
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    const span = hi - lo || 1;
+    const y = (v) => (2 + (hi - v) / span * 12).toFixed(1);
+    const step = 48 / (vals.length - 1 || 1);
+    return { points: vals.map((v, i) => `${(i * step).toFixed(1)},${y(v)}`).join(' '), zeroY: y(0) };
 };
 
 const formatRate = (v) => (v == null ? '–' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(2)}%`);
@@ -260,9 +306,26 @@ $amber: #A0662F;
 }
 
 .list-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 12px;
     h2 { margin: 0; font-size: 18px; font-weight: 700; }
     .count { color: $amber; }
+}
+// 기간 전환 — 글자 버튼(선택 = 진한 글자 + 밑줄)
+.period { display: flex; gap: 12px; }
+.period-btn {
+    border: 0;
+    background: transparent;
+    padding: 4px 0;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: $sub-2;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    &.on { color: $ink; font-weight: 700; border-bottom-color: $brown; }
 }
 
 /* ── 업종 목록: 카드 없이 구분선 ── */
@@ -310,12 +373,21 @@ $amber: #A0662F;
     .name-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
     .name { font-size: 15px; font-weight: 700; letter-spacing: -.2px; overflow-wrap: anywhere; }
     .parent { font-size: 11px; color: $sub-2; white-space: nowrap; }
+    .chg { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .spark {
+        flex-shrink: 0;
+        overflow: visible;
+        polyline { fill: none; stroke: $sub; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+        .spark-zero { stroke: $line; stroke-width: 1; }
+        &.up polyline { stroke: $up; }
+        &.down polyline { stroke: $down; }
+    }
     .sub { font-size: 11px; color: $sub-2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .v { text-align: right; white-space: nowrap; font-weight: 600; }
     .chg { font-size: 15px; font-weight: 700; }
     .flow { font-size: 12px; }
-    .v:not(.up):not(.down) { color: $sub; }
+    .v:not(.up):not(.down):not(.chg), .chg > span:not(.up):not(.down) { color: $sub; }
 }
 
 .sector-detail { padding: 0 0 16px; }
