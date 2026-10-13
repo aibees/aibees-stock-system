@@ -333,9 +333,21 @@ class Broker:
         )
 
     # ── 실제 보유 종목 조회 ──────────────────────────────────────────
+    # 정규장 마감(15:30) 이후에는 잔고 현재가를 "시간외 거래 반영" 기준으로 받는다.
+    #   KIS 주식잔고조회(TTTC8434R)의 AFHR_FLPR_YN: N=정규장 종가 기준(pykis 고정값) / Y=시간외 단일가 반영.
+    #   N 이면 저녁에도 15:30 종가가 남아 MTS 현재가와 어긋난다(2026-10-13 성호전자: N 30,050 / Y·MTS 30,900).
+    #   손절·익절은 실시간 체결가로 판단하므로 이 값은 화면 평가금액·손익(user_holdings)에만 쓰인다.
+    _AFTER_CLOSE_HHMM = 1530
+
     def account_holdings(self) -> Optional[list]:
         """KIS 계좌의 실제 보유 종목 리스트. 실패 시 None.
-        각 항목: symbol, name, qty, avg_price, cur_price, eval_amount, profit."""
+        각 항목: symbol, name, qty, avg_price, cur_price, eval_amount, profit.
+        15:30 이후에는 시간외 반영 가격(AFHR_FLPR_YN=Y)으로 직접 조회하고, 실패하면 기본 조회로 돌아간다."""
+        now = datetime.now(TIMEZONE_KST)
+        if now.hour * 100 + now.minute >= self._AFTER_CLOSE_HHMM:
+            rows = self._holdings_after_hours()
+            if rows is not None:
+                return rows
         try:
             balance = self.kis.account().balance()
             out = []
@@ -359,6 +371,51 @@ class Broker:
             return out
         except Exception as e:  # noqa: BLE001
             log.warning("계좌 보유종목 조회 실패: %s", e)
+            return None
+
+    def _holdings_after_hours(self) -> Optional[list]:
+        """주식잔고조회(TTTC8434R)를 AFHR_FLPR_YN=Y(시간외 단일가 반영)로 직접 호출. 실패 시 None(호출측이 기본 조회로)."""
+        try:
+            account = self.kis.primary
+            params = {
+                "CANO": account.number, "ACNT_PRDT_CD": account.code,
+                "AFHR_FLPR_YN": "Y", "OFL_YN": "", "INQR_DVSN": "02", "UNPR_DVSN": "01",
+                "FUND_STTL_ICLD_YN": "N", "FNCG_AMT_AUTO_RDPT_YN": "N", "PRCS_DVSN": "00",
+                "CTX_AREA_FK100": "", "CTX_AREA_NK100": "",
+            }
+            out, tr_cont = [], ""
+            for _ in range(10):   # 연속조회(보유 종목이 많을 때). 보통 1페이지로 끝난다.
+                resp = self.kis.request(
+                    "/uapi/domestic-stock/v1/trading/inquire-balance", method="GET", params=params,
+                    headers={"tr_id": "TTTC8434R", "custtype": "P", "tr_cont": tr_cont},
+                    appkey_location="header", auth=True,
+                )
+                j = resp.json()
+                if j.get("rt_cd") != "0":
+                    log.warning("시간외 반영 잔고 조회 실패 rt_cd=%s msg=%s → 기본 조회", j.get("rt_cd"), j.get("msg1"))
+                    return None
+                for r in j.get("output1") or []:
+                    qty = Decimal(str(r.get("hldg_qty") or 0))
+                    if qty <= 0:
+                        continue
+                    pur = Decimal(str(r.get("pchs_amt") or 0))
+                    out.append({
+                        "symbol": r.get("pdno") or "",
+                        "name": r.get("prdt_name") or "",
+                        "qty": qty,
+                        "avg_price": pur / qty,
+                        "cur_price": Decimal(str(r.get("prpr") or 0)),
+                        "eval_amount": Decimal(str(r.get("evlu_amt") or 0)),
+                        "profit": Decimal(str(r.get("evlu_pfls_amt") or 0)),
+                    })
+                if resp.headers.get("tr_cont") not in ("M", "F"):
+                    break
+                params["CTX_AREA_FK100"] = j.get("ctx_area_fk100") or ""
+                params["CTX_AREA_NK100"] = j.get("ctx_area_nk100") or ""
+                tr_cont = "N"
+            return out
+        except Exception as e:  # noqa: BLE001
+            log.warning("시간외 반영 잔고 조회 예외 → 기본 조회: %s", e)
             return None
 
     # ── 체결통보 구독 (fill tracking) ────────────────────────────────
