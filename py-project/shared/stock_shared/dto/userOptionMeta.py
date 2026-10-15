@@ -151,6 +151,10 @@ class UserOptionMeta:
         #   BuyExecutor 는 이 순서의 첫 종목을 사므로 1순위 = 매수 종목.
         self.s1_buy_order               = None
 
+        # ── worker 정규장 매수 시가갭 차단 기준 (None이면 0.02 = 2%) ──
+        # |시가 − 전일종가| ÷ 전일종가 > 이 값이면 그 후보를 건너뛴다. 유저별 개인화.
+        self.s1_gap_block_pct           = None
+
         # ── KospiStrategy2 파라미터 (None이면 전략 클래스 기본값 사용) ────────
         # M2: KODEX 코스피100 / 인버스를 **각각 독립적으로** 매매. 30분봉 기준.
         #   진입 = MACD↑ · OBV↑ · MA20↑ · RSI<x  가 confirm_bars 봉 연속

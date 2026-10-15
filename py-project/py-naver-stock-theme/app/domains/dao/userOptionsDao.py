@@ -232,6 +232,8 @@ class UserOptionsDao(BaseDao):
             's1_ma20_signal_mode':       uo.s1_ma20_signal_mode,
             # worker 매수타겟 정렬 (유저별 개인화)
             's1_buy_order':              uo.s1_buy_order,
+            # worker 정규장 매수 시가갭 차단 기준 (유저별 개인화, NULL=기본 2%)
+            's1_gap_block_pct':          uo.s1_gap_block_pct,
         }
 
     # ----------------------------------------------------------------
@@ -258,8 +260,8 @@ class UserOptionsDao(BaseDao):
             's1_enable_bb_upper_filter', 's1_enable_vol_avg_filter',
             's1_enable_regime_gate',
             's1_macd_signal_mode', 's1_obv_signal_mode', 's1_ma20_signal_mode',
-            # worker 매수타겟 정렬 (개인화)
-            's1_buy_order',
+            # worker 매수타겟 정렬 · 시가갭 차단 기준 (개인화)
+            's1_buy_order', 's1_gap_block_pct',
         }
         values = {k: v for k, v in fields.items() if k in S1_ALLOWED}
         if not values:

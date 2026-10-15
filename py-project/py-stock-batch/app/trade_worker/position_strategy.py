@@ -182,10 +182,10 @@ class SellStrategy:
                 changes.append((attr, old_v, new_v))
 
         # 전략 객체에 없고 user_meta 에만 있는 값도 로그에 남긴다.
-        #   s1_buy_order 는 전략 속성이 아니라 BuyExecutor 가 직접 읽는다.
+        #   s1_buy_order·s1_gap_block_pct 는 전략 속성이 아니라 BuyExecutor 가 직접 읽는다.
         #   위 루프만으로는 변경돼도 로그에 안 잡혀, 실제로 반영됐는지 사후 확인이
         #   불가능했다(매수 종목이 예상과 다를 때 원인 추적이 막힌다).
-        for key in ("s1_buy_order",):
+        for key in ("s1_buy_order", "s1_gap_block_pct"):
             old_v, new_v = getattr(old_meta, key, None), getattr(new_meta, key, None)
             if old_v != new_v:
                 changes.append((key, old_v, new_v))

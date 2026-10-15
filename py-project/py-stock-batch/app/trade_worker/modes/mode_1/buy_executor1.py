@@ -31,8 +31,20 @@ class BuyExecutor1(BaseBuyExecutor):
     # 장 시작 갭(현재가 vs 전일종가) 차단 임계값. 2026-09 세션 리서치 반영 —
     # 갭 그 자체를 게이트로 신설. 0%로 두면 정상 호가단위 노이즈만으로도 거의
     # 매번 걸리므로, "유의미한 갭"과 "체결 틱 노이즈"를 가르는 최소값을 둔다.
+    # 2026-10-15: 사용자별 설정(user_options.s1_gap_block_pct)으로 분리, 기본값 1% → 2%.
+    #   값이 없거나(NULL) 이상하면 DEFAULT_GAP_BLOCK_PCT. 설정 폴링으로 재시작 없이 반영된다.
     #   ※ 최우선타겟은 이 게이트를 타지 않는다(_resolve_price 참고).
-    GAP_BLOCK_PCT = Decimal("0.01")   # 1%
+    DEFAULT_GAP_BLOCK_PCT = Decimal("0.02")   # 2%
+
+    def _gap_block_pct(self) -> Decimal:
+        """유저 시가갭 차단 기준(user_options.s1_gap_block_pct). 없거나 0 이하면 기본값."""
+        meta = getattr(self.strategy, "user_meta", None)
+        raw = getattr(meta, "s1_gap_block_pct", None) if meta else None
+        try:
+            v = Decimal(str(raw)) if raw is not None else None
+        except Exception:  # noqa: BLE001
+            v = None
+        return v if v is not None and v > 0 else self.DEFAULT_GAP_BLOCK_PCT
 
     def __init__(self, cfg, broker, repo, notifier=None, strategy=None):
         super().__init__(cfg, broker, repo, notifier, strategy)
@@ -121,24 +133,25 @@ class BuyExecutor1(BaseBuyExecutor):
 
         ref_close = Decimal(str(ref_close))
         gap_pct = abs(price - ref_close) / ref_close
+        limit = self._gap_block_pct()
 
         # 최우선타겟은 갭 크기와 무관하게 통과시킨다(2026-10-01 사용자 결정 — 한도 없음).
         # 게이트를 건너뛰더라도 **갭 값은 반드시 로그에 남긴다**: 상한가 근처 갭에
         # 시장가로 진입한 날 "왜 이 가격에 샀나"를 사후에 추적할 수 있어야 한다.
         if cand.priority:
-            if gap_pct > self.GAP_BLOCK_PCT:
+            if gap_pct > limit:
                 self.wlog.warn(
                     "[매수] %s 최우선타겟 → 시가갭 %.2f%%(전일종가=%s, 현재가=%s)로 "
                     "허용치 %.1f%% 초과이지만 사용자 지정이라 매수 진행",
                     cand.code, float(gap_pct * 100), ref_close, price,
-                    float(self.GAP_BLOCK_PCT * 100),
+                    float(limit * 100),
                 )
             return price
 
-        if gap_pct > self.GAP_BLOCK_PCT:
+        if gap_pct > limit:
             self.wlog.info(
                 "[매수] %s 시가갭 %.2f%%(전일종가=%s, 현재가=%s) > 허용치 %.1f%% → skip",
-                cand.code, float(gap_pct * 100), ref_close, price, float(self.GAP_BLOCK_PCT * 100),
+                cand.code, float(gap_pct * 100), ref_close, price, float(limit * 100),
             )
             return None
         return price

@@ -94,6 +94,44 @@
                 </section>
 
                 <!-- ════════════════════════════════════════════════
+                     1-1. 시가 갭 허용치 (개인화) — 정규장 09:00 매수에서
+                          |시가 − 전일종가| ÷ 전일종가 가 이 값을 넘으면 그 종목은 건너뛴다
+                ═════════════════════════════════════════════════ -->
+                <section class="setting-card">
+                    <header class="card-head">
+                        <div class="ch-left">
+                            <h3>시가 갭 허용치</h3>
+                        </div>
+                    </header>
+
+                    <div class="field-list">
+                        <div class="field-row">
+                            <div class="fr-head">
+                                <label for="s1_gap_block_pct">허용 갭 <span class="fr-unit">(%)</span></label>
+                                <div class="fr-right">
+                                    <span class="fr-def">기본 {{ GAP_DEF_PCT }}%</span>
+                                    <button type="button" class="btn-null" title="기본값 따름(null)"
+                                        @click="gapPct = ''">기본값</button>
+                                </div>
+                            </div>
+                            <div class="fr-ctrl slider-ctrl">
+                                <input type="range" class="sl-range"
+                                    :value="gapPct === '' ? GAP_DEF_PCT : gapPct" @input="onGapInput"
+                                    :min="GAP_MIN_PCT" :max="GAP_MAX_PCT" :step="0.5" />
+                                <div class="sl-num">
+                                    <input id="s1_gap_block_pct" type="number"
+                                        :value="gapPct" @input="onGapInput"
+                                        :min="GAP_MIN_PCT" :max="GAP_MAX_PCT" step="0.5"
+                                        :placeholder="String(GAP_DEF_PCT)" inputmode="decimal" />
+                                    <span class="sl-unit">%</span>
+                                </div>
+                            </div>
+                            <span v-if="gapError" class="field-error">{{ gapError }}</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ════════════════════════════════════════════════
                      2. 후보 선정 조건 (관리자 전용)
                 ═════════════════════════════════════════════════ -->
                 <section v-if="!canEditStrategy" class="admin-notice">
@@ -337,6 +375,31 @@ const onDragOver = (idx) => {
 const resetOrderToDefault = () => { orderRows.value = specToRows(DEFAULT_ORDER_SPEC); };
 
 /* ═══════════════════════════════════════════════════════════
+ * 1-1. 시가 갭 허용치 (s1_gap_block_pct, 개인화)
+ *
+ * 화면은 % 로 다루고(2 = 2%), 저장은 비율(0.02)로 한다. '' = 기본값(서버 NULL → worker 2%).
+ * 허용 범위는 백엔드 _GAP_PCT_RANGE(0.005 ~ 0.30)와 같아야 한다.
+ * ═══════════════════════════════════════════════════════════ */
+const GAP_DEF_PCT = 2;
+const GAP_MIN_PCT = 0.5;
+const GAP_MAX_PCT = 30;
+const gapPct = ref('');
+let originalGapPct = '';
+
+const onGapInput = (ev) => {
+    const raw = ev.target.value;
+    if (raw === '') { gapPct.value = ''; return; }
+    const n = Number(raw);
+    if (!Number.isNaN(n)) gapPct.value = n;
+};
+const gapError = computed(() => {
+    if (gapPct.value === '') return '';
+    const n = Number(gapPct.value);
+    return n < GAP_MIN_PCT || n > GAP_MAX_PCT ? `허용 범위: ${GAP_MIN_PCT} ~ ${GAP_MAX_PCT}%` : '';
+});
+const gapToApi = () => (gapPct.value === '' ? null : +(Number(gapPct.value) / 100).toFixed(6));
+
+/* ═══════════════════════════════════════════════════════════
  * 2. 후보 선정 조건 (관리자 전용) — KospiStrategy0.get_action_in_watch
  * ═══════════════════════════════════════════════════════════ */
 const SIGNAL_MODE_OPTIONS = [
@@ -513,12 +576,15 @@ const fetchOptions = async () => {
             if (d[f.k] !== undefined) form[f.k] = toDisplay(f, d[f.k]);
         });
         orderRows.value = specToRows(d.s1_buy_order || DEFAULT_ORDER_SPEC);
+        gapPct.value = d.s1_gap_block_pct === null || d.s1_gap_block_pct === undefined
+            ? '' : +(Number(d.s1_gap_block_pct) * 100).toFixed(4);
     } catch (e) {
         console.error('[BuySetting] 조회 실패', e);
         orderRows.value = specToRows(DEFAULT_ORDER_SPEC);
     } finally {
         original = JSON.parse(JSON.stringify(form));
         originalOrderSpec = orderSpec.value;
+        originalGapPct = gapPct.value;
         isLoading.value = false;
     }
 };
@@ -580,7 +646,7 @@ const errors = computed(() => {
 
     return e;
 });
-const hasError = computed(() => Object.keys(errors.value).length > 0 || !!orderError.value);
+const hasError = computed(() => Object.keys(errors.value).length > 0 || !!orderError.value || !!gapError.value);
 
 /* ═══════════════ diff / 저장 ═══════════════ */
 const buildDiff = () => {
@@ -592,6 +658,8 @@ const buildDiff = () => {
         });
     }
     if (orderSpec.value !== originalOrderSpec) diff.s1_buy_order = orderSpec.value || null;
+    // 시가 갭 허용치(개인화) — 관리자 여부와 무관하게 전송
+    if (String(gapPct.value) !== String(originalGapPct)) diff.s1_gap_block_pct = gapToApi();
     return diff;
 };
 const isDirty = computed(() => Object.keys(buildDiff()).length > 0);
@@ -600,11 +668,12 @@ const dirtyCount = computed(() => Object.keys(buildDiff()).length);
 const resetForm = () => {
     Object.assign(form, JSON.parse(JSON.stringify(original)));
     orderRows.value = specToRows(originalOrderSpec);
+    gapPct.value = originalGapPct;
 };
 
 const save = async () => {
     if (hasError.value) {
-        mariaToast.error(orderError.value || '입력값을 확인해 주세요.');
+        mariaToast.error(orderError.value || gapError.value || '입력값을 확인해 주세요.');
         return;
     }
     const payload = buildDiff();
@@ -617,9 +686,10 @@ const save = async () => {
         await aibeesApi.patch('/api/v1/strategy/options', payload);
         original = JSON.parse(JSON.stringify(form));
         originalOrderSpec = orderSpec.value;
+        originalGapPct = gapPct.value;
         mariaToast.success(
-            's1_buy_order' in payload
-                ? '저장되었습니다. 정렬은 다음 매수 라운드부터 적용됩니다.'
+            ('s1_buy_order' in payload || 's1_gap_block_pct' in payload)
+                ? '저장되었습니다. 다음 매수 라운드부터 적용됩니다.'
                 : '저장되었습니다. 다음 매수타겟 생성부터 반영됩니다.');
     } catch (e) {
         console.error('[BuySetting] 저장 실패', e);

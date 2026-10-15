@@ -81,6 +81,10 @@ class UserOptions(Base):
     # 위 필터들과 달리 **유저별 개인화** — worker(BuyExecutor)만 쓰므로 서로 간섭 없음.
     s1_buy_order = Column(String(255), nullable=True)
 
+    # worker 정규장 매수의 시가갭 차단 기준(비율, 0.02 = 2%). NULL = 기본값 2% (sql/34).
+    # |시가 − 전일종가| ÷ 전일종가 가 이 값을 넘으면 그 후보를 건너뛴다. 유저별 개인화.
+    s1_gap_block_pct = Column(DECIMAL(6, 4), nullable=True)
+
     def to_dict(self):
         return {
             "user_id": self.user_id,
@@ -140,4 +144,5 @@ class UserOptions(Base):
             "s1_obv_signal_mode": self.s1_obv_signal_mode,
             "s1_ma20_signal_mode": self.s1_ma20_signal_mode,
             "s1_buy_order": self.s1_buy_order,
+            "s1_gap_block_pct": self.s1_gap_block_pct,
         }

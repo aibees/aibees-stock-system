@@ -85,6 +85,8 @@ def extractor(x) -> UserOptionMeta:
     user_meta.s1_ma20_signal_mode       = x.get('s1_ma20_signal_mode')
     # worker 매수타겟 정렬 순서 ("score:desc,volume:desc" 형식, None=기본값)
     user_meta.s1_buy_order              = x.get('s1_buy_order')
+    # worker 정규장 매수 시가갭 차단 기준(비율, None=기본 0.02)
+    user_meta.s1_gap_block_pct          = x.get('s1_gap_block_pct')
     return user_meta
 
 

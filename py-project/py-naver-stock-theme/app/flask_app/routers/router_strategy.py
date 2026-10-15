@@ -126,9 +126,13 @@ _S1_COLS: dict[str, str] = {
     's1_macd_signal_mode':       'signal_mode',
     's1_obv_signal_mode':        'signal_mode',
     's1_ma20_signal_mode':       'ma20_signal_mode',
-    # ── worker 매수타겟 정렬 (개인화) ──
+    # ── worker 매수타겟 정렬 · 시가갭 차단 기준 (개인화) ──
     's1_buy_order':              'buy_order',
+    's1_gap_block_pct':          'gap_pct',
 }
+
+# 시가갭 차단 기준 허용 범위(비율). 0.5% 미만은 호가 단위 노이즈에도 매번 걸려 매수가 사실상 막힌다.
+_GAP_PCT_RANGE = (0.005, 0.30)
 
 # core 진입신호 mode 허용값
 _SIGNAL_MODES = ('off', 'golden', 'slope')
@@ -149,7 +153,7 @@ _FIB_LEVELS = (0.382, 0.5, 0.618)
 #     → 일반 유저가 바꿔도 자기 화면엔 반영되지 않고(공용 테이블이라),
 #       관리자가 바꾸면 전원에게 영향이 간다. 개인화가 성립하지 않는 값들.
 #
-#  [개인화] 그 외 (매도 파라미터 전체 + s1_buy_order)
+#  [개인화] 그 외 (매도 파라미터 전체 + s1_buy_order + s1_gap_block_pct)
 #     worker(SellStrategy / BuyExecutor)가 user_id 별로 읽어 쓴다. 서로 간섭 없음.
 # ─────────────────────────────────────────────────────────────────────
 _S1_ADMIN_ONLY_COLS = frozenset({
@@ -284,6 +288,15 @@ def _validate_s1_body(body: dict, is_admin: bool = False):
                     'INVALID_FIELD',
                     f'{k} 는 {" / ".join(_MA20_SIGNAL_MODES)} 중 하나여야 합니다.')
             clean[k] = str(v)
+
+        elif col_type == 'gap_pct':
+            if not isinstance(v, (int, float)) or isinstance(v, bool):
+                return None, _error('INVALID_FIELD', f'{k} 는 숫자여야 합니다.')
+            lo, hi = _GAP_PCT_RANGE
+            if not (lo <= float(v) <= hi):
+                return None, _error(
+                    'INVALID_FIELD', f'{k} 는 {lo} ~ {hi} (={lo * 100:g}% ~ {hi * 100:g}%) 사이여야 합니다.')
+            clean[k] = float(v)
 
         elif col_type == 'buy_order':
             if not isinstance(v, str):
