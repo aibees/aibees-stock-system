@@ -3,7 +3,7 @@
 
   업종 : master_stock.idx_bztp_* (07:00 STOCK_CODE_MASTER_JOB, sql/34). 그룹 = 중분류 우선, 없으면 대분류.
          KOSPI 와 KOSDAQ 은 같은 이름(전기·전자 등)이라도 다른 지수라 시장별로 따로 묶는다. 업종 없는 현물은 '미분류'.
-  시세 : stock_investor_daily (07:10 STOCK_INVESTOR_JOB, 90일 보관) 의 최근 TREND_DAYS+1 영업일 종가 → 등락률,
+  시세 : stock_investor_daily (07:10 STOCK_INVESTOR_JOB, 5년 보관) 의 최근 TREND_DAYS+1 영업일 종가 → 등락률,
          같은 날 외국인/기관/개인 순매수 대금(백만원). 추가 KIS 호출 없음.
   업종 등락률(하루) = 시가총액 가중(지수와 같은 방식) = Σ(상장주식수 × 종가) ÷ Σ(상장주식수 × 직전 종가) − 1.
          두 날 종가와 상장주식수가 모두 있는 종목만 넣는다. 상장주식수는 현재값으로 고정(과거 증자 등은 무시).

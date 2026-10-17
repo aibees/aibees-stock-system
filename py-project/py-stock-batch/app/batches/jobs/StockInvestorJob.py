@@ -8,7 +8,8 @@ StockInvestorJob — 종목별 투자자(개인/외국인/기관) 순매수 적�
   - 대상: master_stock 중 ETF(group_code='EF') 제외 — 07:00 STOCK_CODE_MASTER_JOB 이 먼저 갱신해 둔다.
   - 병렬: StockBuyCheckJob 과 같이 KIS 유저(앱키)별로 나눠 스레드 병렬. 스레드는 조회만(무 DB).
           rate limit / 초당 건수 초과(EGW00201) 재시도는 pykis 가 처리한다.
-  - 보관: 90일 지난 행은 삭제.
+  - 보관: RETENTION_DAYS(5년) 지난 행만 삭제. shape_proba 수급 피처 학습용으로 길게 쌓는다
+          (KIS 는 최근 ~30영업일만 주므로 지운 과거분은 다시 받을 수 없다 — 2026-10-16 90일→5년).
 
 수동 실행 인자(kwargs): keep_days(기본 5), limit(테스트용 종목 수 제한)
 """
@@ -22,7 +23,7 @@ from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.stockInvestorDailyDao import StockInvestorDailyDao
 
 EXCLUDE_GROUPS = {'EF'}      # ETF — 화면 대상 아님(호출 수 ~1,200 절감)
-RETENTION_DAYS = 90
+RETENTION_DAYS = 365 * 5
 CALL_INTERVAL_SEC = 0.15     # 같은 앱키를 쓰는 trade worker 몫의 여유
 
 
