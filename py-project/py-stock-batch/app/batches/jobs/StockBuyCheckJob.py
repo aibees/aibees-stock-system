@@ -48,6 +48,16 @@ COMPOSITE_MOMENTUM_COLS = ['obv_gap_norm', 'obv_slope3', 'ind_vol_ratio_today', 
 
 
 class StockBuyCheckJob(Job):
+    # ── 장중 갱신 / 최종 배치 구분 (2026-10-17) ─────────────────────────
+    #   10:00~20:00 매시 정각 = 장중 갱신(StockBuyCheckIntradayJob), 20:30 = 최종(이 클래스).
+    #   둘 다 같은 ymd(오늘)의 추천 목록을 통째로 다시 쓴다 — 마지막에 돈 것이 남는다.
+    #   장중 갱신은 **진행 중인 오늘 봉**(부분 거래량·미확정 종가)으로 판정하므로
+    #   아래 두 가지는 최종 배치에서만 한다:
+    #     · 학습셋 적재(trade_shape_train_daily) — 미확정 봉 피처가 섞이면 안 된다.
+    #     · 결과 메일 발송 — 하루 1통.
+    #   수동 실행(/once STOCK_BUY_CHECK_JOB)은 지금처럼 최종 배치로 동작한다.
+    FINAL_RUN = True
+
     def __init__(self):
         super().__init__()
         self.job_name = 'StockBuyCheckJob'
@@ -113,13 +123,7 @@ class StockBuyCheckJob(Job):
         strategy_param = kwargs.get('strategy', 'KOSPI_1')
         ymd = end_date.replace('-', '')
 
-        # 배치 시작 전: 해당 ymd 기존 데이터 삭제
-        deleted_cnt = self.stockServiceImpl.clean_buy_target_stock_by_ymd(self.session, ymd)
-        deleted_chart_cnt = self.stockServiceImpl.clean_buy_target_chart_by_ymd(self.session, ymd)
-        self.session.commit()
-        print(f'[{ymd}] 기존 데이터 {deleted_cnt}건(차트 {deleted_chart_cnt}건) 삭제 완료', flush=True)
-
-        print(f'배치 대상 stock size : {len(stock_list)}', flush=True)
+        print(f'배치 대상 stock size : {len(stock_list)} (최종배치={self.FINAL_RUN})', flush=True)
 
         # ── KIS 토큰 제공 가능 유저 수 = 분할 병렬 수 (현재 2, 향후 3 등 가변) ──
         #   유저별 KIS_USER_ID 로 각각 다른 appkey(=독립 rate limit)의 KisEngine 을 만든다.
@@ -171,13 +175,26 @@ class StockBuyCheckJob(Job):
         #   라벨(net_edge_fwd)은 향후 5봉이 필요하므로 여기서는 비워두고
         #   ShapeLabelJob 이 나중에 채운다(엠바고 5봉).
         #   실패해도 매수추천 본류를 막지 않는다 — 학습셋은 부가 산출물이다.
-        try:
-            saved = self.shapeTrainDaoImpl.upsert_daily_bulk(self.session, train_rows)
-            self.session.commit()
-            print(f"학습셋 적재 완료: {saved}행 (trade_shape_train_daily)", flush=True)
-        except Exception as e:
-            self.session.rollback()
-            print(f"[학습셋 적재 실패 — 매수추천은 계속 진행] {e}", flush=True)
+        #   장중 갱신은 미확정 봉이라 적재하지 않는다(FINAL_RUN 주석 참고).
+        if self.FINAL_RUN:
+            try:
+                saved = self.shapeTrainDaoImpl.upsert_daily_bulk(self.session, train_rows)
+                self.session.commit()
+                print(f"학습셋 적재 완료: {saved}행 (trade_shape_train_daily)", flush=True)
+            except Exception as e:
+                self.session.rollback()
+                print(f"[학습셋 적재 실패 — 매수추천은 계속 진행] {e}", flush=True)
+        else:
+            print(f"장중 갱신 → 학습셋 적재 생략 ({len(train_rows)}행)", flush=True)
+
+        # 해당 ymd 기존 추천 삭제 — **조회가 끝난 뒤, 저장 직전**에 한다.
+        #   예전엔 배치 시작 때 지워서 조회가 도는 14분 동안 오늘 목록이 비어 있었다.
+        #   하루 한 번(20:00)일 땐 문제가 없었지만, 장중 매시 갱신에서는 그 사이
+        #   화면·worker(get_latest_buy_target_ymd)가 오늘 목록을 못 보고 전날 목록으로 떨어진다.
+        deleted_cnt = self.stockServiceImpl.clean_buy_target_stock_by_ymd(self.session, ymd)
+        deleted_chart_cnt = self.stockServiceImpl.clean_buy_target_chart_by_ymd(self.session, ymd)
+        self.session.commit()
+        print(f'[{ymd}] 기존 데이터 {deleted_cnt}건(차트 {deleted_chart_cnt}건) 삭제 완료', flush=True)
 
         # ── 2단계(top10→모멘텀 재정렬) — watch 게이트와 병행 저장 ──────────
         #   watch 게이트를 안 거친 종목이어도 trade_buy_target_stock 행은 OHLCV/지표가
@@ -260,7 +277,10 @@ class StockBuyCheckJob(Job):
         }
         print(f"result ==> {len(result_list)}", flush=True)
 
-        # 이메일 전송 (rank_no 오름차순으로 정렬해 발송)
+        if not self.FINAL_RUN:
+            return return_result
+
+        # 이메일 전송 (rank_no 오름차순으로 정렬해 발송) — 최종 배치에서만
         mail_sorted = sorted(result_list, key=lambda x: x.get('rank_no', 10 ** 9))
         created_html = self.stockServiceImpl.create_mail_html(mail_sorted)
         email_list = self.userServiceImpl.get_user_email_by_condition(self.session, 'email')
@@ -524,3 +544,18 @@ class StockBuyCheckJob(Job):
             print(f"✅ 성공적으로 '{email_to}' 주소로 분석 결과를 발송했습니다.", flush=True)
         else:
             print(f"❌ 메일 발송 실패: {response.get('msg')}", flush=True)
+
+
+class StockBuyCheckIntradayJob(StockBuyCheckJob):
+    """매수추천 장중 갱신 — 평일 10:00~20:00 매시 정각(batch_job_master STOCK_BUY_CHECK_INTRADAY_JOB).
+
+    로직은 최종 배치와 같고, 학습셋 적재·메일·시작/종료 push 만 뺀다(StockBuyCheckJob.FINAL_RUN 참고).
+    진행 중인 오늘 봉으로 판정하므로 거래량 하한(vol_limit)은 이른 시각일수록 덜 채워져
+    후보 수가 적게 나온다 — 하루가 갈수록 최종 배치 결과에 가까워진다.
+    """
+    FINAL_RUN = False
+
+    def __init__(self):
+        super().__init__()
+        self.job_name = 'StockBuyCheckIntradayJob'
+        self.push_notify = False

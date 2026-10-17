@@ -18,6 +18,9 @@ class Job(ABC):
         self.session = None
         self.batchLogDaoImpl = BatchLogDao()
         self.job_name = 'job'
+        # 배치 시작/종료 push 여부. 하루에 여러 번 도는 job(매수추천 장중 갱신 등)은
+        # 끄지 않으면 운영자 폰에 알림이 시간마다 쌓인다. 실패 push 는 항상 보낸다.
+        self.push_notify = True
 
     def process(self, **kwargs):
         print('=======  JOB  START =======')
@@ -40,11 +43,12 @@ class Job(ABC):
         # [추가] 배치 시작 push (공통 알림 → 운영자 1명). push 실패가 배치를 막지 않도록
         # notifyService 내부에서 이미 예외를 삼키지만, 방어적으로 한 번 더 감싼다.
         try:
-            notifyService.to_common(
-                self.session, "배치 시작",
-                f"{self.job_name} 배치가 시작되었습니다.",
-                {"batch_seq": str(batch_seq), "batch_code": self.job_name, "event": "START"},
-            )
+            if self.push_notify:
+                notifyService.to_common(
+                    self.session, "배치 시작",
+                    f"{self.job_name} 배치가 시작되었습니다.",
+                    {"batch_seq": str(batch_seq), "batch_code": self.job_name, "event": "START"},
+                )
         except Exception as e:  # noqa: BLE001
             logging.exception(e)
 
@@ -67,12 +71,13 @@ class Job(ABC):
 
             # [추가] 배치 정상 종료 push (공통 알림 → 운영자 1명)
             try:
-                notifyService.to_common(
-                    self.session, "배치 종료",
-                    f"{self.job_name} 배치가 종료되었습니다. ({update_param['status']})",
-                    {"batch_seq": str(batch_seq), "batch_code": self.job_name,
-                     "event": "END", "status": update_param['status']},
-                )
+                if self.push_notify:
+                    notifyService.to_common(
+                        self.session, "배치 종료",
+                        f"{self.job_name} 배치가 종료되었습니다. ({update_param['status']})",
+                        {"batch_seq": str(batch_seq), "batch_code": self.job_name,
+                         "event": "END", "status": update_param['status']},
+                    )
             except Exception as push_e:  # noqa: BLE001
                 logging.exception(push_e)
 
