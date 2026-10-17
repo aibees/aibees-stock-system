@@ -21,11 +21,22 @@ from flask import Blueprint, request, g
 from app.services.common.authService import AuthService, JWT_SECRET, JWT_ALGORITHM, NaverLoginError, SignupError
 from app.exceptions import ResetRequiredException  # 단일 출처 임포트
 from app.domains.dao.masterInfoDao import MasterInfosDao
+from app.domains.dao.accessLogDao import AccessLogDao
 from app.flask_app.utils.apiResponse import ApiResponse
 
 
 authServiceImpl    = AuthService()
 masterInfosDaoImpl = MasterInfosDao()
+accessLogDaoImpl   = AccessLogDao()
+
+
+def _log_login_result(login_type, results, login_key=None):
+    """로그인 응답으로 기록. 네이버 동의 대기(consentRequired)는 아직 토큰이 없어 로그인 성공이 아니다."""
+    if results.get('consentRequired'):
+        accessLogDaoImpl.insert_login_log(login_type, 'CONSENT_REQUIRED', login_key=login_key)
+    else:
+        accessLogDaoImpl.insert_login_log(login_type, 'SUCCESS', user_id=results['loginInfo']['user_id'],
+                                          login_key=login_key)
 
 oauth_bp = Blueprint("oauth", __name__)
 
@@ -137,13 +148,17 @@ def oauth_login_naver():
     """
     data = request.get_json(silent=True) or {}
     try:
-        return ApiResponse.success(authServiceImpl.naverProcess(g.db, data))
+        results = authServiceImpl.naverProcess(g.db, data)
+        _log_login_result('NAVER', results)
+        return ApiResponse.success(results)
     except NaverLoginError as e:
         g.db.rollback()
+        accessLogDaoImpl.insert_login_log('NAVER', 'FAIL', fail_reason=str(e))
         return ApiResponse.error(str(e), status=400)
     except Exception as e:
         g.db.rollback()
         logging.exception(e)
+        accessLogDaoImpl.insert_login_log('NAVER', 'FAIL', fail_reason=str(e))
         return ApiResponse.error("네이버 로그인 중 오류가 발생했습니다.")
 
 
@@ -160,13 +175,17 @@ def oauth_naver_consent():
     """
     data = request.get_json(silent=True) or {}
     try:
-        return ApiResponse.success(authServiceImpl.naverConsentProcess(g.db, data))
+        results = authServiceImpl.naverConsentProcess(g.db, data)
+        _log_login_result('NAVER_CONSENT', results)
+        return ApiResponse.success(results)
     except NaverLoginError as e:
         g.db.rollback()
+        accessLogDaoImpl.insert_login_log('NAVER_CONSENT', 'FAIL', fail_reason=str(e))
         return ApiResponse.error(str(e), status=400)
     except Exception as e:
         g.db.rollback()
         logging.exception(e)
+        accessLogDaoImpl.insert_login_log('NAVER_CONSENT', 'FAIL', fail_reason=str(e))
         return ApiResponse.error("가입 처리 중 오류가 발생했습니다.")
 
 
@@ -201,13 +220,17 @@ def oauth_signup():
     """
     data = request.get_json(silent=True) or {}
     try:
-        return ApiResponse.success(authServiceImpl.signupProcess(g.db, data))
+        results = authServiceImpl.signupProcess(g.db, data)
+        _log_login_result('SIGNUP', results)
+        return ApiResponse.success(results)
     except SignupError as e:
         g.db.rollback()
+        accessLogDaoImpl.insert_login_log('SIGNUP', 'FAIL', fail_reason=str(e))
         return ApiResponse.error(str(e), status=400)
     except Exception as e:
         g.db.rollback()
         logging.exception(e)
+        accessLogDaoImpl.insert_login_log('SIGNUP', 'FAIL', fail_reason=str(e))
         return ApiResponse.error("가입 처리 중 오류가 발생했습니다.")
 
 
@@ -230,15 +253,19 @@ def oauth_login_email():
     }
     """
     data = request.get_json()
+    email = str((data or {}).get('email') or '')
     try:
         results = authServiceImpl.emailProcess(g.db, data)
+        _log_login_result('EMAIL', results, login_key=email)
         return ApiResponse.success(results)
     except ResetRequiredException as rre:
         # reset_flag == 'Y': 인증은 통과했으나 비밀번호 재설정이 필요한 계정
         # 프론트엔드는 error.code === 'RESET_REQUIRED' 를 감지해 재설정 페이지로 유도
         print(rre)
+        accessLogDaoImpl.insert_login_log('EMAIL', 'RESET_REQUIRED', login_key=email)
         return ApiResponse.reset_required()
     except Exception as e:
+        accessLogDaoImpl.insert_login_log('EMAIL', 'FAIL', login_key=email, fail_reason=str(e))
         return ApiResponse.error(str(e))
 
 
@@ -329,7 +356,8 @@ def oauth_logout():
     """
     data = request.get_json() or {}
     try:
-        result = authServiceImpl.logoutProcess(g.db, data)
-        return ApiResponse.success(result)
+        user_id = authServiceImpl.logoutProcess(g.db, data)
+        accessLogDaoImpl.insert_login_log('LOGOUT', 'SUCCESS', user_id=user_id)
+        return ApiResponse.success(None)
     except Exception as e:
         return ApiResponse.error(str(e))

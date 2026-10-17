@@ -493,11 +493,14 @@ class AuthService:
         → 토큰 탈취 후 로그아웃을 우회하려는 시도를 차단
         """
         refresh_token = data.get('refreshToken')
-        if refresh_token:
-            # 토큰이 DB에 없어도 에러를 반환하지 않음
-            # (이미 만료·폐기된 토큰으로 로그아웃 요청해도 정상 처리)
-            self.refreshTokenDaoImpl.revoke_token(session, refresh_token)
-        return None  # 명세: Response { "success": true, "data": null }
+        if not refresh_token:
+            return None
+        # 토큰이 DB에 없어도 에러를 반환하지 않음
+        # (이미 만료·폐기된 토큰으로 로그아웃 요청해도 정상 처리)
+        token_row = self.refreshTokenDaoImpl.find_by_token(session, refresh_token)
+        self.refreshTokenDaoImpl.revoke_token(session, refresh_token)
+        # 로그아웃 기록용 user_id (라우터는 응답 data 로 null 을 보낸다)
+        return token_row.user_id if token_row is not None else None
 
     # ────────────────────────────────────────────────────────────────
     # [신규] 비밀번호 재설정

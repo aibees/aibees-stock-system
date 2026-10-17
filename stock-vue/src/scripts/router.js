@@ -78,6 +78,10 @@ const routes = [
 let restrictedPaths = new Set();
 // 광고 게이트 대상 경로(AD_GATE_MENU_CODES 의 메뉴). AD_FREE 가 없으면 진입 전에 광고를 본다.
 let adGatedPaths = new Set();
+// 메뉴 경로 → menu_code (메뉴 접근 기록용).
+let menuCodeByPath = new Map();
+// 접근 기록을 남기지 않는 화면(광고 게이트는 메뉴로 가는 중간 단계).
+const NO_ACCESS_LOG_ROUTES = new Set(['NotFound', 'ad-gate']);
 
 const normPath = (p) => '/' + String(p ?? '').replace(/^\/+/, '').replace(/\/+$/, '');
 
@@ -90,11 +94,14 @@ const getRouteList = async () => {
 
     restrictedPaths = new Set();
     adGatedPaths = new Set();
+    menuCodeByPath = new Map();
     routerResult.forEach(r => {
         restrictedPaths.add(normPath(r.menu_path));
+        menuCodeByPath.set(normPath(r.menu_path), r.menu_code);
         (r.children ?? []).forEach(c => {
             const full = normPath(r.menu_path) + normPath(c.menu_path);
             restrictedPaths.add(full);
+            menuCodeByPath.set(full, c.menu_code);
             if (AD_GATE_MENU_CODES.includes(c.menu_code)) adGatedPaths.add(full);
         });
     });
@@ -212,6 +219,18 @@ export const setRouterToApp = async () => {
             && countGateEntry(userSession.user.loginInfo.user_id, gateInterval(access.settings))) {
             return { path: '/ad-gate', query: { next: to.fullPath } };
         }
+    });
+
+    // ── 메뉴(화면) 접근 기록 ──
+    //   로그인 사용자가 다른 화면으로 들어왔을 때만 1건(같은 화면 안의 쿼리 변경은 세지 않는다).
+    //   기록 실패는 화면 이동과 무관하므로 무시한다.
+    router.afterEach((to, from, failure) => {
+        if (failure || NO_ACCESS_LOG_ROUTES.has(to.name) || isAuthPath(to.path)) return;
+        if (!assUserSession().isUserSession()) return;
+        const target = normPath(to.path);
+        if (from.matched.length && normPath(from.path) === target) return;
+        aibeesApi.post('/api/v1/access-logs/menu', { path: target, menuCode: menuCodeByPath.get(target) ?? null })
+            .catch(() => { /* ignore */ });
     });
 
     // ── 배포 후 구버전 chunk 로드 실패 대응 ──
