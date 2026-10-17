@@ -10,7 +10,8 @@
     ├ allow_buy()                ← 훅: 1포지션 원칙 적용 여부
     ├ pick_candidates(premarket) ← 훅: **유일한 필수 구현**
     ├ budget_ratio()             ← 훅: 예수금 투입 비율
-    └ supports_premarket()       ← 훅: NXT 프리마켓 라운드 참여 여부
+    ├ supports_premarket()       ← 훅: NXT 프리마켓 라운드 참여 여부
+    └ supports_realtime()        ← 훅: 장중 실시간 매수 라운드 참여 여부
 
 체결 흐름 (broker 2단 구조):
   주문 → register_watch(armed=False) → wait_fill(동기 창) → 포지션 반영
@@ -55,6 +56,9 @@ class BaseBuyExecutor(ABC):
         self.strategy = strategy          # SellStrategy (초기 라인 계산용)
         # 모든 로그는 trade_worker_log DB 테이블에 시간순 적재
         self.wlog = WorkerLogger(repo, cfg.user_id, "buy")
+        # 이번 라운드 상태 — run() 이 라운드 시작 때 세팅한다(pick_candidates 등 훅이 참조).
+        self.realtime = False                   # 장중 실시간 매수 라운드인지
+        self.last_bought_code: Optional[str] = None   # 이번 라운드에 체결된 종목(없으면 None)
 
     # ── 모드별 훅 ────────────────────────────────────────────────────
     @abstractmethod
@@ -150,11 +154,19 @@ class BaseBuyExecutor(ABC):
         """NXT 프리마켓(08:00) 선매수 라운드에 참여하는 모드인지."""
         return False
 
+    def supports_realtime(self) -> bool:
+        """정규장 중 "계좌 0종목" 실시간 매수 라운드(main._maybe_realtime_buy)에 참여하는 모드인지."""
+        return False
+
     # ── 템플릿 ───────────────────────────────────────────────────────
-    def run(self, premarket: bool = False):
-        """premarket=False: 정규장 · 시장가 / True: NXT 프리마켓 · 지정가."""
+    def run(self, premarket: bool = False, realtime: bool = False):
+        """premarket=False: 정규장 · 시장가 / True: NXT 프리마켓 · 지정가.
+        realtime=True: 정규장 장중 실시간 라운드(시장가). 09:00 라운드와 같은 흐름이고
+        후보 선정만 모드가 self.realtime 을 보고 달리한다(BuyExecutor1 참고)."""
         uid = self.cfg.user_id
-        tag = "NXT프리마켓" if premarket else "정규장"
+        tag = "NXT프리마켓" if premarket else ("실시간" if realtime else "정규장")
+        self.realtime = realtime
+        self.last_bought_code = None
 
         # 매매정지(M0): 라운드 자체를 열지 않는다. try/finally(_finalize_round) **앞**에서 빠져야
         # 최우선타겟 1회성 소비 같은 라운드 종료 처리도 일어나지 않는다(매수를 안 했으니 소비도 없다).
@@ -170,6 +182,9 @@ class BaseBuyExecutor(ABC):
         try:
             if premarket and not self.supports_premarket():
                 self.wlog.info("[매수] %s 는 프리마켓 라운드를 쓰지 않음 → skip", type(self).__name__)
+                return
+            if realtime and not self.supports_realtime():
+                self.wlog.info("[매수] %s 는 실시간 라운드를 쓰지 않음 → skip", type(self).__name__)
                 return
 
             # 1) 매수 가능 여부(모드별 포지션 정책)
@@ -203,6 +218,7 @@ class BaseBuyExecutor(ABC):
                     continue
 
                 if self._place_and_settle(cand, price, qty, balance, premarket, tag):
+                    self.last_bought_code = cand.code
                     return   # 체결 완료 → 이번 라운드 종료
 
             self.wlog.info("[매수] 체결 가능한 후보 없음 (후보=%d)", len(candidates))

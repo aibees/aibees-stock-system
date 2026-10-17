@@ -307,6 +307,11 @@ def main():
     # 매수: 09:00 cron (개장 시 일봉 SELL 정리 → 매수)
     scheduler = BackgroundScheduler(timezone=timezone("Asia/Seoul"))
 
+    # 매수 라운드 상호배제 — 08:00 프리마켓 · 09:00 개장 · 장중 실시간 라운드가 같은 BuyExecutor
+    # 인스턴스(라운드 캐시·최우선타겟 상태)를 쓰므로 동시에 돌면 안 된다. 스케줄러 job 은 서로 다른
+    # 스레드에서 돌 수 있다. 실시간 라운드는 락이 잡혀 있으면 기다리지 않고 이번 폴링을 건너뛴다.
+    _buy_lock = threading.Lock()
+
     def _open_routine():
         # 장 개시(개장일) 확인 — 주말 제외 + KIS 휴장일 API(opnd_yn).
         # 휴장이면 라인 재계산/매도/매수 전체를 건너뛴다(개장일에만 루틴 수행).
@@ -336,7 +341,8 @@ def main():
             _reconcile_positions(cfg, broker, repo)
             sell.reload_positions()      # HOLDING 포지션 재적재(감시 대상 갱신)
             sell.refresh_positions()     # 모드 전략으로 라인/액션 재계산 + SELL이면 즉시 매도
-            buy.run()                    # 매수
+            with _buy_lock:
+                buy.run()                # 매수
             # 매수는 이 루틴의 마지막이라, 여기서 다시 적재하지 않으면 당일 산 종목이
             # sell 의 감시 대상(positions)·소켓 구독에 들어가지 않는다.
             # → 진입 당일 하루 종일 손절/익절이 돌지 않는 사각지대가 생긴다.
@@ -373,7 +379,8 @@ def main():
             # 개장 루틴과 동일하게, 매수 직전 설정 강제 재로드 (위 _open_routine 주석 참조).
             # 프리마켓은 targets[0] 하나만 보므로 정렬이 틀리면 아예 다른 종목을 산다.
             sell.apply_settings_change()
-            buy.run(premarket=True)
+            with _buy_lock:
+                buy.run(premarket=True)
             sell.reload_positions(reset_sold=False)   # 프리마켓 체결분 즉시 감시 등록
         except Exception as e:  # noqa: BLE001
             log.exception("프리마켓 루틴 실패: %s", e)
@@ -438,6 +445,50 @@ def main():
             _trading_cache[ymd] = trading
         return _trading_cache[ymd]
 
+    # ── 실시간 매수 (user_options.s1_realtime_buy=1) ──────────────────
+    #   정규장(cfg.realtime_buy_start~end) 중 계좌 보유가 0종목이 되면 **가장 최신 매수타겟**
+    #   (장중 갱신 배치가 돌았으면 오늘 목록, 아니면 전날 최종 목록)으로 09:00 과 같은 라운드를 연다.
+    #     · 당일 손실 매도 종목은 후보에서 뺀다(BuyExecutor1.pick_candidates).
+    #     · 갭 게이트 기준가 = 그 매수타겟의 close(장중 목록이면 배치 조회 시점 가격).
+    #     · 하루 횟수 상한 없음. 다만 체결 없이 끝난 라운드(갭 초과·후보 없음)는
+    #       cfg.realtime_buy_retry_sec 동안 다시 열지 않는다 — 10초 폴링마다 KIS 시세·매수가능
+    #       조회를 반복하지 않기 위해서다.
+    _realtime_next_at = [0.0]        # 다음 실시간 라운드 허용 시각(monotonic)
+
+    def _maybe_realtime_buy(now_kst):
+        meta = getattr(strategy, "user_meta", None)
+        if not meta or int(getattr(meta, "s1_realtime_buy", 0) or 0) != 1:
+            return
+        if strategy.halted or not buy.supports_realtime():
+            return
+        hhmm = now_kst.hour * 100 + now_kst.minute
+        if not (cfg.realtime_buy_start_hhmm <= hhmm < cfg.realtime_buy_end_hhmm):
+            return
+        if time.monotonic() < _realtime_next_at[0]:
+            return
+        # 1차: DB 기준(값싼 조회). worker 포지션이 하나라도 있거나 직전 폴링 스냅샷에 보유가 있으면 끝.
+        if repo.get_holding_positions(cfg.user_id) or repo.get_user_holdings(cfg.user_id):
+            return
+        # 2차: 계좌 실조회로 확정. 조회 실패(None)면 "비었다"고 단정할 수 없으므로 사지 않는다.
+        holdings = broker.account_holdings()
+        if holdings is None:
+            log.warning("[실시간매수] 계좌 보유 조회 실패 → 이번 폴링 skip")
+            return
+        if any(Decimal(str(h.get("qty") or 0)) > 0 for h in holdings):
+            return
+        if not _buy_lock.acquire(blocking=False):
+            return
+        try:
+            _realtime_next_at[0] = time.monotonic() + cfg.realtime_buy_retry_sec
+            log.info("[실시간매수] 계좌 보유 0종목 → 최신 매수타겟으로 매수 라운드 시작")
+            buy.run(realtime=True)
+            if buy.last_bought_code:
+                # 체결됐으면 곧 보유가 생겨 다음 폴링부터 자연히 멈춘다. 쿨다운은 남겨 둔다 —
+                # 체결 직후 잔고 반영이 늦는 사이에 한 번 더 사는 2중 매수를 막는다.
+                sell.reload_positions(reset_sold=False)   # 실시간 체결분 즉시 감시 등록
+        finally:
+            _buy_lock.release()
+
     def _poll_wallet():
         now_kst = datetime.now(_KST)
         if now_kst.weekday() >= 5:                                  # 주말
@@ -453,6 +504,11 @@ def main():
             reconcile_wallet(broker, repo, cfg.user_id, sync=True, tag="poll", sell_executor=sell)
         except Exception as e:  # noqa: BLE001
             log.warning("[poll] 계좌 갱신 실패: %s", e)
+        # 방금 갱신한 계좌 기준으로 "보유 0종목"이면 실시간 매수 라운드를 연다(옵션 사용자만).
+        try:
+            _maybe_realtime_buy(now_kst)
+        except Exception as e:  # noqa: BLE001
+            log.exception("[실시간매수] 실패: %s", e)
         # 끝내 체결도 취소도 되지 않은 주문 추적을 정리한다(메모리 누수 방지).
         try:
             broker.sweep_watches()

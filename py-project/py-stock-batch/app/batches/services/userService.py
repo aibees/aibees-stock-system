@@ -87,6 +87,8 @@ def extractor(x) -> UserOptionMeta:
     user_meta.s1_buy_order              = x.get('s1_buy_order')
     # worker 정규장 매수 시가갭 차단 기준(비율, None=기본 0.02)
     user_meta.s1_gap_block_pct          = x.get('s1_gap_block_pct')
+    # worker 실시간 매수(계좌 0종목이면 정규장 중 재매수, None/0=미사용)
+    user_meta.s1_realtime_buy           = x.get('s1_realtime_buy')
     return user_meta
 
 

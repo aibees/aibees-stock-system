@@ -132,6 +132,39 @@
                 </section>
 
                 <!-- ════════════════════════════════════════════════
+                     1-2. 실시간 매수 (개인화) — 정규장 중 계좌 보유가 0종목이 되면
+                          가장 최신 매수타겟 1순위로 다시 매수한다
+                ═════════════════════════════════════════════════ -->
+                <section class="setting-card">
+                    <header class="card-head">
+                        <div class="ch-left">
+                            <h3>실시간 매수</h3>
+                        </div>
+                    </header>
+
+                    <div class="field-list">
+                        <div class="field-row">
+                            <div class="fr-head">
+                                <label for="s1_realtime_buy">보유 종목이 없으면 즉시 매수</label>
+                            </div>
+                            <div class="fr-ctrl bool-ctrl">
+                                <button id="s1_realtime_buy" type="button"
+                                    :class="['toggle-btn', realtimeBuy ? 'active' : 'inactive']"
+                                    role="switch" :aria-checked="realtimeBuy"
+                                    @click="realtimeBuy = !realtimeBuy">
+                                    <span class="toggle-knob"></span>
+                                </button>
+                                <span class="bool-text">{{ realtimeBuy ? '사용' : '미사용' }}</span>
+                            </div>
+                            <p class="fr-desc">
+                                정규장(09:05~15:20) 중 계좌에 주식이 하나도 없으면 가장 최신 매수타겟 순서대로 매수합니다.
+                                오늘 손실로 매도한 종목은 다시 사지 않고, 갭은 그 매수타겟 시점 가격 기준으로 봅니다.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ════════════════════════════════════════════════
                      2. 후보 선정 조건 (관리자 전용)
                 ═════════════════════════════════════════════════ -->
                 <section v-if="!canEditStrategy" class="admin-notice">
@@ -400,6 +433,12 @@ const gapError = computed(() => {
 const gapToApi = () => (gapPct.value === '' ? null : +(Number(gapPct.value) / 100).toFixed(6));
 
 /* ═══════════════════════════════════════════════════════════
+ * 1-2. 실시간 매수 (s1_realtime_buy, 개인화) — 서버 NULL/0 = 미사용, 1 = 사용
+ * ═══════════════════════════════════════════════════════════ */
+const realtimeBuy = ref(false);
+let originalRealtimeBuy = false;
+
+/* ═══════════════════════════════════════════════════════════
  * 2. 후보 선정 조건 (관리자 전용) — KospiStrategy0.get_action_in_watch
  * ═══════════════════════════════════════════════════════════ */
 const SIGNAL_MODE_OPTIONS = [
@@ -578,6 +617,7 @@ const fetchOptions = async () => {
         orderRows.value = specToRows(d.s1_buy_order || DEFAULT_ORDER_SPEC);
         gapPct.value = d.s1_gap_block_pct === null || d.s1_gap_block_pct === undefined
             ? '' : +(Number(d.s1_gap_block_pct) * 100).toFixed(4);
+        realtimeBuy.value = Number(d.s1_realtime_buy) === 1;
     } catch (e) {
         console.error('[BuySetting] 조회 실패', e);
         orderRows.value = specToRows(DEFAULT_ORDER_SPEC);
@@ -585,6 +625,7 @@ const fetchOptions = async () => {
         original = JSON.parse(JSON.stringify(form));
         originalOrderSpec = orderSpec.value;
         originalGapPct = gapPct.value;
+        originalRealtimeBuy = realtimeBuy.value;
         isLoading.value = false;
     }
 };
@@ -660,6 +701,8 @@ const buildDiff = () => {
     if (orderSpec.value !== originalOrderSpec) diff.s1_buy_order = orderSpec.value || null;
     // 시가 갭 허용치(개인화) — 관리자 여부와 무관하게 전송
     if (String(gapPct.value) !== String(originalGapPct)) diff.s1_gap_block_pct = gapToApi();
+    // 실시간 매수(개인화) — 관리자 여부와 무관하게 전송
+    if (realtimeBuy.value !== originalRealtimeBuy) diff.s1_realtime_buy = realtimeBuy.value ? 1 : 0;
     return diff;
 };
 const isDirty = computed(() => Object.keys(buildDiff()).length > 0);
@@ -669,6 +712,7 @@ const resetForm = () => {
     Object.assign(form, JSON.parse(JSON.stringify(original)));
     orderRows.value = specToRows(originalOrderSpec);
     gapPct.value = originalGapPct;
+    realtimeBuy.value = originalRealtimeBuy;
 };
 
 const save = async () => {
@@ -687,8 +731,9 @@ const save = async () => {
         original = JSON.parse(JSON.stringify(form));
         originalOrderSpec = orderSpec.value;
         originalGapPct = gapPct.value;
+        originalRealtimeBuy = realtimeBuy.value;
         mariaToast.success(
-            ('s1_buy_order' in payload || 's1_gap_block_pct' in payload)
+            ('s1_buy_order' in payload || 's1_gap_block_pct' in payload || 's1_realtime_buy' in payload)
                 ? '저장되었습니다. 다음 매수 라운드부터 적용됩니다.'
                 : '저장되었습니다. 다음 매수타겟 생성부터 반영됩니다.');
     } catch (e) {
@@ -1187,6 +1232,13 @@ const save = async () => {
 }
 
 .field-error.block { margin-top: 10px; }
+
+.fr-desc {
+    margin: 6px 0 0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: #9A8C7E;
+}
 
 /* ── 저장 바 ── */
 .save-bar {

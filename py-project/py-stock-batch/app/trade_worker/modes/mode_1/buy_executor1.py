@@ -61,6 +61,10 @@ class BuyExecutor1(BaseBuyExecutor):
         """NXT 프리마켓(08:00) 선매수 라운드를 쓴다."""
         return True
 
+    def supports_realtime(self) -> bool:
+        """정규장 중 계좌 0종목 실시간 매수 라운드를 쓴다(user_options.s1_realtime_buy=1 일 때만 열림)."""
+        return True
+
     # ── 1포지션 원칙 + 최우선타겟 예외 ───────────────────────────────
     def allow_buy(self) -> bool:
         """베이스의 1포지션 판정에 **최우선타겟 예외**를 더한다.
@@ -149,9 +153,12 @@ class BuyExecutor1(BaseBuyExecutor):
             return price
 
         if gap_pct > limit:
+            # 실시간 라운드의 ref_close 는 전일종가가 아니라 "가장 최신 매수타겟의 close"다 —
+            # 장중 갱신 목록이면 그 배치가 조회한 시점의 가격(진행 중 봉의 종가)이다.
+            ref_label = "매수타겟 기준가" if self.realtime else "전일종가"
             self.wlog.info(
-                "[매수] %s 시가갭 %.2f%%(전일종가=%s, 현재가=%s) > 허용치 %.1f%% → skip",
-                cand.code, float(gap_pct * 100), ref_close, price, float(limit * 100),
+                "[매수] %s 갭 %.2f%%(%s=%s, 현재가=%s) > 허용치 %.1f%% → skip",
+                cand.code, float(gap_pct * 100), ref_label, ref_close, price, float(limit * 100),
             )
             return None
         return price
@@ -190,6 +197,24 @@ class BuyExecutor1(BaseBuyExecutor):
             targets = [t for t in targets if t["stock_code"] == self._priority_code]
             self.wlog.info("[매수] 1포지션 예외 라운드 → 최우선타겟 %s 단독 후보(대신매수 없음)",
                            self._priority_code)
+
+        # 실시간 라운드: 오늘 **손실로** 매도한 종목은 다시 사지 않는다(수익 매도 종목은 허용).
+        #   사용자가 직접 지정한 최우선타겟은 의도적인 선택이라 예외로 둔다.
+        if self.realtime:
+            try:
+                blocked = self.repo.get_today_loss_exit_codes(self.cfg.user_id)
+            except Exception as e:  # noqa: BLE001
+                # 조회가 안 되면 손절 직후 같은 종목 재매수를 막을 수 없다 → 라운드 자체를 접는다.
+                self.wlog.warn("[매수] 당일 손실매도 종목 조회 실패 → 실시간 라운드 skip: %s", e)
+                return []
+            if blocked:
+                kept = [t for t in targets
+                        if t["stock_code"] not in blocked or t["stock_code"] == self._priority_code]
+                dropped = [t["stock_code"] for t in targets if t not in kept]
+                if dropped:
+                    self.wlog.info("[매수] 실시간 라운드 · 당일 손실매도 종목 제외: %s",
+                                   ", ".join(dropped))
+                targets = kept
 
         if premarket:
             if not targets:
@@ -239,6 +264,12 @@ class BuyExecutor1(BaseBuyExecutor):
         08:00 캐시가 남으면 09:00 라운드가 한 시간 전 타겟·판정을 재사용한다."""
         try:
             if premarket:
+                return
+            # 실시간 라운드는 계좌가 비어 있는 동안 몇 분 간격으로 반복해서 열린다.
+            # 여기서 무조건 소비하면 장중에 "내일 아침용"으로 지정해 둔 최우선타겟이
+            # 다음 실시간 라운드에서 사지도 않은 채 지워진다 → 실제로 그 종목을 샀을 때만 소비한다.
+            if self.realtime and (not self._priority_code
+                                  or self.last_bought_code != self._priority_code):
                 return
             try:
                 if self.repo.clear_priority_target(self.cfg.user_id):

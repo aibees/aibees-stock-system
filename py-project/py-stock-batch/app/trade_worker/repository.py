@@ -129,6 +129,22 @@ class Repository:
             s.commit()
             return result.rowcount > 0
 
+    def get_today_loss_exit_codes(self, user_id: int) -> set[str]:
+        """오늘 **손실로** 매도(청산)된 종목코드 — 실시간 매수 라운드의 재매수 금지 대상.
+
+        손실 = 매도가 ≤ 매수가. 매도가를 모르면(NULL — 외부청산 추정가 조회 실패 등)
+        손실 여부를 알 수 없으므로 보수적으로 금지 쪽에 넣는다. 수익 매도 종목은 다시 살 수 있다.
+        exit_at 은 KST naive 로 저장되고 DB 세션 TZ 도 +09:00 이라 CURDATE() 가 KST 오늘이다.
+        """
+        sql = text(
+            "SELECT DISTINCT stock_code FROM trade_worker_position "
+            " WHERE user_id = :uid AND exit_at >= CURDATE() "
+            "   AND (exit_price IS NULL OR exit_price <= entry_price)"
+        )
+        with get_session() as s:
+            rows = s.execute(sql, {"uid": user_id}).mappings().all()
+        return {r["stock_code"] for r in rows}
+
     # ── worker 전용 포지션 테이블(trade_worker_position) ─────────────
     #   trade_sell_target_stock 와 무관. worker 가 직접 매수한 HOLDING 만 다룬다.
     def get_holding_positions(self, user_id: int, exclude_exclusive: bool = False) -> list[dict]:

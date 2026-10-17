@@ -129,6 +129,8 @@ _S1_COLS: dict[str, str] = {
     # ── worker 매수타겟 정렬 · 시가갭 차단 기준 (개인화) ──
     's1_buy_order':              'buy_order',
     's1_gap_block_pct':          'gap_pct',
+    # ── worker 실시간 매수 on/off (개인화) ──
+    's1_realtime_buy':           'tinyint',
 }
 
 # 시가갭 차단 기준 허용 범위(비율). 0.5% 미만은 호가 단위 노이즈에도 매번 걸려 매수가 사실상 막힌다.
@@ -153,7 +155,7 @@ _FIB_LEVELS = (0.382, 0.5, 0.618)
 #     → 일반 유저가 바꿔도 자기 화면엔 반영되지 않고(공용 테이블이라),
 #       관리자가 바꾸면 전원에게 영향이 간다. 개인화가 성립하지 않는 값들.
 #
-#  [개인화] 그 외 (매도 파라미터 전체 + s1_buy_order + s1_gap_block_pct)
+#  [개인화] 그 외 (매도 파라미터 전체 + s1_buy_order + s1_gap_block_pct + s1_realtime_buy)
 #     worker(SellStrategy / BuyExecutor)가 user_id 별로 읽어 쓴다. 서로 간섭 없음.
 # ─────────────────────────────────────────────────────────────────────
 _S1_ADMIN_ONLY_COLS = frozenset({

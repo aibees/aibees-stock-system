@@ -85,6 +85,10 @@ class UserOptions(Base):
     # |시가 − 전일종가| ÷ 전일종가 가 이 값을 넘으면 그 후보를 건너뛴다. 유저별 개인화.
     s1_gap_block_pct = Column(DECIMAL(6, 4), nullable=True)
 
+    # worker 실시간 매수(sql/39). 1 = 정규장 중 계좌 보유가 0종목이 되면 가장 최신 매수타겟으로
+    # 즉시 매수 라운드를 연다. NULL/0 = 사용 안 함(09:00 라운드만). 유저별 개인화.
+    s1_realtime_buy = Column(TINYINT(1), nullable=True)
+
     def to_dict(self):
         return {
             "user_id": self.user_id,
@@ -145,4 +149,5 @@ class UserOptions(Base):
             "s1_ma20_signal_mode": self.s1_ma20_signal_mode,
             "s1_buy_order": self.s1_buy_order,
             "s1_gap_block_pct": self.s1_gap_block_pct,
+            "s1_realtime_buy": self.s1_realtime_buy,
         }

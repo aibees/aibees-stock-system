@@ -76,6 +76,12 @@ class WorkerConfig:
     # HOLDING 인데 계좌 실보유에 없는 포지션을 외부청산으로 닫기까지 필요한 연속 미발견 횟수
     # (2026-10-01). 1회 관측으로 닫으면 잔고 조회가 일시적으로 불완전할 때 오판 청산한다.
     position_vanish_miss: int = 3
+    # 실시간 매수(user_options.s1_realtime_buy=1) — 정규장 중 계좌 0종목이면 최신 매수타겟으로 재매수.
+    #   창: [start, end) HHMM. 09:00 개장 루틴과 겹치지 않게 09:05 부터, 15:20 동시호가 전까지.
+    #   retry_sec: 라운드가 체결 없이 끝났을 때(갭 초과 등) 다음 시도까지 최소 간격.
+    realtime_buy_start_hhmm: int = 905
+    realtime_buy_end_hhmm: int = 1520
+    realtime_buy_retry_sec: int = 300
 
 
 def load() -> WorkerConfig:
@@ -113,4 +119,7 @@ def load() -> WorkerConfig:
         position_vanish_miss=max(1, int(os.getenv("POSITION_VANISH_MISS", "3"))),
         settings_poll_sec=int(os.getenv("SETTINGS_POLL_SEC", "60")),
         krx_aftermarket_enabled=_bool(os.getenv("KRX_AFTERMARKET_ENABLED"), True),
+        realtime_buy_start_hhmm=int(os.getenv("REALTIME_BUY_START", "09:05").replace(":", "")),
+        realtime_buy_end_hhmm=int(os.getenv("REALTIME_BUY_END", "15:20").replace(":", "")),
+        realtime_buy_retry_sec=int(os.getenv("REALTIME_BUY_RETRY_SEC", "300")),
     )
