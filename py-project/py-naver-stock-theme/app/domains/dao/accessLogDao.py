@@ -6,6 +6,7 @@
   - 기록이 실패해도(테이블 미적용 등) 로그인·화면 이동은 막지 않는다 → 예외는 로그만 남기고 삼킨다.
 """
 import logging
+from datetime import datetime, timedelta
 
 from flask import request
 from sqlalchemy import text
@@ -65,3 +66,107 @@ class AccessLogDao:
                 'user_agent': _user_agent(),
             },
         )
+
+    # 조회 — 접속 로그 관리자 화면 (router_access_log.py, ADMIN 전용)
+    # ================================================================
+    @staticmethod
+    def _parse_from(value):
+        """'YYYY-MM-DD' 또는 ISO8601 → datetime. 'YYYY-MM-DD' 는 00:00:00 으로 보정."""
+        if not value:
+            return None
+        v = str(value).strip()
+        return datetime.strptime(v, "%Y-%m-%d") if len(v) == 10 else datetime.fromisoformat(v)
+
+    @staticmethod
+    def _parse_to(value):
+        """'to' 상한. 'YYYY-MM-DD' 로 오면 다음날 00:00:00 으로 보정(exclusive <)."""
+        if not value:
+            return None
+        v = str(value).strip()
+        if len(v) == 10:
+            return datetime.strptime(v, "%Y-%m-%d") + timedelta(days=1)
+        return datetime.fromisoformat(v)
+
+    def select_login_log_page(self, session, page: int, size: int,
+                               login_type=None, result=None, keyword=None,
+                               date_from=None, date_to=None):
+        """user_login_log 목록(최신순) + total. 조회는 요청 세션(g.db)을 그대로 쓴다(기록과 달리 분리 불필요)."""
+        where = """
+            WHERE (:login_type IS NULL OR l.login_type = :login_type)
+              AND (:result     IS NULL OR l.result = :result)
+              AND (:date_from  IS NULL OR l.created_date >= :date_from)
+              AND (:date_to    IS NULL OR l.created_date <  :date_to)
+              AND (:keyword    IS NULL OR l.login_key LIKE :keyword OR l.client_ip LIKE :keyword
+                   OR um.user_name LIKE :keyword OR um.email LIKE :keyword)
+        """
+        params = {
+            'login_type': login_type or None,
+            'result': result or None,
+            'keyword': f"%{keyword}%" if keyword else None,
+            'date_from': self._parse_from(date_from),
+            'date_to': self._parse_to(date_to),
+        }
+
+        total = session.execute(
+            text(f"""
+                SELECT COUNT(*)
+                FROM   user_login_log l
+                LEFT JOIN user_master um ON um.user_id = l.user_id
+                {where}
+            """), params
+        ).scalar() or 0
+
+        rows = session.execute(
+            text(f"""
+                SELECT l.log_id, l.user_id, um.user_name, um.email, l.login_type, l.result,
+                       l.login_key, l.fail_reason, l.client_ip, l.user_agent, l.created_date
+                FROM   user_login_log l
+                LEFT JOIN user_master um ON um.user_id = l.user_id
+                {where}
+                ORDER BY l.log_id DESC
+                LIMIT :limit OFFSET :offset
+            """),
+            {**params, 'limit': size, 'offset': page * size},
+        ).mappings().all()
+        return [dict(r) for r in rows], total
+
+    def select_menu_access_log_page(self, session, page: int, size: int,
+                                     menu_code=None, keyword=None,
+                                     date_from=None, date_to=None):
+        """user_menu_access_log 목록(최신순) + total."""
+        where = """
+            WHERE (:menu_code IS NULL OR m.menu_code = :menu_code)
+              AND (:date_from IS NULL OR m.created_date >= :date_from)
+              AND (:date_to   IS NULL OR m.created_date <  :date_to)
+              AND (:keyword   IS NULL OR m.menu_path LIKE :keyword OR m.client_ip LIKE :keyword
+                   OR um.user_name LIKE :keyword OR um.email LIKE :keyword)
+        """
+        params = {
+            'menu_code': menu_code or None,
+            'keyword': f"%{keyword}%" if keyword else None,
+            'date_from': self._parse_from(date_from),
+            'date_to': self._parse_to(date_to),
+        }
+
+        total = session.execute(
+            text(f"""
+                SELECT COUNT(*)
+                FROM   user_menu_access_log m
+                LEFT JOIN user_master um ON um.user_id = m.user_id
+                {where}
+            """), params
+        ).scalar() or 0
+
+        rows = session.execute(
+            text(f"""
+                SELECT m.log_id, m.user_id, um.user_name, um.email, m.menu_code, m.menu_path,
+                       m.client_ip, m.user_agent, m.created_date
+                FROM   user_menu_access_log m
+                LEFT JOIN user_master um ON um.user_id = m.user_id
+                {where}
+                ORDER BY m.log_id DESC
+                LIMIT :limit OFFSET :offset
+            """),
+            {**params, 'limit': size, 'offset': page * size},
+        ).mappings().all()
+        return [dict(r) for r in rows], total
