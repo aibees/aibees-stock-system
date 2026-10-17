@@ -72,8 +72,21 @@ class RoleMenuDao:
             ).scalars().all())
         else:
             granted = set()
-        return [r for r in rows
-                if r['common_flag'] == 'Y' or r['public_flag'] == 'Y' or r['menu_code'] in granted]
+        visible = {r['menu_code']: r for r in rows
+                   if r['common_flag'] == 'Y' or r['public_flag'] == 'Y' or r['menu_code'] in granted}
+
+        # 자식만 부여되고 상위(root) 메뉴 자체는 미부여인 경우 — 상위 행을 "껍데기"로라도
+        # 포함한다. 그러지 않으면 상위 행이 roots 에 없어 호출측(router_master.py)의
+        # 부모 파생(if kids: ...)이 자식을 붙일 대상을 못 찾고, 보이는 자식이 있어도
+        # 메뉴 전체가 통째로 사라진다
+        # (예: WORKER_USER 는 Trade 의 자식(TradeLog 등)만 부여돼 있고 Trade 자신은
+        #  미부여라 /trade 메뉴가 전혀 안 보였다 — 2026-10-17).
+        needed_parents = {r['menu_parents'] for r in visible.values() if r['menu_parents'] != 'root'}
+        for r in rows:
+            if r['menu_code'] in needed_parents and r['menu_code'] not in visible:
+                visible[r['menu_code']] = r
+
+        return list(visible.values())
 
     def select_features_for_user(self, session, auth_ids):
         """기능 플래그. ADMIN 도 우회 없이 role_feature 에 명시된 것만 인정한다."""
