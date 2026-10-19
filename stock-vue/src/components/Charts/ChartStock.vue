@@ -60,14 +60,6 @@
                             <span class="stock-name">{{ searchParam.name || searchParam.code }}</span>
                             <span class="stock-code">{{ searchParam.code }}</span>
                         </div>
-                        <div class="legend">
-                            <span class="leg-item" style="--c:#f38980">MA5</span>
-                            <span class="leg-item" style="--c:#efa55b">MA20</span>
-                            <span class="leg-item" style="--c:#8bb400">MA60</span>
-                            <span class="leg-item" style="--c:#01b6f3">MA120</span>
-                            <span class="leg-item leg-dashed" style="--c:#a78bfa">BB</span>
-                            <span class="leg-item leg-bar" style="--c:rgba(100,100,100,0.35)">Vol</span>
-                        </div>
                     </div>
                     <!-- 시가총액(상장주식수 × 직전 영업일 종가) + 같은 날 투자자별 순매수. 순매수=빨강, 순매도=파랑 -->
                     <dl v-if="summary" class="stock-summary">
@@ -83,10 +75,9 @@
                         </template>
                         <p v-if="summary.investor" class="summary-note">{{ summary.investor.dateLabel }} 종가·순매수 기준</p>
                     </dl>
-                    <div class="chart-scroll" ref="chartScroll">
-                        <div class="chart-wrap" :style="{ width: dynamicWidth }">
-                            <CandlestickChart :chartData="chartData" :extraOptions="chartOptions" />
-                        </div>
+                    <!-- 휠/핀치로 확대, 드래그로 이동, 마우스를 올리면 위 범례가 그 봉 값으로 바뀐다 -->
+                    <div class="chart-wrap">
+                        <LwStockChart :data="chartData" />
                     </div>
                 </div>
 
@@ -101,7 +92,7 @@
 <script setup>
 import Lnb from '../common/Lnb.vue';
 import SAutoInput from '../common/comp/SAutoInput.vue';
-import CandlestickChart from '../common/comp/CandlestickChart.vue';
+import LwStockChart from '../common/comp/LwStockChart.vue';
 import aibeesApi from '@scripts/aibeesApi.js';
 import { formatEok, formatNetAmt, signClass, shortYmd } from '@scripts/marketFormat.js';
 
@@ -130,26 +121,15 @@ const searchParam = reactive({
 });
 
 const chartData    = ref(null);
-const chartOptions = ref(null);
 const isLoading    = ref(false);
-const slicedLength = ref(0);
-const windowWidth  = ref(window.innerWidth);
-
-const onResize = () => { windowWidth.value = window.innerWidth; };
 
 onMounted(async () => {
-    window.addEventListener('resize', onResize);
-
     const code = route.query.code || '';
     if (code) {
         searchParam.code = code;
         await setStockInfo(code);
         await fetchChart();
     }
-});
-
-onBeforeUnmount(() => {
-    window.removeEventListener('resize', onResize);
 });
 
 const setStockInfo = async (code) => {
@@ -208,86 +188,13 @@ const fetchChart = async () => {
         }
         const { data } = await aibeesApi.get('/api/v1/charts/stock', { params });
 
-        const all = data.data;
-
-        const volume = all.volume || [];
-        const rate   = all.rate   || [];
-
-        // rate를 ohcl 각 항목에 병합 → tooltip에서 context.raw.rate로 접근
-        const ohcl = (all.ohcl || []).map((c, i) => ({ ...c, rate: rate[i] ?? null }));
-        slicedLength.value = ohcl.length;
-
-        // y2 max를 실제 최대값의 5배로 → 볼륨 바가 하단 20%에만 표시
-        const maxVol = Math.max(...volume.map(v => (typeof v === 'object' ? v.y : v) || 0), 1);
-        chartOptions.value = {
-            scales: {
-                y2: {
-                    position: 'right',
-                    display: false,
-                    beginAtZero: true,
-                    max: maxVol * 5,
-                    grid: { display: false },
-                },
-            },
-        };
-
-        // 상승/하락 기준으로 볼륨 바 색상
-        const volColors = ohcl.map(c =>
-            c.o <= c.c ? 'rgba(197,19,0,0.25)' : 'rgba(3,116,141,0.25)'
-        );
-
-        chartData.value = {
-            datasets: [
-                {
-                    label: 'Candle',
-                    data:  ohcl,
-                    color: { up: '#C8282A', down: '#1F5BD1', unchanged: '#9A8C7E' }
-                },
-                { label: 'MA5',      data: all.ma5      || [], borderColor: '#f38980', type: 'line', pointRadius: 0 },
-                { label: 'MA20',     data: all.ma20     || [], borderColor: '#efa55b', type: 'line', pointRadius: 0 },
-                { label: 'MA60',     data: all.ma60     || [], borderColor: '#8bb400', type: 'line', pointRadius: 0 },
-                { label: 'MA120',    data: all.ma120    || [], borderColor: '#01b6f3', type: 'line', pointRadius: 0 },
-                { label: 'BB Upper', data: all.bb_upper || [], borderColor: '#a78bfa', borderDash: [4, 3], type: 'line', pointRadius: 0 },
-                { label: 'BB Mid',   data: all.bb_mid   || [], borderColor: '#818cf8', borderDash: [4, 3], type: 'line', pointRadius: 0 },
-                { label: 'BB Lower', data: all.bb_lower || [], borderColor: '#a78bfa', borderDash: [4, 3], type: 'line', pointRadius: 0 },
-                {
-                    label:           'Volume',
-                    data:            volume,
-                    type:            'bar',
-                    yAxisID:         'y2',
-                    backgroundColor: volColors,
-                    borderWidth:     0,
-                    barPercentage:    0.4,
-                    categoryPercentage: 0.5,
-                    maxBarThickness: 6,
-                },
-            ]
-        };
+        chartData.value = data.data;   // { ohcl, volume, rate, ma5..ma120, bb_* } 그대로 넘긴다
     } catch (e) {
         console.error(e);
     } finally {
         isLoading.value = false;
     }
 };
-
-const dynamicWidth = computed(() => {
-    const px = windowWidth.value < 768 ? 10 : 20;
-    return Math.max(slicedLength.value * px, 400) + 'px';
-});
-
-// 차트가 화면보다 넓으면 가로 스크롤이 생긴다. 로드 직후엔 최근 봉(오른쪽 끝)이 보이게 맞춘다.
-// .chart-scroll 은 로딩이 끝나야 렌더되므로 DOM 갱신(nextTick)과 레이아웃(rAF)을 기다린 뒤 이동한다.
-const chartScroll = ref(null);
-const scrollToLatest = async () => {
-    await nextTick();
-    requestAnimationFrame(() => {
-        const el = chartScroll.value;
-        if (el) el.scrollLeft = el.scrollWidth;
-    });
-};
-watch([chartData, isLoading, dynamicWidth], () => {
-    if (chartData.value && !isLoading.value) scrollToLatest();
-});
 </script>
 
 <style scoped lang="scss">
@@ -487,12 +394,6 @@ $cream:   #FFF8E1;
             .stock-name { font-size: 18px; font-weight: 700; color: $ink; }
             .stock-code { font-size: 13px; color: $sub-2; }
         }
-
-        .legend {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
     }
 
     // 시가총액 · 전일 수급 — 칩 없이 한 줄 텍스트(라벨 + 값), 등락은 글자색으로만
@@ -519,50 +420,9 @@ $cream:   #FFF8E1;
         }
     }
 
-    .chart-header {
-
-        .leg-item {
-            font-size: 12px;
-            font-weight: 600;
-            color: $sub;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-
-            &::before {
-                content: '';
-                display: inline-block;
-                width: 16px;
-                height: 2px;
-                background: var(--c);
-            }
-
-            &.leg-dashed::before {
-                background: none;
-                border-top: 2px dashed var(--c);
-            }
-
-            &.leg-bar::before {
-                width: 10px;
-                height: 10px;
-                border-radius: 2px;
-                background: var(--c);
-            }
-        }
-    }
-
-    .chart-scroll {
-        overflow-x: auto;
-        padding: 4px 0 8px;
-
-        &::-webkit-scrollbar       { height: 4px; }
-        &::-webkit-scrollbar-track { background: transparent; }
-        &::-webkit-scrollbar-thumb { background: $line-2; border-radius: 2px; }
-    }
-
+    // 범례(OHLC·이평 값)가 차트 컴포넌트 안에 있어 높이에 그만큼 더한다
     .chart-wrap {
-        min-width: 400px;
-        height: 62vh;
+        height: 66vh;
     }
 }
 
@@ -613,9 +473,7 @@ $cream:   #FFF8E1;
 
 /* ── 태블릿 / 좁은 화면 ── */
 @media (max-width: 768px) {
-    .legend { gap: 8px; }
-    .leg-item { font-size: 11px; }
-    .chart-wrap { height: 52vh; }
+    .chart-wrap { height: 58vh; }
     .chart-skeleton { height: 52vh; }
 }
 
@@ -642,17 +500,7 @@ $cream:   #FFF8E1;
         align-items: flex-start;
         gap: 8px;
     }
-    .chart-card .chart-header .legend {
-        width: 100%;
-        overflow-x: auto;
-        flex-wrap: nowrap;
-        padding-bottom: 2px;
-        -webkit-overflow-scrolling: touch;
-        &::-webkit-scrollbar { height: 3px; }
-    }
-    .leg-item { white-space: nowrap; }
-
-    .chart-card .chart-wrap { height: 46vh; min-width: 320px; }
+    .chart-card .chart-wrap { height: 56vh; }
     .chart-skeleton { height: 46vh; }
 }
 

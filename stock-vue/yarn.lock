@@ -1641,6 +1641,11 @@ exsolve@^1.0.1, exsolve@^1.0.5:
   resolved "https://registry.yarnpkg.com/exsolve/-/exsolve-1.0.5.tgz#1f5b6b4fe82ad6b28a173ccb955a635d77859dcf"
   integrity sha512-pz5dvkYYKQ1AHVrgOzBKWeP4u4FRb3a6DNK2ucr0OoNwYIU4QWsJ+NM36LLzORT+z845MzKHHhpXiUF5nvQoJg==
 
+fancy-canvas@2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/fancy-canvas/-/fancy-canvas-2.1.0.tgz#44b40e40419ad8ef8304df365e4276767e918552"
+  integrity sha512-nifxXJ95JNLFR2NgRV4/MxVP45G9909wJTEKz5fg/TZS20JJZA6hfgRVh/bC9bwl2zBtBNcYPjiBE4njQHVBwQ==
+
 faye-websocket@0.11.4:
   version "0.11.4"
   resolved "https://registry.yarnpkg.com/faye-websocket/-/faye-websocket-0.11.4.tgz#7f0d9275cfdd86a1c963dc8b65fcc451edcbb1da"
@@ -2028,6 +2033,13 @@ knitwork@^1.2.0:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/knitwork/-/knitwork-1.2.0.tgz#3cc92e76249aeb35449cfbed3f31c6df8444db3f"
   integrity sha512-xYSH7AvuQ6nXkq42x0v5S8/Iry+cfulBz/DJQzhIyESdLD7425jXsPy4vn5cCXU+HhRN2kVw51Vd1K6/By4BQg==
+
+lightweight-charts@5.2.1:
+  version "5.2.1"
+  resolved "https://registry.yarnpkg.com/lightweight-charts/-/lightweight-charts-5.2.1.tgz#5a27ead719573607d4d3483ad2728c055ccea8fd"
+  integrity sha512-IVwoK1RLFiLPubaKIjNbtjWLnpPMqiABSrTay6whmNa8L1+19292VtHJ+BWyPUuLCwF0tcQlhEWd1CLB2a1nsQ==
+  dependencies:
+    fancy-canvas "2.1.0"
 
 lines-and-columns@^1.1.6:
   version "1.2.4"
