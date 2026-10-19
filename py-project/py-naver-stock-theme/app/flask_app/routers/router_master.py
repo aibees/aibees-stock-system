@@ -20,15 +20,21 @@ masterStockDaoImpl = MasterStockDao()
 roleMenuDaoImpl = RoleMenuDao()
 masterCodesDaoImpl = MasterCodesDao()
 
-# 화면 설정값(공통코드). master_codes system=stock / source=setting / category=ad 의 {code: desc} 를
-# /menus/my 응답의 settings 로 같이 내려 준다 — 화면이 따로 요청하지 않아도 권한과 함께 받는다.
-#   GATE_INTERVAL : 광고 게이트를 N번 진입마다 1번 보여준다(프런트 useAdGate.js, 기본 5)
-_APP_SETTING_KEY = {'system': 'stock', 'source': 'setting', 'category': 'ad'}
+# 화면 설정값(공통코드). master_codes system=stock / source=setting / category ∈ _APP_SETTING_CATEGORIES 의
+# {code: desc} 를 /menus/my 응답의 settings 로 같이 내려 준다 — 화면이 따로 요청하지 않아도 권한과 함께 받는다.
+# (code 는 카테고리를 합쳐 한 dict 로 내려가므로 카테고리가 달라도 겹치면 안 된다)
+#   ad     / GATE_INTERVAL      : 광고 게이트를 N번 진입마다 1번 보여준다(프런트 useAdGate.js, 기본 5)
+#   screen / WALLET_REFRESH_SEC : 지갑(MyWallet.vue) 자동 갱신 간격(초, 기본 10, 0=자동 갱신 끔)
+_APP_SETTING_CATEGORIES = ('ad', 'screen')
 
 
 def _app_settings(session) -> dict:
     try:
-        return {r['code']: r['desc'] for r in masterCodesDaoImpl.select_master_code(session, _APP_SETTING_KEY)}
+        settings = {}
+        for category in _APP_SETTING_CATEGORIES:
+            key = {'system': 'stock', 'source': 'setting', 'category': category}
+            settings.update({r['code']: r['desc'] for r in masterCodesDaoImpl.select_master_code(session, key)})
+        return settings
     except Exception as e:
         # 설정값을 못 읽어도 메뉴/권한 응답은 내보낸다(프런트가 기본값으로 동작)
         logging.warning(f"[menus/my] app settings 조회 실패: {e}")

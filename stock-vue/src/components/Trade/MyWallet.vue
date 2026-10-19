@@ -7,7 +7,7 @@
                 <h1>내 자산</h1>
                 <div class="wh-right">
                     <span v-if="updatedAt" class="wh-time">{{ updatedAt }} 갱신</span>
-                    <button type="button" class="icon-btn" aria-label="새로고침" @click="reloadAll">
+                    <button type="button" class="icon-btn" aria-label="새로고침" @click="reloadAll()">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"></path><path d="M4 4v4h4"></path><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"></path><path d="M20 20v-4h-4"></path></svg>
                     </button>
                 </div>
@@ -274,9 +274,11 @@ const loadingAccount = ref(true);
 const loadingPortfolio = ref(true);
 const loadingPositions = ref(true);
 
-/* ── fetch ── */
-const fetchAccount = async () => {
-    loadingAccount.value = true;
+/* ── fetch ──
+ * silent=true: 10초 자동 갱신용 — 스켈레톤을 띄우지 않고 값만 바꾼다(깜빡임 방지).
+ * 수동 새로고침·최초 진입은 지금처럼 로딩 표시를 한다. */
+const fetchAccount = async (silent = false) => {
+    if (!silent) loadingAccount.value = true;
     try {
         const { data } = await aibeesApi.get(`/api/v1/users/${userId.value}/account`);
         account.value = data ?? null;
@@ -285,8 +287,8 @@ const fetchAccount = async () => {
     }
 };
 
-const fetchPortfolio = async () => {
-    loadingPortfolio.value = true;
+const fetchPortfolio = async (silent = false) => {
+    if (!silent) loadingPortfolio.value = true;
     try {
         const { data } = await aibeesApi.get(`/api/v1/users/${userId.value}/portfolio`);
         holdings.value = data?.holdings ?? [];
@@ -296,8 +298,8 @@ const fetchPortfolio = async () => {
     }
 };
 
-const fetchPositions = async () => {
-    loadingPositions.value = true;
+const fetchPositions = async (silent = false) => {
+    if (!silent) loadingPositions.value = true;
     try {
         const { data } = await aibeesApi.get(`/api/v1/users/${userId.value}/positions`, {
             params: { status: 'HOLDING', limit: 100, offset: 0 },
@@ -318,19 +320,54 @@ const switchTab = (key) => {
 const updatedAt = ref('');
 const stampUpdated = () => {
     const d = new Date();
-    updatedAt.value = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const p2 = (n) => String(n).padStart(2, '0');
+    updatedAt.value = `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
 };
-const reloadAll = () => {
-    stampUpdated();
-    fetchAccount();
-    fetchPortfolio();
-    if (activeTab.value === 'positions' || positionsLoaded.value) fetchPositions();
+
+let refreshing = false;      // 직전 갱신이 아직 안 끝났으면 이번 회차는 건너뛴다(요청 누적 방지)
+const reloadAll = async (silent = false) => {
+    if (refreshing) return;
+    refreshing = true;
+    try {
+        const jobs = [fetchAccount(silent), fetchPortfolio(silent)];
+        if (activeTab.value === 'positions' || positionsLoaded.value) jobs.push(fetchPositions(silent));
+        await Promise.allSettled(jobs);
+        stampUpdated();
+    } finally {
+        refreshing = false;
+    }
+};
+
+/* ── 자동 갱신 ──
+ * 간격은 공통코드 master_codes(stock/setting/screen, code=WALLET_REFRESH_SEC, desc=초)를
+ * /master/menus/my 의 settings 로 받는다. 못 받았거나 값이 이상하면 기본 10초, 0 이면 자동 갱신 끔.
+ * 화면을 떠나면(unmount) 멈추고, 앱/탭이 백그라운드면 건너뛴다. 다시 보이게 되면 즉시 한 번 갱신한다. */
+const DEFAULT_REFRESH_SEC = 10;
+const MIN_REFRESH_SEC = 3;       // 너무 짧게 잘못 넣어도 API 를 두드리지 않게 하한
+const refreshSec = () => {
+    const n = Number.parseInt(userSession.access?.settings?.WALLET_REFRESH_SEC, 10);
+    if (!Number.isInteger(n) || n < 0) return DEFAULT_REFRESH_SEC;
+    return n === 0 ? 0 : Math.max(n, MIN_REFRESH_SEC);
+};
+let autoTimer = null;
+const onVisible = () => {
+    if (document.visibilityState === 'visible') reloadAll(true);
 };
 
 onMounted(() => {
-    stampUpdated();
-    fetchAccount();
-    fetchPortfolio();
+    reloadAll();
+    const sec = refreshSec();
+    if (sec > 0) {
+        autoTimer = setInterval(() => {
+            if (document.visibilityState === 'visible') reloadAll(true);
+        }, sec * 1000);
+        document.addEventListener('visibilitychange', onVisible);
+    }
+});
+
+onBeforeUnmount(() => {
+    clearInterval(autoTimer);
+    document.removeEventListener('visibilitychange', onVisible);
 });
 
 /* ── 종목별 수익률 / 소계 ── */

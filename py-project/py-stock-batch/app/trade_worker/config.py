@@ -1,7 +1,15 @@
 """
-trade_worker 설정 (환경변수 파싱).
+trade_worker 설정.
 
 worker 는 유저 1명당 1 프로세스(상시 daemon)로 뜬다. KIS_USER_ID 만 다르게.
+
+값을 읽는 순서 (2026-10-19 — 설정은 공통코드로 옮기는 방향):
+  1) 공통코드 master_codes (system='stock', source='setting', category='worker', code=변수명, desc=값)
+     — 전 worker 공통. 행을 추가/수정하고 worker 를 재시작하면 반영된다.
+  2) 환경변수 (공통코드에 행이 없을 때 — 기존 배포 호환)
+  3) 아래 표의 기본값
+  KIS_USER_ID 는 프로세스(유저)마다 달라야 하므로 환경변수로만 받는다.
+  공통코드 조회가 실패해도 worker 는 2)·3) 으로 그대로 뜬다.
 
 ※ 실전투자 전용이다 — 뜨면 즉시 실주문이 나간다. 예전에 있던 DRY_RUN 플래그는
   선언만 되고 주문 경로 어디서도 실제로 분기하지 않아 안전장치로 기능하지 못했다
@@ -27,17 +35,43 @@ worker 는 유저 1명당 1 프로세스(상시 daemon)로 뜬다. KIS_USER_ID �
 | EXCHANGE | SOR | 실전 주문 거래소 라우팅: KRX / NXT / SOR(KRX+NXT 통합 최선체결) |
 | BUY_FILL_WAIT_RETRIES | 3 | 매수 미체결(PENDING) 시 즉시 취소 전 추가 체결대기 재확인 횟수 |
 | BUY_FILL_WAIT_SEC | 10 | 매수 체결대기 재확인 1회당 대기 시간(초) |
-| WALLET_POLL_SEC | 10 | 계좌 예수금·보유종목 주기 갱신 간격(초). 0 이하면 폴링 비활성 |
+| WALLET_POLL_SEC | 30 | 계좌 예수금·보유종목 주기 갱신 간격(초). 0 이하면 폴링 비활성 |
 | POSITION_VANISH_MISS | 3 | HOLDING 포지션이 계좌 실보유에서 **연속 이 횟수** 안 보이면 외부청산으로
     간주하고 SOLD 처리한다(wallet_sync._close_vanished_positions). WALLET_POLL_SEC=30 이면 3회 ≈ 90초.
     1 로 낮추면 잔고 조회가 한 번만 불완전해도 오판 청산할 수 있으니 2 이상을 권한다. |
+| REALTIME_BUY_START / REALTIME_BUY_END | 09:05 / 15:20 | 실시간 매수(user_options.s1_realtime_buy) 허용 시간대 |
+| REALTIME_BUY_RETRY_SEC | 300 | 실시간 매수 라운드가 체결 없이 끝났을 때 다음 시도까지 간격(초) |
 | KRX_AFTERMARKET_ENABLED | true | 2026-09-14 KRX 애프터마켓(16:00~20:00) 매도 세션 사용 여부. KRX 전용 종목도
     이 시간까지 청산 가능해진다(ORD_DVSN=41 KRX애프터마켓지정가). **매수에는 영향 없음** —
     매수는 지금처럼 BUY_TIME/NXT_BUY_TIME cron 에서만 실행되고, 오후에는 매수를 트리거하는
     경로 자체가 없다. |
 """
+import logging
 import os
 from dataclasses import dataclass
+
+from sqlalchemy import text
+
+log = logging.getLogger(__name__)
+
+# 공통코드(master_codes)의 worker 설정 위치. code = 환경변수 이름과 같게 둔다.
+_SETTING_KEY = {"system": "stock", "source": "setting", "category": "worker"}
+
+
+def _load_common_settings() -> dict:
+    """master_codes 의 worker 설정 {code: desc}. 실패하면 빈 dict(환경변수·기본값으로 동작)."""
+    try:
+        from stock_shared.db.contextManager import get_session
+        sql = text(
+            "SELECT code, `desc` FROM master_codes "
+            " WHERE `system` = :system AND source = :source AND category = :category"
+        )
+        with get_session() as s:
+            rows = s.execute(sql, _SETTING_KEY).mappings().all()
+        return {r["code"]: r["desc"] for r in rows if r["desc"] is not None and str(r["desc"]).strip() != ""}
+    except Exception as e:  # noqa: BLE001
+        log.warning("[config] 공통코드(worker 설정) 조회 실패 → 환경변수/기본값 사용: %s", e)
+        return {}
 
 
 def _bool(v, default):
@@ -89,37 +123,49 @@ def load() -> WorkerConfig:
     if not uid:
         raise RuntimeError("KIS_USER_ID 가 필요합니다. (worker 는 유저 1명당 1 프로세스)")
 
-    buy_time = os.getenv("BUY_TIME", "09:00")
+    common = _load_common_settings()
+
+    def _get(key: str, default=None):
+        """공통코드 → 환경변수 → 기본값."""
+        if key in common:
+            return str(common[key]).strip()
+        return os.getenv(key, default)
+
+    if common:
+        log.info("[config] 공통코드 worker 설정 적용: %s",
+                 ", ".join(f"{k}={v}" for k, v in sorted(common.items())))
+
+    buy_time = _get("BUY_TIME", "09:00")
     hh, mm = (buy_time.split(":") + ["0"])[:2]
 
-    nxt_time = os.getenv("NXT_BUY_TIME", "08:00")
+    nxt_time = _get("NXT_BUY_TIME", "08:00")
     nhh, nmm = (nxt_time.split(":") + ["0"])[:2]
 
     return WorkerConfig(
         user_id=int(uid),
         buy_hour=int(hh),
         buy_minute=int(mm),
-        nxt_premarket=_bool(os.getenv("NXT_PREMARKET"), True),
+        nxt_premarket=_bool(_get("NXT_PREMARKET"), True),
         nxt_buy_hour=int(nhh),
         nxt_buy_minute=int(nmm),
-        nxt_limit_slip_pct=float(os.getenv("NXT_LIMIT_SLIP_PCT", "2.0")),
-        sell_limit_slip_pct=float(os.getenv("SELL_LIMIT_SLIP_PCT", "1.0")),
-        sell_limit_reprice_steps=int(os.getenv("SELL_LIMIT_REPRICE_STEPS", "2")),
-        sell_limit_reprice_step_pct=float(os.getenv("SELL_LIMIT_REPRICE_STEP_PCT", "1.0")),
-        market=os.getenv("MARKET", "KR"),
-        buy_budget_ratio=float(os.getenv("BUY_BUDGET_RATIO", "0.98")),
-        sync_wallet_on_boot=_bool(os.getenv("SYNC_WALLET_ON_BOOT"), True),
-        sync_wallet_on_trade=_bool(os.getenv("SYNC_WALLET_ON_TRADE"), True),
-        sell_retry_cooldown_sec=int(os.getenv("SELL_RETRY_COOLDOWN_SEC", "60")),
-        sell_max_fails=int(os.getenv("SELL_MAX_FAILS", "5")),
-        exchange=(os.getenv("EXCHANGE", "SOR").upper() if os.getenv("EXCHANGE", "SOR").upper() in ("KRX", "NXT", "SOR") else "KRX"),
-        buy_fill_wait_retries=int(os.getenv("BUY_FILL_WAIT_RETRIES", "5")),
-        buy_fill_wait_sec=int(os.getenv("BUY_FILL_WAIT_SEC", "10")),
-        wallet_poll_sec=int(os.getenv("WALLET_POLL_SEC", "30")),
-        position_vanish_miss=max(1, int(os.getenv("POSITION_VANISH_MISS", "3"))),
-        settings_poll_sec=int(os.getenv("SETTINGS_POLL_SEC", "60")),
-        krx_aftermarket_enabled=_bool(os.getenv("KRX_AFTERMARKET_ENABLED"), True),
-        realtime_buy_start_hhmm=int(os.getenv("REALTIME_BUY_START", "09:05").replace(":", "")),
-        realtime_buy_end_hhmm=int(os.getenv("REALTIME_BUY_END", "15:20").replace(":", "")),
-        realtime_buy_retry_sec=int(os.getenv("REALTIME_BUY_RETRY_SEC", "300")),
+        nxt_limit_slip_pct=float(_get("NXT_LIMIT_SLIP_PCT", "2.0")),
+        sell_limit_slip_pct=float(_get("SELL_LIMIT_SLIP_PCT", "1.0")),
+        sell_limit_reprice_steps=int(_get("SELL_LIMIT_REPRICE_STEPS", "2")),
+        sell_limit_reprice_step_pct=float(_get("SELL_LIMIT_REPRICE_STEP_PCT", "1.0")),
+        market=_get("MARKET", "KR"),
+        buy_budget_ratio=float(_get("BUY_BUDGET_RATIO", "0.98")),
+        sync_wallet_on_boot=_bool(_get("SYNC_WALLET_ON_BOOT"), True),
+        sync_wallet_on_trade=_bool(_get("SYNC_WALLET_ON_TRADE"), True),
+        sell_retry_cooldown_sec=int(_get("SELL_RETRY_COOLDOWN_SEC", "60")),
+        sell_max_fails=int(_get("SELL_MAX_FAILS", "5")),
+        exchange=(_get("EXCHANGE", "SOR").upper() if _get("EXCHANGE", "SOR").upper() in ("KRX", "NXT", "SOR") else "KRX"),
+        buy_fill_wait_retries=int(_get("BUY_FILL_WAIT_RETRIES", "5")),
+        buy_fill_wait_sec=int(_get("BUY_FILL_WAIT_SEC", "10")),
+        wallet_poll_sec=int(_get("WALLET_POLL_SEC", "30")),
+        position_vanish_miss=max(1, int(_get("POSITION_VANISH_MISS", "3"))),
+        settings_poll_sec=int(_get("SETTINGS_POLL_SEC", "60")),
+        krx_aftermarket_enabled=_bool(_get("KRX_AFTERMARKET_ENABLED"), True),
+        realtime_buy_start_hhmm=int(_get("REALTIME_BUY_START", "09:05").replace(":", "")),
+        realtime_buy_end_hhmm=int(_get("REALTIME_BUY_END", "15:20").replace(":", "")),
+        realtime_buy_retry_sec=int(_get("REALTIME_BUY_RETRY_SEC", "300")),
     )
