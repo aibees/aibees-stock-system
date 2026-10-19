@@ -23,6 +23,7 @@
 #   ASC_KEY_ID      키 ID. AuthKey_XXXXXXXXXX.p8 의 XXXXXXXXXX 부분
 #   ASC_ISSUER_ID   Issuer ID (App Store Connect > 사용자 및 액세스 > 통합)
 #   ASC_KEY_PATH    .p8 파일 경로 (생략 시 stock-vue/AuthKey_<ASC_KEY_ID>.p8)
+#   또는 ios/asc.env.local 에 같은 이름으로 적어 두면 자동으로 읽는다.
 # 이 값들을 주면 archive 단계도 Apple 과 통신해 프로비저닝/인증서를 자동 갱신한다
 # (-allowProvisioningUpdates). 주지 않으면 Xcode 에 로그인된 계정으로 서명한다.
 # =============================================================================
@@ -55,6 +56,23 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ── App Store Connect 인증 플래그 (3개가 모두 있을 때만 사용) ────────────────
+# 매번 환경변수로 넘기지 않도록 ios/asc.env.local 이 있으면 읽는다(*.local 은 gitignore 대상).
+#   ASC_KEY_ID=49JM9DT87K
+#   ASC_ISSUER_ID=<issuer-uuid>
+# 명령줄에서 넘긴 환경변수가 있으면 그쪽이 우선한다.
+ASC_LOCAL="$ROOT/ios/asc.env.local"
+if [[ -f "$ASC_LOCAL" ]]; then
+  _KEY_ID="${ASC_KEY_ID:-}"; _ISSUER_ID="${ASC_ISSUER_ID:-}"; _KEY_PATH="${ASC_KEY_PATH:-}"
+  # shellcheck disable=SC1090
+  source "$ASC_LOCAL"
+  ASC_KEY_ID="${_KEY_ID:-${ASC_KEY_ID:-}}"
+  ASC_ISSUER_ID="${_ISSUER_ID:-${ASC_ISSUER_ID:-}}"
+  ASC_KEY_PATH="${_KEY_PATH:-${ASC_KEY_PATH:-}}"
+fi
+
+# xcodebuild 는 Xcode 에 로그인된 계정을 못 보는 환경(터미널·CI)이 있어, 키 없이는
+# 클라우드 서명이 안 되고 export 가 'No signing certificate "iOS Distribution" found' 로 실패한다
+# (이 Mac 키체인엔 Apple Development 인증서만 있다). 그래서 업로드가 아니어도 키를 쓰는 걸 권장.
 ASC_KEY_ID="${ASC_KEY_ID:-}"
 ASC_ISSUER_ID="${ASC_ISSUER_ID:-}"
 ASC_KEY_PATH="${ASC_KEY_PATH:-}"
@@ -80,7 +98,7 @@ if [[ -n "$ASC_KEY_ID" && -n "$ASC_ISSUER_ID" && -n "$ASC_KEY_PATH" ]]; then
   echo ">>> App Store Connect API 키 사용 (keyID=$ASC_KEY_ID)"
 elif [[ $DO_UPLOAD -eq 1 ]]; then
   echo ">>> [ERROR] --upload 에는 ASC_KEY_ID / ASC_ISSUER_ID 가 필요합니다." >&2
-  echo "    예) ASC_KEY_ID=7PFAYQMD47 ASC_ISSUER_ID=<issuer-uuid> ./ios/archive.sh --upload" >&2
+  echo "    예) ASC_KEY_ID=49JM9DT87K ASC_ISSUER_ID=<issuer-uuid> ./ios/archive.sh --upload" >&2
   exit 1
 else
   echo ">>> ASC 키 없음 → Xcode 에 로그인된 계정으로 서명합니다."
