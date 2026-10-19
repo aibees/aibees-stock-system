@@ -8,6 +8,7 @@ user_option_m2 — M2(KODEX 코스피100 / 인버스 **독립 운용**) 개인�
   · 행이 없어도 동작해야 한다. row 없음 == 전 항목 NULL
 
 DDL: py-project/sql/02_user_option_mode_ddl.sql + 07_user_option_m3_rebuild.sql
+     + 41_user_option_m2_etf_rename.sql (구 user_option_m3 → user_option_m2)
 """
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.dialects.mysql import DECIMAL, TINYINT

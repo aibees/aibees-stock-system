@@ -44,6 +44,34 @@ def _ono(order_number) -> Optional[str]:
     return str(n) if n else str(order_number)
 
 
+# KIS 초당 거래건수 초과("원장에서 허용 가능한 초당 거래건수를 초과하였습니다.").
+# 계좌 조회(잔고·매수가능)가 worker 의 여러 스레드(계좌 폴링·매수 라운드·매도 판정)에서
+# 같은 순간 겹치면 HTTP 500 또는 rt_cd=1 로 돌아온다. 일시적이라 잠깐 쉬고 다시 묻는다.
+_RATE_LIMIT_MSG_CD = "EGW00215"
+_RATE_LIMIT_BACKOFF_SEC = (0.3, 0.7, 1.5)
+
+
+class _RateLimited(Exception):
+    """응답 본문(rt_cd≠0)으로 온 초당 거래건수 초과 — 재시도 대상 표시용."""
+
+
+def _is_rate_limited(e: Exception) -> bool:
+    return isinstance(e, _RateLimited) or _RATE_LIMIT_MSG_CD in str(e)
+
+
+def _with_rate_retry(label: str, fn):
+    """fn() 을 호출하고, 초당 거래건수 초과면 백오프 후 다시 부른다. 그 외 예외는 그대로 올린다."""
+    for wait in _RATE_LIMIT_BACKOFF_SEC:
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            if not _is_rate_limited(e):
+                raise
+            log.info("%s 초당 거래건수 초과(%s) → %.1f초 후 재시도", label, _RATE_LIMIT_MSG_CD, wait)
+            time.sleep(wait)
+    return fn()
+
+
 # 지정가 계열 ORD_DVSN — 시장가('01')가 아니라 반드시 호가를 넣어야 하는 코드들.
 # '00'=지정가(NXT 프리/애프터마켓), '41'=KRX애프터마켓지정가(2026-09-14 KRX 애프터마켓 신설).
 _LIMIT_ORD_DVSN = frozenset({"00", "41"})
@@ -279,28 +307,34 @@ class Broker:
         qty = int(Decimal(str(o.get("nrcvb_buy_qty") or 0)))  # 미수없는매수수량
         return qty, amount
 
+    def _get_json(self, path: str, params: dict, headers: dict):
+        """KIS GET 조회 → (resp, json). 본문으로 온 초당 거래건수 초과는 _RateLimited 로 올려
+        _with_rate_retry 가 다시 부르게 한다(HTTP 500 으로 오는 경우는 pykis 예외에 msg_cd 가 담긴다)."""
+        resp = self.kis.request(path, method="GET", params=params, headers=headers,
+                                appkey_location="header", auth=True)
+        j = resp.json()
+        if j.get("msg_cd") == _RATE_LIMIT_MSG_CD:
+            raise _RateLimited(j.get("msg1"))
+        return resp, j
+
     def _inquire_psbl(self, symbol: str, price: Optional[Decimal] = None,
                       ord_dvsn: str = "01") -> Optional[dict]:
         """매수가능조회(inquire-psbl-order, TTTC8908R) 원본 output. 실패 시 None.
         orderable(주문 수량 산정)과 account_cash(계좌 현금) 가 같은 응답을 쓰도록 분리해 둔다."""
         try:
             account = self.kis.primary  # KisAccountNumber (CANO/ACNT_PRDT_CD)
-            resp = self.kis.request(
-                "/uapi/domestic-stock/v1/trading/inquire-psbl-order",
-                method="GET",
-                params={
-                    "CANO": account.number,
-                    "ACNT_PRDT_CD": account.code,
-                    "PDNO": symbol,
-                    "ORD_UNPR": str(int(price)) if price else "0",
-                    "ORD_DVSN": ord_dvsn,         # 01=시장가(종목증거금율 반영) / 00=지정가
-                    "CMA_EVLU_AMT_ICLD_YN": "N",  # CMA평가금액 미포함
-                    "OVRS_ICLD_YN": "N",          # 해외 미포함
-                },
-                headers={"tr_id": "TTTC8908R", "custtype": "P"},
-                appkey_location="header", auth=True,
-            )
-            j = resp.json()
+            params = {
+                "CANO": account.number,
+                "ACNT_PRDT_CD": account.code,
+                "PDNO": symbol,
+                "ORD_UNPR": str(int(price)) if price else "0",
+                "ORD_DVSN": ord_dvsn,         # 01=시장가(종목증거금율 반영) / 00=지정가
+                "CMA_EVLU_AMT_ICLD_YN": "N",  # CMA평가금액 미포함
+                "OVRS_ICLD_YN": "N",          # 해외 미포함
+            }
+            _, j = _with_rate_retry("매수가능조회", lambda: self._get_json(
+                "/uapi/domestic-stock/v1/trading/inquire-psbl-order", params,
+                {"tr_id": "TTTC8908R", "custtype": "P"}))
             if j.get("rt_cd") != "0":
                 log.warning("매수가능조회 실패 %s: rt_cd=%s msg=%s",
                             symbol, j.get("rt_cd"), j.get("msg1"))
@@ -349,7 +383,7 @@ class Broker:
             if rows is not None:
                 return rows
         try:
-            balance = self.kis.account().balance()
+            balance = _with_rate_retry("계좌 보유종목 조회", lambda: self.kis.account().balance())
             out = []
             for st in balance.stocks:
                 market = getattr(st, "market", "KRX")
@@ -385,12 +419,9 @@ class Broker:
             }
             out, tr_cont = [], ""
             for _ in range(10):   # 연속조회(보유 종목이 많을 때). 보통 1페이지로 끝난다.
-                resp = self.kis.request(
-                    "/uapi/domestic-stock/v1/trading/inquire-balance", method="GET", params=params,
-                    headers={"tr_id": "TTTC8434R", "custtype": "P", "tr_cont": tr_cont},
-                    appkey_location="header", auth=True,
-                )
-                j = resp.json()
+                resp, j = _with_rate_retry("시간외 반영 잔고 조회", lambda: self._get_json(
+                    "/uapi/domestic-stock/v1/trading/inquire-balance", params,
+                    {"tr_id": "TTTC8434R", "custtype": "P", "tr_cont": tr_cont}))
                 if j.get("rt_cd") != "0":
                     log.warning("시간외 반영 잔고 조회 실패 rt_cd=%s msg=%s → 기본 조회", j.get("rt_cd"), j.get("msg1"))
                     return None
@@ -430,6 +461,18 @@ class Broker:
                      ※ 통보가 연달아 오므로 호출측에서 throttle 할 것.
         """
         self._unknown_cb = on_unknown
+
+        # KIS가 국내 체결통보(H0STCNI0) 필드를 23→26개로 늘렸다. 끝에 붙인 게 아니라
+        # 17 ACNT_NAME 뒤에 ORD_COND_PRC·ORD_EXG_GB·POPUP_YN·FILLER 가 들어오고
+        # CNTG_ISNM 이 빠져서, 22 CRDT_CLS 부터 3칸씩 밀렸다(ODER_PRC 22→25).
+        # (koreainvestment/open-trading-api 샘플 ccnl_notice 컬럼 목록으로 확인)
+        # python-kis 2.1.6 은 23개 기준이라 "Invalid data length: 26" 으로 통보를 통째로
+        # 버린다 → 이벤트 드리븐 체결 반영이 멈추고 폴링 fallback 에만 기댄다.
+        # pykis 가 읽는 칸 중 밀리는 건 22 ODER_PRC(unit_price) 하나뿐이고 18~21 은 None 이므로,
+        # 22 앞에 더미 3칸을 넣어 맞춘다(멱등). 0~17 인덱스(__pre_init__·주문번호 등)는 그대로다.
+        from pykis.api.websocket.order_execution import KisDomesticRealtimeOrderExecution
+        if len(KisDomesticRealtimeOrderExecution.__fields__) == 23:
+            KisDomesticRealtimeOrderExecution.__fields__[22:22] = [None, None, None]
 
         def _cb(client, ev):
             try:
