@@ -15,6 +15,9 @@ BaseBuyExecutor 에서 갈리는 지점은 **후보 선정 하나**뿐이다.
 까지 허용하면 최우선타겟이 실패했을 때 사용자가 지정하지도 않은 종목으로 2번째
 포지션이 열린다. 그래서 예외로 통과한 라운드는 후보를 그 종목 하나로 좁힌다.
 소비 정책은 그대로 "정규장 라운드 종료 시 1회성"이다(당일만 유효).
+
+종합순위가 2파 돌파 신호(BUY_RANK_MODE=WAVE2, 2026-10-22~)일 때는 **신호 종목과 최우선타겟만** 산다.
+둘 다 없으면 그날은 매수하지 않는다(사용자 결정 — 신호 없는 날 기존 점수 순 종목으로 폴백하지 않는다).
 """
 from decimal import Decimal
 from typing import Optional
@@ -198,6 +201,19 @@ class BuyExecutor1(BaseBuyExecutor):
             self.wlog.info("[매수] 1포지션 예외 라운드 → 최우선타겟 %s 단독 후보(대신매수 없음)",
                            self._priority_code)
 
+        # 종합순위 WAVE2(2파 하락 추세선 돌파 신호): 신호 종목(composite_rank_no 있음)과 최우선타겟만 남긴다.
+        #   둘 다 없으면 매수하지 않는다. MOMENTUM 이면 예전처럼 score 순 폴백을 허용한다.
+        if self._signal_only():
+            kept = [t for t in targets
+                    if t.get("composite_rank_no") is not None or t["stock_code"] == self._priority_code]
+            if len(kept) != len(targets):
+                self.wlog.info("[매수] 종합순위(2파 돌파 신호) 종목·최우선타겟만 → %d건 중 %d건",
+                               len(targets), len(kept))
+            targets = kept
+            if not targets:
+                self.wlog.info("[매수] 2파 돌파 신호 종목도 최우선타겟도 없음 → 오늘 매수 안 함")
+                return []
+
         # 실시간 라운드: 오늘 **손실로** 매도한 종목은 다시 사지 않는다(수익 매도 종목은 허용).
         #   사용자가 직접 지정한 최우선타겟은 의도적인 선택이라 예외로 둔다.
         if self.realtime:
@@ -228,6 +244,14 @@ class BuyExecutor1(BaseBuyExecutor):
             targets = [top]
 
         return [self._to_candidate(t, ymd) for t in targets]
+
+    def _signal_only(self) -> bool:
+        """종합순위가 2파 돌파 신호 방식(WAVE2)이면 신호 종목·최우선타겟만 산다. 조회 실패는 WAVE2 로 본다."""
+        try:
+            return self.repo.get_buy_rank_mode() == 'WAVE2'
+        except Exception as e:  # noqa: BLE001
+            self.wlog.warn("[매수] BUY_RANK_MODE 조회 실패 → 신호 종목만 매수: %s", e)
+            return True
 
     def _promote_priority(self, targets: list[dict]) -> list[dict]:
         """Home.vue "최우선타겟" select 로 사용자가 지정한 종목이 오늘 매수타겟

@@ -54,7 +54,8 @@ COMPOSITE_MOMENTUM_COLS = ['obv_gap_norm', 'obv_slope3', 'ind_vol_ratio_today', 
 #                                     stock_shared.strategy.wave2_breakout 참고. 5년 검증(+15%/-8%/10일) 매매당 +0.74%,
 #                                     현행 매도 규칙으로 +1.07%(2023~26 매년 +). 기존 모멘텀 1위는 같은 기간 매년 마이너스였다.
 #     MOMENTUM                      : 이전 방식(shape 상위 10 → 모멘텀 재정렬).
-#   WAVE2 에서 그날 신호가 없으면 종합순위는 비고, worker 는 DEFAULT_BUY_ORDER 의 다음 기준(score)으로 넘어간다.
+#   WAVE2 에서 그날 신호가 없으면 종합순위는 비고, worker(M1)는 최우선타겟이 없으면 그날 매수하지 않는다
+#   (buy_executor1._signal_only — 2026-10-22 사용자 결정).
 #   신호 판정이 실패하면 그날은 MOMENTUM 으로 자동 폴백한다.
 BUY_RANK_MODE_DEFAULT = 'WAVE2'
 WAVE2_TOP_N = 10
@@ -255,7 +256,7 @@ class StockBuyCheckJob(Job):
                 print(f"2단계 top10 저장 완료: {len(composite_top10)}건 (OHLCV/지표 포함) "
                       f"(1위: {composite_top10[0]['stock_name']}({composite_top10[0]['stock_code']}))", flush=True)
             else:
-                print("종합순위 대상 없음 → composite_rank_no 미생성(worker 는 score 순으로 폴백)", flush=True)
+                print("종합순위 대상 없음 → composite_rank_no 미생성(WAVE2: worker 는 최우선타겟만 매수, MOMENTUM: score 순 폴백)", flush=True)
         except Exception as e:
             self.session.rollback()
             print(f"[2단계 top10 저장 실패, watch 게이트 결과는 유지됨] {e}", flush=True)

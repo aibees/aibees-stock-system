@@ -7,6 +7,7 @@
     3. 갭 게이트 기준가 = 매수타겟 close (장중 목록이면 배치 시점 가격)
     4. 실시간 라운드는 최우선타겟을 **산 경우에만** 소비하고, 09:00 라운드는 기존대로 항상 소비한다
     5. 손실매도 조회가 실패하면 라운드를 접는다(재매수 방지 우선)
+    6. 종합순위 WAVE2(2파 돌파 신호): 신호 종목·최우선타겟만 사고, 둘 다 없으면 매수 안 함 / MOMENTUM 은 예전 폴백
 
 실행
     poetry run python -m app.test.test_realtime_buy_unit
@@ -26,8 +27,9 @@ def check(name, cond, detail=''):
 
 
 class FakeRepo:
-    def __init__(self, targets, loss_codes=(), priority=None, loss_fail=False):
+    def __init__(self, targets, loss_codes=(), priority=None, loss_fail=False, rank_mode='MOMENTUM'):
         self.targets = targets
+        self.rank_mode = rank_mode          # 1~5 는 종합순위 방식과 무관한 검증이라 예전 동작(MOMENTUM)으로 둔다
         self.loss_codes = set(loss_codes)
         self.priority = priority
         self.loss_fail = loss_fail
@@ -39,6 +41,7 @@ class FakeRepo:
     def get_latest_buy_target_ymd(self, min_ymd=None): return '20261017'
     def get_buy_targets(self, ymd, order_spec=None): return [dict(t) for t in self.targets]
     def get_priority_target(self, uid): return self.priority
+    def get_buy_rank_mode(self): return self.rank_mode
 
     def clear_priority_target(self, uid):
         self.cleared += 1
@@ -138,10 +141,36 @@ def test_loss_query_fail():
     check('last_bought_code 없음', ex.last_bought_code is None)
 
 
+def test_wave2_signal_only():
+    print('\n[5] 종합순위 WAVE2 — 신호 종목·최우선타겟만')
+    S = lambda code, close, rk: {**T(code, close), 'composite_rank_no': rk}
+    ex, repo, bought = make([T('AAA', 1000), T('BBB', 2000)], {'AAA': 1000, 'BBB': 2000}, rank_mode='WAVE2')
+    ex.run()
+    check('신호 없고 최우선타겟 없으면 매수 안 함', not bought, bought)
+
+    ex, repo, bought = make([S('SIG', 3000, 1), T('AAA', 1000)], {'SIG': 3000, 'AAA': 1000}, rank_mode='WAVE2')
+    ex.run()
+    check('신호 종목(종합순위 1위) 매수', bought and bought[0][0] == 'SIG', bought)
+
+    ex, repo, bought = make([S('SIG', 3000, 1), T('AAA', 1000)], {'SIG': 3300, 'AAA': 1000}, rank_mode='WAVE2')
+    ex.run()
+    check('신호 종목이 갭으로 막혀도 비신호 종목으로 대신매수하지 않음', not bought, bought)
+
+    ex, repo, bought = make([T('AAA', 1000), T('BBB', 2000)], {'AAA': 1000, 'BBB': 2000},
+                            rank_mode='WAVE2', priority='BBB')
+    ex.run()
+    check('신호 없어도 최우선타겟은 매수', bought and bought[0][0] == 'BBB', bought)
+
+    ex, repo, bought = make([T('AAA', 1000), T('BBB', 2000)], {'AAA': 1000, 'BBB': 2000}, rank_mode='MOMENTUM')
+    ex.run()
+    check('MOMENTUM 은 예전처럼 score 순 1위 매수', bought and bought[0][0] == 'AAA', bought)
+
+
 if __name__ == '__main__':
     test_loss_exclusion()
     test_priority_exception_and_consume()
     test_gap_ref()
     test_loss_query_fail()
+    test_wave2_signal_only()
     print(f'\n결과: PASS {len(PASS)} / FAIL {len(FAIL)}')
     sys.exit(1 if FAIL else 0)

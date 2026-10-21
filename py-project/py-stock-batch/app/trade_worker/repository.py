@@ -75,6 +75,25 @@ class Repository:
             row = s.execute(sql, {"min_ymd": min_ymd}).mappings().first()
         return row["ymd"] if row and row["ymd"] else None
 
+    def get_buy_rank_mode(self) -> str:
+        """매수추천 종합순위 방식(공통코드 stock/setting/batch/BUY_RANK_MODE). 매 라운드 읽는다(재시작 불필요).
+
+        WAVE2(기본·행 없음·조회 실패) : 종합순위 = 2파 하락 추세선 돌파 신호 → 신호 종목·최우선타겟만 산다.
+        MOMENTUM                       : 이전 방식 → 종합순위가 없으면 score 순으로 폴백(예전 동작).
+        """
+        try:
+            sql = text(
+                "SELECT `desc` FROM master_codes WHERE `system` = 'stock' AND source = 'setting' "
+                " AND category = 'batch' AND code = 'BUY_RANK_MODE'"
+            )
+            with get_session() as s:
+                row = s.execute(sql).first()
+            v = ((row[0] if row else '') or '').strip().upper()
+            return v if v in ('WAVE2', 'MOMENTUM') else 'WAVE2'
+        except Exception as e:  # noqa: BLE001
+            log.warning("[repo] BUY_RANK_MODE 조회 실패 → WAVE2: %s", e)
+            return 'WAVE2'
+
     def get_buy_targets(self, ymd: str, order_spec: str | None = None) -> list[dict]:
         """해당 ymd 추천 전체를 order_spec 순서로 정렬해 반환.
 
