@@ -10,3 +10,6 @@ firebase-service-account.json
 
 # spec 문서(작업 메모용) — 버전관리 대상 아님
 spec_docs/*.md
+
+# 매수추천×차트분석 백테스트 중간 캐시(재생성 가능)
+app/test/bt_reco_cache/
