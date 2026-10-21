@@ -1,5 +1,31 @@
 <template>
     <div v-if="sections.length" class="ca-summary">
+        <!-- 엘리엇 파동: 후보 해석 목록(누르면 차트에 그 해석을 그린다) + 선택한 해석의 목표·확인·무효 -->
+        <section v-if="show('elliott') && a.elliott?.length" class="ca-sec">
+            <h3>엘리엇 파동</h3>
+            <ul class="ca-waves">
+                <li v-for="(w, k) in a.elliott" :key="w.title" :class="{ on: k === pickIndex }" @click="emit('pick', k)">
+                    <span class="ca-wave-rank">{{ k === 0 ? '주요 해석' : `대안 ${k}` }}</span>
+                    <span class="ca-wave-title">{{ w.title }}</span>
+                    <small>{{ w.subtitle }} · 적합도 {{ w.score }}</small>
+                    <svg class="ca-spark" viewBox="0 0 60 20" preserveAspectRatio="none" aria-hidden="true">
+                        <polyline :points="spark(w)" fill="none" stroke="currentColor" stroke-width="1.4" />
+                    </svg>
+                </li>
+            </ul>
+            <dl v-if="wave">
+                <div><dt>현재 파동</dt><dd>{{ wave.current }}파 <small>{{ wave.points.map(p => p.label).join('-') }}</small></dd></div>
+                <div><dt>기본 목표</dt><dd>{{ fmt(wave.target.basic) }} <small>{{ wave.target.basic_label }}</small></dd></div>
+                <div><dt>확장 목표</dt><dd>{{ fmt(wave.target.extended) }} <small>{{ wave.target.extended_label }}</small></dd></div>
+                <div v-if="wave.confirm"><dt>다음 확인</dt><dd>{{ fmt(wave.confirm.price) }} <small>{{ wave.confirm.label }}</small></dd></div>
+                <div><dt>해석 무효</dt><dd>{{ fmt(wave.invalid.price) }} <small>{{ wave.invalid.label }}</small></dd></div>
+                <div v-if="wave.ratios.length" class="ca-levels"><dt>파동 비율</dt><dd>
+                    <span v-for="x in wave.ratios" :key="x.label">{{ x.label }} {{ x.value }}</span>
+                    <span v-if="wave.scale === 'log'">로그 기준</span>
+                </dd></div>
+            </dl>
+        </section>
+
         <!-- 추세 구조 + RSI/ATR -->
         <section v-if="show('structure') && a.structure" class="ca-sec">
             <h3>추세 구조</h3>
@@ -61,13 +87,24 @@
 <script setup>
 // /charts/stock 응답의 analysis 를 숫자 목록으로 보여 준다. 레이어 토글(layers)과 같은 ON/OFF 를 따른다.
 const props = defineProps({
-    analysis: { type: Object, default: null },
-    layers:   { type: Array, default: () => [] },
+    analysis:  { type: Object, default: null },
+    layers:    { type: Array, default: () => [] },
+    pickIndex: { type: Number, default: 0 },   // 차트에 그린 엘리엇 해석
 })
+const emit = defineEmits(['pick'])
 
 const a = computed(() => props.analysis || {})
 const show = (key) => props.layers.includes(key)
-const sections = computed(() => ['structure', 'fib', 'pattern', 'divergence'].filter(k => show(k) && a.value[k] != null))
+const sections = computed(() => ['elliott', 'structure', 'fib', 'pattern', 'divergence'].filter(k => show(k) && a.value[k] != null))
+const wave = computed(() => a.value.elliott?.[props.pickIndex] ?? a.value.elliott?.[0] ?? null)
+
+// 해석 모양 미리보기: 파동 꼭짓점 + 예상 경로를 60×20 에 맞춘다
+const spark = (w) => {
+    const ys = [...w.points.map(p => p.price), ...(w.projection || []).filter(p => p.bars > 0).map(p => p.price)]
+    const lo = Math.min(...ys), hi = Math.max(...ys)
+    const step = 60 / Math.max(ys.length - 1, 1)
+    return ys.map((y, i) => `${(i * step).toFixed(1)},${(18 - (hi === lo ? 8 : (y - lo) / (hi - lo) * 16)).toFixed(1)}`).join(' ')
+}
 
 const fmt = (v) => (v == null || Number.isNaN(v)) ? '-' : Math.round(v).toLocaleString('ko-KR')
 const md = (ymd) => (ymd || '').slice(5).replace('-', '.')
@@ -155,6 +192,29 @@ dd {
 }
 
 .ca-pattern + .ca-pattern { margin-top: 10px; }
+
+// 해석 목록: 카드 없이 구분선 행. 선택한 행은 글자색으로만 표시
+.ca-waves {
+    margin: 0 0 10px;
+    padding: 0;
+    list-style: none;
+
+    li {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        padding: 8px 0;
+        border-bottom: 1px solid #F4ECD6;
+        color: $sub;
+        cursor: pointer;
+        &:last-child { border-bottom: 0; }
+        &.on { color: #A8458A; .ca-wave-title { font-weight: 700; } }
+    }
+    .ca-wave-rank { flex: 0 0 64px; font-size: 12px; color: $sub-2; }
+    .ca-wave-title { color: inherit; font-weight: 600; }
+    small { color: $sub-2; }
+    .ca-spark { margin-left: auto; width: 60px; height: 20px; align-self: center; flex: none; }
+}
 .ca-pattern-head {
     margin: 0 0 4px;
     display: flex;

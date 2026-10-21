@@ -34,6 +34,7 @@ const props = defineProps({
     data:        { type: Object, required: true },
     visibleBars: { type: Number, default: 120 },   // 처음 보여줄 최근 봉 수(나머지는 왼쪽으로 드래그/축소해서 본다)
     layers:      { type: Array, default: () => [] },   // 켜진 분석 레이어 key
+    layerOptions:{ type: Object, default: () => ({}) }, // 레이어별 선택값(예: { elliott: 해석 index })
 })
 
 const UP   = '#C8282A'
@@ -157,14 +158,19 @@ const render = (keepRange = false) => {
     candle.setData((d.ohcl || []).map(c => ({ time: c.x, open: c.o, high: c.h, low: c.l, close: c.c })))
 
     const n = (d.ohcl || []).length
-    rsiOn.value = drawAnalysis({
-        chart, candle, analysis: d.analysis, enabled: props.layers, lastTime: d.ohcl?.[n - 1]?.x,
-    }).rsiOn
+    const drawn = drawAnalysis({
+        chart, candle, analysis: d.analysis, enabled: props.layers,
+        times: (d.ohcl || []).map(c => c.x), options: props.layerOptions,
+    })
+    rsiOn.value = drawn.rsiOn
 
     if (prevRange) {
         chart.timeScale().setVisibleLogicalRange(prevRange)
-    } else if (n > props.visibleBars) {
-        chart.timeScale().setVisibleLogicalRange({ from: n - props.visibleBars, to: n + 4 })
+    } else if (n > props.visibleBars || drawn.futureBars) {
+        // 예상 경로가 있으면 오른쪽에 그 앞부분(최대 40봉)까지 보이게 둔다
+        chart.timeScale().setVisibleLogicalRange({
+            from: Math.max(n - props.visibleBars, 0), to: n + 4 + Math.min(drawn.futureBars, 40),
+        })
     } else {
         chart.timeScale().fitContent()
     }
@@ -178,7 +184,7 @@ const render = (keepRange = false) => {
 
 onMounted(() => render())
 watch(() => props.data, () => nextTick(() => render()))
-watch(() => props.layers, () => nextTick(() => render(true)), { deep: true })
+watch(() => [props.layers, props.layerOptions], () => nextTick(() => render(true)), { deep: true })
 onBeforeUnmount(() => { chart?.remove(); chart = null })
 </script>
 

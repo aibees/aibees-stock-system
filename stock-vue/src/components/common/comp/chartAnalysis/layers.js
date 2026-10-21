@@ -12,6 +12,26 @@ export const C = {
     fib:   '#8E6FB5',
     rsi:   '#8E7CC3',
     pat:   '#7A4423',
+    wave:  '#A8458A',
+}
+
+const MAX_FUTURE_BARS = 80   // 예상 경로는 이 봉수 앞까지만 그린다
+
+// 마지막 봉 날짜에서 k 영업일(주말만 건너뜀, 공휴일은 무시) 뒤
+const addWeekdays = (ymd, k) => {
+    const d = new Date(ymd + 'T00:00:00Z')
+    while (k > 0) {
+        d.setUTCDate(d.getUTCDate() + 1)
+        const wd = d.getUTCDay()
+        if (wd !== 0 && wd !== 6) k--
+    }
+    return d.toISOString().slice(0, 10)
+}
+
+// 마지막 봉 기준 bars 칸 뒤(0 이하면 이미 있는 봉)의 날짜
+const timeAt = (ctx, bars) => {
+    const last = ctx.times.length - 1
+    return bars <= 0 ? ctx.times[Math.max(last + bars, 0)] : addWeekdays(ctx.times[last], bars)
 }
 
 // 두 점 이상을 잇는 보조선. 같은 날짜가 겹치면 뒤의 값만 남긴다(시간축은 엄격히 증가해야 한다)
@@ -138,6 +158,34 @@ const drawPattern = (ctx, list) => {
     }
 }
 
+// 선택된 해석 하나만 그린다(options.elliott = 목록 index, 기본 0 = 주요 해석)
+const drawElliott = (ctx, list) => {
+    const w = list?.[ctx.options.elliott ?? 0] ?? list?.[0]
+    if (!w) return
+    addLine(ctx, w.points.map(p => ({ time: p.date, value: p.price })), { color: C.wave, lineWidth: 2 })
+    w.points.forEach(p => { if (p.label !== '0') marker(ctx, p, p.label, C.wave) })
+
+    const last = w.points[w.points.length - 1]
+    const proj = (w.projection || []).filter(p => p.bars <= MAX_FUTURE_BARS)
+    if (proj.length) {
+        const pts = [{ time: last.date, value: last.price }, ...proj.map(p => ({ time: timeAt(ctx, p.bars), value: p.price }))]
+        const s = addLine(ctx, pts, { color: C.wave, lineStyle: LineStyle.Dashed })
+        if (s) {
+            // 미래 봉에는 캔들이 없어 캔들 마커를 못 단다 — 점선 시리즈에 라벨을 단다
+            const ms = proj.map((p, k) => {
+                const prev = k ? proj[k - 1].price : last.price
+                const high = p.price > prev
+                return { time: timeAt(ctx, p.bars), position: high ? 'aboveBar' : 'belowBar', shape: 'circle', size: 0.3, color: C.wave, text: p.label }
+            }).sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0))
+            createSeriesMarkers(s, ms)
+        }
+        ctx.futureBars = Math.max(ctx.futureBars, ...proj.map(p => p.bars))
+    }
+    priceLine(ctx, w.target?.basic, C.wave, '기본 목표', LineStyle.LargeDashed)
+    priceLine(ctx, w.invalid?.price, '#A99B8C', '해석 무효')
+    if (w.confirm) priceLine(ctx, w.confirm.price, C.wave, '다음 확인', LineStyle.Dotted)
+}
+
 // 순서가 곧 그리는 순서 — RSI 패널이 먼저 생겨야 다이버전스가 RSI 쪽에도 선을 긋는다
 export const LAYERS = [
     { key: 'swing',      label: '스윙 고저점', draw: drawSwing },
@@ -146,12 +194,13 @@ export const LAYERS = [
     { key: 'rsi',        label: 'RSI(14)',     draw: drawRsi },
     { key: 'divergence', label: 'RSI 다이버전스', draw: drawDivergence },
     { key: 'pattern',    label: '차트 패턴',    draw: drawPattern },
+    { key: 'elliott',    label: '엘리엇 파동',  draw: drawElliott },
 ]
 
 /** analysis 중 켜진 레이어를 차트에 그린다. 레이어 하나가 실패해도 나머지는 그린다. */
-export function drawAnalysis({ chart, candle, analysis, enabled, lastTime }) {
-    if (!analysis) return { rsiOn: false }
-    const ctx = { chart, candle, lastTime, markers: [], rsiPane: null }
+export function drawAnalysis({ chart, candle, analysis, enabled, times, options = {} }) {
+    if (!analysis) return { rsiOn: false, futureBars: 0 }
+    const ctx = { chart, candle, times, lastTime: times[times.length - 1], options, markers: [], rsiPane: null, futureBars: 0 }
     for (const layer of LAYERS) {
         if (!enabled.includes(layer.key) || analysis[layer.key] == null) continue
         try {
@@ -164,5 +213,5 @@ export function drawAnalysis({ chart, candle, analysis, enabled, lastTime }) {
         ctx.markers.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0))
         createSeriesMarkers(candle, ctx.markers)
     }
-    return { rsiOn: ctx.rsiPane != null }
+    return { rsiOn: ctx.rsiPane != null, futureBars: ctx.futureBars }
 }

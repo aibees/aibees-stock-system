@@ -94,9 +94,10 @@
                     </dl>
                     <!-- 휠/핀치로 확대, 드래그로 이동, 마우스를 올리면 위 범례가 그 봉 값으로 바뀐다 -->
                     <div class="chart-wrap">
-                        <LwStockChart :data="chartData" :layers="layers" />
+                        <LwStockChart :data="chartData" :layers="layers" :layer-options="{ elliott: elliottPick }" />
                     </div>
-                    <ChartAnalysisSummary :analysis="chartData.analysis" :layers="layers" />
+                    <ChartAnalysisSummary :analysis="chartData.analysis" :layers="layers"
+                        :pick-index="elliottPick" @pick="k => elliottPick = k" />
                 </div>
 
                 <div v-else class="empty-box">
@@ -150,6 +151,8 @@ const { enabled: enabledLayers, isOn: isLayerOn, toggle: toggleLayer } = useChar
 const availableLayers = computed(() => LAYERS.filter(l => chartData.value?.analysis?.[l.key] !== undefined));
 const layers          = computed(() => availableLayers.value.map(l => l.key).filter(k => enabledLayers.value.includes(k)));
 const layerMenuOpen   = ref(false);
+const elliottPick     = ref(0);   // 차트에 그릴 엘리엇 해석(0 = 주요 해석). 종목을 다시 조회하면 주요 해석으로
+watch(chartData, () => { elliottPick.value = 0; });
 const layerMenuEl     = ref(null);
 const closeLayerMenu  = (e) => { if (layerMenuEl.value && !layerMenuEl.value.contains(e.target)) layerMenuOpen.value = false; };
 onMounted(() => document.addEventListener('click', closeLayerMenu));

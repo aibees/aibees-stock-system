@@ -1,4 +1,4 @@
-"""일봉 차트 분석(스윙·추세 구조·피보나치·RSI·다이버전스·패턴) — 모듈 단위로 켜고 끈다.
+"""일봉 차트 분석(스윙·추세 구조·피보나치·RSI·다이버전스·패턴·엘리엇 파동) — 모듈 단위로 켜고 끈다.
 
 모듈 목록은 MODULES 한 곳에서 관리한다. 어떤 모듈을 계산할지는 공통코드
 stock/setting/screen/CHART_ANALYSIS (쉼표 목록, 'N' 이면 전부 끔)가 정하고,
@@ -17,6 +17,7 @@ from app.services.chart_analysis.structure import analyze_structure
 from app.services.chart_analysis.fib import analyze_fib
 from app.services.chart_analysis.divergence import analyze_divergence
 from app.services.chart_analysis.patterns import analyze_patterns
+from app.services.chart_analysis.elliott import analyze_elliott
 from app.services.chart_analysis.levels import r
 
 
@@ -58,6 +59,7 @@ MODULES = {
     'rsi':        _rsi,
     'divergence': lambda ctx: analyze_divergence(ctx.swings, ctx.rsi.tolist()),
     'pattern':    lambda ctx: analyze_patterns(ctx.view, ctx.swings, ctx.atr_last),
+    'elliott':    lambda ctx: analyze_elliott(ctx.view, ctx.atr),
 }
 
 
