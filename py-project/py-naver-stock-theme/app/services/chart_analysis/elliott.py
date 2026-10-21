@@ -8,6 +8,11 @@
    어기면 버리고, 남은 후보를 가이드라인 점수로 줄 세운다.
      피보 적합도 45 · 완성된 파동 수 20 · 2·4파 교대 10 · 시작점이 직전 극값인가 15 · 파동별 최소 봉수 10
    점수 가중치는 경험값이라 순위는 "가능성 높은 순"이 아니라 "규칙·비율에 잘 맞는 순"으로 읽는다.
+4) 큰 단위 추세(120봉 이평 기울기)와 맞는 해석에 가점(TREND_WEIGHT). 충격파는 추세와 같은 방향,
+   조정파는 추세와 반대 방향(상승 추세 속 하락 조정)이면 맞는 것으로 본다.
+5) 해석마다 가까운 기대 방향(bias = 예상 경로 첫 구간이 현재가보다 위/아래)을 붙이고,
+   전체를 종합(consensus)한다. 라벨이 달라도 다음 움직임이 같으면 매매 판단은 같기 때문에,
+   매수 판단에는 "주요 해석 하나"보다 "해석들이 어느 쪽을 가리키나"를 쓴다.
 
 가격 계산은 산술 가격이 기본이고, 목표·예상 경로가 현재가의 10% 이하로 나오는 해석만 로그 가격
 (파동 길이 = 등락률)으로 다시 계산한다. 예) -70% 하락 1파에 1.618배를 산술로 곱하면 3파 목표가 0 아래.
@@ -23,6 +28,11 @@ DEGREES = (2.5, 4.0, 6.0)
 TOP_N = 4
 MIN_SCORE = 30
 MIN_WAVE_BARS = 3
+TREND_WEIGHT = 10        # 큰 단위 추세 일치 가점(100점 중). 0 이면 끔 — 백테스트 비교용
+TREND_MA = 120
+TREND_LOOKBACK = 20      # 이평 기울기를 이 봉수 전과 비교
+TREND_FLAT_PCT = 1.0     # 기울기가 이 % 안쪽이면 횡보
+BULL_SHARE = 0.65        # 상승 점수 비중이 이 이상이면 상승 우세, 1-이 값 이하면 하락 우세
 
 
 def _close(v, ideals):
@@ -121,7 +131,8 @@ def _impulse(P, s, last_i, log=False):
         alt = 1.0 if abs(d2 - d4) > 0.15 or not (0.625 < t2 / t4 < 1.6) else 0.0
     else:
         alt = 0.5
-    score = 45 * fib + 20 * min(complete, 5) / 5 + 10 * alt + 15 * _start_extreme(P, s, N) + 10 * _bars_ok(bars, complete)
+    parts = {'fib': fib, 'count': min(complete, 5) / 5, 'alt': alt, 'start': _start_extreme(P, s, N), 'bars': _bars_ok(bars, complete)}
+    score = 45 * parts['fib'] + 20 * parts['count'] + 10 * parts['alt'] + 15 * parts['start'] + 10 * parts['bars']
 
     # ── 현재 파동 기준 목표·확인·무효 ──
     cur = n
@@ -187,6 +198,7 @@ def _impulse(P, s, last_i, log=False):
         'subtitle': '충격파',
         'current': labels[n],
         'score': score,
+        'parts': {k: r(v) for k, v in parts.items()},
         'points': [{'date': p['date'], 'kind': p['kind'], 'price': r(p['price']), 'label': labels[k]} for k, p in enumerate(seq)],
         'ratios': ratios,
         'target': {'basic': N.p(basic), 'basic_label': bl, 'extended': N.p(ext), 'extended_label': el},
@@ -227,7 +239,8 @@ def _correction(P, s, last_i, log=False):
     else:
         ctx = 0.5
     complete = n - 1
-    score = 45 * fib + 20 * 0.6 * complete / 3 + 10 * ctx + 15 * _start_extreme(P, s, N) + 10 * _bars_ok(bars, complete)
+    parts = {'fib': fib, 'count': 0.6 * complete / 3, 'ctx': ctx, 'start': _start_extreme(P, s, N), 'bars': _bars_ok(bars, complete)}
+    score = 45 * parts['fib'] + 20 * parts['count'] + 10 * parts['ctx'] + 15 * parts['start'] + 10 * parts['bars']
 
     xn = x[n]
     confirm = None
@@ -258,6 +271,7 @@ def _correction(P, s, last_i, log=False):
         'subtitle': '지그재그' if zigzag else '플랫',
         'current': labels[n],
         'score': score,
+        'parts': {k: r(v) for k, v in parts.items()},
         'points': [{'date': p['date'], 'kind': p['kind'], 'price': r(p['price']), 'label': labels[k]} for k, p in enumerate(seq)],
         'ratios': ratios,
         'target': {'basic': N.p(basic), 'basic_label': bl, 'extended': N.p(ext), 'extended_label': el},
@@ -280,9 +294,69 @@ def _build(fn, P, s, last_i, floor):
     return c
 
 
-def analyze_elliott(view, atr) -> list:
+def _trend(view) -> str:
+    """큰 단위 추세: 종가 120봉 이평의 최근 20봉 기울기."""
+    ma = view['close'].astype(float).rolling(TREND_MA).mean()
+    now, before = ma.iloc[-1], ma.iloc[-1 - TREND_LOOKBACK] if len(ma) > TREND_LOOKBACK else None
+    if before is None or before != before or now != now:      # NaN — 봉이 모자람
+        return 'flat'
+    pct = (now / before - 1) * 100
+    return 'up' if pct > TREND_FLAT_PCT else 'down' if pct < -TREND_FLAT_PCT else 'flat'
+
+
+def _agrees(c, trend) -> float:
+    if trend == 'flat':
+        return 0.5
+    same = c['direction'] == trend
+    return 1.0 if (same if c['type'] == 'impulse' else not same) else 0.0
+
+
+def _bias(c, last_close):
+    """가까운 기대 방향 — 예상 경로 중 미래(bars>0) 첫 점이 현재가보다 위면 up."""
+    nxt = next((p for p in c['projection'] if p['bars'] > 0), None)
+    if nxt is None:
+        return None, None
+    return ('up' if nxt['price'] > last_close else 'down'), nxt['price']
+
+
+def _consensus(items, last_close, trend) -> dict:
+    up = [c for c in items if c['bias'] == 'up']
+    down = [c for c in items if c['bias'] == 'down']
+    us, ds = sum(c['score'] for c in up), sum(c['score'] for c in down)
+    share = us / (us + ds) if us + ds else None
+    if share is None:
+        label = '판단 불가'
+    elif share >= BULL_SHARE:
+        label = '상승 우세'
+    elif share <= 1 - BULL_SHARE:
+        label = '하락 우세'
+    else:
+        label = '방향 불명확'
+    best_up = up[0] if up else None          # items 는 점수순이라 첫 번째가 가장 유력
+    inv_pct = None
+    if best_up and best_up['invalid']['price'] < last_close:
+        inv_pct = r((last_close - best_up['invalid']['price']) / last_close * 100)
+    return {
+        'up_count': len(up),
+        'down_count': len(down),
+        'up_score': int(us),
+        'down_score': int(ds),
+        'up_share': r(share) if share is not None else None,
+        'label': label,
+        'unanimous': bool(items) and (len(up) == len(items) or len(down) == len(items)),
+        'trend': trend,
+        'trend_label': {'up': '상승', 'down': '하락', 'flat': '횡보'}[trend],
+        'up_invalid_pct': inv_pct,      # 가장 유력한 상승 해석의 무효선까지 거리(%)
+    }
+
+
+def analyze_elliott(view, atr, trend_weight: float = None) -> dict:
+    """반환: {'items': 해석(점수순, 최대 TOP_N), 'consensus': 종합}. trend_weight 는 백테스트 비교용."""
+    tw = TREND_WEIGHT if trend_weight is None else trend_weight
     last_i = len(view) - 1
-    floor = float(view['close'].iloc[-1]) * 0.1
+    last_close = float(view['close'].iloc[-1])
+    floor = last_close * 0.1
+    trend = _trend(view)
     best = {}
     for mult in DEGREES:
         P = find_swings(view, atr, atr_mult=mult)
@@ -295,6 +369,9 @@ def analyze_elliott(view, atr) -> list:
                 if c is None:
                     continue
                 c['degree'] = mult
+                agree = _agrees(c, trend)
+                c['parts']['trend'] = agree
+                c['score'] = c['score'] * (1 - tw / 100) + tw * agree
                 # 같은 해석이 여러 단위에서 나오면 점수 높은 쪽만
                 key = (c['title'], c['points'][0]['date'])
                 if key not in best or c['score'] > best[key]['score']:
@@ -307,7 +384,8 @@ def analyze_elliott(view, atr) -> list:
             continue
         seen.add(c['title'])
         c['score'] = int(round(c['score']))
+        c['bias'], c['bias_target'] = _bias(c, last_close)
         out.append(c)
         if len(out) == TOP_N:
             break
-    return out
+    return {'items': out, 'consensus': _consensus(out, last_close, trend)}

@@ -550,6 +550,11 @@ $cream:   #FFF8E1;
 }
 
 /* ── 태블릿 / 좁은 화면 ── */
+// PC: 차트를 넓게 보도록 화면 폭의 90%까지 쓴다(태블릿·모바일은 위 900px 기준 그대로)
+@media (min-width: 769px) {
+    .contents { max-width: 90%; }
+}
+
 @media (max-width: 768px) {
     .chart-wrap { height: 58vh; }
     .chart-skeleton { height: 52vh; }

@@ -159,7 +159,8 @@ const drawPattern = (ctx, list) => {
 }
 
 // 선택된 해석 하나만 그린다(options.elliott = 목록 index, 기본 0 = 주요 해석)
-const drawElliott = (ctx, list) => {
+const drawElliott = (ctx, e) => {
+    const list = e?.items
     const w = list?.[ctx.options.elliott ?? 0] ?? list?.[0]
     if (!w) return
     addLine(ctx, w.points.map(p => ({ time: p.date, value: p.price })), { color: C.wave, lineWidth: 2 })
