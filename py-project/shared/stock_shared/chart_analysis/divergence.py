@@ -7,7 +7,7 @@
 """
 import math
 
-from app.services.chart_analysis.levels import r
+from stock_shared.chart_analysis.levels import r
 
 MIN_RSI_GAP = 2.0      # RSI 차이가 이보다 작으면 같은 높이로 보고 버린다
 MAX_BARS = 80          # 두 스윙 사이가 이보다 멀면 비교하지 않는다

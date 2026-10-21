@@ -1,5 +1,5 @@
 """추세 구조 — 최근 확정 스윙 고점 2개·저점 2개로 상승/하락/횡보 판정 + 지지·저항."""
-from app.services.chart_analysis.levels import r
+from stock_shared.chart_analysis.levels import r
 
 
 def analyze_structure(swings: list, last_close: float) -> dict | None:

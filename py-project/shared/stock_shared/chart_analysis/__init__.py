@@ -11,14 +11,14 @@ import logging
 
 import pandas as pd
 
-from app.services.chart_analysis.indicators import atr, rsi
-from app.services.chart_analysis.swings import find_swings
-from app.services.chart_analysis.structure import analyze_structure
-from app.services.chart_analysis.fib import analyze_fib
-from app.services.chart_analysis.divergence import analyze_divergence
-from app.services.chart_analysis.patterns import analyze_patterns
-from app.services.chart_analysis.elliott import analyze_elliott
-from app.services.chart_analysis.levels import r
+from stock_shared.chart_analysis.indicators import atr, rsi
+from stock_shared.chart_analysis.swings import find_swings
+from stock_shared.chart_analysis.structure import analyze_structure
+from stock_shared.chart_analysis.fib import analyze_fib
+from stock_shared.chart_analysis.divergence import analyze_divergence
+from stock_shared.chart_analysis.patterns import analyze_patterns
+from stock_shared.chart_analysis.elliott import analyze_elliott
+from stock_shared.chart_analysis.levels import r
 
 
 class Context:

@@ -21,8 +21,8 @@
 """
 import math
 
-from app.services.chart_analysis.swings import find_swings
-from app.services.chart_analysis.levels import r
+from stock_shared.chart_analysis.swings import find_swings
+from stock_shared.chart_analysis.levels import r
 
 DEGREES = (2.5, 4.0, 6.0)
 TOP_N = 4

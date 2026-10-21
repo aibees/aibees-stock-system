@@ -4,7 +4,7 @@
 가장 최근 스윙 a" 에서 "a 이후의 최고가(최저가) b" 까지로 잡는다. 바로 앞 작은 파동만 쓰면
 급락 한 번에 시작점이 깨져 곧바로 무효가 되기 때문에, 깨지지 않은 더 큰 파동으로 거슬러 올라간다.
 """
-from app.services.chart_analysis.levels import plan, r
+from stock_shared.chart_analysis.levels import plan, r
 
 RETRACE = (0.236, 0.382, 0.5, 0.618, 0.786)
 EXTEND = (1.272, 1.618)

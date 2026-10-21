@@ -8,7 +8,7 @@ from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.stockInvestorDailyDao import StockInvestorDailyDao
 from app.ext_services.kis.KisEngine import KisEngine
 from app.services.stocks.StockModService import StockModService
-from app.services import chart_analysis
+from stock_shared import chart_analysis
 from app.domains.dao.masterCodesDao import MasterCodesDao
 from app.utils.constants.Literal import Literal
 from datetime import datetime, timedelta

@@ -5,7 +5,7 @@
 """
 import pandas as pd
 
-from app.services.chart_analysis.levels import plan, r
+from stock_shared.chart_analysis.levels import plan, r
 
 RECENT_BARS = 60        # 패턴의 마지막 꼭짓점이 최근 이 봉수 안에 있어야 한다
 MIN_GAP_BARS = 5        # 쌍봉 두 꼭짓점 사이 최소 봉수
