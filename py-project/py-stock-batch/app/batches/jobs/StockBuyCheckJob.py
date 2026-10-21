@@ -19,6 +19,8 @@ from stock_shared.dto.userOptionMeta import UserOptionMeta
 from stock_shared.dao.tradeShapeTrainDailyDao import TradeShapeTrainDailyDao
 from stock_shared.ml.shape_features import SHAPE_FEATURE_COLUMNS
 from stock_shared.ml.shape_model import score as shape_score
+from stock_shared.strategy import wave2_breakout
+from sqlalchemy import text
 
 
 # 최근 N일(캘린더) 내 매수추천에 등장했던 종목은 오늘 다시 조건을 만족해도
@@ -45,6 +47,19 @@ COMPOSITE_ATR_RATIO_MAX = 0.10         # ATR/종가 상한(kospi1.atr_ratio_min=
 COMPOSITE_SMA20_TREND_BARS = 14        # 14봉 전 대비 sma20(ema20 필드) 상승 여부
 # 모멘텀 합성점수 = 아래 5개를 그날 후보 pool 내 z-score 로 정규화한 평균.
 COMPOSITE_MOMENTUM_COLS = ['obv_gap_norm', 'obv_slope3', 'ind_vol_ratio_today', 'ind_macd_hist_norm']
+
+# ── 종합순위(composite_rank_no) 산정 방식 (2026-10-22) ─────────────────────────
+#   공통코드 master_codes(stock/setting/batch/BUY_RANK_MODE) — 매 실행마다 읽는다(재시작 불필요).
+#     WAVE2    (기본, 행 없을 때도) : 2파 하락 추세선 돌파 + 거래량 2배↑ 신호 종목만, 거래량 배수 큰 순 1~10위.
+#                                     stock_shared.strategy.wave2_breakout 참고. 5년 검증(+15%/-8%/10일) 매매당 +0.74%,
+#                                     현행 매도 규칙으로 +1.07%(2023~26 매년 +). 기존 모멘텀 1위는 같은 기간 매년 마이너스였다.
+#     MOMENTUM                      : 이전 방식(shape 상위 10 → 모멘텀 재정렬).
+#   WAVE2 에서 그날 신호가 없으면 종합순위는 비고, worker 는 DEFAULT_BUY_ORDER 의 다음 기준(score)으로 넘어간다.
+#   신호 판정이 실패하면 그날은 MOMENTUM 으로 자동 폴백한다.
+BUY_RANK_MODE_DEFAULT = 'WAVE2'
+WAVE2_TOP_N = 10
+# 2파 판정은 ZigZag 를 일봉 처음부터 진행시키므로 조회 봉수를 넉넉히(250봉 필터 + 여유). KIS 1회 100봉이라 300봉도 3회 호출.
+OHLCV_MIN_BARS = 300
 
 
 class StockBuyCheckJob(Job):
@@ -151,6 +166,7 @@ class StockBuyCheckJob(Job):
         # ── 스레드는 KIS 조회+지표계산만 수행(무 DB). 결과(비-HOLD)만 리턴 ──
         result_list = []
         composite_pool = []
+        wave2_pool = []
         train_rows = []
         with ThreadPoolExecutor(max_workers=n) as ex:
             futures = []
@@ -164,10 +180,11 @@ class StockBuyCheckJob(Job):
                 ))
             for f in futures:
                 try:
-                    chunk_results, chunk_composite, chunk_train = f.result()
+                    chunk_results, chunk_composite, chunk_train, chunk_wave2 = f.result()
                     result_list.extend(chunk_results)
                     composite_pool.extend(chunk_composite)
                     train_rows.extend(chunk_train)
+                    wave2_pool.extend(chunk_wave2)
                 except Exception as e:
                     print(f"[run_batch] 워커 실패: {e}", flush=True)
 
@@ -205,7 +222,7 @@ class StockBuyCheckJob(Job):
         #   나중에 real score/rank_no/재무정보로 다시 덮어써야 하기 때문이다(순서 반대면
         #   watch 게이트가 채운 score/rank_no 를 이 블록이 NULL 로 되돌려버린다).
         try:
-            composite_top10 = self._compute_composite_top10(composite_pool, ymd)
+            composite_top10 = self._select_top10(composite_pool, wave2_pool, ymd)
             if composite_top10:
                 empty_fin = {'eps': None, 'pbr': None, 'per': None, 'roe': None, 'peg': None}
                 # 재무(PER/PBR 등) — watch 게이트 종목만 스레드에서 조회해 왔기 때문에 2단계로만 뽑힌 종목은
@@ -238,7 +255,7 @@ class StockBuyCheckJob(Job):
                 print(f"2단계 top10 저장 완료: {len(composite_top10)}건 (OHLCV/지표 포함) "
                       f"(1위: {composite_top10[0]['stock_name']}({composite_top10[0]['stock_code']}))", flush=True)
             else:
-                print("2단계 후보 pool 이 비어있어(안정성 필터 통과 종목 없음) top10 미생성", flush=True)
+                print("종합순위 대상 없음 → composite_rank_no 미생성(worker 는 score 순으로 폴백)", flush=True)
         except Exception as e:
             self.session.rollback()
             print(f"[2단계 top10 저장 실패, watch 게이트 결과는 유지됨] {e}", flush=True)
@@ -288,6 +305,55 @@ class StockBuyCheckJob(Job):
             self.send_mail_buy_target_stock(created_html, email, len(result_list))
 
         return return_result
+
+    def _buy_rank_mode(self) -> str:
+        """공통코드 stock/setting/batch/BUY_RANK_MODE. 없거나 읽기 실패면 기본(WAVE2)."""
+        try:
+            row = self.session.execute(text(
+                "SELECT `desc` FROM master_codes WHERE `system` = 'stock' AND source = 'setting' "
+                " AND category = 'batch' AND code = 'BUY_RANK_MODE'")).first()
+            v = (row[0] if row else '') or ''
+            v = v.strip().upper()
+            return v if v in ('WAVE2', 'MOMENTUM') else BUY_RANK_MODE_DEFAULT
+        except Exception as e:
+            print(f"[종합순위] BUY_RANK_MODE 조회 실패 → 기본 {BUY_RANK_MODE_DEFAULT}: {e}", flush=True)
+            return BUY_RANK_MODE_DEFAULT
+
+    def _select_top10(self, composite_pool: list, wave2_pool: list, ymd: str) -> list:
+        """종합순위 산정 방식 선택(BUY_RANK_MODE). WAVE2 산정이 실패하면 MOMENTUM 으로 폴백."""
+        mode = self._buy_rank_mode()
+        if mode == 'WAVE2':
+            try:
+                top = self._compute_wave2_top10(wave2_pool, ymd)
+                print(f"[종합순위] WAVE2 — 2파 돌파 신호 {len(wave2_pool)}건 → {len(top)}건 순위 부여", flush=True)
+                return top
+            except Exception as e:
+                print(f"[종합순위] WAVE2 산정 실패 → MOMENTUM 폴백: {e}", flush=True)
+        top = self._compute_composite_top10(composite_pool, ymd)
+        print(f"[종합순위] MOMENTUM — {len(top)}건", flush=True)
+        return top
+
+    @staticmethod
+    def _compute_wave2_top10(wave2_pool: list, ymd: str) -> list:
+        """2파 하락 추세선 돌파 + 거래량 2배↑ 신호를 거래량 배수 큰 순으로 1~10위.
+        momentum_composite 칸에는 거래량 배수(신호 강도)를 넣는다 — 화면에 쓰이지 않는 칸이라 컬럼을 늘리지 않았다."""
+        ranked = sorted(wave2_pool, key=lambda r: (-r['vol_ratio'], r['stock_code']))[:WAVE2_TOP_N]
+        return [
+            {
+                'ymd': ymd,
+                'stock_code': r['stock_code'],
+                'stock_name': r['stock_name'],
+                'close': r['close'],
+                'shape_proba': round(float(r['proba']), 4) if r['proba'] is not None else None,
+                'momentum_composite': round(float(r['vol_ratio']), 4),
+                'composite_rank_no': k,
+                'action_type': r['action_type'],
+                'todayStock': r['today_stock'],
+                'indicator': r['indicator'],
+                'chart_data': r['chart_data'],
+            }
+            for k, r in enumerate(ranked, 1)
+        ]
 
     @staticmethod
     def _compute_composite_top10(composite_pool: list, ymd: str) -> list:
@@ -412,6 +478,7 @@ class StockBuyCheckJob(Job):
         strategy = self._make_strategy(strategy_param)
         results = []
         composite_pool = []
+        wave2_pool = []          # 2파 하락 추세선 돌파 + 거래량 2배↑ 신호(종합순위 WAVE2 모드)
         train_rows = []          # 재학습 학습셋(전종목, 게이트 통과 무관)
         idx = 0
 
@@ -425,7 +492,7 @@ class StockBuyCheckJob(Job):
                 time.sleep(1.5)
 
                 # 매수추천배치 일봉 조회: 국내주식기간별시세 API(FHKST03010100) 사용
-                ohlcv = engine.get_daily_ohlcv(stock_code, start_date, end_date)
+                ohlcv = engine.get_daily_ohlcv(stock_code, start_date, end_date, min_days=OHLCV_MIN_BARS)
                 if ohlcv is None:
                     print(f"[{tag}] 조회 불가 종목 ==> {stock_name}({stock_code})", flush=True)
                     idx += 1
@@ -488,6 +555,30 @@ class StockBuyCheckJob(Job):
                     train_row['action_type'] = result.get('action_type')
                     train_rows.append(train_row)
 
+                # 2파 하락 추세선 돌파 신호 — 오늘(마지막 봉)이 돌파일이고 거래량 2배↑ 인 종목만.
+                #   판정 실패는 이 종목만 건너뛴다(다른 후보·기존 순위에 영향 없음).
+                try:
+                    bad = (str(stock.get('admin_issue') or 'N').upper() == 'Y'
+                           or str(stock.get('trading_halt') or 'N').upper() == 'Y')
+                    w2 = wave2_breakout.today_signal(ohlcv, stock.get('listed_shares'), bad, stock_code)
+                except Exception as e:
+                    print(f"[{tag}] 2파 판정 실패 {stock_code}: {e}", flush=True)
+                    w2 = None
+                if w2 is not None:
+                    wave2_pool.append({
+                        'stock_code': stock_code,
+                        'stock_name': stock_name,
+                        'close': float(last_close),
+                        'proba': shape_proba,
+                        'vol_ratio': w2['vol_ratio'],
+                        'action_type': result['action_type'],
+                        'today_stock': result['todayStock'],
+                        'indicator': result['indicator'],
+                        'chart_data': self._build_chart_data(trade_data),
+                    })
+                    print(f"[{tag}] 2파 돌파 신호 {stock_name}({stock_code}) 거래량 {w2['vol_ratio']:.1f}배 · "
+                          f"되돌림 {w2['retr']:.2f} · H1까지 {w2['to_h1'] * 100:+.1f}%", flush=True)
+
                 if shape_proba is not None and is_eligible:
                     # watch 게이트 통과 여부와 무관하게, trade_buy_target_stock 에 들어갈
                     # 행은 항상 OHLCV/지표가 채워져 있어야 한다 — result['todayStock']/
@@ -526,8 +617,8 @@ class StockBuyCheckJob(Job):
                 continue
 
         print(f"[{tag}] 청크 완료: watch게이트 후보 {len(results)}건 / 2단계 pool {len(composite_pool)}건 "
-              f"/ 학습셋 {len(train_rows)}건", flush=True)
-        return results, composite_pool, train_rows
+              f"/ 2파 돌파 {len(wave2_pool)}건 / 학습셋 {len(train_rows)}건", flush=True)
+        return results, composite_pool, train_rows, wave2_pool
 
 
     # smtpUtils.py 파일에서 emailUtils 객체를 임포트한다고 가정합니다.
