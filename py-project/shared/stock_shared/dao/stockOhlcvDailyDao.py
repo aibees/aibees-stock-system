@@ -65,8 +65,13 @@ class StockOhlcvDailyDao(BaseDao):
     # write
     # ------------------------------------------------------------------
     def replace_bars(self, session, stock_code: str, bars: list, chunk_size: int = 500) -> int:
-        """종목 일봉 전체 교체. 수정주가가 바뀌면 과거 전 구간이 달라지므로 부분 갱신으로는 맞출 수 없다."""
-        session.execute(delete(StockOhlcvDaily).where(StockOhlcvDaily.stock_code == stock_code))
+        """종목 일봉 전체 교체. 수정주가가 바뀌면 과거 전 구간이 달라지므로 부분 갱신으로는 맞출 수 없다.
+
+        처음 받는 종목은 DELETE 를 건너뛴다. REPEATABLE READ 에서 없는 범위를 DELETE 하면
+        갭 락이 걸리고, 병렬 스레드가 인접 종목을 INSERT 하다 서로 막혀 데드락(1213)이 난다.
+        """
+        if self.select_bounds(session, stock_code)["bar_cnt"]:
+            session.execute(delete(StockOhlcvDaily).where(StockOhlcvDaily.stock_code == stock_code))
         return self._insert(session, stock_code, bars, chunk_size, upsert=False)
 
     def upsert_bars(self, session, stock_code: str, bars: list, chunk_size: int = 500) -> int:

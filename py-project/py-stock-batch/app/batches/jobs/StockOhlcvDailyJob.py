@@ -199,8 +199,9 @@ class StockOhlcvDailyJob(Job):
                 except Exception as e:  # noqa: BLE001
                     session.rollback()
                     err = str(e)
-                    if ('API 호출 횟수를 초과' in err or isinstance(e, ConnectionError)) \
-                            and retry < self.MAX_RETRY:
+                    # 일시 오류: KIS rate limit / 네트워크 / InnoDB 데드락(1213, 병렬 스레드 간 락 경합)
+                    if ('API 호출 횟수를 초과' in err or 'Deadlock found' in err
+                            or isinstance(e, ConnectionError)) and retry < self.MAX_RETRY:
                         retry += 1
                         print(f'[{tag}][{idx}] {code} 일시 오류({retry}/{self.MAX_RETRY}) → 재시도', flush=True)
                         time.sleep(1 + retry)
