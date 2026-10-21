@@ -15,6 +15,7 @@
                 <span v-for="m in maLines" :key="m.key" :style="{ '--c': m.color }">
                     <em>{{ m.label }}</em>{{ fmt(hover[m.key]) }}
                 </span>
+                <span v-if="rsiOn && hover.rsi != null" class="lw-rsi"><em>RSI</em>{{ hover.rsi.toFixed(1) }}</span>
             </div>
         </div>
         <div ref="el" class="lw-canvas"></div>
@@ -24,12 +25,15 @@
 <script setup>
 // TradingView lightweight-charts(Apache 2.0) 기반 캔들 차트 — 휠/핀치 확대, 드래그 이동, 호버 시 상단 범례 갱신.
 // 라이선스상 TradingView 출처 표시가 필요해 차트 안 attribution 로고는 끄지 않는다.
-// data 는 /api/v1/charts/stock 응답 그대로({ ohcl, volume, ma5..., bb_* }, x='YYYY-MM-DD').
+// data 는 /api/v1/charts/stock 응답 그대로({ ohcl, volume, ma5..., bb_*, analysis? }, x='YYYY-MM-DD').
+// analysis(일봉 분석)는 chartAnalysis/layers.js 가 레이어별로 그린다 — layers 에 든 key 만 그린다.
 import { createChart, CandlestickSeries, LineSeries, HistogramSeries, CrosshairMode, LineStyle } from 'lightweight-charts'
+import { drawAnalysis } from './chartAnalysis/layers.js'
 
 const props = defineProps({
     data:        { type: Object, required: true },
     visibleBars: { type: Number, default: 120 },   // 처음 보여줄 최근 봉 수(나머지는 왼쪽으로 드래그/축소해서 본다)
+    layers:      { type: Array, default: () => [] },   // 켜진 분석 레이어 key
 })
 
 const UP   = '#C8282A'
@@ -49,6 +53,7 @@ const bbLines = [
 
 const el    = ref(null)
 const hover = ref(null)
+const rsiOn = ref(false)
 let chart   = null
 let byTime  = new Map()   // time → 범례용 값 묶음
 let lastRow = null
@@ -63,6 +68,7 @@ const toLine = (arr) => (arr || [])
 const buildRows = (d) => {
     const vol = new Map((d.volume || []).map(p => [p.x, p.y]))
     const ma  = Object.fromEntries(maLines.map(m => [m.key, new Map((d[m.key] || []).map(p => [p.x, p.y]))]))
+    const rsi = new Map((d.analysis?.rsi?.series || []).map(p => [p.x, p.y]))
     byTime = new Map()
     let prevClose = null
     for (const c of d.ohcl || []) {
@@ -74,13 +80,16 @@ const buildRows = (d) => {
             chgClass: chg == null || chg === 0 ? '' : chg > 0 ? 'up' : 'down',
         }
         for (const m of maLines) row[m.key] = ma[m.key].get(c.x) ?? null
+        row.rsi = rsi.get(c.x) ?? null
         byTime.set(c.x, row)
         prevClose = c.c
         lastRow = row
     }
 }
 
-const render = () => {
+// keepRange: 레이어만 바꿔 다시 그릴 때 보던 확대·이동 위치를 유지한다
+const render = (keepRange = false) => {
+    const prevRange = keepRange ? chart?.timeScale().getVisibleLogicalRange() : null
     if (chart) { chart.remove(); chart = null }
     const d = props.data
     if (!d || !el.value) return
@@ -148,7 +157,13 @@ const render = () => {
     candle.setData((d.ohcl || []).map(c => ({ time: c.x, open: c.o, high: c.h, low: c.l, close: c.c })))
 
     const n = (d.ohcl || []).length
-    if (n > props.visibleBars) {
+    rsiOn.value = drawAnalysis({
+        chart, candle, analysis: d.analysis, enabled: props.layers, lastTime: d.ohcl?.[n - 1]?.x,
+    }).rsiOn
+
+    if (prevRange) {
+        chart.timeScale().setVisibleLogicalRange(prevRange)
+    } else if (n > props.visibleBars) {
         chart.timeScale().setVisibleLogicalRange({ from: n - props.visibleBars, to: n + 4 })
     } else {
         chart.timeScale().fitContent()
@@ -161,8 +176,9 @@ const render = () => {
     })
 }
 
-onMounted(render)
-watch(() => props.data, () => nextTick(render))
+onMounted(() => render())
+watch(() => props.data, () => nextTick(() => render()))
+watch(() => props.layers, () => nextTick(() => render(true)), { deep: true })
 onBeforeUnmount(() => { chart?.remove(); chart = null })
 </script>
 
@@ -200,6 +216,8 @@ onBeforeUnmount(() => { chart?.remove(); chart = null })
 }
 
 .lw-date { font-weight: 600; color: #6B5B4E; }
+
+.lw-ma .lw-rsi::before { background: #8E7CC3; }
 
 .lw-ma {
     font-size: 12px;

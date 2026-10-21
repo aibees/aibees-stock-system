@@ -12,6 +12,7 @@ declare module 'vue' {
     CandlestickChart: typeof import('./components/common/comp/CandlestickChart.vue')['default']
     CArea: typeof import('./components/common/comp/CArea.vue')['default']
     CBodyArea: typeof import('./components/common/comp/CBodyArea.vue')['default']
+    ChartAnalysisSummary: typeof import('./components/common/comp/chartAnalysis/ChartAnalysisSummary.vue')['default']
     CSearchItem: typeof import('./components/common/comp/CSearchItem.vue')['default']
     DayCandle: typeof import('./components/common/comp/DayCandle.vue')['default']
     Headers: typeof import('./components/common/comp/Headers.vue')['default']

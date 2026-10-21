@@ -60,6 +60,23 @@
                             <span class="stock-name">{{ searchParam.name || searchParam.code }}</span>
                             <span class="stock-code">{{ searchParam.code }}</span>
                         </div>
+                        <!-- 분석 레이어 표시 ON/OFF(일봉 + 서버가 계산한 모듈만 나온다) -->
+                        <div v-if="availableLayers.length" class="layer-menu" ref="layerMenuEl">
+                            <button class="layer-btn" :aria-expanded="layerMenuOpen" @click="layerMenuOpen = !layerMenuOpen">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+                                    <circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="7" cy="18" r="2"/>
+                                </svg>
+                                차트 설정
+                            </button>
+                            <ul v-if="layerMenuOpen" class="layer-list" role="menu">
+                                <li v-for="l in availableLayers" :key="l.key" role="menuitemcheckbox"
+                                    :aria-checked="isLayerOn(l.key)" :class="{ on: isLayerOn(l.key) }" @click="toggleLayer(l.key)">
+                                    <span class="check">{{ isLayerOn(l.key) ? '✓' : '' }}</span>{{ l.label }}
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                     <!-- 시가총액(상장주식수 × 직전 영업일 종가) + 같은 날 투자자별 순매수. 순매수=빨강, 순매도=파랑 -->
                     <dl v-if="summary" class="stock-summary">
@@ -77,8 +94,9 @@
                     </dl>
                     <!-- 휠/핀치로 확대, 드래그로 이동, 마우스를 올리면 위 범례가 그 봉 값으로 바뀐다 -->
                     <div class="chart-wrap">
-                        <LwStockChart :data="chartData" />
+                        <LwStockChart :data="chartData" :layers="layers" />
                     </div>
+                    <ChartAnalysisSummary :analysis="chartData.analysis" :layers="layers" />
                 </div>
 
                 <div v-else class="empty-box">
@@ -93,6 +111,9 @@
 import Lnb from '../common/Lnb.vue';
 import SAutoInput from '../common/comp/SAutoInput.vue';
 import LwStockChart from '../common/comp/LwStockChart.vue';
+import ChartAnalysisSummary from '../common/comp/chartAnalysis/ChartAnalysisSummary.vue';
+import { LAYERS } from '../common/comp/chartAnalysis/layers.js';
+import { useChartLayers } from '../common/comp/chartAnalysis/useChartLayers.js';
 import aibeesApi from '@scripts/aibeesApi.js';
 import { formatEok, formatNetAmt, signClass, shortYmd } from '@scripts/marketFormat.js';
 
@@ -122,6 +143,17 @@ const searchParam = reactive({
 
 const chartData    = ref(null);
 const isLoading    = ref(false);
+
+// ── 분석 레이어 ON/OFF ───────────────────────────────────────────────
+// 서버가 계산해 준 모듈(analysis 의 key)만 메뉴에 나오고, 켜고 끈 상태는 이 브라우저에 기억한다
+const { enabled: enabledLayers, isOn: isLayerOn, toggle: toggleLayer } = useChartLayers();
+const availableLayers = computed(() => LAYERS.filter(l => chartData.value?.analysis?.[l.key] !== undefined));
+const layers          = computed(() => availableLayers.value.map(l => l.key).filter(k => enabledLayers.value.includes(k)));
+const layerMenuOpen   = ref(false);
+const layerMenuEl     = ref(null);
+const closeLayerMenu  = (e) => { if (layerMenuEl.value && !layerMenuEl.value.contains(e.target)) layerMenuOpen.value = false; };
+onMounted(() => document.addEventListener('click', closeLayerMenu));
+onBeforeUnmount(() => document.removeEventListener('click', closeLayerMenu));
 
 onMounted(async () => {
     const code = route.query.code || '';
@@ -423,6 +455,48 @@ $cream:   #FFF8E1;
     // 범례(OHLC·이평 값)가 차트 컴포넌트 안에 있어 높이에 그만큼 더한다
     .chart-wrap {
         height: 66vh;
+    }
+
+    // 차트 설정: 버튼은 글자+아이콘, 펼친 목록은 ✓ 표시 행
+    .layer-menu { position: relative; }
+    .layer-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 4px;
+        background: none;
+        border: 0;
+        color: $ink;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .layer-list {
+        position: absolute;
+        right: 0;
+        top: 36px;
+        z-index: 10;
+        min-width: 168px;
+        margin: 0;
+        padding: 6px 0;
+        list-style: none;
+        background: $white;
+        border: 1px solid $line-2;
+        border-radius: 10px;
+        box-shadow: 0 6px 20px rgba(43, 29, 20, .10);
+
+        li {
+            display: flex;
+            align-items: center;
+            padding: 8px 14px;
+            font-size: 13px;
+            color: $sub;
+            cursor: pointer;
+            &.on { color: $ink; font-weight: 600; }
+            &:hover { background: $cream; }
+        }
+        .check { width: 18px; color: $brown; }
     }
 }
 

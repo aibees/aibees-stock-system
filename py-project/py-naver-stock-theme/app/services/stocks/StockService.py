@@ -1,3 +1,4 @@
+import logging
 import pandas as pd
 
 from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
@@ -7,6 +8,8 @@ from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.stockInvestorDailyDao import StockInvestorDailyDao
 from app.ext_services.kis.KisEngine import KisEngine
 from app.services.stocks.StockModService import StockModService
+from app.services import chart_analysis
+from app.domains.dao.masterCodesDao import MasterCodesDao
 from app.utils.constants.Literal import Literal
 from datetime import datetime, timedelta
 
@@ -185,7 +188,9 @@ class StockService:
         # if start_date:
         #     start_date = (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=120)).strftime('%Y-%m-%d')
 
-        ohlcv:pd.DataFrame = self.kis.get_ohlcv_period_unit(stock_code, 200, unit=period or "day")
+        # 일봉만 분석(스윙·피보·패턴 등)을 붙인다. 분석을 켜면 지표 워밍업용으로 봉을 더 받는다(화면은 그대로 200봉)
+        modules = self._chart_analysis_modules(session) if (period or "day") == "day" else []
+        ohlcv:pd.DataFrame = self.kis.get_ohlcv_period_unit(stock_code, 350 if modules else 200, unit=period or "day")
 
         if ohlcv is None:
             raise Exception("DF is NONE")
@@ -229,7 +234,7 @@ class StockService:
             } for _, row in created.iterrows()
         ]
 
-        return {
+        result = {
             'ohcl':     ohcl,
             'volume':   vol,
             'rate':     rate,
@@ -241,3 +246,20 @@ class StockService:
             'bb_mid':   to_xy(Literal.BB_MID),
             'bb_lower': to_xy(Literal.BB_LOWER),
         }
+        if modules:
+            full = ohlcv[[Literal.YMD, Literal.OPEN, Literal.HIGH, Literal.LOW, Literal.CLOSE]].copy()
+            full[Literal.YMD] = full[Literal.YMD].str[:10]
+            result['analysis'] = chart_analysis.analyze(full, len(created), modules)
+        return result
+
+    @staticmethod
+    def _chart_analysis_modules(session) -> list:
+        """공통코드 stock/setting/screen/CHART_ANALYSIS → 켤 분석 모듈. 행이 없으면 전부, 'N' 이면 끔."""
+        try:
+            rows = MasterCodesDao().select_master_code(
+                session, {'system': 'stock', 'source': 'setting', 'category': 'screen'})
+            setting = next((row['desc'] for row in rows if row['code'] == 'CHART_ANALYSIS'), None)
+        except Exception as e:
+            logging.warning(f"[chart] CHART_ANALYSIS 설정 조회 실패 — 전부 켬: {e}")
+            setting = None
+        return chart_analysis.parse_modules(setting)

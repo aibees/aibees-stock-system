@@ -25,6 +25,7 @@ masterCodesDaoImpl = MasterCodesDao()
 # (code 는 카테고리를 합쳐 한 dict 로 내려가므로 카테고리가 달라도 겹치면 안 된다)
 #   ad     / GATE_INTERVAL      : 광고 게이트를 N번 진입마다 1번 보여준다(프런트 useAdGate.js, 기본 5)
 #   screen / WALLET_REFRESH_SEC : 지갑(MyWallet.vue) 자동 갱신 간격(초, 기본 10, 0=자동 갱신 끔)
+#   screen / CHART_ANALYSIS     : 일봉 차트 분석 모듈 쉼표 목록(서버 StockService 가 읽음, 'N'=끔, 없으면 전부)
 _APP_SETTING_CATEGORIES = ('ad', 'screen')
 
 
