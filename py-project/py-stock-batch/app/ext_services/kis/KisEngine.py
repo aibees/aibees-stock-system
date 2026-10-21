@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -315,6 +316,74 @@ class KisEngine:
             cur_end = (win_start_dt - timedelta(days=1)).strftime("%Y%m%d")
 
         return seen
+
+    # ──────────────────────────────────────────────────────────────────
+    # 일봉 엄격 수집 — 백테스트 원천(StockOhlcvDailyJob) 전용.
+    #   _fetch_daily_mkt 는 요청 실패·rt_cd 오류에서 조용히 break 하고 부분 결과를 돌려준다.
+    #   지표용으로는 그걸로 충분하지만, 5년치 원천을 "완료"로 기록하는 백필에서는
+    #   중간 구간이 빠진 채 저장될 수 있다 → 여기서는 실패를 그대로 raise 한다.
+    #   시장은 KRX(J) 단일 기준. UN(통합)은 NXT 편입 시점부터만 있어 5년 시계열에 두 기준이 섞인다.
+    #   거래대금(acml_tr_pbmn)까지 담아 오름차순 list[dict] 로 반환한다.
+    #   거래정지일처럼 시/고/저가 0 으로 오는 봉은 종가로 채운다(백테스트 체결가가 0 이 되지 않도록).
+    # ──────────────────────────────────────────────────────────────────
+    def fetch_daily_bars(self, code: str, from_ymd: str, to_ymd: str,
+                         mkt: str = "J", adj_price: bool = True,
+                         call_gap: float = 0.0) -> list:
+        PATH = "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"
+        TR_ID = "FHKST03010100"
+
+        window_days = self._spec("D")["window_days"]
+        floor_dt = datetime.strptime(from_ymd, "%Y%m%d")
+        cur_end = to_ymd
+        seen: dict[str, dict] = {}
+        while cur_end >= from_ymd:
+            cur_end_dt = datetime.strptime(cur_end, "%Y%m%d")
+            win_start_dt = max(floor_dt, cur_end_dt - timedelta(days=window_days))
+            win_start = win_start_dt.strftime("%Y%m%d")
+
+            if call_gap:
+                time.sleep(call_gap)
+            resp = self.kis.request(
+                PATH, method="GET",
+                params={
+                    "FID_COND_MRKT_DIV_CODE": mkt,
+                    "FID_INPUT_ISCD": code,
+                    "FID_INPUT_DATE_1": win_start,
+                    "FID_INPUT_DATE_2": cur_end,
+                    "FID_PERIOD_DIV_CODE": "D",
+                    "FID_ORG_ADJ_PRC": "0" if adj_price else "1",
+                },
+                headers={"tr_id": TR_ID, "custtype": "P"},
+                appkey_location="header", auth=True,
+            )
+            j = resp.json()
+            if j.get("rt_cd") != "0":
+                raise RuntimeError(f"{code}({mkt}) {win_start}~{cur_end} rt_cd={j.get('rt_cd')} msg={j.get('msg1')}")
+
+            for r in (j.get("output2") or []):
+                if r.get("stck_bsop_date"):
+                    seen[r["stck_bsop_date"]] = r
+
+            if win_start <= from_ymd:
+                break
+            cur_end = (win_start_dt - timedelta(days=1)).strftime("%Y%m%d")
+
+        bars = []
+        for ymd in sorted(seen):
+            r = seen[ymd]
+            close = _safe_int(r.get("stck_clpr"))
+            if close <= 0:
+                continue
+            bars.append({
+                "trade_date": datetime.strptime(ymd, "%Y%m%d").date(),
+                "open_price": _safe_int(r.get("stck_oprc")) or close,
+                "high_price": _safe_int(r.get("stck_hgpr")) or close,
+                "low_price": _safe_int(r.get("stck_lwpr")) or close,
+                "close_price": close,
+                "volume": _safe_int(r.get("acml_vol")),
+                "amount": _safe_int(r.get("acml_tr_pbmn")),
+            })
+        return bars
 
     # ──────────────────────────────────────────────────────────────────
     # 국내주식기간별시세(일/주/월/년) — inquire-daily-itemchartprice

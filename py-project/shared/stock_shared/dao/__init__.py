@@ -5,6 +5,7 @@ from stock_shared.dao.batchJobMasterDao import BatchJobMasterDao
 from stock_shared.dao.devicePushTokenDao import DevicePushTokenDao
 from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.stockInvestorDailyDao import StockInvestorDailyDao
+from stock_shared.dao.stockOhlcvDailyDao import StockOhlcvDailyDao
 from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
 from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
 from stock_shared.dao.tradeShapeTrainDailyDao import TradeShapeTrainDailyDao
@@ -16,6 +17,7 @@ __all__ = [
     "DevicePushTokenDao",
     "MasterStockDao",
     "StockInvestorDailyDao",
+    "StockOhlcvDailyDao",
     "TradeBuyTargetStockDao",
     "TradeCandleDataDao",
     "TradeShapeTrainDailyDao",
