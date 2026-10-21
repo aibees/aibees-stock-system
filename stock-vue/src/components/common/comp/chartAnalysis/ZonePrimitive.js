@@ -27,6 +27,7 @@ export class ZonePrimitive {
             const x = Math.max(xFrom ?? 0, 0)
             const w = mediaSize.width - x
             if (w <= 0) return
+            ctx.save()   // 글꼴·정렬 등 캔버스 상태를 다른 그리기에 남기지 않는다
             const y = Math.min(y1, y2)
             const h = Math.max(Math.abs(y2 - y1), 1)
             ctx.fillStyle = fill
@@ -44,6 +45,7 @@ export class ZonePrimitive {
                 ctx.textAlign = 'right'
                 ctx.fillText(label, x + w - 6, y + h / 2)
             }
+            ctx.restore()
         })
     }
 }

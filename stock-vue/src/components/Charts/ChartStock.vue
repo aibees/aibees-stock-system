@@ -94,7 +94,7 @@
                     </dl>
                     <!-- 휠/핀치로 확대, 드래그로 이동, 마우스를 올리면 위 범례가 그 봉 값으로 바뀐다 -->
                     <div class="chart-wrap">
-                        <LwStockChart :data="chartData" :layers="layers" :layer-options="{ elliott: elliottPick }" />
+                        <LwStockChart :data="chartData" :layers="layers" :layer-options="layerOptions" />
                     </div>
                     <ChartAnalysisSummary :analysis="chartData.analysis" :layers="layers"
                         :pick-index="elliottPick" @pick="k => elliottPick = k" />
@@ -152,6 +152,7 @@ const availableLayers = computed(() => LAYERS.filter(l => chartData.value?.analy
 const layers          = computed(() => availableLayers.value.map(l => l.key).filter(k => enabledLayers.value.includes(k)));
 const layerMenuOpen   = ref(false);
 const elliottPick     = ref(0);   // 차트에 그릴 엘리엇 해석(0 = 주요 해석). 종목을 다시 조회하면 주요 해석으로
+const layerOptions    = computed(() => ({ elliott: elliottPick.value }));
 watch(chartData, () => { elliottPick.value = 0; });
 const layerMenuEl     = ref(null);
 const closeLayerMenu  = (e) => { if (layerMenuEl.value && !layerMenuEl.value.contains(e.target)) layerMenuOpen.value = false; };
@@ -579,6 +580,8 @@ $cream:   #FFF8E1;
     }
     .chart-card .chart-wrap { height: 56vh; }
     .chart-skeleton { height: 46vh; }
+    // 헤더가 세로로 쌓이면 설정 버튼이 왼쪽에 붙는다 — 목록도 왼쪽 기준으로 펼쳐 화면 밖으로 나가지 않게
+    .chart-card .layer-list { left: 0; right: auto; }
 }
 
 @media (max-width: 360px) {

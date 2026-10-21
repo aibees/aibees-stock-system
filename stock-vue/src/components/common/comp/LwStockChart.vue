@@ -184,7 +184,8 @@ const render = (keepRange = false) => {
 
 onMounted(() => render())
 watch(() => props.data, () => nextTick(() => render()))
-watch(() => [props.layers, props.layerOptions], () => nextTick(() => render(true)), { deep: true })
+// 값이 실제로 바뀔 때만 다시 그린다(새 종목을 받으면 data 쪽 watch 가 이미 그리므로 같은 레이어면 건너뜀)
+watch(() => JSON.stringify([props.layers, props.layerOptions]), () => nextTick(() => render(true)))
 onBeforeUnmount(() => { chart?.remove(); chart = null })
 </script>
 
