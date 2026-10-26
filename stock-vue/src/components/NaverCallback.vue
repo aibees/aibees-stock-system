@@ -60,9 +60,10 @@ onMounted(async () => {
 
         if (data.data.consentRequired) {
             // 회원정보는 저장됨. 동의해야 로그인 토큰을 받는다. 토큰은 URL 에 싣지 않는다.
-            sessionStorage.setItem('naverConsent', JSON.stringify({
+            sessionStorage.setItem('socialConsent', JSON.stringify({
+                provider: 'naver',
                 consentToken: data.data.consentToken,
-                naverResult: data.data.naverResult,
+                socialResult: data.data.naverResult,
                 profile: data.data.profile,
             }));
             return router.replace({ name: 'signup-consent' });

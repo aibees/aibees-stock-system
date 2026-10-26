@@ -21,6 +21,8 @@ user_wallet 잔고 동기화 헬퍼.
   "1포지션 원칙" 카운트에서는 빠진다 — 계좌에 있던 종목이 편입됐다고 worker
   자신의 09:00 자동매수까지 멈추면 안 되기 때문이다(매도 감시는 exclusive_flag
   와 무관하게 그대로 적용됨). repository.open_position_if_absent 참고.
+  ※ 2026-10-23 개정으로 allow_buy() 는 계좌 실보유 0종목일 때만 매수한다 —
+    편입 종목(exclusive_flag='Y')도 보유로 보고 09:00 자동매수를 막는다.
 
 계좌에서 사라진 포지션 정리 (2026-10-01, _close_vanished_positions):
   위 편입이 "계좌 → DB" 한 방향만 맞추고 있었다. 반대 방향(사용자가 HTS/MTS 로

@@ -18,7 +18,7 @@ SUPER_USER_IDS = {
     int(x) for x in os.environ.get('SUPER_USER_IDS', '1').split(',') if x.strip().isdigit()
 }
 # 슈퍼유저에게만 보이는 메뉴. ADMIN 전체 허용·role_menu 매핑이 있어도 슈퍼유저가 아니면 제외한다.
-SUPER_ONLY_MENU_CODES = {'UserAuthSetting'}
+SUPER_ONLY_MENU_CODES = {'UserAuthSetting', 'MasterInfoSetting'}
 
 
 def is_super_user(user_id):

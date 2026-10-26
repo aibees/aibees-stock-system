@@ -237,6 +237,8 @@ const loginTypeOptions = [
     { value: 'EMAIL', label: '이메일' },
     { value: 'NAVER', label: '네이버' },
     { value: 'NAVER_CONSENT', label: '네이버 동의' },
+    { value: 'GOOGLE', label: '구글' },
+    { value: 'GOOGLE_CONSENT', label: '구글 동의' },
     { value: 'SIGNUP', label: '가입' },
     { value: 'LOGOUT', label: '로그아웃' },
 ];

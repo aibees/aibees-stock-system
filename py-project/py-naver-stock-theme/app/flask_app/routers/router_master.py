@@ -9,6 +9,7 @@ from stock_shared.dao.masterStockDao import MasterStockDao
 from functools import wraps
 
 from app.domains.dao.masterMenuDao import MasterInfosDao
+from app.domains.dao.masterInfoDao import MasterInfosDao as MasterKeyDao
 from app.domains.dao.roleMenuDao import RoleMenuDao, ADMIN_AUTH_ID, is_super_user
 from app.domains.dao.masterCodesDao import MasterCodesDao
 from app.flask_app.routers.router_oauth import require_auth
@@ -19,6 +20,7 @@ masterMenuDaoImpl = MasterInfosDao()
 masterStockDaoImpl = MasterStockDao()
 roleMenuDaoImpl = RoleMenuDao()
 masterCodesDaoImpl = MasterCodesDao()
+masterKeyDaoImpl = MasterKeyDao()
 
 # 화면 설정값(공통코드). master_codes system=stock / source=setting / category ∈ _APP_SETTING_CATEGORIES 의
 # {code: desc} 를 /menus/my 응답의 settings 로 같이 내려 준다 — 화면이 따로 요청하지 않아도 권한과 함께 받는다.
@@ -359,4 +361,49 @@ def set_user_role(user_id, auth_id):
         return ApiResponse.error("본인의 ADMIN 권한은 회수할 수 없습니다.", status=400)
 
     roleMenuDaoImpl.set_user_role(g.db, user_id, auth_id, enabled)
+    return ApiResponse.success(None)
+
+
+# master_infos 관리 (슈퍼유저 전용) — 외부 연동 키(KIS 토큰, 네이버/구글 OAuth 등)
+# ===============================================================================
+_MASTER_KEY_TYPE = re.compile(r'^[A-Za-z0-9_.-]{1,20}$')
+
+
+@master_bp.route("/admin/master-infos")
+@require_super
+def select_master_infos():
+    return ApiResponse.success(masterKeyDaoImpl.select_master_key_all(g.db))
+
+
+@master_bp.route("/admin/master-infos/<key_type>", methods=['PUT'])
+@require_super
+def upsert_master_info(key_type):
+    """등록/수정. body: { "key_value": str, "category": str, "expired_date": "YYYY-MM-DD HH:MM:SS" }"""
+    if not _MASTER_KEY_TYPE.match(key_type):
+        return ApiResponse.error("key_type 은 영문·숫자·_.- 20자 이내여야 합니다.", status=400)
+    body = request.get_json(silent=True) or {}
+    key_value = str(body.get('key_value') or '').strip()
+    category = str(body.get('category') or '').strip()
+    if not key_value or len(key_value) > 350:
+        return ApiResponse.error("key_value 는 1~350자여야 합니다.", status=400)
+    if not category or len(category) > 45:
+        return ApiResponse.error("category 는 1~45자여야 합니다.", status=400)
+    raw_date = str(body.get('expired_date') or '').strip() or '2999-12-31 23:59:59'
+    try:
+        expired = datetime.fromisoformat(raw_date.replace('T', ' '))
+    except ValueError:
+        return ApiResponse.error("expired_date 형식이 올바르지 않습니다(YYYY-MM-DD HH:MM:SS).", status=400)
+
+    masterKeyDaoImpl.upsert_master_key_full(g.db, {
+        'key_type': key_type, 'key_value': key_value,
+        'expired_date': expired, 'category': category,
+    })
+    return ApiResponse.success(None)
+
+
+@master_bp.route("/admin/master-infos/<key_type>", methods=['DELETE'])
+@require_super
+def delete_master_info(key_type):
+    if not masterKeyDaoImpl.delete_master_key(g.db, key_type):
+        return ApiResponse.error("존재하지 않는 키입니다.", status=404)
     return ApiResponse.success(None)

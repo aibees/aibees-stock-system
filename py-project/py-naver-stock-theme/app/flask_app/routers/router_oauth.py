@@ -3,7 +3,8 @@ router_oauth.py — OAuth / 이메일 인증 라우터
 
 변경 이력:
     - [유지] POST /login     : 소셜 oAuth 로그인 (기존)
-    - [유지] GET  /infos/<type> : 소셜 키 정보 조회 (기존)
+    - [유지] GET  /infos/<type> : 소셜 키 정보 조회 (기존, GOOGLE 추가)
+    - [신규] POST /google, /google/consent : 구글 로그인(웹 GIS ID 토큰) / 가입 동의
     - [유지] POST /email     : 이메일 로그인 (기존 라우트, 내부 로직 변경)
     - [신규] POST /refresh   : silent refresh — refreshToken으로 토큰 쌍 재발급
     - [신규] POST /logout    : 서버 측 refreshToken 폐기
@@ -18,7 +19,7 @@ import jwt  # PyJWT
 
 from flask import Blueprint, request, g
 
-from app.services.common.authService import AuthService, JWT_SECRET, JWT_ALGORITHM, NaverLoginError, SignupError
+from app.services.common.authService import AuthService, JWT_SECRET, JWT_ALGORITHM, SocialLoginError, SignupError
 from app.exceptions import ResetRequiredException  # 단일 출처 임포트
 from app.domains.dao.masterInfoDao import MasterInfosDao
 from app.domains.dao.accessLogDao import AccessLogDao
@@ -31,7 +32,7 @@ accessLogDaoImpl   = AccessLogDao()
 
 
 def _log_login_result(login_type, results, login_key=None):
-    """로그인 응답으로 기록. 네이버 동의 대기(consentRequired)는 아직 토큰이 없어 로그인 성공이 아니다."""
+    """로그인 응답으로 기록. 소셜 동의 대기(consentRequired)는 아직 토큰이 없어 로그인 성공이 아니다."""
     if results.get('consentRequired'):
         accessLogDaoImpl.insert_login_log(login_type, 'CONSENT_REQUIRED', login_key=login_key)
     else:
@@ -111,7 +112,7 @@ def require_auth(f):
 #   NAVER_AUTH_SECRET 까지 노출됐다(→ 네이버 개발자센터에서 secret 재발급 필요).
 #   type 도 허용 목록으로 제한해 다른 카테고리(*_AUTH)의 값을 조회할 수 없게 한다.
 #   (휴대폰 번호만으로 사용자를 찾던 POST /oauth/login 은 검증 없이 계정 정보를 내줘 삭제했다)
-SOCIAL_PROVIDERS = {'NAVER', 'KAKAO'}
+SOCIAL_PROVIDERS = {'NAVER', 'KAKAO', 'GOOGLE'}
 
 
 @oauth_bp.route("/infos/<type>")
@@ -151,7 +152,7 @@ def oauth_login_naver():
         results = authServiceImpl.naverProcess(g.db, data)
         _log_login_result('NAVER', results)
         return ApiResponse.success(results)
-    except NaverLoginError as e:
+    except SocialLoginError as e:
         g.db.rollback()
         accessLogDaoImpl.insert_login_log('NAVER', 'FAIL', fail_reason=str(e))
         return ApiResponse.error(str(e), status=400)
@@ -175,10 +176,10 @@ def oauth_naver_consent():
     """
     data = request.get_json(silent=True) or {}
     try:
-        results = authServiceImpl.naverConsentProcess(g.db, data)
+        results = authServiceImpl.socialConsentProcess(g.db, data, 'NAVER')
         _log_login_result('NAVER_CONSENT', results)
         return ApiResponse.success(results)
-    except NaverLoginError as e:
+    except SocialLoginError as e:
         g.db.rollback()
         accessLogDaoImpl.insert_login_log('NAVER_CONSENT', 'FAIL', fail_reason=str(e))
         return ApiResponse.error(str(e), status=400)
@@ -186,6 +187,56 @@ def oauth_naver_consent():
         g.db.rollback()
         logging.exception(e)
         accessLogDaoImpl.insert_login_log('NAVER_CONSENT', 'FAIL', fail_reason=str(e))
+        return ApiResponse.error("가입 처리 중 오류가 발생했습니다.")
+
+
+# ── 구글 로그인 (웹) ─────────────────────────────────────────────────
+@oauth_bp.route("/google", methods=['POST'])
+def oauth_login_google():
+    """
+    POST /api/oauth/google
+
+    Request : { "credential": "<Google Identity Services 가 준 ID 토큰>", "nonce": "<GIS 초기화 때 넣은 nonce>" }
+    Response: 이메일 로그인과 같은 형식 + "socialResult": "login" | "linked" | "created"
+              (동의가 없으면 네이버와 같이 consentRequired/consentToken → POST /google/consent)
+
+    ID 토큰은 서버가 구글 공개키로 직접 검증한다(aud = master_infos GOOGLE_AUTH 의 클라이언트 ID).
+    실패하면 가입 도중 만든 행이 남지 않게 롤백한다.
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        results = authServiceImpl.googleProcess(g.db, data)
+        _log_login_result('GOOGLE', results)
+        return ApiResponse.success(results)
+    except SocialLoginError as e:
+        g.db.rollback()
+        accessLogDaoImpl.insert_login_log('GOOGLE', 'FAIL', fail_reason=str(e))
+        return ApiResponse.error(str(e), status=400)
+    except Exception as e:
+        g.db.rollback()
+        logging.exception(e)
+        accessLogDaoImpl.insert_login_log('GOOGLE', 'FAIL', fail_reason=str(e))
+        return ApiResponse.error("구글 로그인 중 오류가 발생했습니다.")
+
+
+@oauth_bp.route("/google/consent", methods=['POST'])
+def oauth_google_consent():
+    """
+    POST /api/oauth/google/consent — /naver/consent 와 같은 형식(consentToken 은 구글 로그인 때 받은 것만 통과)
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        results = authServiceImpl.socialConsentProcess(g.db, data, 'GOOGLE')
+        _log_login_result('GOOGLE_CONSENT', results)
+        return ApiResponse.success(results)
+    except SocialLoginError as e:
+        g.db.rollback()
+        accessLogDaoImpl.insert_login_log('GOOGLE_CONSENT', 'FAIL', fail_reason=str(e))
+        return ApiResponse.error(str(e), status=400)
+    except Exception as e:
+        g.db.rollback()
+        logging.exception(e)
+        accessLogDaoImpl.insert_login_log('GOOGLE_CONSENT', 'FAIL', fail_reason=str(e))
         return ApiResponse.error("가입 처리 중 오류가 발생했습니다.")
 
 

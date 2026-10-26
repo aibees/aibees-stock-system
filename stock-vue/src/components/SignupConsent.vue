@@ -5,7 +5,7 @@
         <main class="sc-main">
             <template v-if="!pending">
                 <p class="sc-title">가입 정보를 찾을 수 없어요</p>
-                <p class="sc-msg">네이버로 다시 로그인해 주세요.</p>
+                <p class="sc-msg">로그인 화면에서 다시 로그인해 주세요.</p>
                 <button type="button" class="btn-primary" @click="toLogin">로그인 화면으로</button>
             </template>
 
@@ -36,10 +36,11 @@
 
 <script setup>
 /**
- * 네이버 가입 — 가입 동의 화면(/oauth/naver/consent). 만 14세·이용약관·개인정보 수집·이용을 항목별로 받는다.
- * NaverCallback 이 서버 응답 consentRequired 를 받으면 consentToken 을 sessionStorage('naverConsent')에
- * 담아 이리로 보낸다(회원정보는 이미 저장됨). 동의하면 POST /api/oauth/naver/consent 가 동의 기록 후
- * 토큰을 주고, 로그인 처리 뒤 홈으로 간다. 취소하면 로그인하지 않는다 — 다음 네이버 로그인 때 다시 묻는다.
+ * 소셜(네이버·구글) 가입 — 가입 동의 화면(/oauth/naver/consent). 만 14세·이용약관·개인정보 수집·이용을 항목별로 받는다.
+ * NaverCallback·Login(구글)이 서버 응답 consentRequired 를 받으면 { provider, consentToken, socialResult, profile } 을
+ * sessionStorage('socialConsent')에 담아 이리로 보낸다(회원정보는 이미 저장됨). 동의하면
+ * POST /api/oauth/<provider>/consent 가 동의 기록 후 토큰을 주고, 로그인 처리 뒤 홈으로 간다.
+ * 취소하면 로그인하지 않는다 — 다음 소셜 로그인 때 다시 묻는다.
  */
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores';
@@ -50,9 +51,12 @@ import { TERMS_VERSION } from '@scripts/termsOfService.js';
 const router = useRouter();
 const userSession = assUserSession();
 
+const PROVIDERS = { naver: '네이버', google: '구글' };
+
 const readPending = () => {
     try {
-        return JSON.parse(sessionStorage.getItem('naverConsent') || 'null');
+        const v = JSON.parse(sessionStorage.getItem('socialConsent') || 'null');
+        return PROVIDERS[v?.provider] ? v : null;
     } catch {
         return null;
     }
@@ -67,7 +71,7 @@ const errorMsg = ref('');
 const toLogin = () => router.replace('/login');
 
 const cancel = () => {
-    sessionStorage.removeItem('naverConsent');
+    sessionStorage.removeItem('socialConsent');
     toLogin();
 };
 
@@ -76,7 +80,8 @@ const submit = async () => {
     submitting.value = true;
     errorMsg.value = '';
     try {
-        const { data } = await aibeesApi.post('/api/oauth/naver/consent', {
+        const { provider } = pending.value;
+        const { data } = await aibeesApi.post(`/api/oauth/${provider}/consent`, {
             consentToken: pending.value.consentToken,
             termsVersion: TERMS_VERSION,
             policyVersion: PRIVACY_POLICY_VERSION,
@@ -86,10 +91,11 @@ const submit = async () => {
         });
         if (!data?.success) throw { error: data?.error };
 
-        sessionStorage.removeItem('naverConsent');
+        sessionStorage.removeItem('socialConsent');
         userSession.loginUser(data.data, localStorage.getItem('autoLogin') === 'true');
-        if (data.data.naverResult === 'created') alert('네이버 계정으로 가입했어요. 환영합니다!');
-        else if (data.data.naverResult === 'linked') alert('기존 계정에 네이버 로그인을 연결했어요.');
+        const label = PROVIDERS[provider];
+        if (data.data.socialResult === 'created') alert(`${label} 계정으로 가입했어요. 환영합니다!`);
+        else if (data.data.socialResult === 'linked') alert(`기존 계정에 ${label} 로그인을 연결했어요.`);
         router.replace({ name: 'home' });
     } catch (err) {
         errorMsg.value = err?.response?.data?.error?.message ?? err?.error?.message ?? '가입을 완료하지 못했어요.';

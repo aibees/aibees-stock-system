@@ -5,8 +5,8 @@ from stock_shared.base import Base
 class MasterInfos(Base):
     __tablename__ = 'master_infos'
     
-    key_type     = Column(String(10), primary_key=True)
-    key_value    = Column(String(256), nullable=False)
+    key_type     = Column(String(20), primary_key=True)
+    key_value    = Column(String(350), nullable=False)
     expired_date = Column(DateTime, nullable=False)
     category     = Column(String(45), nullable=False)
     

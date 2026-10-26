@@ -47,13 +47,22 @@ DEFAULT_SIGNUP_ROLE = 'STOCK_USER'                # 네이버로 신규 가입�
 NAVER_TOKEN_URL = 'https://nid.naver.com/oauth2.0/token'
 NAVER_PROFILE_URL = 'https://openapi.naver.com/v1/nid/me'
 
+# ── 구글 로그인 (웹: Google Identity Services 가 준 ID 토큰을 서버가 직접 검증) ──────
+GOOGLE = 'GOOGLE'
+GOOGLE_CERTS_URL = 'https://www.googleapis.com/oauth2/v3/certs'
+GOOGLE_ISSUERS = ('accounts.google.com', 'https://accounts.google.com')
+_google_jwks = jwt.PyJWKClient(GOOGLE_CERTS_URL, cache_keys=True, lifespan=3600)
+
+# 화면 문구용 이름
+PROVIDER_LABELS = {NAVER: '네이버', GOOGLE: '구글'}
+
 # ── 가입 동의 (이용약관 / 개인정보 수집·이용 / 만 14세 이상) — 항목별로 따로 받아 따로 기록한다 ──
 # 버전은 프런트(stock-vue src/scripts/termsOfService.js, privacyPolicy.js)와 같아야 한다.
-# 문구를 고치면 양쪽 버전을 함께 올린다 → 다음 네이버 로그인 때 재동의를 받는다.
+# 문구를 고치면 양쪽 버전을 함께 올린다 → 다음 소셜(네이버·구글) 로그인 때 재동의를 받는다.
 CONSENT_PRIVACY = 'PRIVACY'                        # user_consent.consent_type 값
 CONSENT_TERMS = 'TERMS'
 CONSENT_AGE14 = 'AGE14'
-PRIVACY_POLICY_VERSION = '2026-10-10.2'   # .2: 휴대전화번호 수집 항목 삭제 (프런트 privacyPolicy.js 와 같아야 함)
+PRIVACY_POLICY_VERSION = '2026-10-23'     # 구글 로그인 수집 항목 추가 (프런트 privacyPolicy.js 와 같아야 함)
 TERMS_VERSION = '2026-10-10'              # 프런트 termsOfService.js 와 같아야 함
 AGE14_VERSION = '1'
 # 로그인에 필요한 동의 {consent_type: 현재 버전}
@@ -92,8 +101,8 @@ def _code_mac(jti: str, code: str) -> str:
     return hmac.new(SIGNUP_TOKEN_SECRET.encode(), f'{jti}:{code}'.encode(), hashlib.sha256).hexdigest()
 
 
-class NaverLoginError(Exception):
-    """사용자에게 그대로 보여줄 수 있는 네이버 로그인 실패 사유."""
+class SocialLoginError(Exception):
+    """사용자에게 그대로 보여줄 수 있는 소셜(네이버·구글) 로그인 실패 사유."""
 
 
 class SignupError(Exception):
@@ -198,73 +207,108 @@ class AuthService:
     def naverProcess(self, session, data):
         """
         프런트는 네이버 인가 후 받은 code/state 만 보낸다. 사용자 정보는 서버가 네이버에서 직접 받는다
-        (클라이언트가 보낸 이메일·전화번호를 믿지 않는다).
-
-        계정 결정 순서:
-            ① 이 네이버 고유 ID 가 이미 연결된 사용자 → 그 사용자로 로그인
-            ② 네이버가 준 이메일과 user_master.email 이 정확히 1명 일치 → 그 사용자에 연결 후 로그인
-            ③ 일치하는 사용자가 없음 → 신규 가입(기본 권한 STOCK_USER) 후 로그인
+        (클라이언트가 보낸 이메일·전화번호를 믿지 않는다). 계정 결정은 _social_login 참고.
         반환: 이메일 로그인과 같은 형식 + 'naverResult': 'login' | 'linked' | 'created'
-              단, 현재 처리방침 동의가 없으면 토큰 대신 consentRequired/consentToken (→ _naver_result)
-        Raises: NaverLoginError(사용자에게 보여줄 메시지)
+              단, 현재 처리방침 동의가 없으면 토큰 대신 consentRequired/consentToken (→ _social_result)
+        Raises: SocialLoginError(사용자에게 보여줄 메시지)
         """
         code, state = (data or {}).get('code'), (data or {}).get('state')
         if not code or not state:
-            raise NaverLoginError("네이버 인증 정보가 없습니다. 다시 시도해 주세요.")
+            raise SocialLoginError("네이버 인증 정보가 없습니다. 다시 시도해 주세요.")
 
         profile = self._naver_profile(session, code, state)
         naver_id = profile.get('id')
         email = (profile.get('email') or '').strip()
         if not naver_id:
-            raise NaverLoginError("네이버 사용자 정보를 받지 못했습니다.")
+            raise SocialLoginError("네이버 사용자 정보를 받지 못했습니다.")
+        name = profile.get('name') or profile.get('nickname')
+        return self._social_login(session, NAVER, naver_id, email, name)
 
+    # ────────────────────────────────────────────────────────────────
+    # 구글 로그인 (네이버와 같은 계정 결정 규칙)
+    # ────────────────────────────────────────────────────────────────
+    def googleProcess(self, session, data):
+        """
+        프런트는 Google Identity Services 가 준 ID 토큰(credential)과, 그 요청에 넣은 nonce 를 보낸다.
+        서버가 구글 공개키로 서명·aud(우리 클라이언트 ID)·iss·exp 를 직접 검증한 뒤 sub/email 을 쓴다.
+        반환: 이메일 로그인과 같은 형식 + 'socialResult': 'login' | 'linked' | 'created'
+        Raises: SocialLoginError(사용자에게 보여줄 메시지)
+        """
+        credential, nonce = (data or {}).get('credential'), (data or {}).get('nonce')
+        if not credential or not nonce:
+            raise SocialLoginError("구글 인증 정보가 없습니다. 다시 시도해 주세요.")
+
+        claims = self._google_claims(session, credential)
+        if not hmac.compare_digest(str(claims.get('nonce') or ''), str(nonce)):
+            raise SocialLoginError("로그인 요청이 올바르지 않아요. 다시 시도해 주세요.")
+        google_id = claims.get('sub')
+        if not google_id:
+            raise SocialLoginError("구글 사용자 정보를 받지 못했습니다.")
+        # 구글이 확인하지 않은 이메일로는 기존 계정에 연결하거나 가입하지 않는다
+        email = (claims.get('email') or '').strip() if claims.get('email_verified') is True else None
+        return self._social_login(session, GOOGLE, google_id, email, claims.get('name'))
+
+    def _social_login(self, session, login_type, provider_uid, email, name):
+        """
+        소셜 로그인 공통 계정 결정 순서:
+            ① 이 소셜 고유 ID 가 이미 연결된 사용자 → 그 사용자로 로그인
+            ② 소셜이 준(검증된) 이메일과 user_master.email 이 정확히 1명 일치 → 그 사용자에 연결 후 로그인
+            ③ 일치하는 사용자가 없음 → 신규 가입(기본 권한 STOCK_USER) 후 로그인
+        """
+        label = PROVIDER_LABELS[login_type]
         dao = self.socialLoginDaoImpl
 
-        # ① 이미 연결된 네이버 계정
-        row = dao.select_by_provider_uid(session, NAVER, naver_id)
+        # ① 이미 연결된 소셜 계정
+        row = dao.select_by_provider_uid(session, login_type, provider_uid)
         if row is not None:
             if row.enabled_flag != 'Y':
-                raise NaverLoginError("네이버 로그인이 비활성화된 계정입니다. 관리자에게 문의해 주세요.")
+                raise SocialLoginError(f"{label} 로그인이 비활성화된 계정입니다. 관리자에게 문의해 주세요.")
             user = dao.select_user(session, row.user_id)
-            return self._naver_result(session, user.user_id, user.user_name, 'login')
+            return self._social_result(session, user.user_id, user.user_name, 'login', login_type)
 
         if not email:
-            raise NaverLoginError("네이버 이메일 제공에 동의해야 로그인할 수 있어요.")
+            raise SocialLoginError(f"{label} 이메일 제공에 동의해야 로그인할 수 있어요.")
 
         # ② 이메일이 같은 기존 사용자에 자동 연결
         matches = dao.select_users_by_email(session, email)
         if len(matches) > 1:
-            raise NaverLoginError("같은 이메일의 계정이 여러 개라 자동 연결할 수 없습니다. 관리자에게 문의해 주세요.")
+            raise SocialLoginError("같은 이메일의 계정이 여러 개라 자동 연결할 수 없습니다. 관리자에게 문의해 주세요.")
         if len(matches) == 1:
             user = matches[0]
-            existing = dao.select_login_type(session, user.user_id, NAVER)
+            existing = dao.select_login_type(session, user.user_id, login_type)
             if existing is not None and existing.enabled_flag != 'Y':
-                raise NaverLoginError("네이버 로그인이 비활성화된 계정입니다. 관리자에게 문의해 주세요.")
-            if existing is not None and existing.provider_uid and existing.provider_uid != naver_id:
-                raise NaverLoginError("이 계정에는 다른 네이버 계정이 이미 연결돼 있습니다.")
-            dao.link(session, user.user_id, NAVER, naver_id)
-            return self._naver_result(session, user.user_id, user.user_name, 'linked')
+                raise SocialLoginError(f"{label} 로그인이 비활성화된 계정입니다. 관리자에게 문의해 주세요.")
+            if existing is not None and existing.provider_uid and existing.provider_uid != provider_uid:
+                raise SocialLoginError(f"이 계정에는 다른 {label} 계정이 이미 연결돼 있습니다.")
+            dao.link(session, user.user_id, login_type, provider_uid)
+            return self._social_result(session, user.user_id, user.user_name, 'linked', login_type)
 
         # ③ 신규 가입 — 회원정보를 저장한 뒤 개인정보 처리방침 동의 화면으로 보낸다
-        name = (profile.get('name') or profile.get('nickname') or email.split('@')[0])[:45]
-        # 휴대전화번호는 받지 않는다(2026-10-10 처리방침에서 수집 항목 삭제) — 네이버가 mobile 을 줘도 저장하지 않는다.
+        name = (name or email.split('@')[0])[:45]
+        # 휴대전화번호는 받지 않는다(2026-10-10 처리방침에서 수집 항목 삭제) — 소셜이 줘도 저장하지 않는다.
         new_id = dao.create_user(session, user_name=name, email=email, phone=None,
-                                 login_type=NAVER, provider_uid=naver_id, auth_id=DEFAULT_SIGNUP_ROLE)
-        return self._naver_result(session, new_id, name, 'created')
+                                 login_type=login_type, provider_uid=provider_uid, auth_id=DEFAULT_SIGNUP_ROLE)
+        return self._social_result(session, new_id, name, 'created', login_type)
 
-    def _naver_result(self, session, user_id, user_name, naver_result):
+    def _social_result(self, session, user_id, user_name, social_result, login_type):
         """
-        네이버 로그인 응답. 현재 버전의 개인정보 처리방침 동의가 있으면 바로 로그인(토큰 발급),
-        없으면 토큰 대신 동의 화면용 consentToken 을 준다(→ POST /api/oauth/naver/consent).
+        소셜 로그인 응답. 현재 버전의 가입 동의가 있으면 바로 로그인(토큰 발급),
+        없으면 토큰 대신 동의 화면용 consentToken 을 준다(→ POST /api/oauth/<naver|google>/consent).
         가입 직후뿐 아니라 동의 화면에서 이탈한 사용자·처리방침 개정 후 첫 로그인도 여기서 걸린다.
+        결과 키: 'socialResult' 공통 + 네이버는 기존 앱 호환용 'naverResult' 도 같이 준다.
         """
+        result_keys = {'socialResult': social_result}
+        if login_type == NAVER:
+            result_keys['naverResult'] = social_result
+
         if self._has_required_consents(session, user_id):
-            return {**self._login_result(session, user_id, user_name), 'naverResult': naver_result}
+            return {**self._login_result(session, user_id, user_name), **result_keys}
 
         now = datetime.now(tz=timezone.utc)
         consent_token = jwt.encode({
             'sub': str(user_id),
-            'nres': naver_result,
+            'nres': social_result,
+            'lt': login_type,
             'iat': now,
             'exp': now + timedelta(minutes=CONSENT_TOKEN_EXPIRE_MINUTES),
         }, CONSENT_TOKEN_SECRET, algorithm=JWT_ALGORITHM)
@@ -274,39 +318,46 @@ class AuthService:
             'consentToken': consent_token,
             'policyVersion': PRIVACY_POLICY_VERSION,
             'termsVersion': TERMS_VERSION,
-            'naverResult': naver_result,
+            **result_keys,
             'profile': {'user_name': user_name, 'email': user.email if user else None},
         }
 
-    def naverConsentProcess(self, session, data):
+    def socialConsentProcess(self, session, data, login_type):
         """
-        개인정보 처리방침 동의 → 동의 기록 저장 → 로그인(토큰 발급).
+        가입 동의 → 동의 기록 저장 → 로그인(토큰 발급). login_type 은 라우트(/naver|/google/consent)가 정한다.
 
         Request : { "consentToken": "...", "termsVersion": "...", "policyVersion": "...",
                     "agreeAge14": true, "agreeTerms": true, "agreePrivacy": true }
-        반환: 이메일 로그인과 같은 형식 + 'naverResult'(네이버 로그인 때 결정된 값)
-        Raises: NaverLoginError(사용자에게 보여줄 메시지)
+        반환: 이메일 로그인과 같은 형식 + 'socialResult'(네이버는 'naverResult' 도) — 로그인 때 결정된 값
+        Raises: SocialLoginError(사용자에게 보여줄 메시지)
         """
+        label = PROVIDER_LABELS[login_type]
         data = data or {}
-        _check_consents(data, NaverLoginError)
+        _check_consents(data, SocialLoginError)
         try:
             payload = jwt.decode(data.get('consentToken') or '', CONSENT_TOKEN_SECRET,
                                  algorithms=[JWT_ALGORITHM])
         except jwt.ExpiredSignatureError:
-            raise NaverLoginError("동의 시간이 지났어요. 네이버로 다시 로그인해 주세요.")
+            raise SocialLoginError(f"동의 시간이 지났어요. {label}로 다시 로그인해 주세요.")
         except jwt.InvalidTokenError:
-            raise NaverLoginError("가입 정보가 올바르지 않아요. 네이버로 다시 로그인해 주세요.")
+            raise SocialLoginError(f"가입 정보가 올바르지 않아요. {label}로 다시 로그인해 주세요.")
+        # 'lt' 가 없는 토큰은 구글 로그인 추가 전에 발급된 네이버 토큰
+        if payload.get('lt', NAVER) != login_type:
+            raise SocialLoginError(f"가입 정보가 올바르지 않아요. {label}로 다시 로그인해 주세요.")
 
         user_id = int(payload['sub'])
         dao = self.socialLoginDaoImpl
         user = dao.select_user(session, user_id)
-        login_type = dao.select_login_type(session, user_id, NAVER)
-        if user is None or login_type is None or login_type.enabled_flag != 'Y':
-            raise NaverLoginError("가입 정보를 찾을 수 없어요. 네이버로 다시 로그인해 주세요.")
+        row = dao.select_login_type(session, user_id, login_type)
+        if user is None or row is None or row.enabled_flag != 'Y':
+            raise SocialLoginError(f"가입 정보를 찾을 수 없어요. {label}로 다시 로그인해 주세요.")
 
         self._save_required_consents(session, user_id)
-        return {**self._login_result(session, user_id, user.user_name),
-                'naverResult': payload.get('nres', 'login')}
+        social_result = payload.get('nres', 'login')
+        result_keys = {'socialResult': social_result}
+        if login_type == NAVER:
+            result_keys['naverResult'] = social_result
+        return {**self._login_result(session, user_id, user.user_name), **result_keys}
 
     def _has_required_consents(self, session, user_id) -> bool:
         dao = self.socialLoginDaoImpl
@@ -410,7 +461,7 @@ class AuthService:
                 for r in self.masterInfosDaoImpl.select_master_key_by_category(session, 'NAVER_AUTH')}
         client_id, client_secret = keys.get('NAVER_AUTH_ID'), keys.get('NAVER_AUTH_SECRET')
         if not client_id or not client_secret:
-            raise NaverLoginError("네이버 로그인 설정이 없습니다. 관리자에게 문의해 주세요.")
+            raise SocialLoginError("네이버 로그인 설정이 없습니다. 관리자에게 문의해 주세요.")
 
         # 네이버 가이드(접근 토큰 발급 요청) 예시와 같이 쿼리 파라미터로 보낸다.
         token = requests.post(NAVER_TOKEN_URL, params={
@@ -421,14 +472,41 @@ class AuthService:
         if not access_token:
             # 코드 만료·재사용 등. 네이버 오류 내용은 로그로만 남기고 사용자에게는 일반 문구.
             print(f"[naverProcess] token 실패: {token.get('error')} {token.get('error_description')}", flush=True)
-            raise NaverLoginError("네이버 인증이 만료됐어요. 다시 로그인해 주세요.")
+            raise SocialLoginError("네이버 인증이 만료됐어요. 다시 로그인해 주세요.")
 
         me = requests.get(NAVER_PROFILE_URL, headers={'Authorization': f'Bearer {access_token}'},
                           timeout=10).json()
         if me.get('resultcode') != '00':
             print(f"[naverProcess] profile 실패: {me.get('resultcode')} {me.get('message')}", flush=True)
-            raise NaverLoginError("네이버 사용자 정보를 받지 못했습니다.")
+            raise SocialLoginError("네이버 사용자 정보를 받지 못했습니다.")
         return me.get('response') or {}
+
+    def _google_claims(self, session, credential):
+        """
+        구글 ID 토큰 검증 → claims. aud 는 master_infos GOOGLE_AUTH 의 *_ID(웹·iOS 클라이언트 ID) 중 하나여야 한다.
+        공개키는 GOOGLE_CERTS_URL 에서 받아 캐시한다(키 교체 시 kid 로 다시 받음).
+        """
+        audiences = [r['key_value'] for r in self.masterInfosDaoImpl.select_master_key_by_category(session, 'GOOGLE_AUTH')
+                     if str(r.get('key_type', '')).upper().endswith('_ID') and r.get('key_value')]
+        if not audiences:
+            raise SocialLoginError("구글 로그인 설정이 없습니다. 관리자에게 문의해 주세요.")
+        try:
+            signing_key = _google_jwks.get_signing_key_from_jwt(credential)
+            # leeway: 서버 시계가 구글보다 몇 초만 늦어도 갓 발급된 토큰이 iat 미래로 거절된다
+            # (2026-10-23 로컬 맥 시계 -2초로 "not yet valid (iat)" 재현). 구글 공식 라이브러리도 오차를 허용한다.
+            claims = jwt.decode(credential, signing_key.key, algorithms=['RS256'], audience=audiences,
+                                leeway=60,
+                                options={'require': ['exp', 'iat', 'iss', 'aud', 'sub']})
+        except jwt.ExpiredSignatureError:
+            raise SocialLoginError("구글 인증이 만료됐어요. 다시 로그인해 주세요.")
+        except (jwt.InvalidTokenError, jwt.PyJWKClientError) as e:
+            # 구글 오류 내용은 로그로만 남기고 사용자에게는 일반 문구
+            print(f"[googleProcess] ID 토큰 검증 실패: {e}", flush=True)
+            raise SocialLoginError("구글 인증 정보가 올바르지 않아요. 다시 로그인해 주세요.")
+        if claims.get('iss') not in GOOGLE_ISSUERS:
+            print(f"[googleProcess] iss 불일치: {claims.get('iss')}", flush=True)
+            raise SocialLoginError("구글 인증 정보가 올바르지 않아요. 다시 로그인해 주세요.")
+        return claims
 
     # ────────────────────────────────────────────────────────────────
     # [신규] 토큰 재발급 (Silent Refresh)

@@ -19,10 +19,10 @@
             <!-- ── 총자산 히어로 ──
                  총자산을 한 번만 크게 보여주고 평가손익·수익률을 바로 아래 붙인다.
                  수익률 분모는 매입금액이다(portfolioTotals.costBasis 주석 참고). -->
-            <section class="asset-hero" :class="{ skeleton: loadingAccount }">
-                <template v-if="!loadingAccount">
+            <section class="asset-hero" :class="{ skeleton: loadingAccount || loadingPortfolio }">
+                <template v-if="!loadingAccount && !loadingPortfolio">
                     <span class="ah-label">총자산</span>
-                    <span class="ah-amount">{{ fmtWon(account?.total_asset) }}<span class="won">원</span></span>
+                    <span class="ah-amount">{{ fmtWon(totalAsset) }}<span class="won">원</span></span>
                     <span class="ah-pnl">평가손익
                         <b :class="pnlClass(portfolioTotals.profitSum)">
                             <template v-if="portfolioTotals.profitPct !== null">
@@ -405,6 +405,13 @@ const portfolioTotals = computed(() => {
         costBasis,
         profitPct: costBasis > 0 ? (profitSum / costBasis) * 100 : null,
     };
+});
+
+// 총자산 = 주문가능금액 + 매입금액. API 의 total_asset(평가금액 기준)은 쓰지 않는다.
+const totalAsset = computed(() => {
+    const b = toNum(account.value?.user_balance);
+    if (b === null || Number.isNaN(b)) return null;
+    return b + portfolioTotals.value.costBasis;
 });
 
 /* ── 예수금 vs 주문가능금액 ──

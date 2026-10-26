@@ -41,6 +41,9 @@
 
             <div class="lg-or" aria-hidden="true"><span>또는</span></div>
 
+            <!-- 구글 버튼은 GIS 가 그린다(구글 브랜드 가이드). 웹에서 클라이언트 ID 가 설정됐을 때만 보인다 -->
+            <div v-show="googleReady" ref="googleBtnEl" class="lg-google"></div>
+
             <button type="button" class="btn-naver" :disabled="isLoading" @click="naverlogin">
                 <span class="naver-n" aria-hidden="true">N</span>
                 네이버로 계속하기
@@ -92,6 +95,7 @@
 import aibeesApi from '../scripts/aibeesApi.js'
 import * as StrUtils from '@/scripts/utils/stringUtils.js'
 import { assUserSession } from '../scripts/stores/user-stores';
+import { renderGoogleButton } from '@/scripts/googleLogin.js'
 
 const userSession = assUserSession();
 const router = useRouter()
@@ -209,6 +213,36 @@ const emaillogin = async () => {
         isLoading.value = false;
     }
 }
+
+// ── 구글 로그인 (웹) ───────────────────────────────────────────
+const googleBtnEl = ref(null)
+const googleReady = ref(false)
+
+const onGoogleResponse = (res) => {
+    if (res.consentRequired) {
+        // 회원정보는 저장됨. 동의해야 로그인 토큰을 받는다(네이버와 같은 동의 화면).
+        sessionStorage.setItem('socialConsent', JSON.stringify({
+            provider: 'google',
+            consentToken: res.consentToken,
+            socialResult: res.socialResult,
+            profile: res.profile,
+        }))
+        return router.replace({ name: 'signup-consent' })
+    }
+    userSession.loginUser(res, autoLogin.value)
+    if (res.socialResult === 'linked') alert('기존 계정에 구글 로그인을 연결했어요.')
+    else if (res.socialResult === 'created') alert('구글 계정으로 가입했어요. 환영합니다!')
+    router.replace({ name: 'home' })
+}
+
+onMounted(async () => {
+    googleReady.value = await renderGoogleButton(googleBtnEl.value, {
+        onStart: () => { errorMsg.value = ''; isLoading.value = true },
+        onResponse: (res) => { isLoading.value = false; onGoogleResponse(res) },
+        onError: (msg) => { isLoading.value = false; errorMsg.value = msg },
+    })
+})
+// ─────────────────────────────────────────────────────────────
 
 const naverlogin = async () => {
     try {
@@ -357,6 +391,13 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
     font-size: 14px;
     color: $sub;
     a { color: $brown; font-weight: 700; text-decoration: underline; }
+}
+
+/* ── 구글 버튼(GIS iframe) — 가운데 정렬, 높이는 다른 버튼과 비슷하게 ── */
+.lg-google {
+    display: flex;
+    justify-content: center;
+    min-height: 44px;
 }
 
 /* ── 버튼 ── */

@@ -116,6 +116,7 @@ const ICON = {
     history: 'M12 8v4l3 2M3 12a9 9 0 1 0 3-6.7M3 4v5h5',
     shield:  'M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z',
     user:    'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c0-4 3.6-6 8-6s8 2 8 6',
+    key:     'M8 15a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 11h10M17 11v3M20 11v2',
     route:   'M6 3v12M18 9v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
     grid:    'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
     dot:     'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
@@ -127,7 +128,7 @@ const ICON_BY_CODE = {
     AutoTradeStatus: 'pulse', TradeSimulation: 'pulse',
     MyWallet: 'wallet', TradeProfit: 'coin', RecoPerformance: 'trophy', TradeLog: 'doc',
     BatchSetting: 'history', BatchLogSetting: 'doc', RouteList: 'route',
-    RoleMenuSetting: 'shield', UserAuthSetting: 'user',
+    RoleMenuSetting: 'shield', UserAuthSetting: 'user', MasterInfoSetting: 'key',
 };
 const iconOf = (code) => ICON[ICON_BY_CODE[code] ?? 'dot'];
 
