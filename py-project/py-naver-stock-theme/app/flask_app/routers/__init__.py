@@ -15,6 +15,7 @@ from app.flask_app.routers.router_indicators import indicators_bp
 from app.flask_app.routers.router_profit import profit_bp
 from app.flask_app.routers.router_auto_trade import auto_trade_bp
 from app.flask_app.routers.router_access_log import access_log_bp
+from app.flask_app.routers.router_notice import notice_bp
 
 def register_blueprints(app: Flask):
     
@@ -39,3 +40,4 @@ def register_blueprints(app: Flask):
     app.register_blueprint(profit_bp, url_prefix="/api/v1/profit")
     app.register_blueprint(auto_trade_bp, url_prefix="/api/v1/auto-trade")
     app.register_blueprint(access_log_bp, url_prefix="/api/v1/access-logs")
+    app.register_blueprint(notice_bp, url_prefix="/api/v1/notices")

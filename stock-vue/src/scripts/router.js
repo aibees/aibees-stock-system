@@ -6,6 +6,7 @@ import { ensureAccess } from "./useAccess.js";
 import { consumeAdPass, countGateEntry, gateInterval } from "./useAdGate.js";
 import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
 import { isAuthPath } from "./authPaths.js";
+import { NOTICE_DETAIL_PATH, NOTICE_LIST_PATH } from "./notice.js";
 import AdGate from '@/components/AdGate.vue';
 import NaverCallback from '@/components/NaverCallback.vue';
 import SignupConsent from '@/components/SignupConsent.vue';
@@ -70,6 +71,15 @@ const routes = [
         path: "/user-option",
         name: "user-option",
         component: UserOption
+    },
+    {
+        // 공지 짧은 주소: /notice/12 → 상세(/board/notice/detail?id=12), /notice → 목록.
+        //   화면은 메뉴(Board) 라우트라 리다이렉트된 경로에서 권한 가드가 그대로 적용된다.
+        path: "/notice/:id(\\d+)?",
+        name: "notice-short",
+        redirect: (to) => (to.params.id
+            ? { path: NOTICE_DETAIL_PATH, query: { id: to.params.id } }
+            : { path: NOTICE_LIST_PATH })
     }
 ]
 

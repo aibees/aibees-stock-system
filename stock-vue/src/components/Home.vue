@@ -66,6 +66,23 @@
                 <AdSlot placement="homeHero" />
             </section>
 
+            <!-- ── 공지사항: 최근 3건. 누르면 상세, '전체'는 목록. 공지가 없거나 실패하면 섹션째 숨긴다 ── -->
+            <section v-if="notices.length" class="notice" aria-label="공지사항">
+                <div class="list-head">
+                    <h2>공지사항</h2>
+                    <button type="button" class="notice-all" @click="router.push(NOTICE_LIST_PATH)">전체</button>
+                </div>
+                <ul class="notice-list">
+                    <li v-for="n in notices" :key="n.notice_id">
+                        <button type="button" class="notice-row" @click="goToNotice(n)">
+                            <span class="notice-title">{{ n.title }}</span>
+                            <span :class="['notice-cat', noticeCategoryClass(n.category)]">{{ n.category }}</span>
+                            <span class="notice-date">{{ noticeDateText(n.created_date).slice(5) }}</span>
+                        </button>
+                    </li>
+                </ul>
+            </section>
+
             <!-- ── 전월 추천 성과: 종목당 첫 추천 기준, 추천일 종가 → 5거래일 내 최고가 ── -->
             <section v-if="perf && perf.evaluated_count" class="perf" aria-label="전월 추천 성과">
                 <div class="list-head">
@@ -313,6 +330,7 @@ import { assUserSession } from '@scripts/stores/user-stores.js';
 import { hasRole, WORKER_ROLE } from '@scripts/useAccess.js';
 import { useShowAds } from '@scripts/useAds.js';
 import { isNativeAdsEnabled } from '@scripts/useAdMob.js';
+import { NOTICE_LIST_PATH, NOTICE_DETAIL_PATH, noticeCategoryClass, noticeDateText } from '@scripts/notice.js';
 import {
     numOrNull, formatNumber, hasValue, changeInfo,
     kstNowParts, isMarketOpenNow, weekdayKo, toYmdString, shiftDate, getLatestBatchDate,
@@ -417,6 +435,7 @@ onMounted(async () => {
     onScroll();
     loadMarketSnapshot();
     marketTimer = setInterval(loadMarketSnapshot, 60 * 1000);
+    loadNotices();
     loadPerformance();
     await getStockMainData();
     loadPriorityTarget();
@@ -494,6 +513,19 @@ const fxItem = computed(() => {
         cls: clsOf(rate ?? 0),
     };
 });
+
+/* ── 공지사항(최근 3건) ──
+ * 보조 정보라 실패하면 섹션째 숨긴다. 상세에서 ‹ 를 누르면 홈으로 돌아오게 from=home 을 붙인다. */
+const notices = ref([]);
+const loadNotices = async () => {
+    try {
+        const { data } = await aibeesApi.get('/api/v1/notices', { params: { page: 0, size: 3 } });
+        notices.value = Array.isArray(data?.data) ? data.data : [];
+    } catch (e) {
+        notices.value = [];
+    }
+};
+const goToNotice = (n) => router.push({ path: NOTICE_DETAIL_PATH, query: { id: n.notice_id, from: 'home' } });
 
 /* ── 전월 추천 성과 ──
  * 서버가 지난달 추천 종목의 "추천일 종가 → 5거래일 내 최고가" 수익률을 계산해 준다(6시간 캐시).
@@ -679,6 +711,7 @@ $bar:      #FFF6D2;
 $card:     #FFFFFF;
 $line:     #EFE2BC;
 $line-2:   #EAD9A6;
+$line-soft:#F3EAD2;   // 홈 블록 구분선(목록 행 구분선 $line 보다 옅게)
 $brown:    #7A4423;
 $brown-d:  #4A2814;
 $brown-ink:#5C3118;
@@ -831,6 +864,14 @@ $down:     #1F5BD1;
     display: flex;
     flex-direction: column;
     gap: 16px;
+
+    // 블록 구분: 블록의 첫 요소 위에 옅은 선 + 위아래 20px(위 = gap 16 + margin 4, 아래 = padding 20).
+    //   시장 요약 | 광고 | 공지 | 추천 성과 | 광고 | 날짜·최우선 타겟·추천 종목(한 묶음) | 면책 문구
+    > .hero-ad, > .notice, > .perf, > .date-nav, > .disclaimer {
+        margin-top: 4px;
+        padding-top: 20px;
+        border-top: 1px solid $line-soft;
+    }
 }
 
 /* ── 날짜 네비게이터 ── */
@@ -1158,6 +1199,45 @@ $down:     #1F5BD1;
 
 .skeleton-row { height: 72px; border-bottom: 1px solid $line; background: rgba(239, 226, 188, .35); animation: pulse 1.6s infinite ease-in-out; }
 .empty-box { text-align: center; padding: 56px 0; color: $sub; font-size: 14px; }
+
+/* ── 공지사항 ── */
+.notice {
+    .list-head { margin-bottom: 4px; }
+    .notice-all {
+        border: 0;
+        background: transparent;
+        padding: 4px 0;
+        font: inherit;
+        font-size: 13px;
+        color: $sub;
+        cursor: pointer;
+    }
+}
+.notice-list { margin: 0; padding: 0; list-style: none; }
+.notice-row {
+    width: 100%;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 11px 0;
+    border: 0;
+    border-bottom: 1px solid $line;
+    background: transparent;
+    color: $ink;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+
+    .notice-cat { flex-shrink: 0; font-size: 12px; font-weight: 600; }
+    .notice-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .notice-date { flex-shrink: 0; font-size: 12px; color: $sub-2; font-variant-numeric: tabular-nums; }
+    // 카테고리 글자색 (NoticeList 와 같음)
+    .cat-notice { color: $brown; }
+    .cat-maint  { color: $up; }
+    .cat-update { color: $down; }
+    .cat-event  { color: #A0662F; }
+    .cat-etc    { color: $sub-2; }
+}
 
 /* ── 전월 추천 성과 ── */
 .perf {
