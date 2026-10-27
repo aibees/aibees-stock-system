@@ -124,6 +124,7 @@ import {
     TRIGGER_LABEL, TRIGGER_DESC, triggerOf, pctVs, formatPct, pctClass,
     suggestTrigger, describeTier, firesImmediately,
 } from '@scripts/sellPrice.js';
+import aibeesApi from '@scripts/aibeesApi.js';
 
 const holdings = ref([]);
 const manualSells = ref([]);   // 유저의 수기등록 전체(모든 종목·모든 상태)
@@ -195,9 +196,13 @@ const tiersOf = (code) => {
 
 const pctOf = (ratio) => Math.round(Number(ratio) * 100);
 
-const allocatedPct = (code) => {
-    const armed = tiersOf(code).armed;
-    return armed.reduce((sum, t) => sum + pctOf(t.qty_ratio), 0);
+// 등록 비율은 방향(익절/손절)별로 센다. 익절 100% + 손절 100% 는 "먼저 도달한 쪽이 판다"는
+// 정상 설정이라 합치면 200% 로 잘못 경고된다. trigger 를 안 주면 두 방향 중 큰 쪽(헤더 표시용).
+const allocatedPct = (code, trigger) => {
+    const sumOf = (dir) => tiersOf(code).armed
+        .filter(t => triggerOf(t) === dir)
+        .reduce((sum, t) => sum + pctOf(t.qty_ratio), 0);
+    return trigger ? sumOf(trigger) : Math.max(sumOf('UP'), sumOf('DOWN'));
 };
 
 const stateLabel = (t) => MANUAL_SELL_STATE_LABEL[t.state] ?? t.state;
@@ -211,14 +216,48 @@ const toggleExpand = (code) => {
     triggerTouched.value = false;
 };
 
+// ── 익절 저장 시 손절가 같이 지정 ──
+// 손절 % 는 매도전략(SellSetting) 의 s1_stop_loss_pct 를 쓴다. worker 도 같은 값으로
+// 손절선 = 매입가 × (1 - %) 를 잡는다(position_strategy). 값이 없으면 worker 기본값 5%.
+const STOP_LOSS_PCT_DEFAULT = 0.05;
+const fetchStopLossPct = async () => {
+    try {
+        const { data } = await aibeesApi.get('/api/v1/strategy/options');
+        const v = Number(data.data?.s1_stop_loss_pct);
+        return v > 0 && v < 1 ? v : STOP_LOSS_PCT_DEFAULT;
+    } catch (e) {
+        console.error('[LimitOrder] 매도전략 손절 % 조회 실패 → 기본값', e);
+        return STOP_LOSS_PCT_DEFAULT;
+    }
+};
+
+// 손절가를 같이 등록할지 묻고, 등록할 손절가를 돌려준다(안 하면 null).
+// 이미 감시 중인 손절 지정가가 있으면 중복이라 묻지 않는다.
+const askStopLoss = async (holding, ratioPct) => {
+    const avg = Number(holding.avg_price);
+    if (!(avg > 0)) return null;
+    if (tiersOf(holding.stock_code).armed.some(t => triggerOf(t) === 'DOWN')) return null;
+
+    const lossPct = await fetchStopLossPct();
+    const stopPrice = Math.round(avg * (1 - lossPct));
+    const lossLabel = `${Math.round(lossPct * 1000) / 10}%`;
+    let msg = `손절가도 같이 저장할까요?\n\n`
+        + `매도전략 손절 -${lossLabel} 기준\n`
+        + `매입가 ${formatNumber(avg)}원 → 손절가 ${formatNumber(stopPrice)}원 (비율 ${ratioPct}%)`;
+    if (form.enabled_flag === 'Y' && firesImmediately('DOWN', stopPrice, holding.cur_price)) {
+        msg += `\n\n현재가(${formatNumber(holding.cur_price)}원)가 이미 손절가 이하라 등록 즉시 매도됩니다.`;
+    }
+    return confirm(msg) ? { price: stopPrice, lossLabel } : null;
+};
+
 const onAdd = async (holding) => {
     if (!form.sell_price || Number(form.sell_price) <= 0) { alert('지정 매도가를 입력해 주세요.'); return; }
     const pct = (form.qty_ratio_pct === null || form.qty_ratio_pct === '') ? 100 : Number(form.qty_ratio_pct);
     if (pct <= 0 || pct > 100) { alert('비율은 1~100 사이여야 합니다.'); return; }
 
-    const already = allocatedPct(holding.stock_code);
+    const already = allocatedPct(holding.stock_code, form.trigger_type);
     if (already + pct > 100 &&
-        !confirm(`이 종목에 이미 ${already}% 등록돼 있습니다. 이번 ${pct}%를 더하면 ${already + pct}%로 100%를 넘습니다. 계속할까요?`)) {
+        !confirm(`이 종목에 이미 ${TRIGGER_LABEL[form.trigger_type]} ${already}% 등록돼 있습니다. 이번 ${pct}%를 더하면 ${already + pct}%로 100%를 넘습니다. 계속할까요?`)) {
         return;
     }
 
@@ -233,6 +272,8 @@ const onAdd = async (holding) => {
 
     isBusy.value = true;
     try {
+        const stop = form.trigger_type === 'UP' ? await askStopLoss(holding, pct) : null;
+
         await addManualSell({
             stock_code: holding.stock_code,
             stock_name: holding.stock_name,
@@ -242,6 +283,23 @@ const onAdd = async (holding) => {
             enabled_flag: form.enabled_flag,
             memo: form.memo,
         });
+
+        // 손절은 익절과 같은 비율·감시 여부로 등록한다. 둘 중 먼저 도달한 쪽이 팔린다.
+        if (stop) {
+            try {
+                await addManualSell({
+                    stock_code: holding.stock_code,
+                    stock_name: holding.stock_name,
+                    sell_price: stop.price,
+                    trigger_type: 'DOWN',
+                    qty_ratio: pct / 100,
+                    enabled_flag: form.enabled_flag,
+                    memo: `매도전략 손절 -${stop.lossLabel}`,
+                });
+            } catch (e) {
+                alert(apiErrorMessage(e, '익절가는 저장했지만 손절가 저장에 실패했습니다. 손절로 직접 추가해 주세요.'));
+            }
+        }
         Object.assign(form, defaultForm());
         triggerTouched.value = false;
         await load();
