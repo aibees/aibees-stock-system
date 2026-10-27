@@ -104,6 +104,7 @@
                                 <th class="tr">평가금액</th>
                                 <th class="tr">평가손익</th>
                                 <th class="tr">수익률</th>
+                                <th class="tc"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -116,9 +117,15 @@
                                 <td class="tr num">{{ fmtWon(row.eval_amount) }}</td>
                                 <td class="tr num" :class="pnlClass(row.profit)">{{ fmtSigned(row.profit) }}</td>
                                 <td class="tr num" :class="pnlClass(rowProfitPct(row))">{{ fmtPct(rowProfitPct(row)) }}</td>
+                                <td class="tc">
+                                    <button type="button" class="sell-now-btn sm" :disabled="sellingCode === row.stock_code"
+                                        @click="onSellNow(row)">
+                                        {{ sellingCode === row.stock_code ? '요청 중…' : (sellRequested[row.stock_code] ? '✓ 요청됨' : '지금 팔기') }}
+                                    </button>
+                                </td>
                             </tr>
                             <tr v-if="holdings.length === 0">
-                                <td colspan="8" class="empty-cell">보유 종목이 없습니다.</td>
+                                <td colspan="9" class="empty-cell">보유 종목이 없습니다.</td>
                             </tr>
                         </tbody>
                         <tfoot v-if="summary && holdings.length > 0">
@@ -127,11 +134,12 @@
                                 <td class="tr num">{{ fmtWon(portfolioTotals.evalAmount) }}</td>
                                 <td class="tr num" :class="pnlClass(portfolioTotals.profitSum)">{{ fmtSigned(portfolioTotals.profitSum) }}</td>
                                 <td class="tr num" :class="pnlClass(portfolioTotals.profitPct)">{{ fmtPct(portfolioTotals.profitPct) }}</td>
+                                <td></td>
                             </tr>
                             <tr class="total-row sub">
                                 <!-- summary.cash = v_user_portfolio TOTAL 행의 예수금(user_wallet.deposit) -->
                                 <td class="tl" colspan="5">합계(예수금 포함)</td>
-                                <td class="tr num" colspan="3">
+                                <td class="tr num" colspan="4">
                                     {{ fmtWon(summary.stock_amount) }}원
                                     <span class="sub-note">· 예수금 {{ fmtWon(summary.cash) }}원</span>
                                 </td>
@@ -165,6 +173,10 @@
                                 <div class="li-row"><span class="li-label">수량</span><span>{{ fmtQty(row.qty) }}</span></div>
                                 <div class="li-row"><span class="li-label">매입/현재</span><span>{{ fmtWon(row.avg_price) }} / {{ fmtWon(row.cur_price) }}</span></div>
                                 <div class="li-row"><span class="li-label">평가금액</span><span>{{ fmtWon(row.eval_amount) }} 원</span></div>
+                                <button type="button" class="sell-now-btn" :disabled="sellingCode === row.stock_code"
+                                    @click="onSellNow(row)">
+                                    {{ sellingCode === row.stock_code ? '요청 중…' : (sellRequested[row.stock_code] ? '✓ 매도 요청됨' : '지금 팔기') }}
+                                </button>
                             </li>
                             <li v-if="holdings.length === 0" class="empty-cell">보유 종목이 없습니다.</li>
                         </ul>
@@ -250,6 +262,7 @@
 <script setup>
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores';
+import { sellNow, apiErrorMessage } from '@scripts/useAutoTrade.js';
 
 const title = ref('내 자산');
 const router = useRouter();
@@ -369,6 +382,29 @@ onBeforeUnmount(() => {
     clearInterval(autoTimer);
     document.removeEventListener('visibilitychange', onVisible);
 });
+
+/* ── 지금 팔기 ──
+ * 보유 전량 시장가 매도 요청. Flask 가 직접 주문하지 않고 즉시 도달하는 손절 티어를 등록하면
+ * worker 가 다음 재적재(최대 약 1분) 후 시장가로 판다(router_manual_sell.sell_now).
+ * 매도가 끝나면 보유종목에서 빠지므로, 요청 표시는 화면에 남아 있는 동안만 의미가 있다. */
+const sellingCode = ref(null);
+const sellRequested = reactive({});
+const onSellNow = async (row) => {
+    if (sellingCode.value) return;
+    const msg = `${row.stock_name} ${fmtQty(row.qty)}주 전량을 시장가로 매도할까요?\n`
+        + `(현재가 ${fmtWon(row.cur_price)}원 · 실제 체결가는 다를 수 있어요)`;
+    if (!confirm(msg)) return;
+    sellingCode.value = row.stock_code;
+    try {
+        await sellNow(row.stock_code);
+        sellRequested[row.stock_code] = true;
+        alert('매도 요청을 접수했어요. 1분 안에 시장가로 주문이 나가요.');
+    } catch (e) {
+        alert(apiErrorMessage(e, '매도 요청에 실패했어요. 잠시 후 다시 시도해 주세요.'));
+    } finally {
+        sellingCode.value = null;
+    }
+};
 
 /* ── 종목별 수익률 / 소계 ── */
 // 매입가 대비 현재가 수익률(%). row.profit(평가손익 금액)이 있으면 수량*매입가 대비로,
@@ -954,6 +990,24 @@ $yb-down:  #1F5BD1;
     thead th { color: $yb-sub; background: #FFFDF5; }
 }
 .m-li { border: 1px solid $yb-line; border-radius: 14px; }
+
+/* 지금 팔기: 카드 하단 전체폭 / 표에서는 작게 */
+.sell-now-btn {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    margin-top: 10px;
+    border: 1px solid $yb-down;
+    border-radius: 12px;
+    background: #fff;
+    color: $yb-down;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    &:disabled { opacity: .5; cursor: default; }
+    &.sm { display: inline-block; width: auto; min-height: 32px; margin: 0; padding: 0 12px; font-size: 13px; border-radius: 8px; }
+}
 .m-subtotal { border-radius: 12px; }
 .up   { color: $yb-up; }
 .down { color: $yb-down; }

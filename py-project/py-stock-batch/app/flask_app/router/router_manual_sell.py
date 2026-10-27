@@ -50,6 +50,7 @@ from decimal import Decimal, InvalidOperation
 from flask import Blueprint, request
 
 from app.flask_app.utils.apiResponse import ApiResponse
+from app.trade_worker.broker import Broker
 from app.trade_worker.repository import Repository
 
 manual_sell_bp = Blueprint("manual_sell", __name__)
@@ -169,6 +170,62 @@ def save_manual_sell():
         )
         row = _repo.get_manual_sell_by_id(uid, new_id)
     except ValueError as e:   # DOWN 인데 sql/27 미적용 등 — 사용자가 고칠 수 있는 오류
+        return ApiResponse.error(str(e), status=400)
+    except Exception as e:  # noqa: BLE001
+        return ApiResponse.error(str(e), status=500)
+    return ApiResponse.success(_jsonable(row))
+
+
+# "지금 팔기" 티어 표식. sell_price 는 DECIMAL(15,2) 최댓값 근처로 둔다 — DOWN(체결가 <= sell_price)
+# 이라 어떤 체결가에서도 첫 틱에 도달한다. 주문가는 이 값이 아니라 실시간 체결가로 나가므로
+# (정규장=시장가, sell_executor._order_with_reprice) 터무니없는 가격이 주문에 실리지 않는다.
+SELL_NOW_MEMO = "지금 팔기"
+SELL_NOW_PRICE = Decimal("9999999999999")
+
+
+@manual_sell_bp.route("/orders/sell-now", methods=["POST"])
+def sell_now():
+    """지갑(MyWallet.vue) 보유 카드의 "지금 팔기" — 보유 전량 시장가 매도 요청.
+
+    Flask 앱은 KIS 세션이 없어 직접 주문하지 않는다. 대신 즉시 도달하는 DOWN 티어
+    (qty_ratio=1, base_qty=현재 보유수량)를 수기등록에 넣고, worker 가 다음 수기등록
+    재적재(apply_settings_change 폴링, 기본 60초) 후 첫 틱에 시장가로 판다.
+    같은 종목에 다른 지정가 티어가 있어도 pick_manual_tier 가 DOWN 을 먼저 고른다.
+
+    정규장(09:00~15:30, 시장가 세션)에서만 받는다. 장외에 등록하면 다음 세션
+    (프리/애프터마켓 지정가)이나 다음 날 개장에 팔리게 돼 "지금 시장가"가 아니다.
+    같은 종목에 이미 대기 중인 "지금 팔기"가 있으면 새로 만들지 않고 그 행을 돌려준다."""
+    uid = _resolve_user_id()
+    if uid is None:
+        return ApiResponse.error("user_id 가 필요합니다.", status=400)
+    body = request.get_json(silent=True) or {}
+    code = body.get("stock_code")
+    if not code:
+        return ApiResponse.error("stock_code 가 필요합니다.", status=400)
+
+    sess = Broker.market_session(False, krx_aftermarket=False)
+    if not sess.tradable or sess.limit_only:
+        return ApiResponse.error("지금 팔기는 정규장(09:00~15:30)에만 할 수 있어요.", status=400)
+
+    try:
+        pending = next((r for r in _repo.get_active_manual_sells(uid)
+                        if r.get("stock_code") == code and r.get("memo") == SELL_NOW_MEMO), None)
+        if pending:
+            return ApiResponse.success(_jsonable(pending))
+        holding = _repo.get_user_holding(uid, code)
+    except Exception as e:  # noqa: BLE001
+        return ApiResponse.error(str(e), status=500)
+    if not holding or Decimal(str(holding.get("qty") or 0)) <= 0:
+        return ApiResponse.error("계좌에 보유 수량이 없는 종목입니다.", status=400)
+
+    try:
+        new_id = _repo.insert_manual_sell(
+            uid, code, holding.get("stock_name"), SELL_NOW_PRICE, Decimal("1"),
+            SELL_NOW_MEMO, "Y",
+            base_qty=Decimal(str(holding["qty"])), trigger_type="DOWN",
+        )
+        row = _repo.get_manual_sell_by_id(uid, new_id)
+    except ValueError as e:   # sql/27 미적용(DOWN 불가)
         return ApiResponse.error(str(e), status=400)
     except Exception as e:  # noqa: BLE001
         return ApiResponse.error(str(e), status=500)

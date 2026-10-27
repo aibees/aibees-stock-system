@@ -102,6 +102,15 @@ export const cancelManualSell = async (manual_sell_id) => {
     await batchApi.post(`${SELL_BASE}/orders/cancel`, { user_id, manual_sell_id });
 };
 
+/* 지갑 "지금 팔기" — 보유 전량 시장가 매도 요청(정규장만).
+ *  서버가 즉시 도달하는 손절(DOWN) 티어를 등록하고, worker 가 다음 재적재(최대 약 1분) 후 판다. */
+export const sellNow = async (stock_code) => {
+    const user_id = currentUserId();
+    if (!user_id) throw new Error('로그인 세션이 없습니다.');
+    const { data } = await batchApi.post(`${SELL_BASE}/orders/sell-now`, { user_id, stock_code });
+    return data.data ?? {};
+};
+
 /* ── 변경 이력 ── */
 export const fetchHistory = async (limit = 30) => {
     if (USE_MOCK) return mock.mockFetchHistory(limit);
