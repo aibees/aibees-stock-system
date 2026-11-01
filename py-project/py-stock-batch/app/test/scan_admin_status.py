@@ -24,7 +24,7 @@ sys.path.insert(0, '../shared')
 from stock_shared.db.database import dbConn
 from app.ext_services.kis.KisEngine import KisEngine
 
-DB_URL = 'mysql+pymysql://stock:stock123!!@210.103.60.108:3333/stock'
+DB_URL = 'mysql+pymysql://stock:stock123!!@210.100.177.162:3333/stock'
 SLEEP_SEC = 1.5
 
 

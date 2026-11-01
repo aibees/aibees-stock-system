@@ -165,7 +165,7 @@ from stock_shared.ml.shape_features import (
     EXHAUSTION_RET_1D_TODAY_MIN,
 )
 
-DB_URL = 'mysql+pymysql://stock:stock123!!@210.103.60.108:3333/stock'
+DB_URL = 'mysql+pymysql://stock:stock123!!@210.100.177.162:3333/stock'
 
 FEE_RATE = 0.0011          # 편도. 왕복 2배 차감 (sim_buy_target.py 와 동일)
 INIT_CASH = 1_000_000

@@ -34,7 +34,7 @@ from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.kis.component.KisStockService import KisService
 from app.batches.services.stockService import StockService
 
-DB_URL = 'mysql+pymysql://stock:stock123!!@210.103.60.108:3333/stock'
+DB_URL = 'mysql+pymysql://stock:stock123!!@210.100.177.162:3333/stock'
 # PR #4(RSI/MACD/거래량비율 피처 추가) 이전 스냅샷 — old_score 3-way 비교용 참고 아티팩트.
 # origin/main 의 shape_gbm_v1.joblib(당시 버전)을 그대로 복사해 둔 것.
 OLD_MODEL_PATH = os.path.join(os.path.dirname(__file__), 'shape_gbm_v1_OLD.joblib')
