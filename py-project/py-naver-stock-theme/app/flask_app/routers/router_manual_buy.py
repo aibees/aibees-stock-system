@@ -2,7 +2,7 @@
 router_manual_buy.py — 수동 매수 (Blueprint url_prefix = /api/v1/auto-trade/manual-buy)
 
     GET  /               내 주문 목록          ?limit=30
-    POST /               주문 요청             body: { client_key, stock_code, order_type, qty, limit_price }
+    POST /               주문 요청             body: { client_key, stock_code, order_type, qty 또는 qty_pct, limit_price }
     POST /<id>/cancel    주문 취소
 
 설계 메모:
@@ -10,6 +10,8 @@ router_manual_buy.py — 수동 매수 (Blueprint url_prefix = /api/v1/auto-trad
     - 이 서버는 주문을 내지 않는다. 요청을 trade_worker_manual_buy 에 저장하면 worker 가 폴링해서 낸다
       (py-stock-batch trade_worker/manual_buy.py). 거래 시간·주문가능수량 판정도 실제 주문 직전에 worker 가 한다.
     - 추천·매수 게이트와 무관하게 master_stock 의 모든 종목을 살 수 있고, M0 여도 막지 않는다.
+    - qty_pct 는 주문가능수량 대비 %다. 화면이 시장가의 현재가를 모르고 증거금율도 종목마다 달라, 주문 직전 worker 가
+      KIS 주문가능수량으로 수량을 확정한다. 그 전까지 qty 는 0 이다.
     - client_key 가 같은 재전송은 같은 주문을 돌려준다(주문이 두 번 나가지 않는다).
 """
 import logging
@@ -66,15 +68,29 @@ def _parse_order(body: dict):
     if order_type not in ORDER_TYPES:
         return None, "주문 방식은 시장가 또는 지정가여야 합니다."
 
-    try:
-        qty_dec = Decimal(str(body.get('qty')))
-        if qty_dec != qty_dec.to_integral_value():
-            raise ValueError
-        qty = int(qty_dec)
-    except (InvalidOperation, TypeError, ValueError, OverflowError):
-        return None, "수량은 1주 단위로 입력해 주세요."
-    if qty < 1 or qty > MAX_ORDER_QTY:
-        return None, f"수량은 1~{MAX_ORDER_QTY:,}주로 입력해 주세요."
+    qty, qty_pct = 0, None
+    raw_qty, raw_pct = body.get('qty'), body.get('qty_pct')
+    if (raw_qty in (None, '')) == (raw_pct in (None, '')):
+        return None, "수량 또는 비율 중 하나만 입력해 주세요."
+    if raw_pct not in (None, ''):
+        try:
+            qty_pct = Decimal(str(raw_pct))
+            if not qty_pct.is_finite() or qty_pct != qty_pct.to_integral_value():
+                raise ValueError
+        except (InvalidOperation, TypeError, ValueError):
+            return None, "비율은 1~100% 로 입력해 주세요."
+        if qty_pct < 1 or qty_pct > 100:
+            return None, "비율은 1~100% 로 입력해 주세요."
+    else:
+        try:
+            qty_dec = Decimal(str(raw_qty))
+            if qty_dec != qty_dec.to_integral_value():
+                raise ValueError
+            qty = int(qty_dec)
+        except (InvalidOperation, TypeError, ValueError, OverflowError):
+            return None, "수량은 1주 단위로 입력해 주세요."
+        if qty < 1 or qty > MAX_ORDER_QTY:
+            return None, f"수량은 1~{MAX_ORDER_QTY:,}주로 입력해 주세요."
 
     limit_price = None
     if order_type == 'LIMIT':
@@ -91,7 +107,7 @@ def _parse_order(body: dict):
             return None, f"이 가격대의 호가 단위는 {tick:,}원이에요. 호가 단위에 맞춰 입력해 주세요."
 
     return {'client_key': client_key, 'stock_code': stock_code, 'order_type': order_type,
-            'qty': qty, 'limit_price': limit_price}, None
+            'qty': qty, 'qty_pct': qty_pct, 'limit_price': limit_price}, None
 
 
 @manual_buy_bp.route("", methods=['GET'], strict_slashes=False)
@@ -135,7 +151,7 @@ def create_order():
         try:
             manualBuyDaoImpl.insert(g.db, uid, order['client_key'], order['stock_code'],
                                     stock.get('stock_name') or '', order['order_type'],
-                                    order['limit_price'], order['qty'])
+                                    order['limit_price'], order['qty'], order['qty_pct'])
         except IntegrityError:
             # 같은 키의 동시 요청 — 먼저 들어간 주문을 돌려준다
             g.db.rollback()

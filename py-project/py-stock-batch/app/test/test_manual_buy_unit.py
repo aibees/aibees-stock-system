@@ -22,7 +22,7 @@ from pytz import timezone
 
 from app.trade_worker import manual_buy as MB
 from app.trade_worker.broker import Broker, MarketSession, OrderResult, TradingHaltedError
-from app.trade_worker.manual_buy import ManualBuyExecutor, next_state, resolve_session
+from app.trade_worker.manual_buy import ManualBuyExecutor, next_state, qty_from_pct, resolve_session
 
 PASS, FAIL = [], []
 KST = timezone("Asia/Seoul")
@@ -158,6 +158,9 @@ class FakeRepo:
         r['state'] = 'ORDERING'
         return True
 
+    def set_manual_buy_qty(self, uid, id_, qty):
+        self.rows[id_]['qty'] = qty
+
     def mark_manual_buy_open(self, uid, id_, no, branch, dvsn, exch, sess, ymd):
         self.rows[id_].update(state='OPEN', order_no=no, branch=branch, ord_dvsn=dvsn,
                               exchange=exch, session_name=sess, order_ymd=ymd)
@@ -284,6 +287,24 @@ def test_executor():
     ex, repo, br, _, _ = make([req()], max_qty=None)
     ex.poll(at(10, 0), trading)
     check('수량 조회 실패여도 주문 진행', len(br.orders) == 1)
+
+    check('qty_from_pct 버림', qty_from_pct(7, 50) == 3 and qty_from_pct(10, 100) == 10 and qty_from_pct(3, 10) == 0)
+
+    ex, repo, br, _, _ = make([req(qty=0, qty_pct=Decimal('25'))], max_qty=100)
+    ex.poll(at(10, 0), trading)
+    check('% 시장가 → 수량 확정 후 주문', repo.rows[1]['qty'] == 25 and br.orders[0][1] == Decimal(25) and repo.rows[1]['state'] == 'OPEN')
+
+    ex, repo, br, _, _ = make([req(qty=0, qty_pct=Decimal('100'), order_type='LIMIT', limit_price=Decimal('70000'))], max_qty=7)
+    ex.poll(at(10, 0), trading)
+    check('% 지정가 100% → 최대수량', br.orders[0][1] == Decimal(7) and br.orders[0][2] == '00')
+
+    ex, repo, br, _, _ = make([req(qty=0, qty_pct=Decimal('10'))], max_qty=5)
+    ex.poll(at(10, 0), trading)
+    check('% 결과 1주 미만 거부', repo.rows[1]['state'] == 'REJECTED' and br.orders == [] and '10%' in repo.rows[1]['reason'])
+
+    ex, repo, br, _, _ = make([req(qty=0, qty_pct=Decimal('50'))], max_qty=None)
+    ex.poll(at(10, 0), trading)
+    check('% 인데 수량 조회 실패 → 주문 안 함', repo.rows[1]['state'] == 'REJECTED' and br.orders == [])
 
     ex, repo, br, _, _ = make([req()])
     ex.poll(at(10, 0), lambda: False)

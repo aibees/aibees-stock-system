@@ -778,6 +778,16 @@ class Repository:
             s.commit()
             return result.rowcount == 1
 
+    def set_manual_buy_qty(self, user_id: int, order_id: int, qty: int) -> None:
+        """% 주문의 확정 수량. 주문 전에 기록해 둔다(결과 불명이어도 얼마를 주문했는지 남도록)."""
+        sql = text(
+            "UPDATE trade_worker_manual_buy SET qty = :qty "
+            " WHERE user_id = :uid AND id = :id AND state = 'ORDERING'"
+        )
+        with get_session() as s:
+            s.execute(sql, {"uid": user_id, "id": order_id, "qty": qty})
+            s.commit()
+
     def mark_manual_buy_open(self, user_id: int, order_id: int, order_no: str, branch: str | None,
                              ord_dvsn: str, exchange: str, session_name: str, order_ymd: str) -> None:
         sql = text(

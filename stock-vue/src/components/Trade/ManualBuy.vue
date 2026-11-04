@@ -33,17 +33,26 @@
                 <label class="field">
                     <span class="row-label">수량</span>
                     <span class="input-unit">
-                        <input v-model.number="qty" type="number" inputmode="numeric" min="1" step="1" placeholder="0" />
+                        <input v-model.number="qty" type="number" inputmode="numeric" min="1" step="1"
+                            :placeholder="qtyPct ? `주문가능의 ${qtyPct}%` : '0'" @input="qtyPct = null" />
                         <span>주</span>
                     </span>
                 </label>
+                <div class="pct-row" role="group" aria-label="주문가능수량 대비 비율">
+                    <button v-for="p in QTY_PCTS" :key="p" type="button" :class="['pct-btn', { on: qtyPct === p }]"
+                        :aria-pressed="qtyPct === p" @click="pickPct(p)">{{ p }}%</button>
+                </div>
 
                 <dl class="summary">
                     <div>
                         <dt>주문가능금액</dt>
                         <dd>{{ balance === null ? '-' : `${formatNumber(balance)}원` }}</dd>
                     </div>
-                    <div v-if="orderType === 'LIMIT'">
+                    <div v-if="qtyPct && pctEstimate !== null">
+                        <dt>예상 수량</dt>
+                        <dd>약 {{ formatNumber(pctEstimate) }}주</dd>
+                    </div>
+                    <div v-else-if="orderType === 'LIMIT' && !qtyPct">
                         <dt>주문금액</dt>
                         <dd :class="{ over: overBalance }">{{ orderAmount === null ? '-' : `${formatNumber(orderAmount)}원` }}</dd>
                     </div>
@@ -51,6 +60,7 @@
 
                 <p class="note" v-if="orderType === 'MARKET'">시장가는 정규장(09:00~15:30)에만 주문할 수 있고, 체결 가격은 시장 상황에 따라 정해져요.</p>
                 <p class="note" v-else>지정가는 당일에만 유효해요. 프리마켓·애프터마켓에서도 주문할 수 있어요.</p>
+                <p v-if="qtyPct" class="note">%는 주문가능수량 기준이에요. 실제 수량은 주문 직전에 계산하고, 1주 미만은 버려요.</p>
                 <p class="note">매매정지 중에도 주문이 나가요. 체결된 종목은 운용모드의 손절·익절 규칙으로 자동 매도될 수 있어요.</p>
 
                 <button type="button" class="btn-buy" :disabled="!canSubmit" @click="onSubmit">
@@ -71,7 +81,7 @@
                         </div>
                         <div class="order-meta">
                             {{ o.order_type === 'LIMIT' ? `지정가 ${formatNumber(o.limit_price)}원` : '시장가' }}
-                            · {{ formatNumber(o.qty) }}주 · {{ formatDateTime(o.created_at) }}
+                            · {{ orderQtyText(o) }} · {{ formatDateTime(o.created_at) }}
                         </div>
                         <div v-if="Number(o.filled_qty) > 0" class="order-meta">
                             체결 {{ formatNumber(o.filled_qty) }}주<template v-if="o.avg_fill_price"> · 평균 {{ formatNumber(o.avg_fill_price) }}원</template>
@@ -104,6 +114,7 @@ const stock = ref(null);
 const orderType = ref('MARKET');
 const limitPrice = ref(null);
 const qty = ref(null);
+const qtyPct = ref(null);
 const pickerOpen = ref(false);
 const balance = ref(null);
 
@@ -117,6 +128,20 @@ const TICKS = [[2000, 1], [5000, 5], [20000, 10], [50000, 50], [200000, 100], [5
 const tickOf = (price) => (TICKS.find(([upper]) => price < upper) || [0, 1000])[1];
 const priceTick = computed(() => tickOf(Number(limitPrice.value) || 0));
 
+/* % 수량: 수량을 비우고 비율을 보낸다. 실제 수량은 주문 직전 worker 가 KIS 주문가능수량으로 정한다
+ * (시장가는 화면에 현재가가 없고, 증거금율도 종목마다 달라 여기서 정확히 계산할 수 없다). */
+const QTY_PCTS = [10, 25, 50, 100];
+const pickPct = (p) => {
+    const next = qtyPct.value === p ? null : p;
+    qty.value = null;       // watch 보다 먼저 지워 둔다
+    qtyPct.value = next;
+};
+// 지정가만 보여줄 수 있는 참고값이다. 증거금율 때문에 실제 수량과 다를 수 있다.
+const pctEstimate = computed(() => {
+    if (!qtyPct.value || orderType.value !== 'LIMIT' || !(limitPrice.value > 0) || balance.value === null) return null;
+    return Math.floor((balance.value * qtyPct.value) / 100 / limitPrice.value);
+});
+
 const priceError = computed(() => {
     if (orderType.value !== 'LIMIT' || !limitPrice.value) return '';
     return limitPrice.value % priceTick.value === 0 ? ''
@@ -128,22 +153,27 @@ const orderAmount = computed(() => (qtyValid.value && limitPrice.value > 0 ? qty
 const overBalance = computed(() => balance.value !== null && orderAmount.value !== null && orderAmount.value > balance.value);
 
 const submitting = ref(false);
-const canSubmit = computed(() => stock.value && qtyValid.value && priceValid.value && !submitting.value);
+const canSubmit = computed(() => stock.value && (qtyValid.value || qtyPct.value) && priceValid.value && !submitting.value);
 
 /* ── 주문 ──
  * 같은 입력을 다시 보내면(응답 유실 후 재시도) 같은 키를 쓴다 → 서버가 같은 주문을 돌려주고 주문은 1건만 나간다.
  * 입력이 바뀌면 새 주문이므로 키를 버린다. */
 let clientKey = null;
-watch([stock, orderType, limitPrice, qty], () => { clientKey = null; });
+watch([stock, orderType, limitPrice, qty, qtyPct], () => { clientKey = null; });
 const newClientKey = () => globalThis.crypto?.randomUUID?.()
     ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 const onSubmit = async () => {
     if (!canSubmit.value) return;
     const isLimit = orderType.value === 'LIMIT';
-    const line = isLimit
-        ? `지정가 ${formatNumber(limitPrice.value)}원 · ${formatNumber(qty.value)}주\n주문금액 ${formatNumber(orderAmount.value)}원`
-        : `시장가 · ${formatNumber(qty.value)}주\n체결 가격은 시장 상황에 따라 정해져요.`;
+    const price = isLimit ? `지정가 ${formatNumber(limitPrice.value)}원` : '시장가';
+    const amount = qtyPct.value
+        ? `주문가능수량의 ${qtyPct.value}%${pctEstimate.value !== null ? ` (약 ${formatNumber(pctEstimate.value)}주)` : ''}`
+        : `${formatNumber(qty.value)}주`;
+    const detail = isLimit && !qtyPct.value
+        ? `주문금액 ${formatNumber(orderAmount.value)}원`
+        : (isLimit ? '실제 수량은 주문 직전에 정해져요.' : '체결 가격은 시장 상황에 따라 정해져요.');
+    const line = `${price} · ${amount}\n${detail}`;
     if (!confirm(`${stock.value.stock_name}을(를) 매수할까요?\n${line}`)) return;
 
     clientKey = clientKey ?? newClientKey();
@@ -153,10 +183,12 @@ const onSubmit = async () => {
             client_key: clientKey,
             stock_code: stock.value.stock_code,
             order_type: orderType.value,
-            qty: qty.value,
+            qty: qtyPct.value ? null : qty.value,
+            qty_pct: qtyPct.value,
             limit_price: isLimit ? limitPrice.value : null,
         });
         qty.value = null;
+        qtyPct.value = null;
         limitPrice.value = null;
         await loadOrders();
     } catch (e) {
@@ -174,6 +206,7 @@ const busyId = ref(null);
 
 const ACTIVE_STATES = ['REQUESTED', 'ORDERING', 'OPEN'];
 const canCancel = (o) => ['REQUESTED', 'OPEN'].includes(o.state) && o.cancel_requested !== 'Y';
+const orderQtyText = (o) => (Number(o.qty) > 0 ? `${formatNumber(o.qty)}주` : `주문가능의 ${Number(o.qty_pct)}%`);
 const stateLabel = (o) => {
     if (o.state === 'OPEN' && o.cancel_requested === 'Y') return '취소 중';
     if (o.state === 'OPEN' && Number(o.filled_qty) > 0) return '부분 체결';
@@ -323,7 +356,7 @@ $down:  #1F5BD1;
     align-items: center;
     justify-content: flex-end;
     gap: 6px;
-    font-size: 15px;
+    font-size: 16px;   // iOS 는 16px 미만 입력창에 포커스되면 화면을 확대한다
 
     input {
         flex: 1;
@@ -337,6 +370,26 @@ $down:  #1F5BD1;
         font-weight: 700;
         text-align: right;
     }
+}
+
+.pct-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px 0;
+    border-bottom: 1px solid $line;
+}
+.pct-btn {
+    min-height: 44px;
+    padding: 0;
+    border: 1px solid $line;
+    border-radius: 10px;
+    background: #fff;
+    color: $sub;
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    &.on { border-color: #7A4423; background: #FFF6D2; color: #7A4423; font-weight: 700; }
 }
 
 .field-error { margin: 6px 0 0; font-size: 13px; color: $up; }

@@ -14,6 +14,8 @@
   계좌 동기화가 포지션 편입(또는 수량 보정)과 초기 라인 설정을 한다. 이후 매도는 운용모드 규칙을 따른다.
   다음 날 09:00 자동매수도 평소처럼 계좌 보유 여부만 본다.
 
+% 수량(qty_pct)은 주문 직전 KIS 주문가능수량 기준으로 확정한다. 조회가 안 되면 수량을 알 수 없으므로 주문하지 않는다.
+
 주문 상태는 KIS 일별주문체결조회로 맞춘다. 체결통보 유실이나 재시작과 무관하게 항상 같은 답을 얻는다.
 """
 import logging
@@ -48,6 +50,11 @@ def resolve_session(order_type: str, nxt: bool, krx_aftermarket: bool,
     if sess.limit_only:
         return sess, ""
     return MarketSession(True, sess.exchange, "00", sess.name), ""
+
+
+def qty_from_pct(max_qty, pct) -> int:
+    """주문가능수량의 pct% (1주 미만 버림)."""
+    return int(Decimal(int(max_qty)) * Decimal(str(pct)) / 100)
 
 
 def next_state(qty, status: Optional[dict], order_ymd: str, today_ymd: str) -> Optional[str]:
@@ -121,7 +128,7 @@ class ManualBuyExecutor:
             self.wlog.warn("[수동매수] %s 거부: %s", code, reason)
 
         order_type = row["order_type"]
-        qty = int(row["qty"])
+        qty_pct = row.get("qty_pct")
         price = Decimal(str(row["limit_price"])) if order_type == "LIMIT" else None
         nxt = row.get("nxt_flag") == "Y"
         sess, why = resolve_session(order_type, nxt, self.cfg.krx_aftermarket_enabled, now_kst)
@@ -129,11 +136,22 @@ class ManualBuyExecutor:
             reject(why)
             return
 
-        # 조회 실패(None)면 막지 않는다 — 초과 주문은 거래소가 거부한다
         max_qty, _ = self.broker.orderable(code, price, ord_dvsn="01" if order_type == "MARKET" else "00")
-        if max_qty is not None and qty > int(max_qty):
-            reject(f"주문가능수량을 넘었어요(최대 {int(max_qty):,}주).")
-            return
+        if qty_pct is not None:
+            if max_qty is None:
+                reject("주문가능수량을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.")
+                return
+            qty = qty_from_pct(max_qty, qty_pct)
+            if qty < 1:
+                reject(f"주문가능수량의 {Decimal(str(qty_pct)).normalize():f}%가 1주보다 적어요(최대 {int(max_qty):,}주).")
+                return
+            self.repo.set_manual_buy_qty(uid, order_id, qty)
+        else:
+            qty = int(row["qty"])
+            # 조회 실패(None)면 막지 않는다 — 초과 주문은 거래소가 거부한다
+            if max_qty is not None and qty > int(max_qty):
+                reject(f"주문가능수량을 넘었어요(최대 {int(max_qty):,}주).")
+                return
 
         try:
             order = self.broker.manual_buy(code, Decimal(qty), sess, price)

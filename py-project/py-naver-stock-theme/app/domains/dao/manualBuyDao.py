@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 REQUEST_TTL_SEC = 60   # worker 가 이 시간 안에 집어가지 않으면 만료(늦은 주문 방지). manual_buy.py 와 같은 값
 
-_COLUMNS = """id, stock_code, stock_name, order_type, limit_price, qty, state, cancel_requested,
+_COLUMNS = """id, stock_code, stock_name, order_type, limit_price, qty, qty_pct, state, cancel_requested,
               order_no, session_name, filled_qty, avg_fill_price, reason, created_at, updated_at"""
 
 
@@ -52,16 +52,16 @@ class ManualBuyDao:
         return [dict(r) for r in rows]
 
     def insert(self, session, user_id: int, client_key: str, stock_code: str, stock_name: str,
-               order_type: str, limit_price, qty: int) -> None:
+               order_type: str, limit_price, qty: int, qty_pct=None) -> None:
         session.execute(
             text("""
                 INSERT INTO trade_worker_manual_buy
-                    (user_id, client_key, stock_code, stock_name, order_type, limit_price, qty, state)
+                    (user_id, client_key, stock_code, stock_name, order_type, limit_price, qty, qty_pct, state)
                 VALUES
-                    (:uid, :key, :code, :name, :type, :price, :qty, 'REQUESTED')
+                    (:uid, :key, :code, :name, :type, :price, :qty, :pct, 'REQUESTED')
             """),
             {'uid': user_id, 'key': client_key, 'code': stock_code, 'name': stock_name,
-             'type': order_type, 'price': limit_price, 'qty': qty},
+             'type': order_type, 'price': limit_price, 'qty': qty, 'pct': qty_pct},
         )
 
     def expire_stale(self, session, user_id: int) -> None:
