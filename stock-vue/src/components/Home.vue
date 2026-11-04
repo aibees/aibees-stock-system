@@ -299,17 +299,21 @@
                             <strong>최우선 타겟 선택</strong>
                             <button type="button" class="sheet-close" aria-label="닫기" @click="sheetOpen = false">✕</button>
                         </div>
+                        <!-- '선택 안 함'은 종목이 아니라 해제 동작이다. 목록 첫 행에 두면 제목처럼 보이고 스크롤하면 사라져서
+                             목록 밖에 고정한다. 앱은 하단에 네이티브 광고가 겹칠 수 있어 위쪽에 둔다. -->
+                        <div class="sheet-none-wrap">
+                            <button type="button" class="sheet-none" :class="{ on: !priorityTarget }" @click="selectPriority(null)">
+                                <span class="sn-label"><template v-if="!priorityTarget">✓ </template>선택 안 함</span>
+                                <span v-if="priorityTarget" class="sn-sub">{{ priorityTargetName || priorityTarget }} 해제</span>
+                            </button>
+                        </div>
                         <ul class="sheet-list">
-                            <li>
-                                <button type="button" class="sheet-item" :class="{ on: !priorityTarget }" @click="selectPriority(null)">
-                                    <span class="si-name">선택 안 함</span>
-                                </button>
-                            </li>
                             <li v-for="(item, i) in sortedData" :key="item.stock_code">
                                 <button type="button" class="sheet-item" :class="{ on: item.stock_code === priorityTarget }" @click="selectPriority(item.stock_code)">
                                     <span class="si-rank">{{ String(i + 1).padStart(2, '0') }}</span>
                                     <span class="si-name">{{ item.stock_name }} <em>{{ item.stock_code }}</em></span>
                                     <span class="si-chg" :class="changeInfo(item).cls">{{ changeInfo(item).text }}</span>
+                                    <span v-if="item.stock_code === priorityTarget" class="si-check" aria-label="선택됨">✓</span>
                                 </button>
                             </li>
                         </ul>
@@ -1356,7 +1360,28 @@ $down:     #1F5BD1;
     strong { font-size: 16px; }
 }
 .sheet-close { width: 44px; height: 44px; border: 0; background: transparent; color: $sub; font-size: 16px; cursor: pointer; }
-.sheet-list { margin: 0; padding: 4px 8px 12px; list-style: none; overflow-y: auto; }
+.sheet-none-wrap { flex-shrink: 0; padding: 10px 16px; border-bottom: 1px solid $line; }
+.sheet-none {
+    width: 100%;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 14px;
+    border: 1.5px solid $brown;
+    border-radius: 10px;
+    background: $card;
+    color: $brown;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &.on { background: $bar; }
+    .sn-label { flex-shrink: 0; font-size: 15px; font-weight: 700; }
+    .sn-sub { min-width: 0; font-size: 13px; color: $sub; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+.sheet-list { flex: 1; min-height: 0; margin: 0; padding: 4px 8px 12px; list-style: none; overflow-y: auto; }
 .sheet-item {
     width: 100%;
     min-height: 48px;
@@ -1377,6 +1402,7 @@ $down:     #1F5BD1;
     .si-name { flex: 1; min-width: 0; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         em { font-style: normal; font-size: 12px; color: $sub-2; margin-left: 4px; } }
     .si-chg { font-size: 12px; font-weight: 600; &.up { color: $up; } &.down { color: $down; } &.flat { color: $sub; } }
+    .si-check { flex-shrink: 0; font-size: 15px; font-weight: 700; color: $brown; }
 }
 .sheet-enter-active, .sheet-leave-active { transition: opacity .18s ease; .sheet { transition: transform .22s ease; } }
 .sheet-enter-from, .sheet-leave-to { opacity: 0; .sheet { transform: translateY(24px); } }
