@@ -44,7 +44,7 @@
                         <input class="filter-input" v-model.trim="tradeFilter.stock_code" placeholder="예) 005930"
                             @keyup.enter="applyTradeFilter" />
                     </div>
-                    <div class="filter-group">
+                    <div class="filter-group period">
                         <span class="filter-label">기간</span>
                         <input class="filter-input date" type="date" v-model="tradeFilter.from" />
                         <span class="tilde">~</span>
@@ -458,7 +458,14 @@ $green: #1F7A3E;
     background: $white; border: 1px solid $gray-200;
 }
 .filter-group { display: flex; align-items: center; gap: 10px; }
-.filter-label { font-size: 0.76rem; font-weight: 700; color: $gray-500; letter-spacing: .03em; }
+.filter-label { flex-shrink: 0; font-size: 0.76rem; font-weight: 700; color: $gray-500; letter-spacing: .03em; }
+// 터치 기기는 입력창이 16px 이라(App.vue) 날짜 두 칸이 카드 밖으로 나간다 → 위아래로 쌓는다
+@media (max-width: 640px) {
+    .filter-group.period { width: 100%; flex-wrap: wrap; }
+    .filter-group.period .filter-label { width: 100%; text-align: left; }
+    .filter-group.period .tilde { display: none; }
+    .filter-input.date { flex: 1 1 100%; min-width: 0; box-sizing: border-box; }
+}
 .chip-group { display: flex; gap: 6px; }
 .filter-chip {
     border-radius: 12px;

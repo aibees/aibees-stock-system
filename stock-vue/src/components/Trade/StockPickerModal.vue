@@ -129,7 +129,7 @@ $blue: #1F5BD1;
         height: 36px;
         border: 1px solid $gray-200;
         padding: 0 10px;
-        font-size: .86rem;
+        font-size: 16px;   // iOS 는 16px 미만 입력창에 포커스되면 화면을 확대한다
     }
 
     .btn-search {

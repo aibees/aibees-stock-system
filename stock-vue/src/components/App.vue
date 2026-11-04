@@ -39,6 +39,17 @@ const showLnb = computed(() => !isAuthPath(route.path));
   --ad-bottom-total: 0px;
 }
 
+/* iOS 는 글자가 16px 보다 작은 입력창에 포커스되면 화면을 자동으로 확대하고 되돌리지 않는다.
+ * 각 화면의 스코프 스타일이 더 구체적이라 !important 로 덮는다. 데스크톱 글자 크기는 그대로 둔다.
+ * maximum-scale 로 막으면 사용자가 직접 확대할 수도 없게 되므로 쓰지 않는다. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"], [type="file"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* 모바일 하단 배너(AdBottomBanner)가 떠 있는 동안.
  * 배너가 맨 아래(홈 인디케이터 포함)를 차지하고 탭바는 그 위에 얹힌다.
  *   - --lnb-total 을 "탭바 + 배너"로 재정의 → 이 값을 쓰는 하단 여백이 자동으로 늘어난다.
