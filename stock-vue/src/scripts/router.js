@@ -182,6 +182,11 @@ export const setRouterToApp = async () => {
     const router = createRouter({
       history: createWebHistory(),
       routes: [...routes],
+      // 화면이 바뀌면 뒤로가기를 포함해 항상 맨 위에서 시작한다. 없으면 이전 화면의 스크롤 위치가 그대로 남는다.
+      // 쿼리만 바뀌는 같은 화면 안의 이동은 읽던 위치를 유지한다.
+      scrollBehavior(to, from) {
+        return to.path === from.path ? false : { top: 0, left: 0 };
+      },
     });
 
     dynamicRoutes.forEach(d => {
