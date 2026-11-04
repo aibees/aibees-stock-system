@@ -385,7 +385,7 @@ onBeforeUnmount(() => {
 
 /* ── 지금 팔기 ──
  * 보유 전량 시장가 매도 요청. Flask 가 직접 주문하지 않고 즉시 도달하는 손절 티어를 등록하면
- * worker 가 다음 재적재(최대 약 1분) 후 시장가로 판다(router_manual_sell.sell_now).
+ * worker 가 다음 재적재(최대 약 1분) 후 시장가로 판다(ROOT router_auto_trade.sell_now).
  * 매도가 끝나면 보유종목에서 빠지므로, 요청 표시는 화면에 남아 있는 동안만 의미가 있다. */
 const sellingCode = ref(null);
 const sellRequested = reactive({});

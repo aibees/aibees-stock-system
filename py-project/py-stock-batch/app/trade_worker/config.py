@@ -116,6 +116,8 @@ class WorkerConfig:
     realtime_buy_start_hhmm: int = 905
     realtime_buy_end_hhmm: int = 1520
     realtime_buy_retry_sec: int = 300
+    # 수동 매수 요청 확인 주기(초). 0 이면 수동 매수 비활성.
+    manual_buy_poll_sec: int = 3
 
 
 def load() -> WorkerConfig:
@@ -168,4 +170,5 @@ def load() -> WorkerConfig:
         realtime_buy_start_hhmm=int(_get("REALTIME_BUY_START", "09:05").replace(":", "")),
         realtime_buy_end_hhmm=int(_get("REALTIME_BUY_END", "15:20").replace(":", "")),
         realtime_buy_retry_sec=int(_get("REALTIME_BUY_RETRY_SEC", "300")),
+        manual_buy_poll_sec=int(_get("MANUAL_BUY_POLL_SEC", "3")),
     )

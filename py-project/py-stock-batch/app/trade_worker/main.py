@@ -31,6 +31,7 @@ from app.ext_services.kis.KisEngine import KisEngine
 from app.trade_worker import config
 from app.trade_worker.broker import Broker
 from app.trade_worker.modes.mode_1 import BuyExecutor1, SellExecutor1
+from app.trade_worker.manual_buy import ManualBuyExecutor
 from app.trade_worker.notifier import Notifier
 from app.trade_worker.position_strategy import SellStrategy, UnsupportedModeError
 from app.trade_worker.repository import Repository
@@ -547,6 +548,23 @@ def main():
     else:
         log.info("설정 변경 감지 비활성 (SETTINGS_POLL_SEC=%d) → 변경은 재기동 후 반영",
                  cfg.settings_poll_sec)
+
+    # ── 수동 매수 ─────────────────────────────────────────────────────
+    #  화면 요청을 짧은 주기로 확인해 바로 주문한다(manual_buy.py). 매매정지(M0)여도 돈다.
+    #  휴장일 판단은 요청이 있을 때만 하고, 휴장일 요청은 주문 없이 거부한다.
+    manual_buy = ManualBuyExecutor(cfg, broker, repo, sell, notifier)
+    manual_buy.recover_after_boot()
+
+    def _poll_manual_buy():
+        now_kst = datetime.now(_KST)
+        if now_kst.weekday() >= 5 or not (_POLL_START_HOUR <= now_kst.hour <= _POLL_END_HOUR):
+            return
+        manual_buy.poll(now_kst, lambda: _is_trading_day_cached(now_kst))
+
+    if cfg.manual_buy_poll_sec > 0:
+        scheduler.add_job(_poll_manual_buy, IntervalTrigger(seconds=cfg.manual_buy_poll_sec),
+                          id="manual_buy_poll", max_instances=1, coalesce=True)
+        log.info("수동 매수 확인 등록: %d초마다", cfg.manual_buy_poll_sec)
 
     scheduler.start()
     for j in scheduler.get_jobs():

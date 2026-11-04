@@ -750,13 +750,80 @@ class Broker:
                            branch=getattr(order, "branch", None),
                            ord_dvsn="01", exchange=exchange)
 
+    def manual_buy(self, symbol: str, qty: Decimal, sess: MarketSession,
+                   limit_price: Optional[Decimal] = None) -> OrderResult:
+        """사용자 수동 매수(manual_buy.py). 사용자가 직접 낸 주문이라 M0 게이트를 건너뛴다.
+        sess.limit_only 면 limit_price 로 지정가, 아니면 시장가."""
+        qty = Decimal(qty)
+        px = self.align_price(limit_price) if sess.limit_only else Decimal(0)
+        order = self._order_rest("BUY", symbol, qty, sess.exchange,
+                                 ord_dvsn=sess.ord_dvsn, ord_unpr=px, bypass_gate=True)
+        order_no = _ono(getattr(order, "order_number", None) or order)
+        log.info("[LIVE] 수동매수 접수 %s qty=%s %s order=%s exch=%s (%s)",
+                 symbol, qty, f"지정가={px}" if sess.limit_only else "시장가",
+                 order_no, sess.exchange, sess.name)
+        return OrderResult(symbol, "BUY", qty, px, order_no, raw=order,
+                           branch=getattr(order, "branch", None),
+                           ord_dvsn=sess.ord_dvsn, exchange=sess.exchange)
+
+    def order_status(self, order_no: str, symbol: str, ymd: str) -> Optional[dict]:
+        """일별주문체결조회(inquire-daily-ccld)로 매수 주문 1건의 현재 상태를 읽는다. 실패 시 None.
+        반환: {found, filled_qty, avg_price, remain_qty, rejected_qty}. 아직 목록에 없으면 found=False."""
+        try:
+            account = self.kis.primary
+            params = {
+                "CANO": account.number,
+                "ACNT_PRDT_CD": account.code,
+                "INQR_STRT_DT": ymd,
+                "INQR_END_DT": ymd,
+                "SLL_BUY_DVSN_CD": "02",      # 매수
+                "INQR_DVSN": "00",
+                "PDNO": symbol,
+                "CCLD_DVSN": "00",            # 전체(체결+미체결)
+                "ORD_GNO_BRNO": "",
+                "ODNO": "",                   # 주문번호 표기(앞자리 0) 차이를 피해 아래에서 숫자로 비교
+                "INQR_DVSN_3": "00",
+                "INQR_DVSN_1": "",
+                "EXCG_ID_DVSN_CD": "ALL",
+                "CTX_AREA_FK100": "",
+                "CTX_AREA_NK100": "",
+            }
+            tr_id = "VTTC0081R" if getattr(self.kis, "virtual", False) else "TTTC0081R"
+            _, j = _with_rate_retry("주문체결조회", lambda: self._get_json(
+                "/uapi/domestic-stock/v1/trading/inquire-daily-ccld", params,
+                {"tr_id": tr_id, "custtype": "P"}))
+            if j.get("rt_cd") != "0":
+                log.warning("주문체결조회 실패 %s: rt_cd=%s msg=%s", order_no, j.get("rt_cd"), j.get("msg1"))
+                return None
+            return self._parse_order_status(j.get("output1") or [], order_no)
+        except Exception as e:  # noqa: BLE001
+            log.warning("주문체결조회 실패 %s: %s", order_no, e)
+            return None
+
+    @staticmethod
+    def _parse_order_status(rows: list, order_no: str) -> dict:
+        def dec(row, key):
+            return Decimal(str(row.get(key) or 0))
+
+        def same_order(row):
+            try:
+                return int(str(row.get("odno") or "")) == int(str(order_no))
+            except ValueError:
+                return False
+
+        row = next((r for r in rows if same_order(r)), None)
+        if row is None:
+            return {"found": False}
+        return {"found": True, "filled_qty": dec(row, "tot_ccld_qty"), "avg_price": dec(row, "avg_prvs"),
+                "remain_qty": dec(row, "rmn_qty"), "rejected_qty": dec(row, "rjct_qty")}
+
     def _order_rest(self, side: str, symbol: str, qty: Decimal, exchange: str,
-                    ord_dvsn: str = "01", ord_unpr: Decimal | int = 0):
+                    ord_dvsn: str = "01", ord_unpr: Decimal | int = 0, bypass_gate: bool = False):
         """KIS REST order-cash 직접 호출 + EXCG_ID_DVSN_CD(KRX/NXT/SOR) 라우팅.
         pykis 의 인증/토큰/hashkey/도메인 파이프라인(kis.fetch)을 그대로 재사용하고,
         body 에 거래소 구분만 추가한다.
         기본 시장가(ORD_DVSN='01', ORD_UNPR='0'), 지정가는 '00' + 실제 가격."""
-        if not self._trading_allowed(side):
+        if not bypass_gate and not self._trading_allowed(side):
             log.warning("[매매정지] %s %s qty=%s 주문 차단(M0)", side, symbol, qty)
             raise TradingHaltedError(f"매매정지(M0) 상태라 {side} 주문을 내지 않습니다: {symbol}")
         from pykis.api.account.order import KisDomesticOrder

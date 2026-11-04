@@ -5,6 +5,7 @@ router_auto_trade.py — 운용모드 관리 (Blueprint url_prefix = /api/v1/aut
     GET /state     내 현재 운용모드 + worker 보유 포지션
     PUT /state     운용모드 즉시 전환        body: { "mode_code": "M0" }
     GET /history   운용모드 변경 이력        ?limit=30
+    POST /sell-now 지금 팔기(보유 전량 시장가) body: { "stock_code": "005930" }
 
 ⚠ 프록시 주의 (2026-10-11):
     py-stock-batch 도 매도 수기등록 blueprint 를 갖고 있다. 그 쪽이 이 prefix
@@ -26,10 +27,13 @@ router_auto_trade.py — 운용모드 관리 (Blueprint url_prefix = /api/v1/aut
       worker 에 모드가 추가되면 여기에도 추가한다(py-stock-batch trade_worker/modes, position_strategy).
 """
 import logging
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from flask import Blueprint, g, request
 
 from app.domains.dao.roleMenuDao import RoleMenuDao
+from app.domains.dao.manualSellDao import SELL_NOW_MEMO, SELL_NOW_PRICE, ManualSellDao
 from app.domains.dao.tradeModeDao import TradeModeDao
 from app.flask_app.routers.router_oauth import require_auth
 from app.flask_app.utils.apiResponse import ApiResponse
@@ -37,7 +41,9 @@ from app.flask_app.utils.apiResponse import ApiResponse
 auto_trade_bp = Blueprint("auto_trade", __name__)
 tradeModeDaoImpl = TradeModeDao()
 roleMenuDaoImpl = RoleMenuDao()
+manualSellDaoImpl = ManualSellDao()
 
+KST = timezone(timedelta(hours=9))
 WORKER_AUTH_ID = 'WORKER_USER'
 HALT_MODE = 'M0'
 SELECTABLE_MODES = ('M0', 'M1')
@@ -143,3 +149,45 @@ def get_history():
     except Exception as e:
         logging.exception(e)
         return ApiResponse.error("변경 이력을 불러오지 못했습니다.")
+
+
+def _is_regular_session(now: datetime) -> bool:
+    """정규장(평일 09:00~15:30, 시장가 세션). 휴장일은 알 수 없다 — 등록되면 다음 거래일에 팔린다."""
+    if now.weekday() >= 5:
+        return False
+    return 9 * 60 <= now.hour * 60 + now.minute < 15 * 60 + 30
+
+
+@auto_trade_bp.route("/sell-now", methods=['POST'])
+@require_auth
+def sell_now():
+    """지갑(MyWallet.vue) 보유 카드의 '지금 팔기' — 내 보유 전량 시장가 매도 요청.
+
+    이 서버는 주문하지 않는다. 즉시 도달하는 손절 티어를 수기등록에 넣으면 worker 가 판다(manualSellDao).
+    장외에 등록하면 다음 세션에 팔려 "지금 시장가"가 아니므로 정규장에만 받는다.
+    같은 종목에 대기 중인 요청이 있으면 새로 만들지 않고 그 행을 돌려준다.
+    """
+    denied = _require_worker()
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    stock_code = str(body.get('stock_code') or '').strip()
+    if not stock_code:
+        return ApiResponse.error("stock_code 가 필요합니다.", status=400)
+    if not _is_regular_session(datetime.now(KST)):
+        return ApiResponse.error("지금 팔기는 정규장(09:00~15:30)에만 할 수 있어요.", status=400)
+
+    uid = g.current_user_id
+    try:
+        pending = manualSellDaoImpl.select_order_by_memo(g.db, uid, stock_code, SELL_NOW_MEMO)
+        if pending:
+            return ApiResponse.success(pending)
+        holding = manualSellDaoImpl.select_holding(g.db, uid, stock_code)
+        if not holding or Decimal(str(holding.get('qty') or 0)) <= 0:
+            return ApiResponse.error("계좌에 보유 수량이 없는 종목입니다.", status=400)
+        new_id = manualSellDaoImpl.insert(g.db, uid, stock_code, holding.get('stock_name'), SELL_NOW_PRICE,
+                                          'DOWN', 1, holding['qty'], 'Y', SELL_NOW_MEMO)
+        return ApiResponse.success(manualSellDaoImpl.select_order(g.db, uid, new_id))
+    except Exception as e:
+        logging.exception(e)
+        return ApiResponse.error("매도 요청을 저장하지 못했습니다.")

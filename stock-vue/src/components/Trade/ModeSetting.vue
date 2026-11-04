@@ -85,6 +85,12 @@
                     <span>보유 종목에 지정 매도가 걸기</span>
                     <span aria-hidden="true">›</span>
                 </button>
+
+                <!-- ── 수동 매수 ── -->
+                <button type="button" class="link-row" @click="goManualBuy">
+                    <span>원하는 종목 직접 매수하기</span>
+                    <span aria-hidden="true">›</span>
+                </button>
             </template>
         </div>
 
@@ -172,6 +178,7 @@ const apply = async () => {
  * components/AutoTrade/AutoTradeView.vue 는 어느 메뉴에도 매달려 있지 않은
  * 사문화된 파일이고, 그 안의 탭 경로 3개도 전부 죽은 경로다. */
 const goManualSell = () => router.push({ path: '/trade/limit-order' });
+const goManualBuy = () => router.push({ path: '/trade/manual-buy' });
 </script>
 
 <style scoped lang="scss">

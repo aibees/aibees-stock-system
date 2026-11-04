@@ -736,6 +736,112 @@ class Repository:
             })
             s.commit()
 
+    # ── 수동 매수 (trade_worker_manual_buy, sql/50_manual_buy.sql) ──────────
+    #   요청 행은 API 서버가 넣고, 이후 상태는 worker 만 바꾼다(manual_buy.py).
+    #   상태 전이는 전부 WHERE state 조건으로 해서 rowcount 로 성공 여부를 안다.
+    def expire_stale_manual_buys(self, user_id: int, ttl_sec: int) -> None:
+        sql = text(
+            "UPDATE trade_worker_manual_buy "
+            "   SET state = 'EXPIRED', reason = '요청이 오래되어 주문하지 않았습니다.' "
+            " WHERE user_id = :uid AND state = 'REQUESTED' "
+            "   AND created_at < NOW() - INTERVAL :ttl SECOND"
+        )
+        with get_session() as s:
+            s.execute(sql, {"uid": user_id, "ttl": ttl_sec})
+            s.commit()
+
+    def get_requested_manual_buys(self, user_id: int) -> list[dict]:
+        sql = text(
+            "SELECT b.*, ms.nxt_flag FROM trade_worker_manual_buy b "
+            "  LEFT JOIN master_stock ms ON ms.stock_code = b.stock_code "
+            " WHERE b.user_id = :uid AND b.state = 'REQUESTED' ORDER BY b.id"
+        )
+        with get_session() as s:
+            return [dict(r) for r in s.execute(sql, {"uid": user_id}).mappings().all()]
+
+    def get_open_manual_buys(self, user_id: int) -> list[dict]:
+        sql = text(
+            "SELECT * FROM trade_worker_manual_buy "
+            " WHERE user_id = :uid AND state = 'OPEN' ORDER BY id"
+        )
+        with get_session() as s:
+            return [dict(r) for r in s.execute(sql, {"uid": user_id}).mappings().all()]
+
+    def claim_manual_buy(self, user_id: int, order_id: int) -> bool:
+        """REQUESTED → ORDERING. True 를 받은 쪽만 주문한다(한 요청은 한 번만 주문)."""
+        sql = text(
+            "UPDATE trade_worker_manual_buy SET state = 'ORDERING' "
+            " WHERE user_id = :uid AND id = :id AND state = 'REQUESTED'"
+        )
+        with get_session() as s:
+            result = s.execute(sql, {"uid": user_id, "id": order_id})
+            s.commit()
+            return result.rowcount == 1
+
+    def mark_manual_buy_open(self, user_id: int, order_id: int, order_no: str, branch: str | None,
+                             ord_dvsn: str, exchange: str, session_name: str, order_ymd: str) -> None:
+        sql = text(
+            "UPDATE trade_worker_manual_buy "
+            "   SET state = 'OPEN', order_no = :no, branch = :branch, ord_dvsn = :dvsn, "
+            "       exchange = :exch, session_name = :sess, order_ymd = :ymd "
+            " WHERE user_id = :uid AND id = :id AND state = 'ORDERING'"
+        )
+        with get_session() as s:
+            s.execute(sql, {"uid": user_id, "id": order_id, "no": order_no, "branch": branch,
+                            "dvsn": ord_dvsn, "exch": exchange, "sess": session_name, "ymd": order_ymd})
+            s.commit()
+
+    def finish_manual_buy(self, user_id: int, order_id: int, from_state: str, state: str,
+                          reason: str | None = None, filled_qty: Decimal | None = None,
+                          avg_price: Decimal | None = None) -> bool:
+        """from_state → 최종 상태. 체결 후처리가 두 번 돌지 않도록 전이 성공 여부를 돌려준다."""
+        sql = text(
+            "UPDATE trade_worker_manual_buy "
+            "   SET state = :state, reason = COALESCE(:reason, reason), "
+            "       filled_qty = COALESCE(:qty, filled_qty), "
+            "       avg_fill_price = COALESCE(:avg, avg_fill_price), cancel_requested = 'N' "
+            " WHERE user_id = :uid AND id = :id AND state = :from_state"
+        )
+        with get_session() as s:
+            result = s.execute(sql, {
+                "uid": user_id, "id": order_id, "from_state": from_state, "state": state, "reason": reason,
+                "qty": str(filled_qty) if filled_qty is not None else None,
+                "avg": str(avg_price) if avg_price else None,
+            })
+            s.commit()
+            return result.rowcount == 1
+
+    def update_manual_buy_fill(self, user_id: int, order_id: int, filled_qty: Decimal, avg_price: Decimal) -> None:
+        """부분체결 진행 상황(화면 표시용)."""
+        sql = text(
+            "UPDATE trade_worker_manual_buy SET filled_qty = :qty, avg_fill_price = :avg "
+            " WHERE user_id = :uid AND id = :id AND state = 'OPEN'"
+        )
+        with get_session() as s:
+            s.execute(sql, {"uid": user_id, "id": order_id, "qty": str(filled_qty),
+                            "avg": str(avg_price) if avg_price else None})
+            s.commit()
+
+    def clear_manual_buy_cancel(self, user_id: int, order_id: int, reason: str | None) -> None:
+        sql = text(
+            "UPDATE trade_worker_manual_buy "
+            "   SET cancel_requested = 'N', reason = COALESCE(:reason, reason) "
+            " WHERE user_id = :uid AND id = :id"
+        )
+        with get_session() as s:
+            s.execute(sql, {"uid": user_id, "id": order_id, "reason": reason})
+            s.commit()
+
+    def mark_ordering_manual_buys_unknown(self, user_id: int, reason: str) -> int:
+        sql = text(
+            "UPDATE trade_worker_manual_buy SET state = 'UNKNOWN', reason = :reason "
+            " WHERE user_id = :uid AND state = 'ORDERING'"
+        )
+        with get_session() as s:
+            result = s.execute(sql, {"uid": user_id, "reason": reason})
+            s.commit()
+            return result.rowcount
+
     def insert_trade_log(self, user_id: int, stock_code: str, action: str,
                          price: Decimal, qty: Decimal, krw_balance: Decimal,
                          note: str = "") -> None:

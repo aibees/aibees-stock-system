@@ -6,13 +6,10 @@
  *  전환은 항상 즉시 적용 — worker 에 보유분 청산 후 승계(pending) 로직이 없어 예약/전원 API 는 두지 않는다.
  *  USE_MOCK=true 로 되돌리면 autoTradeMock 데모 데이터로 화면만 볼 수 있다.
  *
- * ⚠ 매도 수기등록(fetchHoldings/fetchManualSells/addManualSell/cancelManualSell)만은
- *  예외다. 이 기능은 이 저장소(py-stock-batch, app/trade_worker)에 이미 완전히
- *  구현돼 있어서 ROOT 서버를 기다릴 이유가 없다(2026-08-21) — USE_MOCK 값과
- *  무관하게 항상 실제 서버(batchApi → py-stock-batch)를 호출한다.
+ * 매도 수기등록(fetchHoldings/fetchManualSells/addManualSell/cancelManualSell)도 ROOT 서버가 맡는다
+ *  (router_manual_sell.py, JWT + WORKER_USER). USE_MOCK 값과 무관하게 항상 실제 서버를 호출한다.
  */
-import aibeesApi, { batchApi } from './aibeesApi.js';
-import { assUserSession } from './stores/user-stores.js';
+import aibeesApi from './aibeesApi.js';
 import * as mock from './autoTradeMock.js';
 
 export const USE_MOCK = false;
@@ -20,21 +17,8 @@ export const USE_MOCK = false;
 /* 모드·상태·이력 — ROOT 서버(py-naver-stock-theme). */
 const BASE = '/api/v1/auto-trade';
 
-/* 매도 수기등록 — py-stock-batch.
- * 2026-10-11 까지 이쪽도 '/api/v1/auto-trade' 였다. 두 앱이 같은 prefix 를 쓰는 바람에
- * nginx 가 그 prefix 를 batch 앱으로 직결하자 ROOT 의 /modes·/state·/history 가 전부
- * 404 가 되어 운용방식 설정·운용 현황 화면이 죽었다. prefix 를 분리해 다시 겹치지
- * 않게 한다(batch 쪽 라우트도 /manual-sell → /orders 로 바뀌었다). */
-const SELL_BASE = '/api/v1/manual-sell';
-
-/* 매도 수기등록은 py-stock-batch(app/flask_app/router/router_manual_sell.py)가
- * 직접 처리한다 — 이 앱 Flask 에는 JWT 인증 미들웨어가 없어(job_bp 포함 기존
- * 라우트 전부 무인증) user_id 를 프런트가 세션에서 직접 실어보낸다. */
-const currentUserId = () => {
-    const { user } = assUserSession();
-    const uid = user?.loginInfo?.user_id;
-    return uid ? Number(uid) : null;
-};
+/* 매도 수기등록 — 등록된 지정가는 실제 매도로 이어지므로 JWT 로 사용자를 확인하는 ROOT 서버로 보낸다. */
+const SELL_BASE = `${BASE}/manual-sell`;
 
 /* ── 모드 마스터 ── */
 export const fetchModes = async () => {
@@ -75,39 +59,49 @@ export const saveState = async (mode_code) => {
  *   worker 가 직접 매수한 종목(trade_worker_position)으로 좁히지 않는다.
  */
 export const fetchHoldings = async () => {
-    const user_id = currentUserId();
-    if (!user_id) return [];   // 로그인 세션 없음 — 화면은 빈 목록으로 표시됨
-    const { data } = await batchApi.get(`${SELL_BASE}/holdings`, { params: { user_id } });
+    const { data } = await aibeesApi.get(`${SELL_BASE}/holdings`);
     return data.data ?? [];
 };
 
 export const fetchManualSells = async () => {
-    const user_id = currentUserId();
-    if (!user_id) return [];   // 로그인 세션 없음 — 화면은 "미등록"으로 표시됨
-    const { data } = await batchApi.get(`${SELL_BASE}/orders`, { params: { user_id } });
+    const { data } = await aibeesApi.get(`${SELL_BASE}/orders`);
     return data.data ?? [];
 };
 
 export const addManualSell = async (payload) => {
-    const user_id = currentUserId();
-    if (!user_id) throw new Error('로그인 세션이 없습니다.');
-    const { data } = await batchApi.post(`${SELL_BASE}/orders`, { ...payload, user_id });
+    const { data } = await aibeesApi.post(`${SELL_BASE}/orders`, payload);
     return data.data ?? {};
 };
 
 export const cancelManualSell = async (manual_sell_id) => {
-    const user_id = currentUserId();
-    if (!user_id) throw new Error('로그인 세션이 없습니다.');
     if (!manual_sell_id) throw new Error('취소할 등록 건을 찾을 수 없습니다.');
-    await batchApi.post(`${SELL_BASE}/orders/cancel`, { user_id, manual_sell_id });
+    await aibeesApi.post(`${SELL_BASE}/orders/cancel`, { manual_sell_id });
 };
 
-/* 지갑 "지금 팔기" — 보유 전량 시장가 매도 요청(정규장만).
- *  서버가 즉시 도달하는 손절(DOWN) 티어를 등록하고, worker 가 다음 재적재(최대 약 1분) 후 판다. */
+/* 지갑 "지금 팔기" — 보유 전량 시장가 매도 요청(정규장만). 실제 돈이 움직이는 요청이라 JWT 로 사용자를 확인하는
+ *  ROOT 서버로 보낸다. 서버가 즉시 도달하는 손절 티어를 등록하고, worker 가 다음 재적재(최대 약 1분) 후 판다. */
 export const sellNow = async (stock_code) => {
-    const user_id = currentUserId();
-    if (!user_id) throw new Error('로그인 세션이 없습니다.');
-    const { data } = await batchApi.post(`${SELL_BASE}/orders/sell-now`, { user_id, stock_code });
+    const { data } = await aibeesApi.post(`${BASE}/sell-now`, { stock_code });
+    return data.data ?? {};
+};
+
+/* ── 수동 매수 ──
+ *  ROOT 서버(router_manual_buy.py, JWT + WORKER_USER)에 요청을 저장하면 worker 가 바로 주문한다.
+ *  client_key 가 같은 재전송은 같은 주문을 돌려준다(주문 1건). */
+const MANUAL_BUY_BASE = `${BASE}/manual-buy`;
+
+export const fetchManualBuys = async (limit = 30) => {
+    const { data } = await aibeesApi.get(MANUAL_BUY_BASE, { params: { limit } });
+    return data.data ?? [];
+};
+
+export const placeManualBuy = async (payload) => {
+    const { data } = await aibeesApi.post(MANUAL_BUY_BASE, payload);
+    return data.data ?? {};
+};
+
+export const cancelManualBuy = async (id) => {
+    const { data } = await aibeesApi.post(`${MANUAL_BUY_BASE}/${id}/cancel`);
     return data.data ?? {};
 };
 
@@ -160,6 +154,17 @@ export const MANUAL_SELL_STATE_LABEL = {
     ARMED: '지정가 감시 중',
     DONE: '매도 완료',
     CANCELLED: '취소됨',
+};
+
+export const MANUAL_BUY_STATE_LABEL = {
+    REQUESTED: '주문 대기',
+    ORDERING: '주문 중',
+    OPEN: '체결 대기',
+    FILLED: '체결 완료',
+    CANCELLED: '취소됨',
+    REJECTED: '주문 거부',
+    EXPIRED: '만료됨',
+    UNKNOWN: '확인 필요',
 };
 
 export const formatNumber = (v) =>

@@ -1,33 +1,31 @@
 <template>
     <Teleport to="body">
-        <Transition name="fade">
-            <div v-if="visible" class="picker-overlay" @click.self="close">
-                <div class="picker-panel" v-draggable>
-                    <div class="picker-header">
-                        <h3>{{ title }}</h3>
-                        <button class="btn-close" @click="close">✕</button>
-                    </div>
-
-                    <div class="picker-search">
-                        <input ref="inputRef" v-model="keyword" type="text" placeholder="종목명 또는 코드 입력"
-                            @keyup.enter="runSearch" />
-                        <button class="btn-search" @click="runSearch" :disabled="loading">
-                            {{ loading ? '검색중' : '검색' }}
-                        </button>
-                    </div>
-
-                    <ul class="picker-list">
-                        <li v-for="s in list" :key="s.stock_code" @click="pick(s)">
-                            <span class="code-chip">{{ s.stock_code }}</span>
-                            <span class="name">{{ s.stock_name }}</span>
-                            <span class="type">{{ s.type }}</span>
-                        </li>
-                        <li v-if="searched && list.length === 0" class="empty">검색 결과가 없습니다.</li>
-                        <li v-if="!searched" class="empty">검색어를 입력해 주세요.</li>
-                    </ul>
+        <div v-if="visible" class="picker-overlay" @click.self="close">
+            <div class="picker-panel" v-draggable>
+                <div class="picker-header">
+                    <h3>{{ title }}</h3>
+                    <button class="btn-close" @click="close">✕</button>
                 </div>
+
+                <div class="picker-search">
+                    <input ref="inputRef" v-model="keyword" type="text" placeholder="종목명 또는 코드 입력"
+                        @keyup.enter="runSearch" />
+                    <button class="btn-search" @click="runSearch" :disabled="loading">
+                        {{ loading ? '검색중' : '검색' }}
+                    </button>
+                </div>
+
+                <ul class="picker-list">
+                    <li v-for="s in list" :key="s.stock_code" @click="pick(s)">
+                        <span class="code-chip">{{ s.stock_code }}</span>
+                        <span class="name">{{ s.stock_name }}</span>
+                        <span class="type">{{ s.type }}</span>
+                    </li>
+                    <li v-if="searched && list.length === 0" class="empty">검색 결과가 없습니다.</li>
+                    <li v-if="!searched" class="empty">검색어를 입력해 주세요.</li>
+                </ul>
             </div>
-        </Transition>
+        </div>
     </Teleport>
 </template>
 
@@ -196,13 +194,4 @@ $blue: #1F5BD1;
     }
 }
 
-.fade-enter-active,
-.fade-leave-active {
-    transition: opacity .15s;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-    opacity: 0;
-}
 </style>
