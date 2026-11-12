@@ -9,7 +9,7 @@ router_manual_buy.py — 수동 매수 (Blueprint url_prefix = /api/v1/auto-trad
     - user_id 는 JWT 에서만 얻고 WORKER_USER 권한을 요구한다(주문 API 라 batch 앱의 무인증 경로에 두지 않는다).
     - 이 서버는 주문을 내지 않는다. 요청을 trade_worker_manual_buy 에 저장하면 worker 가 폴링해서 낸다
       (py-stock-batch trade_worker/manual_buy.py). 거래 시간·주문가능수량 판정도 실제 주문 직전에 worker 가 한다.
-    - 추천·매수 게이트와 무관하게 master_stock 의 모든 종목을 살 수 있고, M0 여도 막지 않는다.
+    - 추천·매수 게이트와 무관하게 master_stock 의 모든 종목을 살 수 있고, HALT 여도 막지 않는다.
     - qty_pct 는 주문가능수량 대비 %다. 화면이 시장가의 현재가를 모르고 증거금율도 종목마다 달라, 주문 직전 worker 가
       KIS 주문가능수량으로 수량을 확정한다. 그 전까지 qty 는 0 이다.
     - client_key 가 같은 재전송은 같은 주문을 돌려준다(주문이 두 번 나가지 않는다).

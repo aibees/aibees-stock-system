@@ -87,7 +87,7 @@ class StockService:
 
     # ────────────────────────────────────────────────────────────────
     # 최우선타겟 (Home.vue 매수추천 카드 select) — 유저당 1건, 날짜 무관.
-    # worker(BuyExecutor1)가 다음 영업일 정규장 라운드에서 읽어 소비(1회성 null화)한다.
+    # worker(RecoBuyExecutor)가 다음 영업일 정규장 라운드에서 읽어 소비(1회성 null화)한다.
     # ────────────────────────────────────────────────────────────────
     def get_priority_target(self, session, user_id: int):
         return self.buyTargetPriorityDaoImpl.select_by_user_id(session, user_id)

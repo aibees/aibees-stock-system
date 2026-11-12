@@ -38,7 +38,7 @@ _KST = timezone("Asia/Seoul")
 
 
 # ──────────────────────────────────────────────────────────────────
-#  매수타겟 정렬 — 유저별 개인화 (user_options.s1_buy_order)
+#  매수타겟 정렬 — 유저별 개인화 (user_option_reco.buy_order)
 #
 #  구현은 stock_shared.strategy.buy_order 에 있다.
 #  worker 와 화면 시뮬레이션(TradeSimulation)이 **같은 순서**로 종목을 골라야
@@ -97,7 +97,7 @@ class Repository:
     def get_buy_targets(self, ymd: str, order_spec: str | None = None) -> list[dict]:
         """해당 ymd 추천 전체를 order_spec 순서로 정렬해 반환.
 
-        order_spec: user_options.s1_buy_order (예 "score:desc,volume:desc").
+        order_spec: user_option_reco.buy_order (예 "score:desc,volume:desc").
                     None/빈값이면 DEFAULT_BUY_ORDER(= composite_rank_no:asc,score:desc,rank_no:asc).
                     문법·필드 상세는 buy_order.py 의 ORDER_FIELDS 주석 참고.
 
@@ -121,7 +121,7 @@ class Repository:
         return rows
 
     # ── 최우선타겟(trade_buy_target_priority) — Home.vue select 로 사용자가 지정.
-    #   유저당 1행(전역, 날짜 무관). BuyExecutor1 이 정규장 라운드에서 읽고,
+    #   유저당 1행(전역, 날짜 무관). RecoBuyExecutor 이 정규장 라운드에서 읽고,
     #   라운드가 끝나면(성공/스킵 무관) clear_priority_target 으로 1회성 소비한다.
     #   API 서버 쪽(조회/설정/해제)은 stock_shared.dao.tradeBuyTargetPriorityDao 를
     #   ORM 으로 쓴다 — worker 는 이 파일의 기존 관례(raw SQL)를 그대로 따른다.
@@ -500,7 +500,7 @@ class Repository:
             remain = Decimal(str(row["qty"] or 0)) - Decimal(str(filled_qty))
             if remain <= 0:
                 # 전량 소진 → 종료. pnl 은 이번 체결분까지 누적해서 확정.
-                # qty 는 건드리지 않는다 — close_position 과 동일하게 두어 M0 동작을 보존한다
+                # qty 는 건드리지 않는다 — close_position 과 동일하게 두어 HALT 동작을 보존한다
                 # (SOLD 행의 qty = 마지막 보유수량. 매수 총량은 trade_log 로 추적한다).
                 s.execute(
                     text("""

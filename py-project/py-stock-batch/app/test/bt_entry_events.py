@@ -42,7 +42,7 @@ sys.path.insert(0, '../shared')
 from app.test.eval_shape_proba import FEE_RATE
 from app.test.bt_reco_stop import sim_live
 from stock_shared.chart_analysis.indicators import atr as atr_fn
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.reco import RecoStrategy
 
 CACHE = os.path.join(os.path.dirname(__file__), 'bt_reco_cache')
 DEGREES = (2.5, 4.0)
@@ -160,7 +160,7 @@ def sim_plan(recs: list, i_sig: int, stop: float, target: float):
 
 
 def run(paths: list) -> tuple[pd.DataFrame, pd.DataFrame]:
-    s5, s8 = KospiStrategy1(), KospiStrategy1()
+    s5, s8 = RecoStrategy(), RecoStrategy()
     s8.stop_loss_pct = 0.08
     ev_rows, base_rows = [], []
     t0 = time.time()

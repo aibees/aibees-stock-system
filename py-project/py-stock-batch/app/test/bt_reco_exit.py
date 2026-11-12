@@ -5,7 +5,7 @@ bt_reco_exit.py — 같은 매수추천 신호에서 "매도 방식"만 바꾸�
 (보유 중에 다시 분석하면 ZigZag 가 바뀌어 목표가 따라 움직이는 "사후 맞춤"이 된다).
 
 매도 방식
-    base      : 현행 KospiStrategy1(손절 -5% / 익절 +30% / 트레일 ATR3 / 타임스탑 12봉) — run_one_trade 그대로
+    base      : 현행 RecoStrategy(손절 -5% / 익절 +30% / 트레일 ATR3 / 타임스탑 12봉) — run_one_trade 그대로
     elliott   : 가장 유력한 '다음 상승' 해석의 다음 목표(bias_target) 익절 / 그 해석 무효선 손절
     el_hybrid : 현행 규칙 그대로 + 엘리엇 목표에 닿으면 그 가격에 익절
     fib       : 피보 매수 쪽 기준 파동 고점 익절 / 0.786 되돌림 손절
@@ -35,7 +35,7 @@ from app.test.eval_shape_proba import (DB_URL, FEE_RATE, SELL_ACTIONS, _base_use
 from app.test.bt_reco_chart_analysis import load_bars, ANALYSIS_BARS, VIEW_BARS
 from app.test.bt_reco_history import load_reco, dedupe
 from stock_shared import chart_analysis
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.reco import RecoStrategy
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 
 OUT_DIR = os.path.join(os.path.dirname(__file__), 'bt_reco_cache')
@@ -95,7 +95,7 @@ def sim_levels(recs: list, i_sig: int, target: float, stop: float) -> dict | Non
 
 
 def sim_hybrid(strategy, recs: list, i_sig: int, target: float) -> dict | None:
-    """현행 KospiStrategy1 + 엘리엇 목표 익절(봉 안에서 목표 닿으면 그 가격)."""
+    """현행 RecoStrategy + 엘리엇 목표 익절(봉 안에서 목표 닿으면 그 가격)."""
     if i_sig + 1 >= len(recs) or target is None:
         return None
     er = recs[i_sig + 1]
@@ -131,7 +131,7 @@ def sim_hybrid(strategy, recs: list, i_sig: int, target: float) -> dict | None:
 
 
 def evaluate(reco: pd.DataFrame, engine) -> pd.DataFrame:
-    strategy = KospiStrategy1()
+    strategy = RecoStrategy()
     rows = []
     codes = reco['stock_code'].unique()
     for n, code in enumerate(codes, 1):

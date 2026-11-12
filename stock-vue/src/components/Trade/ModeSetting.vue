@@ -147,7 +147,7 @@ const pick = (m) => { if (m.selectable) selected.value = m.mode_code; };
 const apply = async () => {
     const name = selectedMode.value?.mode_name;
     const held = positions.value.length;
-    // M0 안내는 sql/33(2026-10-11) 개정 내용을 따른다 — 신규 매수만 멈추고 보유분
+    // HALT(매매정지) 안내는 sql/33(2026-10-11) 개정 내용을 따른다 — 신규 매수만 멈추고 보유분
     // 매도(손절·익절·트레일링·수기등록 지정가)는 계속 돈다. 예전 문구는 "매도도 모두
     // 멈춘다 / 손절선에 닿아도 팔지 않는다"로 정반대를 경고하고 있어서, 같은 화면
     // 위쪽의 mode_desc 와 한 화면에서 서로 모순됐다.

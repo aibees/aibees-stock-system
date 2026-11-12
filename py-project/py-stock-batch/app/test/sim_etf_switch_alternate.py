@@ -1,5 +1,5 @@
 """
-M2 교대매매(시나리오 1) 단일 조합 시뮬레이션 러너.
+ETF_SWITCH 교대매매(시나리오 1) 단일 조합 시뮬레이션 러너.
 
 trade_candle_30m 에 백필된 30분봉으로 KODEX 코스피100(237350) ↔
 KODEX 인버스(114800) 교대매매를 재생하고 성과를 출력한다.
@@ -9,12 +9,12 @@ KODEX 인버스(114800) 교대매매를 재생하고 성과를 출력한다.
     (최소 250봉. 부족하면 지표가 NaN 구간에서 시작해 결과가 왜곡된다)
 
 사용
-    poetry run python -m app.test.sim_m2_alternate
-    poetry run python -m app.test.sim_m2_alternate --confirm 3 --verbose
-    poetry run python -m app.test.sim_m2_alternate --start 2026-06-01 --end 2026-08-13
-    poetry run python -m app.test.sim_m2_alternate --macd-mode golden --obv-mode off
+    poetry run python -m app.test.sim_etf_switch_alternate
+    poetry run python -m app.test.sim_etf_switch_alternate --confirm 3 --verbose
+    poetry run python -m app.test.sim_etf_switch_alternate --start 2026-06-01 --end 2026-08-13
+    poetry run python -m app.test.sim_etf_switch_alternate --macd-mode golden --obv-mode off
 
-optimize_m2_options.py 가 이 모듈의 load_rows()/build_strategy()/run_once() 를
+optimize_etf_switch_options.py 가 이 모듈의 load_rows()/build_strategy()/run_once() 를
 그대로 재사용한다(조합마다 DB 를 다시 읽지 않도록 캐시 포함).
 """
 import argparse
@@ -23,8 +23,8 @@ from app.batches.services.userService import UserService
 from stock_shared.db.database import dbConn
 from stock_shared.dao.tradeCandle30mDao import TradeCandle30mDao
 from stock_shared.dto.userOptionMeta import UserOptionMeta
-from stock_shared.strategy.kospi1 import KospiStrategy1
-from stock_shared.strategy.m2_alternate import M2AlternateSimulator, ScoreConfig
+from stock_shared.strategy.reco import RecoStrategy
+from stock_shared.strategy.etf_alternate_sim import M2AlternateSimulator, ScoreConfig
 
 CODE_A = '237350'   # KODEX 코스피100 (정방향)
 CODE_B = '114800'   # KODEX 인버스
@@ -77,16 +77,16 @@ def user_info(session) -> UserOptionMeta:
         return ui
 
 
-def build_strategy(**overrides) -> KospiStrategy1:
-    """KospiStrategy1 인스턴스 + 파라미터 오버라이드.
+def build_strategy(**overrides) -> RecoStrategy:
+    """RecoStrategy 인스턴스 + 파라미터 오버라이드.
 
     ⚠ 오타 방지: 존재하지 않는 속성명을 넘기면 조용히 무시되는 대신 에러를 낸다.
        그리드 라벨과 실제 적용 파라미터가 어긋나는 사고를 막는다.
     """
-    s = KospiStrategy1()
+    s = RecoStrategy()
     for k, v in overrides.items():
         if not hasattr(s, k):
-            raise AttributeError(f"KospiStrategy1 에 '{k}' 속성이 없다")
+            raise AttributeError(f"RecoStrategy 에 '{k}' 속성이 없다")
         setattr(s, k, v)
     return s
 
@@ -111,7 +111,7 @@ def run_once(session, *, strategy_kwargs: dict = None, confirm_bars: int = 2,
 def print_result(res: dict, show_trades: bool = True):
     print()
     print('=' * 78)
-    print(f"M2 교대매매 결과  {res['code_a']} ↔ {res['code_b']}   "
+    print(f"ETF_SWITCH 교대매매 결과  {res['code_a']} ↔ {res['code_b']}   "
           f"({res['bars']}봉)")
     print('=' * 78)
     if res.get('note'):
@@ -143,7 +143,7 @@ def print_result(res: dict, show_trades: bool = True):
 
 # ──────────────────────────────────────────────────────────────
 def main():
-    ap = argparse.ArgumentParser(description='M2 교대매매 시뮬레이션 (시나리오 1)')
+    ap = argparse.ArgumentParser(description='ETF_SWITCH 교대매매 시뮬레이션 (시나리오 1)')
     ap.add_argument('--confirm', type=int, default=2,
                     help='매수신호 연속 확인 봉수 (기본 2, 휩쏘 방어)')
     ap.add_argument('--fee', type=float, default=0.0015, help='편도 수수료율')

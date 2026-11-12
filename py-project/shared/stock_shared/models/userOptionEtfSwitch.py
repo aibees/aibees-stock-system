@@ -1,14 +1,15 @@
 """
-user_option_m2 — M2(KODEX 코스피100 / 인버스 **독립 운용**) 개인화 옵션.
+user_option_etf_switch — ETF_SWITCH(KODEX 코스피100 / 인버스 **독립 운용**) 개인화 옵션.
 
   구 '교대(regime flip)' 시나리오 컬럼은 07_user_option_m3_rebuild.sql 로 제거됐다.
-  현행 M2 는 두 ETF 를 각자 신호로만 사고팔고, 신호가 없으면 현금으로 쉰다.
+  현행 ETF_SWITCH 는 두 ETF 를 각자 신호로만 사고팔고, 신호가 없으면 현금으로 쉰다.
 
-  · 모든 값 NULL 허용. NULL = KospiStrategy2 클래스 기본값 사용
+  · 모든 값 NULL 허용. NULL = EtfSwitchStrategy 클래스 기본값 사용
   · 행이 없어도 동작해야 한다. row 없음 == 전 항목 NULL
 
 DDL: py-project/sql/02_user_option_mode_ddl.sql + 07_user_option_m3_rebuild.sql
      + 41_user_option_m2_etf_rename.sql (구 user_option_m3 → user_option_m2)
+     + 54_remove_mode_numbering.sql      (user_option_m2 → user_option_etf_switch)
 """
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.dialects.mysql import DECIMAL, TINYINT
@@ -16,10 +17,10 @@ from sqlalchemy.dialects.mysql import DECIMAL, TINYINT
 from stock_shared.base import Base
 
 
-class UserOptionM2(Base):
-    __tablename__ = "user_option_m2"
+class UserOptionEtfSwitch(Base):
+    __tablename__ = "user_option_etf_switch"
 
-    MODE_CODE = "M2"
+    MODE_CODE = "ETF_SWITCH"
 
     user_id = Column(Integer, primary_key=True, nullable=False)
 

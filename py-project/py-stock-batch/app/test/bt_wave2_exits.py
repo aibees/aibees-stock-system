@@ -3,7 +3,7 @@ bt_wave2_exits.py — 2파 하락 추세선 돌파 + 거래량 2배↑ 매수(bt
 
 매수: D+1 시가(신호 고정). 매도 기준가는 전부 매수 시점에 알 수 있는 값(L0·H1·2파 최저 L2·진입 ATR)으로 정한다.
     base15     : +15% 익절 / -8% 손절 / 10거래일(프로젝트 기준)
-    live8      : 실전 규칙 근사(bt_reco_stop.sim_live, KospiStrategy1 손절 8%: +30% 익절·트레일·타임스탑)
+    live8      : 실전 규칙 근사(bt_reco_stop.sim_live, RecoStrategy 손절 8%: +30% 익절·트레일·타임스탑)
     ew         : 엘리엇 3파 목표 = L2 + 1.618 × (H1 - L0) 익절 / L2 손절 / 40일
     ew_cap8    : 같은 목표 / 손절 = max(L2, 진입 × 0.92) / 40일
     h1_split   : 절반은 H1 에서, 나머지는 3파 목표. 손절 = max(L2, 진입 × 0.92), 절반 판 뒤 나머지 손절은 진입가(본전) / 40일
@@ -27,7 +27,7 @@ from app.test.bt_wave2_trendline import OUT as W2
 from app.test.eval_shape_proba import _base_user_info  # noqa: F401  (sim_live 내부 사용)
 from app.test.bt_reco_stop import sim_live
 from stock_shared.chart_analysis.indicators import atr as atr_fn
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.reco import RecoStrategy
 
 CACHE = os.path.join(os.path.dirname(__file__), 'bt_reco_cache')
 FEE = 0.0022
@@ -80,7 +80,7 @@ def legs(o, h, l, c, i, e, plan, max_hold):
 def evaluate():
     ev = pd.read_pickle(os.path.join(W2, 'events.pkl'))
     ev = ev[(ev.kind == 'tl') & (ev.vol_ratio >= 2)].copy()
-    s8 = KospiStrategy1(); s8.stop_loss_pct = 0.08
+    s8 = RecoStrategy(); s8.stop_loss_pct = 0.08
     rows = []
     for code, g in ev.groupby('code'):
         df = pd.read_pickle(os.path.join(CACHE, 'stocks', f'{code}.pkl')).reset_index(drop=True)

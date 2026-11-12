@@ -33,7 +33,7 @@
 09_manual_sell_multi_ddl.sql):
   trade_worker_manual_sell 에 ARMED 행이 있는 종목은 위 두 판정 경로(on_price 의
   hit_line, refresh_positions 의 strategy.evaluate) 를 **둘 다** 건너뛰고
-  sell_price 도달 여부만 본다 — 활성 운용모드가 M1/M2 무엇이든 동일하다
+  sell_price 도달 여부만 본다 — 활성 운용모드가 RECO/ETF_SWITCH 무엇이든 동일하다
   (reload_manual_sells 참고). 사용자가 "이 종목은 자동 rule 대신 이 가격에
   팔아달라"고 등록해두면 모드 전략보다 우선한다는 뜻. 등록 자체는 계좌 실보유
   (user_holdings)만 있으면 worker 자기매수 여부와 무관하게 할 수 있다
@@ -158,7 +158,7 @@ class BaseSellExecutor(ABC):
     def reload_manual_sells(self):
         """trade_worker_manual_sell(ARMED) 재적재.
 
-        등록된 종목은 **현재 활성 운용모드가 무엇이든**(M1/M2) 그 모드의
+        등록된 종목은 **현재 활성 운용모드가 무엇이든**(RECO/ETF_SWITCH) 그 모드의
         자동 매도 rule(hit_line/일봉 신호)을 보지 않고 여기 담긴 sell_price
         도달 여부만으로 매도한다 — on_price/refresh_positions 에서 모드 판정보다
         먼저(선제) 확인한다. apply_settings_change() 폴링 주기(기본 60초)에
@@ -370,7 +370,7 @@ class BaseSellExecutor(ABC):
 
     # ── 장중 설정 변경 반영 ──────────────────────────────────────────
     def apply_settings_change(self) -> bool:
-        """user_options 가 바뀌었으면 전략을 갈아끼우고 라인을 즉시 재계산한다.
+        """운용모드나 모드별 옵션(user_option_reco 등)이 바뀌었으면 전략을 갈아끼우고 라인을 즉시 재계산한다.
 
         worker 는 장시간 살아있는 데몬이라 부팅 때 configure() 한 값이 그대로 굳는다.
         이 메서드가 없으면 화면에서 손절/익절/트레일링을 바꿔도 **다음 재기동까지**
@@ -392,7 +392,7 @@ class BaseSellExecutor(ABC):
         try:
             changes = self.strategy.reload_if_changed()
         except Exception as e:  # noqa: BLE001
-            self.wlog.warn("[설정] user_options 조회 실패: %s", e)
+            self.wlog.warn("[설정] 옵션 조회 실패: %s", e)
             return False
         if not changes:
             return False
@@ -717,7 +717,7 @@ class BaseSellExecutor(ABC):
                 manual: dict | None = None):
         # manual: MANUAL_SELL 이면 이번에 체결하는 **단일 티어**(trade_worker_manual_sell
         # 행 1건, 종목당 여러 티어 중 하나) — id/sell_price/qty_ratio/base_qty 를 담고 있다.
-        # 매매정지(M0)여도 매도는 막지 않는다(2026-10-11) — M0 는 신규 매수만 멈추고,
+        # 매매정지(HALT)여도 매도는 막지 않는다(2026-10-11) — HALT 는 신규 매수만 멈추고,
         # 보유분의 손절·익절·트레일링·수기등록 지정가 매도는 평소대로 추적·실행한다.
         # 동시성 가드: 소켓 콜백이 여러 틱 동시 진입해도 종목당 1건만 진행.
         with self._lock:

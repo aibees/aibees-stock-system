@@ -1,13 +1,20 @@
+from decimal import Decimal
+
 from sqlalchemy import select, update
 from sqlalchemy.dialects.mysql import insert
 
 from stock_shared.dao.baseDao import BaseDao
+from stock_shared.dao.userOptionRecoDao import UserOptionRecoDao
+from stock_shared.models.userOptionReco import UserOptionReco
 from stock_shared.models.userOptions import UserOptions
 from stock_shared.models.userMaster import UserMaster
 from stock_shared.models.userDetail import UserDetail
 
 import logging
 logging.basicConfig(level=logging.ERROR)
+
+#: user_option_reco 중 API 로 주고받지 않는 컬럼 (미참조, 롤백 대비 보존)
+_RECO_HIDDEN_KEYS = frozenset({'trail_basis'})
 
 
 class UserOptionsDao(BaseDao):
@@ -68,31 +75,6 @@ class UserOptionsDao(BaseDao):
                 'stock_sell_mail_flag':       uo.stock_sell_mail_flag if uo else None,
                 'stock_buy_target_mail_flag': uo.stock_buy_target_mail_flag if uo else None,
                 'stock_sell_tele_flag':       uo.stock_sell_tele_flag if uo else None,
-                's1_stop_loss_pct':           _f(uo.s1_stop_loss_pct) if uo else None,
-                's1_take_profit_pct':         _f(uo.s1_take_profit_pct) if uo else None,
-                's1_max_hold_bars':           uo.s1_max_hold_bars if uo else None,
-                's1_rsi_overbought':          uo.s1_rsi_overbought if uo else None,
-                's1_rsi_ideal_low':           uo.s1_rsi_ideal_low if uo else None,
-                's1_rsi_ideal_high':          uo.s1_rsi_ideal_high if uo else None,
-                's1_vol_ma_window':           uo.s1_vol_ma_window if uo else None,
-                's1_vol_ma_mult':             _f(uo.s1_vol_ma_mult) if uo else None,
-                's1_regime_window':           uo.s1_regime_window if uo else None,
-                's1_regime_threshold':        _f(uo.s1_regime_threshold) if uo else None,
-                's1_strict_need_macd_up':     uo.s1_strict_need_macd_up if uo else None,
-                's1_loose_need_vol_surge':    uo.s1_loose_need_vol_surge if uo else None,
-                's1_surge_relax_mult':        _f(uo.s1_surge_relax_mult) if uo else None,
-                's1_downtrend_surge_bypass':  uo.s1_downtrend_surge_bypass if uo else None,
-                's1_surge_bypass_mult':       _f(uo.s1_surge_bypass_mult) if uo else None,
-                's1_use_trailing':            uo.s1_use_trailing if uo else None,
-                's1_trail_activate_pct':      _f(uo.s1_trail_activate_pct) if uo else None,
-                's1_k_trail_atr':             _f(uo.s1_k_trail_atr) if uo else None,
-                's1_trail_floor_pct':         _f(uo.s1_trail_floor_pct) if uo else None,
-                's1_trail_drawdown_pct':      _f(uo.s1_trail_drawdown_pct) if uo else None,
-                's1_trail_dual':              uo.s1_trail_dual if uo else None,
-                's1_time_stop_extend':        uo.s1_time_stop_extend if uo else None,
-                's1_time_stop_band':          _f(uo.s1_time_stop_band) if uo else None,
-                's1_time_stop_grace':         uo.s1_time_stop_grace if uo else None,
-                's1_max_hold_bars_hard':      uo.s1_max_hold_bars_hard if uo else None,
             },
         }
 
@@ -135,15 +117,6 @@ class UserOptionsDao(BaseDao):
         """화이트리스트 컬럼만 UPSERT. 관리자 전용 컬럼은 is_admin 일 때만 허용."""
         ALLOWED_ALL = {
             'stock_sell_mail_flag', 'stock_buy_target_mail_flag', 'stock_sell_tele_flag',
-            's1_stop_loss_pct', 's1_take_profit_pct', 's1_max_hold_bars',
-            's1_rsi_overbought', 's1_rsi_ideal_low', 's1_rsi_ideal_high',
-            's1_vol_ma_window', 's1_vol_ma_mult', 's1_regime_window', 's1_regime_threshold',
-            's1_strict_need_macd_up', 's1_loose_need_vol_surge', 's1_surge_relax_mult',
-            's1_downtrend_surge_bypass', 's1_surge_bypass_mult', 's1_use_trailing',
-            's1_trail_activate_pct', 's1_k_trail_atr', 's1_trail_floor_pct',
-            's1_trail_drawdown_pct', 's1_trail_dual',
-            's1_time_stop_extend', 's1_time_stop_band', 's1_time_stop_grace',
-            's1_max_hold_bars_hard',
         }
         ALLOWED_ADMIN = {'vol_limit', 'vol_surge'}
 
@@ -164,111 +137,41 @@ class UserOptionsDao(BaseDao):
             'stock_sell_tele_flag', 'buy_confirm', 'buy_entry', 'sell_entry', 'sell_exit',
             'user_balance', 'ratio_trend', 'ratio_momentum', 'ratio_volatility', 'ratio_volume',
             'time_frame', 'macd_recent_day', 'bb_over_recent_day', 'vol_limit', 'vol_surge',
-            's1_stop_loss_pct', 's1_take_profit_pct', 's1_max_hold_bars',
-            's1_rsi_overbought', 's1_rsi_ideal_low', 's1_rsi_ideal_high',
-            's1_vol_ma_window', 's1_vol_ma_mult', 's1_regime_window', 's1_regime_threshold',
-            's1_strict_need_macd_up', 's1_loose_need_vol_surge', 's1_surge_relax_mult',
-            's1_downtrend_surge_bypass', 's1_surge_bypass_mult', 's1_use_trailing',
-            's1_trail_activate_pct', 's1_k_trail_atr', 's1_trail_floor_pct',
-            's1_trail_drawdown_pct', 's1_trail_dual',
-            's1_time_stop_extend', 's1_time_stop_band', 's1_time_stop_grace',
-            's1_max_hold_bars_hard',
         ]
         values = {c: data.get(c) for c in cols}
         stmt = insert(UserOptions).values(user_id=data['user_id'], **values)
         session.execute(stmt.on_duplicate_key_update(**values))
 
     # ----------------------------------------------------------------
-    # s1_* 전략 파라미터 조회 (GET /api/v1/strategy/options)
+    # 추천매수(RECO) 전략 파라미터 조회 (GET /api/v1/strategy/options)
     # ----------------------------------------------------------------
-    def select_s1_options(self, session, user_id: int) -> dict | None:
-        """user_options 에서 s1_* 컬럼만 반환. 행 없으면 None."""
-        uo = session.execute(
-            select(UserOptions).where(UserOptions.user_id == user_id)
-        ).scalars().first()
-        if not uo:
+    def select_reco_options(self, session, user_id: int) -> dict | None:
+        """user_option_reco 의 파라미터를 접두어 없는 키로 반환. 행 없으면 None.
+
+        DECIMAL 은 float 로 바꿔 내려준다(JSON 직렬화·화면 계산용).
+        trail_basis 는 롤백 대비로만 남긴 미참조 컬럼이라 API 에 노출하지 않는다.
+        """
+        row = UserOptionRecoDao().select_by_user(session, user_id)
+        if not row:
             return None
-
-        def _f(v):
-            return float(v) if v is not None else None
-
         return {
-            's1_stop_loss_pct':        _f(uo.s1_stop_loss_pct),
-            's1_take_profit_pct':      _f(uo.s1_take_profit_pct),
-            's1_max_hold_bars':        uo.s1_max_hold_bars,
-            's1_rsi_overbought':       uo.s1_rsi_overbought,
-            's1_rsi_ideal_low':        uo.s1_rsi_ideal_low,
-            's1_rsi_ideal_high':       uo.s1_rsi_ideal_high,
-            's1_vol_ma_window':        uo.s1_vol_ma_window,
-            's1_vol_ma_mult':          _f(uo.s1_vol_ma_mult),
-            's1_regime_window':        uo.s1_regime_window,
-            's1_regime_threshold':     _f(uo.s1_regime_threshold),
-            's1_strict_need_macd_up':  uo.s1_strict_need_macd_up,
-            's1_loose_need_vol_surge': uo.s1_loose_need_vol_surge,
-            's1_surge_relax_mult':     _f(uo.s1_surge_relax_mult),
-            's1_downtrend_surge_bypass': uo.s1_downtrend_surge_bypass,
-            's1_surge_bypass_mult':    _f(uo.s1_surge_bypass_mult),
-            's1_use_trailing':         uo.s1_use_trailing,
-            's1_trail_activate_pct':   _f(uo.s1_trail_activate_pct),
-            's1_k_trail_atr':          _f(uo.s1_k_trail_atr),
-            's1_trail_floor_pct':      _f(uo.s1_trail_floor_pct),
-            's1_trail_drawdown_pct':   _f(uo.s1_trail_drawdown_pct),
-            's1_trail_giveback_pct':   _f(uo.s1_trail_giveback_pct),
-            's1_trail_dual':           uo.s1_trail_dual,
-            's1_trail_fib_use':        uo.s1_trail_fib_use,
-            's1_trail_fib_level':      _f(uo.s1_trail_fib_level),
-            's1_time_stop_extend':     uo.s1_time_stop_extend,
-            's1_time_stop_band':       _f(uo.s1_time_stop_band),
-            's1_time_stop_grace':      uo.s1_time_stop_grace,
-            's1_max_hold_bars_hard':   uo.s1_max_hold_bars_hard,
-            # 매수 필터 on/off · core 신호 mode (관리자 전용 편집)
-            's1_enable_macd_filter':     uo.s1_enable_macd_filter,
-            's1_enable_rsi_filter':      uo.s1_enable_rsi_filter,
-            's1_enable_bb_upper_filter': uo.s1_enable_bb_upper_filter,
-            's1_enable_vol_avg_filter':  uo.s1_enable_vol_avg_filter,
-            's1_enable_regime_gate':     uo.s1_enable_regime_gate,
-            's1_macd_signal_mode':       uo.s1_macd_signal_mode,
-            's1_obv_signal_mode':        uo.s1_obv_signal_mode,
-            's1_ma20_signal_mode':       uo.s1_ma20_signal_mode,
-            # worker 매수타겟 정렬 (유저별 개인화)
-            's1_buy_order':              uo.s1_buy_order,
-            # worker 정규장 매수 시가갭 차단 기준 (유저별 개인화, NULL=기본 2%)
-            's1_gap_block_pct':          uo.s1_gap_block_pct,
-            # worker 실시간 매수 (유저별 개인화, NULL=미사용)
-            's1_realtime_buy':           uo.s1_realtime_buy,
+            k: (float(v) if isinstance(v, Decimal) else v)
+            for k, v in row.items()
+            if k in UserOptionReco.PARAM_KEYS and k not in _RECO_HIDDEN_KEYS
         }
 
     # ----------------------------------------------------------------
-    # s1_* 전략 파라미터 UPSERT (PATCH /api/v1/strategy/options)
+    # 추천매수(RECO) 전략 파라미터 UPSERT (PATCH /api/v1/strategy/options)
     # ----------------------------------------------------------------
-    def upsert_s1_options(self, session, user_id: int, fields: dict) -> None:
-        """화이트리스트 s1_* 컬럼만 UPSERT."""
-        S1_ALLOWED = {
-            's1_stop_loss_pct', 's1_take_profit_pct', 's1_max_hold_bars',
-            's1_rsi_overbought', 's1_rsi_ideal_low', 's1_rsi_ideal_high',
-            's1_vol_ma_window', 's1_vol_ma_mult', 's1_regime_window',
-            's1_regime_threshold', 's1_strict_need_macd_up', 's1_loose_need_vol_surge',
-            's1_surge_relax_mult', 's1_downtrend_surge_bypass', 's1_surge_bypass_mult',
-            's1_use_trailing', 's1_trail_activate_pct',
-            's1_k_trail_atr', 's1_trail_floor_pct',
-            's1_trail_drawdown_pct', 's1_trail_giveback_pct',
-            's1_trail_dual', 's1_trail_fib_use', 's1_trail_fib_level',
-            's1_time_stop_extend',
-            's1_time_stop_band', 's1_time_stop_grace', 's1_max_hold_bars_hard',
-            # 매수 필터 on/off · core 신호 mode
-            #   라우터(_S1_ADMIN_ONLY_COLS)에서 관리자 여부를 먼저 막는다.
-            #   여기 화이트리스트는 '존재하는 컬럼인가'만 본다.
-            's1_enable_macd_filter', 's1_enable_rsi_filter',
-            's1_enable_bb_upper_filter', 's1_enable_vol_avg_filter',
-            's1_enable_regime_gate',
-            's1_macd_signal_mode', 's1_obv_signal_mode', 's1_ma20_signal_mode',
-            # worker 매수타겟 정렬 · 시가갭 차단 기준 (개인화)
-            's1_buy_order', 's1_gap_block_pct', 's1_realtime_buy',
-        }
-        values = {k: v for k, v in fields.items() if k in S1_ALLOWED}
+    def upsert_reco_options(self, session, user_id: int, fields: dict) -> None:
+        """user_option_reco 에 저장. 키 검증(화이트리스트·관리자 전용)은 라우터에서 끝낸다.
+
+        여기서는 테이블에 있는 컬럼(PARAM_KEYS)만 통과시킨다.
+        """
+        values = {k: v for k, v in fields.items()
+                  if k in UserOptionReco.PARAM_KEYS and k not in _RECO_HIDDEN_KEYS}
         if not values:
             return
-        stmt = insert(UserOptions).values(user_id=user_id, **values)
-        session.execute(stmt.on_duplicate_key_update(**values))
+        UserOptionRecoDao().upsert(session, user_id, values)
 
     # update_by_key / delete_by_key : BaseDao 공통 메서드 사용

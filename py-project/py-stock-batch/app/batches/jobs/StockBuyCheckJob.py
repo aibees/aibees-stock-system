@@ -14,7 +14,7 @@ from app.common.constants.Literal import Literal
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.kis.keyLoader import list_kis_user_ids
 from app.ext_services.kis.component.KisStockService import KisService
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.reco import RecoStrategy
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from stock_shared.dao.tradeShapeTrainDailyDao import TradeShapeTrainDailyDao
 from stock_shared.ml.shape_features import SHAPE_FEATURE_COLUMNS
@@ -33,7 +33,7 @@ REPEAT_PENALTY_DAYS = 5
 CHART_DAYS = 120
 
 # ── 2단계(top10 → 모멘텀 합성 재정렬) 매수추천 — 2026-09 세션 후속 리서치 ──────────
-# KospiStrategy1 watch 신호(기존 경로, "watch 게이트")와 **병행**으로 동작한다.
+# RecoStrategy watch 신호(기존 경로, "watch 게이트")와 **병행**으로 동작한다.
 # 전종목(get_stock_master_list) 중 watch 신호 통과 여부와 무관하게 아래 안정성
 # 필터를 통과한 종목 전체를 모아, shape+OBV 모델 상위 10개를 추린 뒤, 같은 계열
 # 모멘텀 지표(OBV/MACD/RSI/거래량)로 재정렬한 1위를 종합picks 1위로 삼는다.
@@ -43,7 +43,7 @@ COMPOSITE_TOP_N = 10
 COMPOSITE_PENNY_PRICE_MIN = 1000
 COMPOSITE_EXTREME_MOVE_PCT = 15.0      # 최근 COMPOSITE_EXTREME_LOOKBACK일 내 이 이상 등락 있으면 제외
 COMPOSITE_EXTREME_LOOKBACK = 10
-COMPOSITE_ATR_RATIO_MAX = 0.10         # ATR/종가 상한(kospi1.atr_ratio_min=0.05 하한과 별개)
+COMPOSITE_ATR_RATIO_MAX = 0.10         # ATR/종가 상한(reco.atr_ratio_min=0.05 하한과 별개)
 COMPOSITE_SMA20_TREND_BARS = 14        # 14봉 전 대비 sma20(ema20 필드) 상승 여부
 # 모멘텀 합성점수 = 아래 5개를 그날 후보 pool 내 z-score 로 정규화한 평균.
 COMPOSITE_MOMENTUM_COLS = ['obv_gap_norm', 'obv_slope3', 'ind_vol_ratio_today', 'ind_macd_hist_norm']
@@ -54,8 +54,8 @@ COMPOSITE_MOMENTUM_COLS = ['obv_gap_norm', 'obv_slope3', 'ind_vol_ratio_today', 
 #                                     stock_shared.strategy.wave2_breakout 참고. 5년 검증(+15%/-8%/10일) 매매당 +0.74%,
 #                                     현행 매도 규칙으로 +1.07%(2023~26 매년 +). 기존 모멘텀 1위는 같은 기간 매년 마이너스였다.
 #     MOMENTUM                      : 이전 방식(shape 상위 10 → 모멘텀 재정렬).
-#   WAVE2 에서 그날 신호가 없으면 종합순위는 비고, worker(M1)는 최우선타겟이 없으면 그날 매수하지 않는다
-#   (buy_executor1._signal_only — 2026-10-22 사용자 결정).
+#   WAVE2 에서 그날 신호가 없으면 종합순위는 비고, worker(RECO)는 최우선타겟이 없으면 그날 매수하지 않는다
+#   (reco/buy_executor._signal_only — 2026-10-22 사용자 결정).
 #   신호 판정이 실패하면 그날은 MOMENTUM 으로 자동 폴백한다.
 BUY_RANK_MODE_DEFAULT = 'WAVE2'
 WAVE2_TOP_N = 10
@@ -103,8 +103,8 @@ class StockBuyCheckJob(Job):
     def _make_strategy(strategy_param: str):
         """전략 인스턴스 생성. 스레드별로 독립 인스턴스를 만들어 상태 공유를 피한다."""
         if strategy_param == 'KOSPI_2':
-            return KospiStrategy1()  # TODO : more strategy
-        return KospiStrategy1()
+            return RecoStrategy()  # TODO : more strategy
+        return RecoStrategy()
 
     @staticmethod
     def _build_chart_data(trade_data: list) -> list:
@@ -482,7 +482,7 @@ class StockBuyCheckJob(Job):
         if not (ema20_now > ema20_prev):
             return False
 
-        # 장기 추세 필터: 저가(low) > sma120(ema120 필드). 매수 필수 조건(kospi1.py와 동일).
+        # 장기 추세 필터: 저가(low) > sma120(ema120 필드). 매수 필수 조건(reco.py와 동일).
         low_today = float(last.get(Literal.LOW) or 0)
         ema120_now = float(last.get(Literal.EMA_120) or 0)
         if ema120_now <= 0 or not (low_today > ema120_now):

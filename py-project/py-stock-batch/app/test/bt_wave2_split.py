@@ -1,7 +1,7 @@
 """
 bt_wave2_split.py — 2파 하락 추세선 돌파 + 거래량 2배↑ 신호(bt_wave2_trendline)에서 분할매수 방식별 수익.
 
-매도는 전부 현행 실전 규칙 근사(bt_reco_stop.sim_live 와 같은 루프, KospiStrategy1 손절 8%: +30% 익절·트레일·타임스탑).
+매도는 전부 현행 실전 규칙 근사(bt_reco_stop.sim_live 와 같은 루프, RecoStrategy 손절 8%: +30% 익절·트레일·타임스탑).
 수익은 **계획 예산 전체 기준**: 안 산 비중은 현금(수익 0)으로 둔다 — 1포지션 운용에서 놀린 현금도 비용이다.
 
 매수 방식 (D = 신호일, 1차 = D+1 시가 e1)
@@ -34,7 +34,7 @@ sys.path.insert(0, '../shared')
 from app.test.bt_wave2_trendline import OUT as W2
 from app.test.bt_reco_stop import _ui, SELL_ACTIONS, INTRADAY
 from app.test.eval_shape_proba import FEE_RATE
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.reco import RecoStrategy
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 
 CACHE = os.path.join(os.path.dirname(__file__), 'bt_reco_cache')
@@ -147,7 +147,7 @@ def sim_split(strategy, recs, i_sig, method, basis):
 def evaluate():
     ev = pd.read_pickle(os.path.join(W2, 'events.pkl'))
     ev = ev[(ev.kind == 'tl') & (ev.vol_ratio >= 2)].copy()
-    s8 = KospiStrategy1(); s8.stop_loss_pct = 0.08
+    s8 = RecoStrategy(); s8.stop_loss_pct = 0.08
     rows = []
     for code, g in ev.groupby('code'):
         df = pd.read_pickle(os.path.join(CACHE, 'stocks', f'{code}.pkl')).reset_index(drop=True)

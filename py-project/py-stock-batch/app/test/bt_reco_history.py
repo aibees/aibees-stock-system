@@ -7,7 +7,7 @@ bt_reco_chart_analysis.py 는 과거 추천을 "재현"해야 해서 전 종목 
 절차
     1) 추천 행마다 그 종목 일봉(stock_ohlcv_daily) → KisService.compute_indicator_df(라이브와 같은 함수)
     2) 추천일 D 까지의 봉만으로 stock_shared.chart_analysis 를 다시 계산 → 항목값(아래 FEATURES)
-    3) eval_shape_proba.run_one_trade — D+1 시가 진입, KospiStrategy1 매도, 왕복 수수료
+    3) eval_shape_proba.run_one_trade — D+1 시가 진입, RecoStrategy 매도, 왕복 수수료
        아직 청산 안 된(OPEN_MTM) 최근 신호는 결과가 확정되지 않아 뺀다.
     4) 항목별 단순 비교(해당/비해당 승률) + 전 항목 동시 로지스틱 회귀(L2) 계수
        기간을 앞/뒤로 나눠 같은 방향인지 본다.
@@ -33,7 +33,7 @@ from app.ext_services.kis.component.KisStockService import KisService
 from app.test.eval_shape_proba import DB_URL, _base_user_info, run_one_trade, _wilson
 from app.test.bt_reco_chart_analysis import load_bars, flatten, ANALYSIS_BARS, VIEW_BARS
 from stock_shared import chart_analysis
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.reco import RecoStrategy
 
 OUT_DIR = os.path.join(os.path.dirname(__file__), 'bt_reco_cache')
 
@@ -86,7 +86,7 @@ def load_reco(engine) -> pd.DataFrame:
 
 
 def evaluate(reco: pd.DataFrame, engine) -> pd.DataFrame:
-    strategy = KospiStrategy1()
+    strategy = RecoStrategy()
     rows, skipped = [], {'no_bars': 0, 'no_date': 0, 'no_trade': 0}
     codes = reco['stock_code'].unique()
     for n, code in enumerate(codes, 1):

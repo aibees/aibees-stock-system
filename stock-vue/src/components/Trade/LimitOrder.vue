@@ -217,13 +217,13 @@ const toggleExpand = (code) => {
 };
 
 // ── 익절 저장 시 손절가 같이 지정 ──
-// 손절 % 는 매도전략(SellSetting) 의 s1_stop_loss_pct 를 쓴다. worker 도 같은 값으로
+// 손절 % 는 매도전략(SellSetting) 의 stop_loss_pct 를 쓴다. worker 도 같은 값으로
 // 손절선 = 매입가 × (1 - %) 를 잡는다(position_strategy). 값이 없으면 worker 기본값 5%.
 const STOP_LOSS_PCT_DEFAULT = 0.05;
 const fetchStopLossPct = async () => {
     try {
         const { data } = await aibeesApi.get('/api/v1/strategy/options');
-        const v = Number(data.data?.s1_stop_loss_pct);
+        const v = Number(data.data?.stop_loss_pct);
         return v > 0 && v < 1 ? v : STOP_LOSS_PCT_DEFAULT;
     } catch (e) {
         console.error('[LimitOrder] 매도전략 손절 % 조회 실패 → 기본값', e);

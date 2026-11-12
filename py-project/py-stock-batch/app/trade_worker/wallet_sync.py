@@ -9,7 +9,7 @@ user_wallet 잔고 동기화 헬퍼.
   reconcile_wallet 에 sell_executor 를 넘기면, 실제 계좌 보유 종목 전체를
   trade_worker_position(HOLDING) 과 대조해 **아직 worker 가 모르는 종목**(HTS/MTS
   등 타채널 매수분 포함)을 trade_worker_position 에 새로 편입한다.
-  ⚠ 편입되는 순간부터 그 종목은 활성 운용모드(M1 등)의 손절/익절/트레일링/
+  ⚠ 편입되는 순간부터 그 종목은 활성 운용모드(RECO 등)의 손절/익절/트레일링/
   타임스탑 자동매도 판정 대상이 된다 — 사용자가 자동매매에 맡길 생각이 없던
   종목까지 알고리즘이 팔 수 있다는 뜻이다. 매도 수기등록(trade_worker_manual_sell)을
   걸어두면 그 종목은 이 자동판정 대신 지정가만 보므로(BaseSellExecutor 선제 확인)
@@ -30,7 +30,7 @@ user_wallet 잔고 동기화 헬퍼.
   담당했다 — ① sell_executor._do_sell 의 '실제 보유 0' 체크, ② 부팅 대조
   (main._reconcile_positions). 그런데 ①은 **매도 트리거(hit_line) 가 먼저 걸려야**
   도달하는 코드다. 라인(stop/target/trail)이 전부 NULL 인 포지션은 hit_line 이
-  영원히 None 을 반환하므로(sell_executor1.hit_line 의 `if stop and ...`) ①에
+  영원히 None 을 반환하므로(reco/sell_executor.hit_line 의 `if stop and ...`) ①에
   도달할 방법이 없고, ②는 재기동 전까지 돌지 않는다.
   결과: 좀비 HOLDING 이 남아 allow_buy() 의 1포지션 카운트를 먹고 신규매수가
   며칠씩 멈췄다(2026-09-29 user_id=3 032580, 2026-10-01 user_id=1 018000).

@@ -3,7 +3,7 @@ router_auto_trade.py — 운용모드 관리 (Blueprint url_prefix = /api/v1/aut
 
     GET /modes     모드 목록 + selectable(지금 worker 가 실제로 돌릴 수 있는 모드인지)
     GET /state     내 현재 운용모드 + worker 보유 포지션
-    PUT /state     운용모드 즉시 전환        body: { "mode_code": "M0" }
+    PUT /state     운용모드 즉시 전환        body: { "mode_code": "HALT" }
     GET /history   운용모드 변경 이력        ?limit=30
     POST /sell-now 지금 팔기(보유 전량 시장가) body: { "stock_code": "005930" }
 
@@ -21,9 +21,9 @@ router_auto_trade.py — 운용모드 관리 (Blueprint url_prefix = /api/v1/aut
     - user_id 는 JWT 에서만 얻는다. 매매 사용자(WORKER_USER) 권한이 있어야 한다.
     - worker 는 active_mode 만 읽는다(평일 08~20시 설정 폴링 60초, 그 외엔 다음 개장 루틴 직전 반영).
       보유분 청산 후 승계(pending)는 worker 에 구현이 없어 쓰지 않는다 — 전환은 항상 즉시.
-    - M0 = 매매정지(sql/27, 2026-10-11 개정): 신규 매수만 멈추고 보유분 매도(손절·익절·트레일링)는 계속한다.
+    - HALT = 매매정지(sql/27, 2026-10-11 개정): 신규 매수만 멈추고 보유분 매도(손절·익절·트레일링)는 계속한다.
       worker 가 여전히 돌고 매도도 하므로 enabled_flag 는 모드와 무관하게 'Y' 로 둔다(worker 는 이 값을 읽지 않는다).
-    - SELECTABLE_MODES: worker 에 실행기가 구현된 모드만. M2~M4 는 화면에 "준비 중"으로만 보인다.
+    - SELECTABLE_MODES: worker 에 실행기가 구현된 모드만. ETF_SWITCH 등 나머지는 화면에 "준비 중"으로만 보인다.
       worker 에 모드가 추가되면 여기에도 추가한다(py-stock-batch trade_worker/modes, position_strategy).
 """
 import logging
@@ -32,6 +32,7 @@ from decimal import Decimal
 
 from flask import Blueprint, g, request
 
+from stock_shared import trade_mode
 from app.domains.dao.roleMenuDao import RoleMenuDao
 from app.domains.dao.manualSellDao import SELL_NOW_MEMO, SELL_NOW_PRICE, ManualSellDao
 from app.domains.dao.tradeModeDao import TradeModeDao
@@ -45,8 +46,8 @@ manualSellDaoImpl = ManualSellDao()
 
 KST = timezone(timedelta(hours=9))
 WORKER_AUTH_ID = 'WORKER_USER'
-HALT_MODE = 'M0'
-SELECTABLE_MODES = ('M0', 'M1')
+HALT_MODE = trade_mode.HALT
+SELECTABLE_MODES = (trade_mode.HALT, trade_mode.RECO)
 
 
 def _require_worker():
@@ -118,7 +119,7 @@ def put_state():
             return ApiResponse.success({'applied': 'NONE', 'active_mode': mode_code,
                                         'message': f"이미 '{name}' 모드입니다."})
 
-        # M0 도 보유분 매도는 계속 돌므로 '운용 중'(Y) 이다.
+        # HALT 도 보유분 매도는 계속 돌므로 '운용 중'(Y) 이다.
         tradeModeDaoImpl.apply_mode(g.db, g.current_user_id, mode_code, 'Y')
         reason = ('매매정지' if mode_code == HALT_MODE
                   else ('매매 재개' if from_mode == HALT_MODE else '운용모드 전환'))

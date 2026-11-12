@@ -7,12 +7,12 @@ v-for 를 돌릴 수 있는 그룹 배열로 변환한다.
 
 응답 형태 (GET /api/v1/strategy/param-guide):
     {
-      "strategy_code": "S1",
+      "strategy_code": "RECO",
       "groups": [
         {
           "id": "A", "title": "...", "desc": "...", "priority": 1,
           "master": null,
-          "fields": [ { "k": "s1_stop_loss_pct", "label": "손실", ... } ]
+          "fields": [ { "k": "stop_loss_pct", "label": "손실", ... } ]
         }
       ]
     }
@@ -37,7 +37,7 @@ class StrategyParamGuideService:
     # ================================================================
     # 화면 렌더링용 그룹 트리
     # ================================================================
-    def get_guide(self, session, strategy_code: str = 'S1',
+    def get_guide(self, session, strategy_code: str = 'RECO',
                   include_disabled: bool = False) -> dict:
         rows = self.dao.select_params(session, strategy_code, include_disabled)
 

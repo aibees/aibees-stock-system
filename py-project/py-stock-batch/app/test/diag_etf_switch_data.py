@@ -12,17 +12,17 @@ trade_candle_30m 데이터 건전성 진단.
     D. Buy&Hold 검증 — 시뮬레이터가 쓰는 값과 동일 계산 + 현실성 판정
     E. 지표 컬럼 건전성 — macd_g_cross_n / obv_g_cross_n 값 분포.
        String(1) 컬럼에 fillna(0.0) 이 들어가면 'G' 비교가 영원히 False 가 된다.
-    F. 신호 재현 — KospiStrategy1 을 실제로 돌려 봉별 매수신호 발생 횟수 집계
+    F. 신호 재현 — RecoStrategy 을 실제로 돌려 봉별 매수신호 발생 횟수 집계
 
 실행
-    poetry run python -m app.test.diag_m2_data
-    poetry run python -m app.test.diag_m2_data --start 2026-06-01
+    poetry run python -m app.test.diag_etf_switch_data
+    poetry run python -m app.test.diag_etf_switch_data --start 2026-06-01
 """
 import argparse
 from collections import Counter, defaultdict
 
 from stock_shared.db.database import dbConn
-from app.test import sim_m2_alternate as sim
+from app.test import sim_etf_switch_alternate as sim
 from stock_shared.strategy.backtester import KisBacktester
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 
@@ -191,7 +191,7 @@ def sec_e(rows_map: dict):
 
 
 def sec_f(session, rows_map: dict, code_a: str, code_b: str):
-    print('\n[F] 매수신호 재현 (KospiStrategy1 실제 호출)')
+    print('\n[F] 매수신호 재현 (RecoStrategy 실제 호출)')
     ui = sim.user_info(session)
 
     presets = [

@@ -11,7 +11,7 @@ scikit-learn/joblib 은 선택 의존성이다 — 설치 안 된 소비처(예:
   실전 손절/익절(OCO -8%/+15%) 백테스트에서는 기존 rank_no(과열최저) 로직보다
   승률·평균손익이 전 구간(-5%~-15% 손절폭)에서 낮았다. 그래서 이 점수를
   1순위 정렬 기준으로 강제하지 않았다 — buy_order.py 의 ORDER_FIELDS 에
-  "shape_proba" 로 등록해 옵트인(s1_buy_order 에 명시해야 적용)으로만 노출한다.
+  "shape_proba" 로 등록해 옵트인(reco_buy_order 에 명시해야 적용)으로만 노출한다.
   기본 정렬(DEFAULT_BUY_ORDER)은 그대로 둔다.
 """
 from __future__ import annotations

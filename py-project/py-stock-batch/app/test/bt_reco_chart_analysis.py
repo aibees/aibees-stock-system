@@ -66,7 +66,7 @@ from stock_shared.ml.shape_features import (
     SHAPE_FEATURE_COLUMNS,
     EXHAUSTION_BARS_SINCE_MIN_MIN, EXHAUSTION_TOTAL_RET_14_MIN, EXHAUSTION_RET_1D_TODAY_MIN,
 )
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.reco import RecoStrategy
 
 CACHE_DIR = os.path.join(os.path.dirname(__file__), 'bt_reco_cache')
 WARMUP_BARS = 250          # 라이브 매수추천 배치가 받는 최소 봉 수 — 이보다 앞 날짜는 신호로 안 쓴다
@@ -277,7 +277,7 @@ def _el_take(a: dict, entry: float):
 
 def phase_eval(picks: pd.DataFrame, stop_pct: float = 0.05) -> pd.DataFrame:
     from app.test.bt_reco_stop import sim_live
-    strategy = KospiStrategy1()
+    strategy = RecoStrategy()
     strategy.stop_loss_pct = stop_pct
     rows = []
     t0 = time.time()

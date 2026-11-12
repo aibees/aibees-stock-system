@@ -106,11 +106,11 @@
                     <div v-if="loadingOptions" class="d-skel"></div>
                     <div v-else-if="!options" class="d-empty">데이터를 불러올 수 없습니다.</div>
                     <dl v-else class="d-rows two-col">
-                        <div class="d-row"><dt>손절</dt><dd>-{{ pct(options.s1_stop_loss_pct, 0.05) }}%</dd></div>
-                        <div class="d-row"><dt>익절</dt><dd>+{{ pct(options.s1_take_profit_pct, 0.30) }}%</dd></div>
-                        <div class="d-row"><dt>트레일링</dt><dd>{{ bool(options.s1_use_trailing, 1) ? '사용' : '미사용' }}</dd></div>
-                        <div class="d-row"><dt>보유 한도</dt><dd>{{ options.s1_max_hold_bars ?? 12 }}봉</dd></div>
-                        <div class="d-row"><dt>RSI 신뢰구간</dt><dd>{{ options.s1_rsi_ideal_low ?? 40 }} ~ {{ options.s1_rsi_ideal_high ?? 65 }}</dd></div>
+                        <div class="d-row"><dt>손절</dt><dd>-{{ pct(options.stop_loss_pct, 0.05) }}%</dd></div>
+                        <div class="d-row"><dt>익절</dt><dd>+{{ pct(options.take_profit_pct, 0.30) }}%</dd></div>
+                        <div class="d-row"><dt>트레일링</dt><dd>{{ bool(options.use_trailing, 1) ? '사용' : '미사용' }}</dd></div>
+                        <div class="d-row"><dt>보유 한도</dt><dd>{{ options.max_hold_bars ?? 12 }}봉</dd></div>
+                        <div class="d-row"><dt>RSI 신뢰구간</dt><dd>{{ options.rsi_ideal_low ?? 40 }} ~ {{ options.rsi_ideal_high ?? 65 }}</dd></div>
                         <div class="d-row"><dt>진입 필터</dt><dd>{{ enabledFilterCount }} / {{ FILTER_KEYS.length }} 사용</dd></div>
                     </dl>
                 </article>
@@ -204,8 +204,8 @@ const options = ref(null);
 const loadingOptions = ref(true);
 
 const FILTER_KEYS = [
-    's1_enable_macd_filter', 's1_enable_rsi_filter', 's1_enable_bb_upper_filter',
-    's1_enable_vol_avg_filter', 's1_enable_regime_gate',
+    'enable_macd_filter', 'enable_rsi_filter', 'enable_bb_upper_filter',
+    'enable_vol_avg_filter', 'enable_regime_gate',
 ];
 const enabledFilterCount = computed(() => {
     if (!options.value) return 0;

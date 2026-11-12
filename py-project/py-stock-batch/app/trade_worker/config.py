@@ -39,7 +39,7 @@ worker 는 유저 1명당 1 프로세스(상시 daemon)로 뜬다. KIS_USER_ID �
 | POSITION_VANISH_MISS | 3 | HOLDING 포지션이 계좌 실보유에서 **연속 이 횟수** 안 보이면 외부청산으로
     간주하고 SOLD 처리한다(wallet_sync._close_vanished_positions). WALLET_POLL_SEC=30 이면 3회 ≈ 90초.
     1 로 낮추면 잔고 조회가 한 번만 불완전해도 오판 청산할 수 있으니 2 이상을 권한다. |
-| REALTIME_BUY_START / REALTIME_BUY_END | 09:05 / 15:20 | 실시간 매수(user_options.s1_realtime_buy) 허용 시간대 |
+| REALTIME_BUY_START / REALTIME_BUY_END | 09:05 / 15:20 | 실시간 매수(user_option_reco.realtime_buy) 허용 시간대 |
 | REALTIME_BUY_RETRY_SEC | 300 | 실시간 매수 라운드가 체결 없이 끝났을 때 다음 시도까지 간격(초) |
 | KRX_AFTERMARKET_ENABLED | true | 2026-09-14 KRX 애프터마켓(16:00~20:00) 매도 세션 사용 여부. KRX 전용 종목도
     이 시간까지 청산 가능해진다(ORD_DVSN=41 KRX애프터마켓지정가). **매수에는 영향 없음** —
@@ -100,7 +100,7 @@ class WorkerConfig:
     buy_fill_wait_retries: int
     buy_fill_wait_sec: int
     wallet_poll_sec: int
-    # user_options(s1_*) 변경 감지 주기(초). 0 이면 비활성 → 재기동해야 반영된다.
+    # user_option_reco 변경 감지 주기(초). 0 이면 비활성 → 재기동해야 반영된다.
     settings_poll_sec: int
     # 2026-09-14 KRX 애프터마켓(16:00~20:00) 매도 세션 사용 여부. 매수 경로에는 영향 없음.
     krx_aftermarket_enabled: bool
@@ -110,7 +110,7 @@ class WorkerConfig:
     # HOLDING 인데 계좌 실보유에 없는 포지션을 외부청산으로 닫기까지 필요한 연속 미발견 횟수
     # (2026-10-01). 1회 관측으로 닫으면 잔고 조회가 일시적으로 불완전할 때 오판 청산한다.
     position_vanish_miss: int = 3
-    # 실시간 매수(user_options.s1_realtime_buy=1) — 정규장 중 계좌 0종목이면 최신 매수타겟으로 재매수.
+    # 실시간 매수(user_option_reco.realtime_buy=1) — 정규장 중 계좌 0종목이면 최신 매수타겟으로 재매수.
     #   창: [start, end) HHMM. 09:00 개장 루틴과 겹치지 않게 09:05 부터, 15:20 동시호가 전까지.
     #   retry_sec: 라운드가 체결 없이 끝났을 때(갭 초과 등) 다음 시도까지 최소 간격.
     realtime_buy_start_hhmm: int = 905

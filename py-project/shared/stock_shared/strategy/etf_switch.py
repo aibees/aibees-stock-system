@@ -1,7 +1,7 @@
 """
-kospi2.py — M2 (KODEX 코스피100 / KODEX 인버스 **독립 운용**) 전략.
+etf_switch.py — ETF_SWITCH (KODEX 코스피100 / KODEX 인버스 **독립 운용**) 전략.
 
-운용모드 M2
+운용모드 ETF_SWITCH
     두 ETF 를 교대(둘 중 하나만 보유)로 굴리지 않는다.
     **각 종목이 자기 신호로만 진입/청산**하고, 신호가 없으면 현금으로 쉰다.
     둘 다 신호가 있으면 둘 다 들 수 있고, 둘 다 없으면 전액 현금이다.
@@ -28,7 +28,7 @@ kospi2.py — M2 (KODEX 코스피100 / KODEX 인버스 **독립 운용**) 전략
 
 타임프레임
     30분봉 전제다(trade_candle_30m). 임계값이 30분봉 스케일로 맞춰져 있다.
-      · stop_loss_pct 기본 0.02 — KospiStrategy1 의 0.05 는 일봉 기준이라
+      · stop_loss_pct 기본 0.02 — RecoStrategy 의 0.05 는 일봉 기준이라
         30분봉에서는 거의 안 걸린다(실측 30분봉 ATR/종가 ≈ 0.82%).
       · confirm_bars 3 = 1시간 30분.
     일봉에 그대로 쓰면 손절이 과하게 타이트해진다.
@@ -74,10 +74,10 @@ def _b(v, default: bool) -> bool:
         return bool(v)
 
 
-class KospiStrategy2(StockStrategy):
-    """M2 : ETF 2종목 독립 운용."""
+class EtfSwitchStrategy(StockStrategy):
+    """ETF_SWITCH : ETF 2종목 독립 운용."""
 
-    MODE_CODE = 'M2'
+    MODE_CODE = 'ETF_SWITCH'
 
     def __init__(self):
         super().__init__()
@@ -110,7 +110,7 @@ class KospiStrategy2(StockStrategy):
     # 유저 설정 주입
     # ══════════════════════════════════════════════════════════════
     def configure(self, user_info: UserOptionMeta) -> None:
-        """user_option_m2(s2_*) 값을 인스턴스에 반영. None 이면 기본값 유지."""
+        """user_option_etf_switch(etf_switch_*) 값을 인스턴스에 반영. None 이면 기본값 유지."""
         g = lambda k: getattr(user_info, k, None)          # noqa: E731
 
         def _set_f(attr, key, allow_zero_as_none=True):
@@ -140,27 +140,27 @@ class KospiStrategy2(StockStrategy):
             if v not in (None, ''):
                 setattr(self, attr, str(v))
 
-        _set_s('long_code', 's2_long_code')
-        _set_s('short_code', 's2_short_code')
+        _set_s('long_code', 'etf_switch_long_code')
+        _set_s('short_code', 'etf_switch_short_code')
 
-        _set_i('confirm_bars', 's2_confirm_bars')
-        _set_i('rsi_overbought', 's2_rsi_overbought')
-        _set_b('enable_macd_up', 's2_enable_macd_up')
-        _set_b('enable_obv_up', 's2_enable_obv_up')
-        _set_b('enable_ma20_up', 's2_enable_ma20_up')
-        _set_b('enable_rsi_filter', 's2_enable_rsi_filter')
+        _set_i('confirm_bars', 'etf_switch_confirm_bars')
+        _set_i('rsi_overbought', 'etf_switch_rsi_overbought')
+        _set_b('enable_macd_up', 'etf_switch_enable_macd_up')
+        _set_b('enable_obv_up', 'etf_switch_enable_obv_up')
+        _set_b('enable_ma20_up', 'etf_switch_enable_ma20_up')
+        _set_b('enable_rsi_filter', 'etf_switch_enable_rsi_filter')
 
-        _set_b('exit_on_reverse', 's2_exit_on_reverse')
-        _set_b('exit_macd_down', 's2_exit_macd_down')
-        _set_b('exit_obv_down', 's2_exit_obv_down')
-        _set_b('exit_rsi_down', 's2_exit_rsi_down')
+        _set_b('exit_on_reverse', 'etf_switch_exit_on_reverse')
+        _set_b('exit_macd_down', 'etf_switch_exit_macd_down')
+        _set_b('exit_obv_down', 'etf_switch_exit_obv_down')
+        _set_b('exit_rsi_down', 'etf_switch_exit_rsi_down')
 
-        _set_f('stop_loss_pct', 's2_stop_loss_pct')
-        _set_f('take_profit_pct', 's2_take_profit_pct')
-        _set_b('use_trailing', 's2_use_trailing')
-        _set_f('trail_drawdown_pct', 's2_trail_drawdown_pct')
+        _set_f('stop_loss_pct', 'etf_switch_stop_loss_pct')
+        _set_f('take_profit_pct', 'etf_switch_take_profit_pct')
+        _set_b('use_trailing', 'etf_switch_use_trailing')
+        _set_f('trail_drawdown_pct', 'etf_switch_trail_drawdown_pct')
         # 활성 임계는 0 이 '즉시 활성' 이라는 의미를 가지므로 0 을 None 으로 죽이지 않는다
-        _set_f('trail_activate_pct', 's2_trail_activate_pct', allow_zero_as_none=False)
+        _set_f('trail_activate_pct', 'etf_switch_trail_activate_pct', allow_zero_as_none=False)
 
         # confirm_bars 는 1 미만이 될 수 없다
         self.confirm_bars = max(1, int(self.confirm_bars or 1))

@@ -17,7 +17,9 @@ router_user_options.py — 개인설정 조회 / 수정
     user_master  : user_phone, email
     user_detail  : kis_id, kis_account, kis_access_key, kis_secret_key, tele_bot_id, tele_chat_id
     user_options : stock_sell_mail_flag, stock_buy_target_mail_flag, stock_sell_tele_flag,
-                   s1_* (전략 파라미터), (vol_limit, vol_surge — 관리자 전용)
+                   (vol_limit, vol_surge — 관리자 전용)
+    ※ 추천매수 전략 파라미터는 user_option_reco 로 옮겨 /api/v1/strategy/options 에서만 다룬다
+      (관리자 전용 키 검사가 그쪽에만 있다).
 """
 
 import logging
@@ -50,15 +52,6 @@ WHITELIST = {
     'user_detail': {'kis_id', 'kis_account', 'kis_access_key', 'kis_secret_key', 'tele_bot_id', 'tele_chat_id'},
     'user_options': {
         'stock_sell_mail_flag', 'stock_buy_target_mail_flag', 'stock_sell_tele_flag',
-        's1_stop_loss_pct', 's1_take_profit_pct', 's1_max_hold_bars',
-        's1_rsi_overbought', 's1_rsi_ideal_low', 's1_rsi_ideal_high',
-        's1_vol_ma_window', 's1_vol_ma_mult', 's1_regime_window', 's1_regime_threshold',
-        's1_strict_need_macd_up', 's1_loose_need_vol_surge', 's1_surge_relax_mult',
-        's1_downtrend_surge_bypass', 's1_surge_bypass_mult', 's1_use_trailing',
-        's1_trail_activate_pct', 's1_k_trail_atr', 's1_trail_floor_pct',
-        's1_trail_drawdown_pct', 's1_trail_dual',
-        's1_time_stop_extend', 's1_time_stop_band', 's1_time_stop_grace',
-        's1_max_hold_bars_hard',
         # 관리자 전용
         'vol_limit', 'vol_surge',
     },

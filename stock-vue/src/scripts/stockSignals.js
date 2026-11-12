@@ -68,7 +68,7 @@ export const fundamentalRows = (item) => {
 };
 
 /* ── 기술적 근거 판정 (실제 지표 플래그를 그대로 쓰고 판정 문구만 서술형으로 변환)
- * 조건 정의는 strategy/kospi1.py, KisStockService.py 계산 로직을 따른다. ── */
+ * 조건 정의는 strategy/reco.py, KisStockService.py 계산 로직을 따른다. ── */
 export const technicalRows = (item) => [
     {
         label: 'MACD 크로스', short: 'MACD 골든크로스',

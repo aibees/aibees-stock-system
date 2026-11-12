@@ -29,8 +29,8 @@
                 </button>
             </nav>
 
-            <!-- ══════════ M1 : 현행 설정 ══════════ -->
-            <template v-if="activeMode === 'M1'">
+            <!-- ══════════ RECO(추천매수) : 현행 설정 ══════════ -->
+            <template v-if="activeMode === 'RECO'">
 
             <!-- ── 로딩 스켈레톤 ── -->
             <div v-if="isLoading" class="loader-rows">
@@ -107,7 +107,7 @@
                     <div class="field-list">
                         <div class="field-row">
                             <div class="fr-head">
-                                <label for="s1_gap_block_pct">허용 갭 <span class="fr-unit">(%)</span></label>
+                                <label for="gap_block_pct">허용 갭 <span class="fr-unit">(%)</span></label>
                                 <div class="fr-right">
                                     <span class="fr-def">기본 {{ GAP_DEF_PCT }}%</span>
                                     <button type="button" class="btn-null" title="기본값 따름(null)"
@@ -119,7 +119,7 @@
                                     :value="gapPct === '' ? GAP_DEF_PCT : gapPct" @input="onGapInput"
                                     :min="GAP_MIN_PCT" :max="GAP_MAX_PCT" :step="0.5" />
                                 <div class="sl-num">
-                                    <input id="s1_gap_block_pct" type="number"
+                                    <input id="gap_block_pct" type="number"
                                         :value="gapPct" @input="onGapInput"
                                         :min="GAP_MIN_PCT" :max="GAP_MAX_PCT" step="0.5"
                                         :placeholder="String(GAP_DEF_PCT)" inputmode="decimal" />
@@ -145,10 +145,10 @@
                     <div class="field-list">
                         <div class="field-row">
                             <div class="fr-head">
-                                <label for="s1_realtime_buy">보유 종목이 없으면 즉시 매수</label>
+                                <label for="realtime_buy">보유 종목이 없으면 즉시 매수</label>
                             </div>
                             <div class="fr-ctrl bool-ctrl">
-                                <button id="s1_realtime_buy" type="button"
+                                <button id="realtime_buy" type="button"
                                     :class="['toggle-btn', realtimeBuy ? 'active' : 'inactive']"
                                     role="switch" :aria-checked="realtimeBuy"
                                     @click="realtimeBuy = !realtimeBuy">
@@ -278,7 +278,7 @@
             </form>
             </template>
 
-            <!-- ══════════ M2 : 준비중 ══════════ -->
+            <!-- ══════════ ETF_SWITCH(ETF 교대) : 준비중 ══════════ -->
             <section v-else class="mode-empty">
                 <span class="me-code">{{ activeMode }}</span>
                 <h3>{{ currentModeName }}</h3>
@@ -298,13 +298,13 @@ const title = ref('매수 설정');
 const userSession = assUserSession();
 
 /* ═══════════════════════════════════════════════════════════
- * 운용 모드 탭 (M1 만 현행 설정, M2 는 준비중)
+ * 운용 모드 탭 (RECO 만 현행 설정, ETF_SWITCH 는 준비중)
  * ═══════════════════════════════════════════════════════════ */
 const MODE_TABS = [
-    { code: 'M1', name: '추천매수' },
-    { code: 'M2', name: 'ETF 교대' },
+    { code: 'RECO', name: '추천매수' },
+    { code: 'ETF_SWITCH', name: 'ETF 교대' },
 ];
-const activeMode = ref('M1');
+const activeMode = ref('RECO');
 const currentModeName = computed(
     () => MODE_TABS.find(m => m.code === activeMode.value)?.name ?? ''
 );
@@ -324,7 +324,7 @@ const serverIsAdmin = ref(false);
 const canEditStrategy = computed(() => serverIsAdmin.value && isAdminRole.value);
 
 /* ═══════════════════════════════════════════════════════════
- * 1. 매수 후보 정렬 (s1_buy_order)
+ * 1. 매수 후보 정렬 (buy_order)
  *
  * 저장 형식: "필드:방향,필드:방향" — 앞 키가 동점일 때만 다음 키로 넘어간다.
  * 허용 필드는 백엔드 _BUY_ORDER_FIELDS / worker _ORDER_FIELDS 와 일치해야 한다.
@@ -408,7 +408,7 @@ const onDragOver = (idx) => {
 const resetOrderToDefault = () => { orderRows.value = specToRows(DEFAULT_ORDER_SPEC); };
 
 /* ═══════════════════════════════════════════════════════════
- * 1-1. 시가 갭 허용치 (s1_gap_block_pct, 개인화)
+ * 1-1. 시가 갭 허용치 (gap_block_pct, 개인화)
  *
  * 화면은 % 로 다루고(2 = 2%), 저장은 비율(0.02)로 한다. '' = 기본값(서버 NULL → worker 2%).
  * 허용 범위는 백엔드 _GAP_PCT_RANGE(0.005 ~ 0.30)와 같아야 한다.
@@ -433,13 +433,13 @@ const gapError = computed(() => {
 const gapToApi = () => (gapPct.value === '' ? null : +(Number(gapPct.value) / 100).toFixed(6));
 
 /* ═══════════════════════════════════════════════════════════
- * 1-2. 실시간 매수 (s1_realtime_buy, 개인화) — 서버 NULL/0 = 미사용, 1 = 사용
+ * 1-2. 실시간 매수 (realtime_buy, 개인화) — 서버 NULL/0 = 미사용, 1 = 사용
  * ═══════════════════════════════════════════════════════════ */
 const realtimeBuy = ref(false);
 let originalRealtimeBuy = false;
 
 /* ═══════════════════════════════════════════════════════════
- * 2. 후보 선정 조건 (관리자 전용) — KospiStrategy0.get_action_in_watch
+ * 2. 후보 선정 조건 (관리자 전용) — RecoStrategy.get_action_in_watch
  * ═══════════════════════════════════════════════════════════ */
 const SIGNAL_MODE_OPTIONS = [
     { v: 'golden', label: '골든크로스' },
@@ -458,15 +458,15 @@ const STRATEGY_GROUPS = [
         id: 'S', title: '진입 신호 (core)',
         fields: [
             {
-                k: 's1_macd_signal_mode', label: 'MACD 신호', type: 'enum', def: 'slope',
+                k: 'macd_signal_mode', label: 'MACD 신호', type: 'enum', def: 'slope',
                 options: SIGNAL_MODE_OPTIONS,
             },
             {
-                k: 's1_obv_signal_mode', label: 'OBV 신호', type: 'enum', def: 'golden',
+                k: 'obv_signal_mode', label: 'OBV 신호', type: 'enum', def: 'golden',
                 options: SIGNAL_MODE_OPTIONS,
             },
             {
-                k: 's1_ma20_signal_mode', label: 'MA20 기울기', type: 'enum', def: 'off',
+                k: 'ma20_signal_mode', label: 'MA20 기울기', type: 'enum', def: 'off',
                 options: MA20_SIGNAL_MODE_OPTIONS,
             },
         ],
@@ -475,19 +475,19 @@ const STRATEGY_GROUPS = [
         id: 'F', title: '매수 필터 on/off',
         fields: [
             {
-                k: 's1_enable_macd_filter', label: 'MACD 조건', type: 'bool', def: 1,
+                k: 'enable_macd_filter', label: 'MACD 조건', type: 'bool', def: 1,
             },
             {
-                k: 's1_enable_rsi_filter', label: '과매수 진입 차단', type: 'bool', def: 1,
+                k: 'enable_rsi_filter', label: '과매수 진입 차단', type: 'bool', def: 1,
             },
             {
-                k: 's1_enable_bb_upper_filter', label: '볼린저 상단 추격 금지', type: 'bool', def: 1,
+                k: 'enable_bb_upper_filter', label: '볼린저 상단 추격 금지', type: 'bool', def: 1,
             },
             {
-                k: 's1_enable_vol_avg_filter', label: '평균 거래량 하한', type: 'bool', def: 1,
+                k: 'enable_vol_avg_filter', label: '평균 거래량 하한', type: 'bool', def: 1,
             },
             {
-                k: 's1_enable_regime_gate', label: '추세국면 게이트', type: 'bool', def: 1,
+                k: 'enable_regime_gate', label: '추세국면 게이트', type: 'bool', def: 1,
             },
         ],
     },
@@ -495,23 +495,23 @@ const STRATEGY_GROUPS = [
         id: 'T', title: '임계값',
         fields: [
             {
-                k: 's1_rsi_overbought', label: '과매수 기준 RSI', unit: '', type: 'int', def: 70,
+                k: 'rsi_overbought', label: '과매수 기준 RSI', unit: '', type: 'int', def: 70,
                 min: 50, max: 90, step: 1,
             },
             {
-                k: 's1_rsi_ideal_low', label: 'RSI 신뢰구간 하한', unit: '', type: 'int', def: 40,
+                k: 'rsi_ideal_low', label: 'RSI 신뢰구간 하한', unit: '', type: 'int', def: 40,
                 min: 0, max: 100, step: 1, ui: 'stepper',
             },
             {
-                k: 's1_rsi_ideal_high', label: 'RSI 신뢰구간 상한', unit: '', type: 'int', def: 65,
+                k: 'rsi_ideal_high', label: 'RSI 신뢰구간 상한', unit: '', type: 'int', def: 65,
                 min: 0, max: 100, step: 1, ui: 'stepper',
             },
             {
-                k: 's1_vol_ma_window', label: '평균 거래량 산정 기간', unit: '일', type: 'int', def: 20,
+                k: 'vol_ma_window', label: '평균 거래량 산정 기간', unit: '일', type: 'int', def: 20,
                 min: 5, max: 60, step: 1,
             },
             {
-                k: 's1_vol_ma_mult', label: '평균 거래량 하한 배수', unit: '배', type: 'float', def: 0.5,
+                k: 'vol_ma_mult', label: '평균 거래량 하한 배수', unit: '배', type: 'float', def: 0.5,
                 min: 0.1, max: 3, step: 0.1,
             },
         ],
@@ -520,28 +520,28 @@ const STRATEGY_GROUPS = [
         id: 'R', title: '추세국면 게이트',
         fields: [
             {
-                k: 's1_regime_window', label: '국면 분류 기간', unit: '봉', type: 'int', def: 90,
+                k: 'regime_window', label: '국면 분류 기간', unit: '봉', type: 'int', def: 90,
                 min: 20, max: 250, step: 5,
             },
             {
-                k: 's1_regime_threshold', label: '하락국면 판정 비율', unit: '%', type: 'pct', def: 0.70,
+                k: 'regime_threshold', label: '하락국면 판정 비율', unit: '%', type: 'pct', def: 0.70,
                 min: 10, max: 100, step: 5,
             },
             {
-                k: 's1_strict_need_macd_up', label: '[하락국면] MACD 모멘텀 요구', type: 'bool', def: 1,
+                k: 'strict_need_macd_up', label: '[하락국면] MACD 모멘텀 요구', type: 'bool', def: 1,
             },
             {
-                k: 's1_downtrend_surge_bypass', label: '[하락국면] 거래량 급증 우회', type: 'bool', def: 1,
+                k: 'downtrend_surge_bypass', label: '[하락국면] 거래량 급증 우회', type: 'bool', def: 1,
             },
             {
-                k: 's1_surge_bypass_mult', label: '[하락국면] 우회 급증 배수', unit: '배', type: 'float', def: 2.0,
+                k: 'surge_bypass_mult', label: '[하락국면] 우회 급증 배수', unit: '배', type: 'float', def: 2.0,
                 min: 1, max: 5, step: 0.1,
             },
             {
-                k: 's1_loose_need_vol_surge', label: '[상승국면] 거래량 급증 요구', type: 'bool', def: 1,
+                k: 'loose_need_vol_surge', label: '[상승국면] 거래량 급증 요구', type: 'bool', def: 1,
             },
             {
-                k: 's1_surge_relax_mult', label: '[상승국면] 완화 급증 배수', unit: '배', type: 'float', def: 2.0,
+                k: 'surge_relax_mult', label: '[상승국면] 완화 급증 배수', unit: '배', type: 'float', def: 2.0,
                 min: 1, max: 5, step: 0.1,
             },
         ],
@@ -553,16 +553,16 @@ const FIELD_MAP = Object.fromEntries(ALL_FIELDS.map(f => [f.k, f]));
 
 /* 조건부 비활성화 — 상위 스위치가 꺼지면 하위 임계값은 의미가 없다 */
 const DISABLE_RULES = {
-    s1_rsi_overbought: 's1_enable_rsi_filter',
-    s1_vol_ma_window: 's1_enable_vol_avg_filter',
-    s1_vol_ma_mult: 's1_enable_vol_avg_filter',
-    s1_regime_window: 's1_enable_regime_gate',
-    s1_regime_threshold: 's1_enable_regime_gate',
-    s1_strict_need_macd_up: 's1_enable_regime_gate',
-    s1_downtrend_surge_bypass: 's1_enable_regime_gate',
-    s1_loose_need_vol_surge: 's1_enable_regime_gate',
-    s1_surge_bypass_mult: () => !isOn('s1_enable_regime_gate') || !isOn('s1_downtrend_surge_bypass'),
-    s1_surge_relax_mult: () => !isOn('s1_enable_regime_gate') || !isOn('s1_loose_need_vol_surge'),
+    rsi_overbought: 'enable_rsi_filter',
+    vol_ma_window: 'enable_vol_avg_filter',
+    vol_ma_mult: 'enable_vol_avg_filter',
+    regime_window: 'enable_regime_gate',
+    regime_threshold: 'enable_regime_gate',
+    strict_need_macd_up: 'enable_regime_gate',
+    downtrend_surge_bypass: 'enable_regime_gate',
+    loose_need_vol_surge: 'enable_regime_gate',
+    surge_bypass_mult: () => !isOn('enable_regime_gate') || !isOn('downtrend_surge_bypass'),
+    surge_relax_mult: () => !isOn('enable_regime_gate') || !isOn('loose_need_vol_surge'),
 };
 
 /* ═══════════════ 폼 상태 ═══════════════ */
@@ -614,10 +614,10 @@ const fetchOptions = async () => {
         ALL_FIELDS.forEach(f => {
             if (d[f.k] !== undefined) form[f.k] = toDisplay(f, d[f.k]);
         });
-        orderRows.value = specToRows(d.s1_buy_order || DEFAULT_ORDER_SPEC);
-        gapPct.value = d.s1_gap_block_pct === null || d.s1_gap_block_pct === undefined
-            ? '' : +(Number(d.s1_gap_block_pct) * 100).toFixed(4);
-        realtimeBuy.value = Number(d.s1_realtime_buy) === 1;
+        orderRows.value = specToRows(d.buy_order || DEFAULT_ORDER_SPEC);
+        gapPct.value = d.gap_block_pct === null || d.gap_block_pct === undefined
+            ? '' : +(Number(d.gap_block_pct) * 100).toFixed(4);
+        realtimeBuy.value = Number(d.realtime_buy) === 1;
     } catch (e) {
         console.error('[BuySetting] 조회 실패', e);
         orderRows.value = specToRows(DEFAULT_ORDER_SPEC);
@@ -681,9 +681,9 @@ const errors = computed(() => {
         }
     });
 
-    const lo = isBlank('s1_rsi_ideal_low') ? FIELD_MAP.s1_rsi_ideal_low.def : Number(form.s1_rsi_ideal_low);
-    const hi = isBlank('s1_rsi_ideal_high') ? FIELD_MAP.s1_rsi_ideal_high.def : Number(form.s1_rsi_ideal_high);
-    if (hi < lo) e.s1_rsi_ideal_high = `상한(${hi})은 하한(${lo}) 이상이어야 합니다.`;
+    const lo = isBlank('rsi_ideal_low') ? FIELD_MAP.rsi_ideal_low.def : Number(form.rsi_ideal_low);
+    const hi = isBlank('rsi_ideal_high') ? FIELD_MAP.rsi_ideal_high.def : Number(form.rsi_ideal_high);
+    if (hi < lo) e.rsi_ideal_high = `상한(${hi})은 하한(${lo}) 이상이어야 합니다.`;
 
     return e;
 });
@@ -698,11 +698,11 @@ const buildDiff = () => {
             if (String(form[f.k]) !== String(original[f.k])) diff[f.k] = toApi(f, form[f.k]);
         });
     }
-    if (orderSpec.value !== originalOrderSpec) diff.s1_buy_order = orderSpec.value || null;
+    if (orderSpec.value !== originalOrderSpec) diff.buy_order = orderSpec.value || null;
     // 시가 갭 허용치(개인화) — 관리자 여부와 무관하게 전송
-    if (String(gapPct.value) !== String(originalGapPct)) diff.s1_gap_block_pct = gapToApi();
+    if (String(gapPct.value) !== String(originalGapPct)) diff.gap_block_pct = gapToApi();
     // 실시간 매수(개인화) — 관리자 여부와 무관하게 전송
-    if (realtimeBuy.value !== originalRealtimeBuy) diff.s1_realtime_buy = realtimeBuy.value ? 1 : 0;
+    if (realtimeBuy.value !== originalRealtimeBuy) diff.realtime_buy = realtimeBuy.value ? 1 : 0;
     return diff;
 };
 const isDirty = computed(() => Object.keys(buildDiff()).length > 0);
@@ -733,7 +733,7 @@ const save = async () => {
         originalGapPct = gapPct.value;
         originalRealtimeBuy = realtimeBuy.value;
         mariaToast.success(
-            ('s1_buy_order' in payload || 's1_gap_block_pct' in payload || 's1_realtime_buy' in payload)
+            ('buy_order' in payload || 'gap_block_pct' in payload || 'realtime_buy' in payload)
                 ? '저장되었습니다. 다음 매수 라운드부터 적용됩니다.'
                 : '저장되었습니다. 다음 매수타겟 생성부터 반영됩니다.');
     } catch (e) {

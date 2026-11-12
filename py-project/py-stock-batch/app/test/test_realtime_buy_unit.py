@@ -1,5 +1,5 @@
 """
-실시간 매수 라운드(user_options.s1_realtime_buy) 단위 검증 — DB / KIS 불필요.
+실시간 매수 라운드(user_option_reco.realtime_buy) 단위 검증 — DB / KIS 불필요.
 
 무엇을 검증하나
     1. 당일 손실 매도 종목은 후보에서 빠지고, 수익 매도 종목은 남는다
@@ -16,7 +16,7 @@ import sys
 from decimal import Decimal
 from types import SimpleNamespace
 
-from app.trade_worker.modes.mode_1.buy_executor1 import BuyExecutor1
+from app.trade_worker.modes.reco.buy_executor import RecoBuyExecutor
 
 PASS, FAIL = [], []
 
@@ -64,10 +64,10 @@ class FakeBroker:
 
 def make(targets, prices, **repo_kw):
     cfg = SimpleNamespace(user_id=9, buy_budget_ratio=0.98, nxt_limit_slip_pct=2.0)
-    meta = SimpleNamespace(s1_gap_block_pct=Decimal('0.02'), s1_buy_order=None, s1_realtime_buy=1)
+    meta = SimpleNamespace(reco_gap_block_pct=Decimal('0.02'), reco_buy_order=None, reco_realtime_buy=1)
     strategy = SimpleNamespace(user_meta=meta, halted=False)
     repo = FakeRepo(targets, **repo_kw)
-    ex = BuyExecutor1(cfg, FakeBroker(prices), repo, notifier=None, strategy=strategy)
+    ex = RecoBuyExecutor(cfg, FakeBroker(prices), repo, notifier=None, strategy=strategy)
     bought = []
 
     def fake_place(cand, price, qty, balance, premarket, tag):

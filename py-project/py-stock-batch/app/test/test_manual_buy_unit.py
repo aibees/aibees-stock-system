@@ -5,7 +5,7 @@
     1. resolve_session — 시장가는 정규장만, 지정가는 프리·애프터마켓 포함
     2. next_state      — 체결/취소/거부/날짜 경과/조회 실패 판정
     3. _parse_order_status — 주문번호 앞자리 0 차이, 없는 주문
-    4. Broker 게이트   — M0 에서 일반 매수는 막히고 manual_buy 만 나간다
+    4. Broker 게이트   — HALT 에서 일반 매수는 막히고 manual_buy 만 나간다
     5. 실행기 흐름     — 한 번만 주문, 수량 초과 거부, 거래소 거부, 결과 불명(재주문 안 함),
                          휴장일, 체결 후처리 1회, 취소
 
@@ -114,16 +114,16 @@ def test_gate():
     print('\n[4] Broker 매매정지 게이트')
     kis = FakeKis()
     b = Broker(kis)
-    b.set_trading_gate(lambda side: side != 'BUY')   # M0
+    b.set_trading_gate(lambda side: side != 'BUY')   # HALT
     try:
         b.buy_market('005930', Decimal(1), Decimal(1000))
-        check('M0: 일반 매수 차단', False)
+        check('HALT: 일반 매수 차단', False)
     except TradingHaltedError:
-        check('M0: 일반 매수 차단', True)
-    check('M0: 일반 매수는 주문 안 나감', kis.bodies == [])
+        check('HALT: 일반 매수 차단', True)
+    check('HALT: 일반 매수는 주문 안 나감', kis.bodies == [])
 
     res = b.manual_buy('005930', Decimal(3), MarketSession(True, 'SOR', '01', '정규장'))
-    check('M0: 수동 시장가는 나감', res.order_no == '777' and kis.bodies[-1]['ORD_DVSN'] == '01')
+    check('HALT: 수동 시장가는 나감', res.order_no == '777' and kis.bodies[-1]['ORD_DVSN'] == '01')
     check('시장가 단가 0', kis.bodies[-1]['ORD_UNPR'] == '0' and kis.bodies[-1]['ORD_QTY'] == '3')
     res = b.manual_buy('005930', Decimal(2), MarketSession(True, 'SOR', '00', '정규장'), Decimal('70000'))
     check('수동 지정가 단가 전달', kis.bodies[-1]['ORD_UNPR'] == '70000' and kis.bodies[-1]['ORD_DVSN'] == '00')

@@ -138,36 +138,36 @@ CREATE TABLE trade_log (
 );
 ```
 
-### 1-3. `user_options` strategy 파라미터 (s1_*)
+### 1-3. `user_option_reco` 전략 파라미터
 
-`KospiStrategy0` 의 파라미터는 `user_options` 테이블의 `s1_*` 컬럼으로 override 가능하다. **NULL이면 전략 클래스 기본값 사용**. 마이그레이션 DDL은 `migrate_user_options_s1.sql` 참고. 핵심 컬럼:
+`RecoStrategy` 의 파라미터는 `user_option_reco` 테이블 컬럼(접두어 없음, 메타에서는 `reco_*`)으로 override 가능하다. **NULL이면 전략 클래스 기본값 사용**. 마이그레이션 DDL은 `migrate_user_options_s1.sql` 참고. 핵심 컬럼:
 
 | 컬럼 | 타입 | 기본값 | 의미 |
 |---|---|---|---|
-| s1_stop_loss_pct | DECIMAL(6,4) | 0.05 | 손절 비율 |
-| s1_take_profit_pct | DECIMAL(6,4) | 0.30 | 익절 비율 |
-| s1_max_hold_bars | INT | 12 | 최대 보유 봉수(타임스탑 기준) |
-| s1_rsi_overbought | INT | 70 | RSI 과매수 진입차단 |
-| s1_rsi_ideal_low / high | INT | 40 / 65 | RSI 신뢰구간 |
-| s1_vol_ma_window | INT | 20 | 평균거래량 산정기간 |
-| s1_vol_ma_mult | DECIMAL(6,2) | 0.5 | 진입 최소거래량 배수 |
-| s1_regime_window | INT | 90 | 국면 분류 봉 길이 |
-| s1_regime_threshold | DECIMAL(6,4) | 0.70 | 하락국면 판정 임계값 |
-| s1_strict_need_macd_up | TINYINT(1) | 1 | 하락국면 macd>=signal 요구 |
-| s1_loose_need_vol_surge | TINYINT(1) | 1 | 상승국면 거래량급증 요구 |
-| s1_surge_relax_mult | DECIMAL(6,2) | 2.0 | 완화 급증 배수(전봉 대비) |
-| s1_downtrend_surge_bypass | TINYINT(1) | 1 | 하락국면 급증 우회 |
-| s1_surge_bypass_mult | DECIMAL(6,2) | 2.0 | 우회 급증 배수 |
-| s1_use_trailing | TINYINT(1) | 1 | 트레일링 사용 |
-| s1_trail_basis | VARCHAR(5) | close | close/high |
-| s1_trail_activate_pct | DECIMAL(6,4) | 0.08 | 트레일링 활성화 수익 |
-| s1_k_trail_atr | DECIMAL(6,2) | 3.0 | 샹들리에 ATR 배수 |
-| s1_trail_floor_pct | DECIMAL(6,4) | 0.10 | ATR 미산출 시 대체 하락폭 |
-| s1_time_stop_extend | TINYINT(1) | 1 | 타임스탑 연장 허용 |
-| s1_time_stop_band | DECIMAL(6,4) | 0.02 | 정체 판정 수익밴드 |
-| s1_time_stop_grace | INT | 3 | 신고가 갱신 허용 봉수 |
-| s1_max_hold_bars_hard | INT | 20 | 절대 보유 한도 |
-| s1_obv_dead_min_bars | INT | 5 | OBV 데드크로스 노이즈 무시 봉수 |
+| stop_loss_pct | DECIMAL(6,4) | 0.05 | 손절 비율 |
+| take_profit_pct | DECIMAL(6,4) | 0.30 | 익절 비율 |
+| max_hold_bars | INT | 12 | 최대 보유 봉수(타임스탑 기준) |
+| rsi_overbought | INT | 70 | RSI 과매수 진입차단 |
+| rsi_ideal_low / high | INT | 40 / 65 | RSI 신뢰구간 |
+| vol_ma_window | INT | 20 | 평균거래량 산정기간 |
+| vol_ma_mult | DECIMAL(6,2) | 0.5 | 진입 최소거래량 배수 |
+| regime_window | INT | 90 | 국면 분류 봉 길이 |
+| regime_threshold | DECIMAL(6,4) | 0.70 | 하락국면 판정 임계값 |
+| strict_need_macd_up | TINYINT(1) | 1 | 하락국면 macd>=signal 요구 |
+| loose_need_vol_surge | TINYINT(1) | 1 | 상승국면 거래량급증 요구 |
+| surge_relax_mult | DECIMAL(6,2) | 2.0 | 완화 급증 배수(전봉 대비) |
+| downtrend_surge_bypass | TINYINT(1) | 1 | 하락국면 급증 우회 |
+| surge_bypass_mult | DECIMAL(6,2) | 2.0 | 우회 급증 배수 |
+| use_trailing | TINYINT(1) | 1 | 트레일링 사용 |
+| trail_basis | VARCHAR(5) | close | close/high |
+| trail_activate_pct | DECIMAL(6,4) | 0.08 | 트레일링 활성화 수익 |
+| k_trail_atr | DECIMAL(6,2) | 3.0 | 샹들리에 ATR 배수 |
+| trail_floor_pct | DECIMAL(6,4) | 0.10 | ATR 미산출 시 대체 하락폭 |
+| time_stop_extend | TINYINT(1) | 1 | 타임스탑 연장 허용 |
+| time_stop_band | DECIMAL(6,4) | 0.02 | 정체 판정 수익밴드 |
+| time_stop_grace | INT | 3 | 신고가 갱신 허용 봉수 |
+| max_hold_bars_hard | INT | 20 | 절대 보유 한도 |
+| obv_dead_min_bars | INT | 5 | OBV 데드크로스 노이즈 무시 봉수 |
 
 ---
 
@@ -286,10 +286,10 @@ avg_bars, exit_breakdown(청산사유별 카운트), trade_list[]
 
 ---
 
-## 4. Strategy: `KospiStrategy0` (핵심 — 정확히 재현)
+## 4. Strategy: `RecoStrategy` (핵심 — 정확히 재현)
 
 `get_action_with_prev(position_type, prev_info, coin_info, user_info)`:
-- 호출 첫줄에서 `configure(user_info)` 실행 → `user_options.s1_*` 값으로 기본값 override.
+- 호출 첫줄에서 `configure(user_info)` 실행 → `user_option_reco.*` 값으로 기본값 override.
 - `position_type=='watch'` → 매수 판별, `'active'` → 매도 판별.
 
 ### 4-1. 매수 판별 (`get_action_in_watch`) — 순서대로 게이트 통과
@@ -351,7 +351,7 @@ SELL_PROFIT=11, SELL_STOP_LOSS=12, SELL_TRAIL=13, SELL_STOP_PROFIT=14, SELL_TIME
 ## 5. 데이터 구조 (DTO)
 
 - **`UserCoinInfo`**: candle 한 봉 + 지표. `from_dict(dict)` / `to_dict()` 지원. 백테스트 핵심 필드: `coin_code, datetime, open/high/low/close/volume, ema20/60/120, bb_*, macd/macd_s, macd_g_cross_n/macd_d_cross_n, obv_g_cross_n/obv_d_cross_n, rsi, atr, vol_surge_n, vol_avg, downtrend_ratio`.
-- **`UserOptionMeta`**: 전략 파라미터 + **포지션 상태**(`entry_price, entry_atr, peak_high, peak_close, bars_since_peak, bars_held, has_position, avg_price`) + `s1_*` override 필드. 진입 옵션: `vol_limit, vol_surge, delay_date, macd_recent_day, bb_over_recent_day, bb_width_threshold`.
+- **`UserOptionMeta`**: 전략 파라미터 + **포지션 상태**(`entry_price, entry_atr, peak_high, peak_close, bars_since_peak, bars_held, has_position, avg_price`) + `reco_*` override 필드. 진입 옵션: `vol_limit, vol_surge, delay_date, macd_recent_day, bb_over_recent_day, bb_width_threshold`.
 
 ---
 
@@ -397,8 +397,8 @@ SELL_PROFIT=11, SELL_STOP_LOSS=12, SELL_TRAIL=13, SELL_STOP_PROFIT=14, SELL_TIME
 | DAO(조회/upsert) | `app/domain/dao/tradeCandleDataDao.py` |
 | 지표 계산 | `app/ext_services/kis/component/KisStockService.py` |
 | 백테스트 엔진 | `shared/stock_shared/strategy/backtester.py` |
-| 전략 | `shared/stock_shared/strategy/kospi0.py`, `shared/stock_shared/strategy/base.py` |
+| 전략 | `shared/stock_shared/strategy/reco.py`, `shared/stock_shared/strategy/base.py` |
 | 적재 러너 | `app/test/test_5.py` |
 | 백테스트 러너 | `app/test/test_backtest.py` |
 | DTO | `app/domain/dto/userCoinInfo.py`, `app/domain/dto/userOptionMeta.py` |
-| s1_* 마이그레이션 | `migrate_user_options_s1.sql` |
+| 추천매수 옵션 이관 | `migrate_user_options_s1.sql`(구), `54_remove_mode_numbering.sql`(user_option_reco 개명) |

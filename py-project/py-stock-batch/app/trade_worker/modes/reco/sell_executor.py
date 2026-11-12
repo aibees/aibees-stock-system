@@ -1,5 +1,5 @@
 """
-M1 (추천매수) 매도 — 손절 / 익절 / 트레일링 라인 감시.
+RECO (추천매수) 매도 — 손절 / 익절 / 트레일링 라인 감시.
 
 BaseSellExecutor 에서 갈리는 지점은 **팔 조건 하나**뿐이다.
 구독·고점추적·세션가드·쿨다운·체결반영은 전부 베이스가 처리한다.
@@ -11,13 +11,14 @@ BaseSellExecutor 에서 갈리는 지점은 **팔 조건 하나**뿐이다.
 """
 from decimal import Decimal
 
+from stock_shared import trade_mode
 from app.trade_worker.sell_executor import BaseSellExecutor, _toDecimal
 
 
-class SellExecutor1(BaseSellExecutor):
-    """M1 : 추천매수 자동매매의 매도 감시."""
+class RecoSellExecutor(BaseSellExecutor):
+    """RECO : 추천매수 자동매매의 매도 감시."""
 
-    MODE_CODE = "M1"
+    MODE_CODE = trade_mode.RECO
 
     def hit_line(self, pos: dict, price: Decimal) -> str | None:
         """손절 > 익절 > 트레일링 순으로 먼저 걸리는 것이 발동.

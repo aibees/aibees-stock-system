@@ -35,7 +35,7 @@ export const fetchState = async () => {
 };
 
 /**
- * 운용모드 즉시 전환 (M0 = 매매정지)
+ * 운용모드 즉시 전환 (HALT = 매매정지)
  * @returns {{applied:'NOW'|'NONE', active_mode:string, message:string}}
  */
 export const saveState = async (mode_code) => {

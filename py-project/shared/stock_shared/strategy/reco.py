@@ -1,11 +1,11 @@
 """
-kospi1.py — M1 (추천매수) 전략. **실전 worker 현행 전략.**
+reco.py — RECO (추천매수) 전략. **실전 worker 현행 전략.**
 
-운용모드 M1: 20:00 배치가 만든 trade_buy_target_stock 의 1순위를 익일 전량 매수하고,
+운용모드 RECO: 20:00 배치가 만든 trade_buy_target_stock 의 1순위를 익일 전량 매수하고,
 손절 > 익절 > 트레일링 > 타임스탑 순으로 매도 판정한다.
 
-M2 와 달리 유일하게 로직이 구현되어 있다. 여기를 고치면 실매매 판정이 즉시 바뀐다.
-(구 kospi0.py / KospiStrategy0 에서 이름만 옮겨온 것 — 로직 변경 없음)
+ETF_SWITCH 와 달리 유일하게 로직이 구현되어 있다. 여기를 고치면 실매매 판정이 즉시 바뀐다.
+(구 reco.py / RecoStrategy 에서 이름만 옮겨온 것 — 로직 변경 없음)
 """
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from stock_shared.dto.userOptionMeta import UserOptionMeta
@@ -13,9 +13,9 @@ from stock_shared.strategy.base import StockStrategy, Action
 from stock_shared.ml.shape_features import is_exhaustion_risk
 
 
-class KospiStrategy1(StockStrategy):
+class RecoStrategy(StockStrategy):
 
-    MODE_CODE = 'M1'
+    MODE_CODE = 'RECO'
 
     def __init__(self):
         super().__init__()
@@ -57,7 +57,7 @@ class KospiStrategy1(StockStrategy):
         # 고점 기준은 **peak_high 단일**이다(구 trail_basis 'close'/'high' 선택 제거).
         # 라이브에서는 SellExecutor 가 소켓 체결가로 peak_high 를 실시간 갱신하고,
         # 백테스트에서는 각 봉의 high 로 갱신한다. 종가 고점 개념은 쓰지 않는다.
-        # ※ user_options.s1_trail_basis 컬럼은 롤백 대비로 남겨두되 참조하지 않는다.
+        # ※ user_option_reco.trail_basis 컬럼은 롤백 대비로 남겨두되 참조하지 않는다.
         self.use_trailing       = True
         self.trail_activate_pct = 0.08     # 고점수익 +8% 도달해야 트레일링 ON
         self.k_trail_atr        = 3.0      # 고점 - k*ATR (작을수록 타이트=빨리 매도). 종목 튜닝 포인트
@@ -169,7 +169,7 @@ class KospiStrategy1(StockStrategy):
         self.ma20_signal_mode = 'off'   # 'off' | 'slope'
 
     def configure(self, user_info: UserOptionMeta) -> None:
-        """user_options의 s1_* 값이 있으면 __init__ 기본값을 덮어씁니다."""
+        """user_option_reco 값(UserOptionMeta.reco_*)이 있으면 __init__ 기본값을 덮어씁니다."""
         def _f(val, cast=float):
             """None이 아니면 cast 변환해서 반환, None이면 None 반환"""
             return cast(val) if val is not None else None
@@ -179,49 +179,49 @@ class KospiStrategy1(StockStrategy):
             return bool(int(val)) if val is not None else None
 
         overrides = {
-            'stop_loss_pct':          _f(user_info.s1_stop_loss_pct),
-            'take_profit_pct':        _f(user_info.s1_take_profit_pct),
-            'max_hold_bars':          _f(user_info.s1_max_hold_bars, int),
-            'rsi_overbought':         _f(user_info.s1_rsi_overbought, int),
-            'rsi_ideal_low':          _f(user_info.s1_rsi_ideal_low, int),
-            'rsi_ideal_high':         _f(user_info.s1_rsi_ideal_high, int),
-            'vol_ma_window':          _f(user_info.s1_vol_ma_window, int),
-            'vol_ma_mult':            _f(user_info.s1_vol_ma_mult),
-            'regime_window':          _f(user_info.s1_regime_window, int),
-            'regime_threshold':       _f(user_info.s1_regime_threshold),
-            'strict_need_macd_up':    _bool(user_info.s1_strict_need_macd_up),
-            'loose_need_vol_surge':   _bool(user_info.s1_loose_need_vol_surge),
-            'surge_relax_mult':       _f(user_info.s1_surge_relax_mult),
-            'downtrend_surge_bypass': _bool(user_info.s1_downtrend_surge_bypass),
-            'surge_bypass_mult':      _f(user_info.s1_surge_bypass_mult),
-            'use_trailing':           _bool(user_info.s1_use_trailing),
-            # s1_trail_basis 는 더 이상 참조하지 않는다(peak_high 단일 기준).
-            'trail_activate_pct':     _f(user_info.s1_trail_activate_pct),
-            'k_trail_atr':            _f(user_info.s1_k_trail_atr),
-            'trail_floor_pct':        _f(user_info.s1_trail_floor_pct),
-            'trail_drawdown_pct':     _f(user_info.s1_trail_drawdown_pct),
-            'trail_giveback_pct':     _f(user_info.s1_trail_giveback_pct),
-            'trail_dual':             _bool(user_info.s1_trail_dual),
-            'trail_fib_use':          _bool(user_info.s1_trail_fib_use),
-            'trail_fib_level':        _f(user_info.s1_trail_fib_level),
-            'time_stop_extend':       _bool(user_info.s1_time_stop_extend),
-            'time_stop_band':         _f(user_info.s1_time_stop_band),
-            'time_stop_grace':        _f(user_info.s1_time_stop_grace, int),
-            'max_hold_bars_hard':     _f(user_info.s1_max_hold_bars_hard, int),
+            'stop_loss_pct':          _f(user_info.reco_stop_loss_pct),
+            'take_profit_pct':        _f(user_info.reco_take_profit_pct),
+            'max_hold_bars':          _f(user_info.reco_max_hold_bars, int),
+            'rsi_overbought':         _f(user_info.reco_rsi_overbought, int),
+            'rsi_ideal_low':          _f(user_info.reco_rsi_ideal_low, int),
+            'rsi_ideal_high':         _f(user_info.reco_rsi_ideal_high, int),
+            'vol_ma_window':          _f(user_info.reco_vol_ma_window, int),
+            'vol_ma_mult':            _f(user_info.reco_vol_ma_mult),
+            'regime_window':          _f(user_info.reco_regime_window, int),
+            'regime_threshold':       _f(user_info.reco_regime_threshold),
+            'strict_need_macd_up':    _bool(user_info.reco_strict_need_macd_up),
+            'loose_need_vol_surge':   _bool(user_info.reco_loose_need_vol_surge),
+            'surge_relax_mult':       _f(user_info.reco_surge_relax_mult),
+            'downtrend_surge_bypass': _bool(user_info.reco_downtrend_surge_bypass),
+            'surge_bypass_mult':      _f(user_info.reco_surge_bypass_mult),
+            'use_trailing':           _bool(user_info.reco_use_trailing),
+            # reco_trail_basis 는 더 이상 참조하지 않는다(peak_high 단일 기준).
+            'trail_activate_pct':     _f(user_info.reco_trail_activate_pct),
+            'k_trail_atr':            _f(user_info.reco_k_trail_atr),
+            'trail_floor_pct':        _f(user_info.reco_trail_floor_pct),
+            'trail_drawdown_pct':     _f(user_info.reco_trail_drawdown_pct),
+            'trail_giveback_pct':     _f(user_info.reco_trail_giveback_pct),
+            'trail_dual':             _bool(user_info.reco_trail_dual),
+            'trail_fib_use':          _bool(user_info.reco_trail_fib_use),
+            'trail_fib_level':        _f(user_info.reco_trail_fib_level),
+            'time_stop_extend':       _bool(user_info.reco_time_stop_extend),
+            'time_stop_band':         _f(user_info.reco_time_stop_band),
+            'time_stop_grace':        _f(user_info.reco_time_stop_grace, int),
+            'max_hold_bars_hard':     _f(user_info.reco_max_hold_bars_hard, int),
             # 매수 필터 on/off 스위치
-            'enable_macd_filter':     _bool(user_info.s1_enable_macd_filter),
-            'enable_rsi_filter':      _bool(user_info.s1_enable_rsi_filter),
-            'enable_bb_upper_filter': _bool(user_info.s1_enable_bb_upper_filter),
-            'enable_vol_avg_filter':  _bool(user_info.s1_enable_vol_avg_filter),
-            'enable_regime_gate':     _bool(user_info.s1_enable_regime_gate),
-            'enable_shape_exhaustion_filter': _bool(user_info.s1_enable_shape_exhaustion_filter),
-            'enable_sma120_filter':   _bool(user_info.s1_enable_sma120_filter),
-            'enable_avg_vol_filter':  _bool(user_info.s1_enable_avg_vol_filter),
-            'avg_vol_min':            _f(user_info.s1_avg_vol_min, int),
+            'enable_macd_filter':     _bool(user_info.reco_enable_macd_filter),
+            'enable_rsi_filter':      _bool(user_info.reco_enable_rsi_filter),
+            'enable_bb_upper_filter': _bool(user_info.reco_enable_bb_upper_filter),
+            'enable_vol_avg_filter':  _bool(user_info.reco_enable_vol_avg_filter),
+            'enable_regime_gate':     _bool(user_info.reco_enable_regime_gate),
+            'enable_shape_exhaustion_filter': _bool(user_info.reco_enable_shape_exhaustion_filter),
+            'enable_sma120_filter':   _bool(user_info.reco_enable_sma120_filter),
+            'enable_avg_vol_filter':  _bool(user_info.reco_enable_avg_vol_filter),
+            'avg_vol_min':            _f(user_info.reco_avg_vol_min, int),
             # core 진입 신호 mode
-            'macd_signal_mode':       user_info.s1_macd_signal_mode if user_info.s1_macd_signal_mode else None,
-            'obv_signal_mode':        user_info.s1_obv_signal_mode  if user_info.s1_obv_signal_mode  else None,
-            'ma20_signal_mode':       user_info.s1_ma20_signal_mode if user_info.s1_ma20_signal_mode else None,
+            'macd_signal_mode':       user_info.reco_macd_signal_mode if user_info.reco_macd_signal_mode else None,
+            'obv_signal_mode':        user_info.reco_obv_signal_mode  if user_info.reco_obv_signal_mode  else None,
+            'ma20_signal_mode':       user_info.reco_ma20_signal_mode if user_info.reco_ma20_signal_mode else None,
         }
         for attr, val in overrides.items():
             if val is not None:

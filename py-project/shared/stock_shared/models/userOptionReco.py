@@ -1,13 +1,14 @@
 """
-user_option_m1 — M1(추천매수) 개인화 옵션.
+user_option_reco — 추천매수(RECO) 운용모드의 개인화 옵션.
 
-기존 user_options.s1_* 39개 컬럼을 모드별 테이블로 분리한 것.
-컬럼명은 s1_ 접두어를 제거했다(테이블명이 이미 모드를 식별).
+예전에는 user_options 에 s1_ 접두어를 붙여 두었다가 모드별 테이블로 옮겼다
+(sql/54_remove_mode_numbering.sql). 테이블이 모드를 식별하므로 컬럼에는 접두어가 없다.
 
-  · 모든 값 NULL 허용. NULL = KospiStrategy1 클래스 기본값 사용
+  · 모든 값 NULL 허용. NULL = RecoStrategy 클래스 기본값 사용
   · 행이 없어도 동작해야 한다. row 없음 == 전 항목 NULL
-
-DDL: py-project/sql/02_user_option_mode_ddl.sql
+  · 매수 필터 스위치·신호 mode 는 매수타겟 생성(StockBuyCheckJob, user_id=1)이 읽어
+    **공용 테이블**을 만든다 → 사실상 전역 설정이라 화면에서 관리자 전용이다.
+  · buy_order / gap_block_pct / realtime_buy 는 worker(BuyExecutor)가 유저별로 읽는다.
 """
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.dialects.mysql import DECIMAL, TINYINT
@@ -15,10 +16,10 @@ from sqlalchemy.dialects.mysql import DECIMAL, TINYINT
 from stock_shared.base import Base
 
 
-class UserOptionM1(Base):
-    __tablename__ = "user_option_m1"
+class UserOptionReco(Base):
+    __tablename__ = "user_option_reco"
 
-    MODE_CODE = "M1"
+    MODE_CODE = "RECO"
 
     user_id = Column(Integer, primary_key=True, nullable=False)
 
@@ -60,6 +61,8 @@ class UserOptionM1(Base):
     obv_signal_mode        = Column(String(10), nullable=True)  # core 신호 OBV: off|golden|slope
     ma20_signal_mode       = Column(String(10), nullable=True)  # MA20(ema20) 기울기 게이트: off|slope
     buy_order              = Column(String(255), nullable=True)  # worker 매수타겟 정렬. score:desc,volume:desc 형식
+    gap_block_pct          = Column(DECIMAL(6, 4), nullable=True)  # 정규장 매수 시가갭 차단 기준(비율, 0.02=2%). NULL=기본 2%
+    realtime_buy           = Column(TINYINT(1), nullable=True)  # 장중 실시간 매수 사용 여부
 
     created_date = Column(DateTime, nullable=True)
     updated_date = Column(DateTime, nullable=True)
@@ -104,47 +107,11 @@ class UserOptionM1(Base):
         "obv_signal_mode",
         "ma20_signal_mode",
         "buy_order",
+        "gap_block_pct",
+        "realtime_buy",
     )
 
     def to_dict(self):
-        return {
-            "user_id": self.user_id,
-            "stop_loss_pct": self.stop_loss_pct,
-            "take_profit_pct": self.take_profit_pct,
-            "max_hold_bars": self.max_hold_bars,
-            "rsi_overbought": self.rsi_overbought,
-            "rsi_ideal_low": self.rsi_ideal_low,
-            "rsi_ideal_high": self.rsi_ideal_high,
-            "vol_ma_window": self.vol_ma_window,
-            "vol_ma_mult": self.vol_ma_mult,
-            "regime_window": self.regime_window,
-            "regime_threshold": self.regime_threshold,
-            "strict_need_macd_up": self.strict_need_macd_up,
-            "loose_need_vol_surge": self.loose_need_vol_surge,
-            "surge_relax_mult": self.surge_relax_mult,
-            "downtrend_surge_bypass": self.downtrend_surge_bypass,
-            "surge_bypass_mult": self.surge_bypass_mult,
-            "use_trailing": self.use_trailing,
-            "trail_basis": self.trail_basis,
-            "trail_activate_pct": self.trail_activate_pct,
-            "k_trail_atr": self.k_trail_atr,
-            "trail_floor_pct": self.trail_floor_pct,
-            "trail_drawdown_pct": self.trail_drawdown_pct,
-            "trail_giveback_pct": self.trail_giveback_pct,
-            "trail_dual": self.trail_dual,
-            "trail_fib_use": self.trail_fib_use,
-            "trail_fib_level": self.trail_fib_level,
-            "time_stop_extend": self.time_stop_extend,
-            "time_stop_band": self.time_stop_band,
-            "time_stop_grace": self.time_stop_grace,
-            "max_hold_bars_hard": self.max_hold_bars_hard,
-            "enable_macd_filter": self.enable_macd_filter,
-            "enable_rsi_filter": self.enable_rsi_filter,
-            "enable_bb_upper_filter": self.enable_bb_upper_filter,
-            "enable_vol_avg_filter": self.enable_vol_avg_filter,
-            "enable_regime_gate": self.enable_regime_gate,
-            "macd_signal_mode": self.macd_signal_mode,
-            "obv_signal_mode": self.obv_signal_mode,
-            "ma20_signal_mode": self.ma20_signal_mode,
-            "buy_order": self.buy_order,
-        }
+        d = {"user_id": self.user_id}
+        d.update({k: getattr(self, k) for k in self.PARAM_KEYS})
+        return d

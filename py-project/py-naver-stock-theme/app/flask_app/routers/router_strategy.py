@@ -2,7 +2,7 @@
 router_strategy.py — 매매전략 셋업 및 백테스트
 
 엔드포인트 (url_prefix = /api/v1/strategy):
-    GET   /options              전략 파라미터 조회 (s1_* 컬럼)
+    GET   /options              전략 파라미터 조회 (user_option_reco 컬럼)
     PATCH /options              전략 파라미터 수정 (변경분만, flat key-value)
     GET   /param-guide          파라미터 조정 화면 메타(master_strategy_param)
     POST  /param-guide          메타 등록   (관리자)
@@ -16,7 +16,7 @@ router_strategy.py — 매매전략 셋업 및 백테스트
 
 보안:
     - user_id 는 클라이언트가 보내지 않음. JWT 에서 추출.
-    - s1_* 화이트리스트 외 key → 400 INVALID_FIELD
+    - user_option_reco 화이트리스트 외 key → 400 INVALID_FIELD
     - backtest 기간 제한: start_date >= 오늘 - 200일, end_date <= 오늘
 """
 from __future__ import annotations
@@ -31,6 +31,7 @@ from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
 from app.domains.dao.userOptionsDao import UserOptionsDao
 from app.domains.dao.masterStrategyParamDao import MasterStrategyParamDao
+from stock_shared.dao.userOptionRecoDao import META_PREFIX as RECO_META_PREFIX
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.ext_services.kis.KisEngine import KisEngine
 from app.flask_app.routers.router_oauth import require_auth
@@ -38,7 +39,7 @@ from app.flask_app.utils.apiResponse import ApiResponse
 from stock_shared.strategy.backtester import KisBacktester
 from stock_shared.strategy.buy_order import DEFAULT_BUY_ORDER, describe_buy_order
 from stock_shared.strategy.buy_target_sim import BuyTargetSimulator
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.reco import RecoStrategy
 from stock_shared.strategy.reco_performance import RecoPerformanceAnalyzer
 from app.services.kis.KisStockService import KisStockService
 from app.services.strategy.backtestService import BacktestService
@@ -88,49 +89,49 @@ _FIELD_MAP_KIS = {
 # ─────────────────────────────────────────────────────────────────────
 # 컬럼 메타 (col → type)
 # ─────────────────────────────────────────────────────────────────────
-_S1_COLS: dict[str, str] = {
-    's1_stop_loss_pct':        'decimal',
-    's1_take_profit_pct':      'decimal',
-    's1_max_hold_bars':        'int',
-    's1_rsi_overbought':       'int',
-    's1_rsi_ideal_low':        'int',
-    's1_rsi_ideal_high':       'int',
-    's1_vol_ma_window':        'int',
-    's1_vol_ma_mult':          'decimal',
-    's1_regime_window':        'int',
-    's1_regime_threshold':     'decimal',
-    's1_strict_need_macd_up':  'tinyint',
-    's1_loose_need_vol_surge': 'tinyint',
-    's1_surge_relax_mult':     'decimal',
-    's1_downtrend_surge_bypass': 'tinyint',
-    's1_surge_bypass_mult':    'decimal',
-    's1_use_trailing':         'tinyint',
-    's1_trail_activate_pct':   'decimal',
-    's1_k_trail_atr':          'decimal',
-    's1_trail_floor_pct':      'decimal',
-    's1_trail_drawdown_pct':   'decimal',
-    's1_trail_giveback_pct':   'decimal',
-    's1_trail_dual':           'tinyint',
-    's1_trail_fib_use':        'tinyint',
-    's1_trail_fib_level':      'fib_level',
-    's1_time_stop_extend':     'tinyint',
-    's1_time_stop_band':       'decimal',
-    's1_time_stop_grace':      'int',
-    's1_max_hold_bars_hard':   'int',
+_RECO_COLS: dict[str, str] = {
+    'stop_loss_pct':        'decimal',
+    'take_profit_pct':      'decimal',
+    'max_hold_bars':        'int',
+    'rsi_overbought':       'int',
+    'rsi_ideal_low':        'int',
+    'rsi_ideal_high':       'int',
+    'vol_ma_window':        'int',
+    'vol_ma_mult':          'decimal',
+    'regime_window':        'int',
+    'regime_threshold':     'decimal',
+    'strict_need_macd_up':  'tinyint',
+    'loose_need_vol_surge': 'tinyint',
+    'surge_relax_mult':     'decimal',
+    'downtrend_surge_bypass': 'tinyint',
+    'surge_bypass_mult':    'decimal',
+    'use_trailing':         'tinyint',
+    'trail_activate_pct':   'decimal',
+    'k_trail_atr':          'decimal',
+    'trail_floor_pct':      'decimal',
+    'trail_drawdown_pct':   'decimal',
+    'trail_giveback_pct':   'decimal',
+    'trail_dual':           'tinyint',
+    'trail_fib_use':        'tinyint',
+    'trail_fib_level':      'fib_level',
+    'time_stop_extend':     'tinyint',
+    'time_stop_band':       'decimal',
+    'time_stop_grace':      'int',
+    'max_hold_bars_hard':   'int',
     # ── 매수 필터 on/off · core 진입신호 mode ──
-    's1_enable_macd_filter':     'tinyint',
-    's1_enable_rsi_filter':      'tinyint',
-    's1_enable_bb_upper_filter': 'tinyint',
-    's1_enable_vol_avg_filter':  'tinyint',
-    's1_enable_regime_gate':     'tinyint',
-    's1_macd_signal_mode':       'signal_mode',
-    's1_obv_signal_mode':        'signal_mode',
-    's1_ma20_signal_mode':       'ma20_signal_mode',
+    'enable_macd_filter':     'tinyint',
+    'enable_rsi_filter':      'tinyint',
+    'enable_bb_upper_filter': 'tinyint',
+    'enable_vol_avg_filter':  'tinyint',
+    'enable_regime_gate':     'tinyint',
+    'macd_signal_mode':       'signal_mode',
+    'obv_signal_mode':        'signal_mode',
+    'ma20_signal_mode':       'ma20_signal_mode',
     # ── worker 매수타겟 정렬 · 시가갭 차단 기준 (개인화) ──
-    's1_buy_order':              'buy_order',
-    's1_gap_block_pct':          'gap_pct',
+    'buy_order':              'buy_order',
+    'gap_block_pct':          'gap_pct',
     # ── worker 실시간 매수 on/off (개인화) ──
-    's1_realtime_buy':           'tinyint',
+    'realtime_buy':           'tinyint',
 }
 
 # 시가갭 차단 기준 허용 범위(비율). 0.5% 미만은 호가 단위 노이즈에도 매번 걸려 매수가 사실상 막힌다.
@@ -149,27 +150,27 @@ _FIB_LEVELS = (0.382, 0.5, 0.618)
 # 권한 분리 — 어디서 소비되는 값인가로 갈린다
 #
 #  [관리자 전용] 매수 전략 파라미터
-#     KospiStrategy1.get_action_in_watch 가 쓰고, 이를 호출하는
+#     RecoStrategy.get_action_in_watch 가 쓰고, 이를 호출하는
 #     StockBuyCheckJob 은 get_user_options(session) 를 user_id 없이 부른다(=user_id 1).
 #     산출물 trade_buy_target_stock 은 **전 유저 공용 추천 테이블**이다.
 #     → 일반 유저가 바꿔도 자기 화면엔 반영되지 않고(공용 테이블이라),
 #       관리자가 바꾸면 전원에게 영향이 간다. 개인화가 성립하지 않는 값들.
 #
-#  [개인화] 그 외 (매도 파라미터 전체 + s1_buy_order + s1_gap_block_pct + s1_realtime_buy)
+#  [개인화] 그 외 (매도 파라미터 전체 + buy_order + gap_block_pct + realtime_buy)
 #     worker(SellStrategy / BuyExecutor)가 user_id 별로 읽어 쓴다. 서로 간섭 없음.
 # ─────────────────────────────────────────────────────────────────────
-_S1_ADMIN_ONLY_COLS = frozenset({
-    's1_rsi_overbought', 's1_rsi_ideal_low', 's1_rsi_ideal_high',
-    's1_vol_ma_window', 's1_vol_ma_mult',
-    's1_regime_window', 's1_regime_threshold',
-    's1_strict_need_macd_up', 's1_loose_need_vol_surge', 's1_surge_relax_mult',
-    's1_downtrend_surge_bypass', 's1_surge_bypass_mult',
-    's1_enable_macd_filter', 's1_enable_rsi_filter', 's1_enable_bb_upper_filter',
-    's1_enable_vol_avg_filter', 's1_enable_regime_gate',
-    's1_macd_signal_mode', 's1_obv_signal_mode', 's1_ma20_signal_mode',
+_RECO_ADMIN_ONLY_COLS = frozenset({
+    'rsi_overbought', 'rsi_ideal_low', 'rsi_ideal_high',
+    'vol_ma_window', 'vol_ma_mult',
+    'regime_window', 'regime_threshold',
+    'strict_need_macd_up', 'loose_need_vol_surge', 'surge_relax_mult',
+    'downtrend_surge_bypass', 'surge_bypass_mult',
+    'enable_macd_filter', 'enable_rsi_filter', 'enable_bb_upper_filter',
+    'enable_vol_avg_filter', 'enable_regime_gate',
+    'macd_signal_mode', 'obv_signal_mode', 'ma20_signal_mode',
 })
 
-# s1_buy_order 허용 필드 — stock_shared.strategy.buy_order.ORDER_FIELDS 와 동일해야 한다.
+# buy_order 허용 필드 — stock_shared.strategy.buy_order.ORDER_FIELDS 와 동일해야 한다.
 # (worker 는 모르는 필드를 조용히 무시하지만, 저장 시점에 걸러야 사용자가 오타를 안다)
 # ※ 여기 빠진 필드는 화면에서 고를 수 있어도 저장이 거부된다 — ORDER_FIELDS 에 항목을
 #   추가하면 이 튜플에도 반드시 같이 넣어야 한다.
@@ -179,7 +180,7 @@ _BUY_ORDER_DIRS = ('asc', 'desc')
 
 
 def _validate_buy_order(spec: str):
-    """s1_buy_order 문법 검증. 반환 (정규화된 spec, 에러메시지|None).
+    """buy_order 문법 검증. 반환 (정규화된 spec, 에러메시지|None).
 
     worker 는 오타를 무시하고 기본값으로 돌지만, 그러면 사용자는 저장이 됐는데
     왜 안 먹는지 알 수 없다. 저장 단계에서 막아 그 혼란을 없앤다.
@@ -225,7 +226,7 @@ def _error(code: str, message: str, status: int = 400):
     )
 
 
-def _validate_s1_body(body: dict, is_admin: bool = False):
+def _validate_reco_body(body: dict, is_admin: bool = False):
     """
     PATCH body 검증.
     - 알 수 없는 key       → 400 INVALID_FIELD
@@ -235,12 +236,12 @@ def _validate_s1_body(body: dict, is_admin: bool = False):
     """
     clean: dict = {}
     for k, v in body.items():
-        col_type = _S1_COLS.get(k)
+        col_type = _RECO_COLS.get(k)
         if col_type is None:
             return None, _error('INVALID_FIELD', f'허용되지 않는 필드입니다: {k}')
 
         # 공용 매수타겟에 영향을 주는 값은 관리자만 바꿀 수 있다.
-        if k in _S1_ADMIN_ONLY_COLS and not is_admin:
+        if k in _RECO_ADMIN_ONLY_COLS and not is_admin:
             return None, _error(
                 'FORBIDDEN',
                 f'{k} 는 전체 매수타겟 생성에 적용되는 값이라 관리자만 변경할 수 있습니다.',
@@ -357,20 +358,20 @@ def _validate_backtest_body(body: dict):
 @strategy_bp.route('/options', methods=['GET'])
 @require_auth
 def get_strategy_options():
-    """s1_* 전체를 반환하되, 편집 권한 메타를 함께 내려준다.
+    """user_option_reco 전체를 반환하되, 편집 권한 메타를 함께 내려준다.
 
     화면(BuySetting.vue)은 admin_only 목록으로 필드를 read-only 처리한다.
     값 자체는 비관리자도 볼 수 있다 — 어떤 조건으로 타겟이 뽑혔는지는
     알아야 정렬 기준을 정할 수 있기 때문.
     """
     try:
-        data = userOptionsDaoImpl.select_s1_options(g.db, g.current_user_id) or {}
+        data = userOptionsDaoImpl.select_reco_options(g.db, g.current_user_id) or {}
         is_admin = (g.current_user_id == ADMIN_USER_ID)
         return ApiResponse.success({
             **data,
             '_meta': {
                 'is_admin': is_admin,
-                'admin_only_fields': sorted(_S1_ADMIN_ONLY_COLS),
+                'admin_only_fields': sorted(_RECO_ADMIN_ONLY_COLS),
                 'buy_order_fields': list(_BUY_ORDER_FIELDS),
             },
         })
@@ -390,12 +391,12 @@ def patch_strategy_options():
     if not body:
         return ApiResponse.error('변경할 항목이 없습니다.', status=400)
 
-    clean, err = _validate_s1_body(body, is_admin=(g.current_user_id == ADMIN_USER_ID))
+    clean, err = _validate_reco_body(body, is_admin=(g.current_user_id == ADMIN_USER_ID))
     if err:
         return err
 
     try:
-        userOptionsDaoImpl.upsert_s1_options(g.db, g.current_user_id, clean)
+        userOptionsDaoImpl.upsert_reco_options(g.db, g.current_user_id, clean)
         g.db.commit()
         return ApiResponse.success({'updated': True})
     except Exception as e:
@@ -406,7 +407,7 @@ def patch_strategy_options():
 
 # ═══════════════════════════════════════════════════════════════════
 # 2-1. 파라미터 조정 화면 메타 조회
-#      GET /api/v1/strategy/param-guide?strategy_code=S1
+#      GET /api/v1/strategy/param-guide?strategy_code=RECO
 #
 #      Vue(TradeSetting.vue)가 이 응답만으로 카드/필드를 렌더링한다.
 #      화면에 하드코딩된 GROUPS 상수를 대체하는 엔드포인트.
@@ -414,7 +415,7 @@ def patch_strategy_options():
 @strategy_bp.route('/param-guide', methods=['GET'])
 @require_auth
 def get_param_guide():
-    strategy_code = request.args.get('strategy_code', 'S1')
+    strategy_code = request.args.get('strategy_code', 'RECO')
     # 관리자는 enabled_flag='N' 항목까지 볼 수 있다(메타 관리용).
     include_disabled = (
         g.current_user_id == ADMIN_USER_ID
@@ -439,7 +440,7 @@ def post_param_guide():
         return _error('FORBIDDEN', '관리자만 수정할 수 있습니다.', status=403)
 
     body = request.get_json(silent=True) or {}
-    body.setdefault('strategy_code', 'S1')
+    body.setdefault('strategy_code', 'RECO')
 
     err_msg = paramGuideSvc.validate(body, for_insert=True)
     if err_msg:
@@ -461,7 +462,7 @@ def post_param_guide():
 
 # ═══════════════════════════════════════════════════════════════════
 # 2-3. 메타 수정 (관리자) — 넘어온 컬럼만
-#      PATCH /api/v1/strategy/param-guide/<param_key>?strategy_code=S1
+#      PATCH /api/v1/strategy/param-guide/<param_key>?strategy_code=RECO
 # ═══════════════════════════════════════════════════════════════════
 @strategy_bp.route('/param-guide/<param_key>', methods=['PATCH'])
 @require_auth
@@ -473,7 +474,7 @@ def patch_param_guide(param_key):
     if not body:
         return _error('INVALID_FIELD', '변경할 항목이 없습니다.')
 
-    strategy_code = request.args.get('strategy_code', 'S1')
+    strategy_code = request.args.get('strategy_code', 'RECO')
 
     err_msg = paramGuideSvc.validate(body, for_insert=False)
     if err_msg:
@@ -493,7 +494,7 @@ def patch_param_guide(param_key):
 
 # ═══════════════════════════════════════════════════════════════════
 # 2-4. 메타 삭제 (관리자)
-#      DELETE /api/v1/strategy/param-guide/<param_key>?strategy_code=S1
+#      DELETE /api/v1/strategy/param-guide/<param_key>?strategy_code=RECO
 # ═══════════════════════════════════════════════════════════════════
 @strategy_bp.route('/param-guide/<param_key>', methods=['DELETE'])
 @require_auth
@@ -501,7 +502,7 @@ def delete_param_guide(param_key):
     if g.current_user_id != ADMIN_USER_ID:
         return _error('FORBIDDEN', '관리자만 삭제할 수 있습니다.', status=403)
 
-    strategy_code = request.args.get('strategy_code', 'S1')
+    strategy_code = request.args.get('strategy_code', 'RECO')
     try:
         cnt = paramGuideDao.delete_param(g.db, strategy_code, param_key)
         if not cnt:
@@ -518,30 +519,30 @@ def delete_param_guide(param_key):
 # 2-5. worker 가 실제로 사용하는 설정만 요약
 #      GET /api/v1/strategy/worker-config
 #
-#      user_options 의 s1_* 는 소비처가 둘로 갈린다:
+#      user_option_reco 의 값은 소비처가 둘로 갈린다:
 #        · worker(SellStrategy/BuyExecutor) — 개인화, 내 매매에 직접 영향
 #        · 매수타겟 배치(StockBuyCheckJob)  — 전 유저 공용 추천 생성
 #      이 API 는 **앞쪽만** 내려준다. 시뮬레이션 화면이 "내 worker 가 지금
 #      이렇게 동작한다"를 보여주는 용도라, 공용 파라미터가 섞이면 오해를 준다.
 # ═══════════════════════════════════════════════════════════════════
 
-# (키, 라벨, 표시타입, 전략 기본값)  — 기본값은 KospiStrategy1.__init__ 과 일치
+# (키, 라벨, 표시타입, 전략 기본값)  — 기본값은 RecoStrategy.__init__ 과 일치
 _WORKER_SELL_FIELDS = [
-    ('s1_stop_loss_pct',      '손절',              'pct',  0.05),
-    ('s1_take_profit_pct',    '익절',              'pct',  0.30),
-    ('s1_use_trailing',       '트레일링 사용',      'bool', 1),
-    ('s1_trail_activate_pct', '트레일링 활성화',    'pct',  0.08),
-    ('s1_k_trail_atr',        'ATR 배수(k)',       'num',  3.0),
-    ('s1_trail_drawdown_pct', '고점 대비 하락',     'pct',  None),
-    ('s1_trail_giveback_pct', '이익 반납',          'pct',  None),
-    ('s1_trail_dual',         'ATR 이중감시',       'bool', 1),
-    ('s1_trail_fib_use',      '피보나치 되돌림 사용', 'bool', 0),
-    ('s1_trail_fib_level',    '되돌림 비율',        'num',  0.382),
-    ('s1_max_hold_bars',      '보유 한도',          'bars', 12),
-    ('s1_time_stop_extend',   '추세생존 시 연장',    'bool', 1),
-    ('s1_time_stop_band',     '정체 판정 밴드',      'pct',  0.02),
-    ('s1_time_stop_grace',    '신고가 grace',       'bars', 3),
-    ('s1_max_hold_bars_hard', '절대 보유 한도',      'bars', 20),
+    ('stop_loss_pct',      '손절',              'pct',  0.05),
+    ('take_profit_pct',    '익절',              'pct',  0.30),
+    ('use_trailing',       '트레일링 사용',      'bool', 1),
+    ('trail_activate_pct', '트레일링 활성화',    'pct',  0.08),
+    ('k_trail_atr',        'ATR 배수(k)',       'num',  3.0),
+    ('trail_drawdown_pct', '고점 대비 하락',     'pct',  None),
+    ('trail_giveback_pct', '이익 반납',          'pct',  None),
+    ('trail_dual',         'ATR 이중감시',       'bool', 1),
+    ('trail_fib_use',      '피보나치 되돌림 사용', 'bool', 0),
+    ('trail_fib_level',    '되돌림 비율',        'num',  0.382),
+    ('max_hold_bars',      '보유 한도',          'bars', 12),
+    ('time_stop_extend',   '추세생존 시 연장',    'bool', 1),
+    ('time_stop_band',     '정체 판정 밴드',      'pct',  0.02),
+    ('time_stop_grace',    '신고가 grace',       'bars', 3),
+    ('max_hold_bars_hard', '절대 보유 한도',      'bars', 20),
 ]
 
 
@@ -549,7 +550,7 @@ _WORKER_SELL_FIELDS = [
 @require_auth
 def get_worker_config():
     try:
-        opts = userOptionsDaoImpl.select_s1_options(g.db, g.current_user_id) or {}
+        opts = userOptionsDaoImpl.select_reco_options(g.db, g.current_user_id) or {}
 
         sell = []
         for key, label, vtype, default in _WORKER_SELL_FIELDS:
@@ -560,10 +561,10 @@ def get_worker_config():
                 'is_default': v is None,          # NULL = 전략 클래스 기본값 사용
             })
 
-        spec = opts.get('s1_buy_order')
+        spec = opts.get('buy_order')
         return ApiResponse.success({
             'buy': {
-                'key': 's1_buy_order',
+                'key': 'buy_order',
                 'label': '매수 후보 우선순위',
                 'value': spec,
                 'applied': describe_buy_order(spec),   # 실제 적용되는 정렬(오타 보정 후)
@@ -586,8 +587,8 @@ def get_worker_config():
 #        init_cash 1000000 / fee_rate 0.0011
 #        entry_price "next_open"|"close" / skip_gapup true|false
 #
-#      매도 판정은 **저장된 내 s1_* 설정**을 그대로 쓴다(화면에서 조정 불가).
-#      종목 선택은 s1_buy_order — worker BuyExecutor 와 동일한 정렬.
+#      매도 판정은 **저장된 내 user_option_reco 설정**을 그대로 쓴다(화면에서 조정 불가).
+#      종목 선택은 buy_order — worker BuyExecutor 와 동일한 정렬.
 # ═══════════════════════════════════════════════════════════════════
 @strategy_bp.route('/sim/buy-target', methods=['POST'])
 @require_auth
@@ -620,12 +621,12 @@ def post_sim_buy_target():
         return _error('INVALID_FIELD', 'init_cash 는 0보다 커야 합니다.')
 
     try:
-        # 저장된 s1_* → UserOptionMeta (매도 판정 파라미터)
+        # 저장된 user_option_reco → UserOptionMeta (매도 판정 파라미터)
         ui = _build_base_user_info(g.db, g.current_user_id)
-        strategy = KospiStrategy1()
+        strategy = RecoStrategy()
         strategy.configure(ui)
 
-        opts = userOptionsDaoImpl.select_s1_options(g.db, g.current_user_id) or {}
+        opts = userOptionsDaoImpl.select_reco_options(g.db, g.current_user_id) or {}
 
         sim = BuyTargetSimulator(g.db, ui, strategy=strategy)
         result = sim.run(
@@ -633,7 +634,7 @@ def post_sim_buy_target():
             init_cash=init_cash, fee_rate=fee_rate,
             entry_price=entry_price,
             skip_gapup=bool(body.get('skip_gapup', False)),
-            buy_order=opts.get('s1_buy_order'),
+            buy_order=opts.get('buy_order'),
         )
         return ApiResponse.success(result)
     except Exception as e:
@@ -706,8 +707,8 @@ def post_backtest():
     print("start_date : " + start_date)
     print("end_date : " + end_date)
     try:
-        # DB에서 사용자 s1_* 설정 로드 (없으면 None → 서비스 내부에서 기본값 적용)
-        user_opts = userOptionsDaoImpl.select_s1_options(g.db, g.current_user_id)
+        # DB에서 사용자 user_option_reco 설정 로드 (없으면 None → 서비스 내부에서 기본값 적용)
+        user_opts = userOptionsDaoImpl.select_reco_options(g.db, g.current_user_id)
         result    = backtestSvc.run(stock_code, start_date, end_date, user_opts)
         print(result)
         return ApiResponse.success(result)
@@ -817,7 +818,7 @@ def post_backtest_run():
         if len(rows) < 5:
             return _error('INSUFFICIENT_DATA', '데이터가 부족합니다.')
 
-        # user options → UserOptionMeta로 s1_* override
+        # user_option_reco → UserOptionMeta 오버라이드
         base_ui   = _build_base_user_info(g.db, g.current_user_id)
         backtester = KisBacktester(fee_rate=fee_rate)
         result     = backtester.run_one(coin_code, rows, base_ui)
@@ -904,14 +905,16 @@ def get_candle():
 
 
 # ──────────────────────────────────────────────────────────────────
-# 내부 헬퍼: DB s1_* → UserOptionMeta
+# 내부 헬퍼: DB user_option_reco → UserOptionMeta
 # ──────────────────────────────────────────────────────────────────
 def _build_base_user_info(db_session, user_id: int) -> UserOptionMeta:
-    """user_options s1_* → UserOptionMeta 에 세팅."""
+    """user_option_reco → UserOptionMeta 에 세팅."""
     ui       = UserOptionMeta()
-    s1_opts  = userOptionsDaoImpl.select_s1_options(db_session, user_id)
-    if s1_opts:
-        for k, v in s1_opts.items():
-            if hasattr(ui, k) and v is not None:
-                setattr(ui, k, v)
+    opts  = userOptionsDaoImpl.select_reco_options(db_session, user_id)
+    if opts:
+        # API/테이블 키는 접두어가 없고 UserOptionMeta 는 reco_ 접두어로 담는다.
+        for k, v in opts.items():
+            attr = f'{RECO_META_PREFIX}{k}'
+            if hasattr(ui, attr) and v is not None:
+                setattr(ui, attr, v)
     return ui

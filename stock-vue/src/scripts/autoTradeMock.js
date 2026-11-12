@@ -11,12 +11,12 @@ const clone = (o) => JSON.parse(JSON.stringify(o ?? null));
 /* ── 모드 마스터 ── */
 const MODES = [
     {
-        mode_code: 'M1', mode_name: '추천매수 자동매매',
-        mode_desc: '매일 저녁 8시 배치가 뽑은 추천 종목 중 <b>1순위 종목을 익일 전량 매수</b>합니다.<br/>매도는 기존 S1 전략(손절·익절·트레일링·타임스탑)을 따릅니다.',
+        mode_code: 'RECO', mode_name: '추천매수 자동매매',
+        mode_desc: '매일 저녁 8시 배치가 뽑은 추천 종목 중 <b>1순위 종목을 익일 전량 매수</b>합니다.<br/>매도는 기존 추천매수 전략(손절·익절·트레일링·타임스탑)을 따릅니다.',
         need_stock: 'N', need_pair: 'N', need_price: 'N', sort_order: 1, enabled_flag: 'Y',
     },
     {
-        mode_code: 'M2', mode_name: 'ETF 교대',
+        mode_code: 'ETF_SWITCH', mode_name: 'ETF 교대',
         mode_desc: '<b>정방향 ETF</b>와 <b>인버스 ETF</b>를 각자의 매수 신호(MACD·OBV·MA20·RSI, 30분봉)로 독립 운용합니다.<br/>신호가 없으면 현금 대기하며, 청산은 손절·익절·트레일링 또는 모멘텀 이탈입니다.',
         need_stock: 'N', need_pair: 'Y', need_price: 'N', sort_order: 2, enabled_flag: 'Y',
     },
@@ -32,7 +32,7 @@ const db = {
     state: {
         enabled_flag: 'Y',
         run_state: 'HOLDING',
-        active_mode: 'M1',
+        active_mode: 'RECO',
         active_config: {},
         active_from: '2026-08-04T09:03:00',
         pending_mode: null,
@@ -41,7 +41,7 @@ const db = {
         last_tick_at: '2026-08-11T14:52:10',
         last_message: 'HOLD · 수익률 +3.21% · 트레일링 라인 71,480 미도달 (보유 5봉)',
         position: {
-            stock_code: '005930', stock_name: '삼성전자', trade_mode: 'M1',
+            stock_code: '005930', stock_name: '삼성전자', trade_mode: 'RECO',
             entry_price: 71200, qty: 14, profit_pct: '+3.21%',
             stop_price: 67640, target_price: 92560, trail_line: 71480,
             bars_held: 5, sell_reason: null,
@@ -60,9 +60,9 @@ const db = {
         filled_price: null, filled_qty: null, filled_at: null,
     },
     history: [
-        { log_id: 3, action_type: 'APPLY_NOW', from_mode: null, to_mode: 'M1', reason: '최초 설정', actor: 'USER', created_at: '2026-08-01T10:12:00' },
-        { log_id: 2, action_type: 'START', from_mode: 'M1', to_mode: 'M1', reason: '자동매매 시작', actor: 'USER', created_at: '2026-08-01T10:12:20' },
-        { log_id: 1, action_type: 'COMMIT', from_mode: 'M1', to_mode: 'M1', reason: '매도 체결 후 재무장', actor: 'WORKER', created_at: '2026-08-04T09:03:00' },
+        { log_id: 3, action_type: 'APPLY_NOW', from_mode: null, to_mode: 'RECO', reason: '최초 설정', actor: 'USER', created_at: '2026-08-01T10:12:00' },
+        { log_id: 2, action_type: 'START', from_mode: 'RECO', to_mode: 'RECO', reason: '자동매매 시작', actor: 'USER', created_at: '2026-08-01T10:12:20' },
+        { log_id: 1, action_type: 'COMMIT', from_mode: 'RECO', to_mode: 'RECO', reason: '매도 체결 후 재무장', actor: 'WORKER', created_at: '2026-08-04T09:03:00' },
     ],
     seq: 4,
 };

@@ -105,7 +105,7 @@
             <div v-if="popupOpen" class="popup-overlay">
                 <div class="popup-panel">
                     <header class="popup-head">
-                        <h3>전략 설정 (S1)</h3>
+                        <h3>전략 설정 (추천매수)</h3>
                         <button class="popup-x" @click="closeStrategyPopup" aria-label="닫기">✕</button>
                     </header>
 
@@ -113,7 +113,7 @@
                         <div v-if="optLoading" class="opt-loading">불러오는 중…</div>
 
                         <template v-else>
-                            <div v-for="g in S1_GROUPS" :key="g.title" class="opt-group">
+                            <div v-for="g in RECO_GROUPS" :key="g.title" class="opt-group">
                                 <div class="opt-group-title">{{ g.title }}</div>
                                 <div class="opt-fields">
                                     <div v-for="f in g.fields" :key="f.k" class="opt-field">
@@ -124,19 +124,19 @@
 
                                         <!-- boolean → toggle -->
                                         <button v-if="f.type === 'bool'" type="button"
-                                            :class="['mini-toggle', Number(s1Form[f.k]) === 1 ? 'on' : 'off']"
-                                            @click="s1Form[f.k] = Number(s1Form[f.k]) === 1 ? 0 : 1">
+                                            :class="['mini-toggle', Number(recoForm[f.k]) === 1 ? 'on' : 'off']"
+                                            @click="recoForm[f.k] = Number(recoForm[f.k]) === 1 ? 0 : 1">
                                             <span class="mini-knob"></span>
                                         </button>
 
                                         <!-- select -->
-                                        <select v-else-if="f.type === 'select'" v-model="s1Form[f.k]">
+                                        <select v-else-if="f.type === 'select'" v-model="recoForm[f.k]">
                                             <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
                                         </select>
 
                                         <!-- number -->
                                         <input v-else type="number"
-                                            v-model="s1Form[f.k]"
+                                            v-model="recoForm[f.k]"
                                             :step="f.type === 'decimal' ? 'any' : '1'"
                                             inputmode="decimal"
                                             :placeholder="String(f.def)" />
@@ -222,75 +222,75 @@ const runBacktest = async () => {
     }
 };
 
-/* ── 전략설정 팝업 (user_options.s1_*) ── */
+/* ── 전략설정 팝업 (user_option_reco.*) ── */
 const popupOpen = ref(false);
 const optLoading = ref(false);
 const optSaving = ref(false);
 
-const S1_GROUPS = [
+const RECO_GROUPS = [
     { title: '손절 / 익절 / 보유', fields: [
-        { k: 's1_stop_loss_pct', label: '손절 비율', type: 'decimal', def: 0.05 },
-        { k: 's1_take_profit_pct', label: '익절 비율', type: 'decimal', def: 0.30 },
-        { k: 's1_max_hold_bars', label: '최대 보유 봉수', type: 'int', def: 12 },
+        { k: 'stop_loss_pct', label: '손절 비율', type: 'decimal', def: 0.05 },
+        { k: 'take_profit_pct', label: '익절 비율', type: 'decimal', def: 0.30 },
+        { k: 'max_hold_bars', label: '최대 보유 봉수', type: 'int', def: 12 },
     ]},
     { title: 'RSI', fields: [
-        { k: 's1_rsi_overbought', label: 'RSI 과매수 기준', type: 'int', def: 70 },
-        { k: 's1_rsi_ideal_low', label: 'RSI 신뢰구간 하한', type: 'int', def: 40 },
-        { k: 's1_rsi_ideal_high', label: 'RSI 신뢰구간 상한', type: 'int', def: 65 },
+        { k: 'rsi_overbought', label: 'RSI 과매수 기준', type: 'int', def: 70 },
+        { k: 'rsi_ideal_low', label: 'RSI 신뢰구간 하한', type: 'int', def: 40 },
+        { k: 'rsi_ideal_high', label: 'RSI 신뢰구간 상한', type: 'int', def: 65 },
     ]},
     { title: '거래량', fields: [
-        { k: 's1_vol_ma_window', label: '평균 거래량 산정 기간', type: 'int', def: 20 },
-        { k: 's1_vol_ma_mult', label: '진입 최소 거래량 배수', type: 'decimal', def: 0.5 },
+        { k: 'vol_ma_window', label: '평균 거래량 산정 기간', type: 'int', def: 20 },
+        { k: 'vol_ma_mult', label: '진입 최소 거래량 배수', type: 'decimal', def: 0.5 },
     ]},
     { title: '국면 판정', fields: [
-        { k: 's1_regime_window', label: '국면 분류 봉 길이', type: 'int', def: 90 },
-        { k: 's1_regime_threshold', label: '하락국면 판정 임계값', type: 'decimal', def: 0.70 },
-        { k: 's1_strict_need_macd_up', label: '하락국면: MACD≥Signal 요구', type: 'bool', def: 1 },
-        { k: 's1_loose_need_vol_surge', label: '상승국면: 거래량 급증 요구', type: 'bool', def: 1 },
-        { k: 's1_surge_relax_mult', label: '완화 급증 배수(전봉 대비)', type: 'decimal', def: 2.0 },
-        { k: 's1_downtrend_surge_bypass', label: '하락국면 거래량급증 우회', type: 'bool', def: 1 },
-        { k: 's1_surge_bypass_mult', label: '우회 급증 판정 배수', type: 'decimal', def: 2.0 },
+        { k: 'regime_window', label: '국면 분류 봉 길이', type: 'int', def: 90 },
+        { k: 'regime_threshold', label: '하락국면 판정 임계값', type: 'decimal', def: 0.70 },
+        { k: 'strict_need_macd_up', label: '하락국면: MACD≥Signal 요구', type: 'bool', def: 1 },
+        { k: 'loose_need_vol_surge', label: '상승국면: 거래량 급증 요구', type: 'bool', def: 1 },
+        { k: 'surge_relax_mult', label: '완화 급증 배수(전봉 대비)', type: 'decimal', def: 2.0 },
+        { k: 'downtrend_surge_bypass', label: '하락국면 거래량급증 우회', type: 'bool', def: 1 },
+        { k: 'surge_bypass_mult', label: '우회 급증 판정 배수', type: 'decimal', def: 2.0 },
     ]},
     { title: '트레일링 스탑', fields: [
-        { k: 's1_use_trailing', label: '트레일링 스탑 사용', type: 'bool', def: 1 },
-        { k: 's1_trail_activate_pct', label: '트레일링 활성화 수익 기준', type: 'decimal', def: 0.08 },
-        { k: 's1_k_trail_atr', label: '샹들리에 ATR 배수', type: 'decimal', def: 3.0 },
-        { k: 's1_trail_floor_pct', label: 'ATR 미산출시 대체 하락폭', type: 'decimal', def: 0.10 },
-        { k: 's1_trail_drawdown_pct', label: '고점 대비 하락폭(미설정=미사용)', type: 'decimal', def: '' },
-        { k: 's1_trail_dual', label: 'ATR 라인과 이중 감시', type: 'bool', def: 1 },
+        { k: 'use_trailing', label: '트레일링 스탑 사용', type: 'bool', def: 1 },
+        { k: 'trail_activate_pct', label: '트레일링 활성화 수익 기준', type: 'decimal', def: 0.08 },
+        { k: 'k_trail_atr', label: '샹들리에 ATR 배수', type: 'decimal', def: 3.0 },
+        { k: 'trail_floor_pct', label: 'ATR 미산출시 대체 하락폭', type: 'decimal', def: 0.10 },
+        { k: 'trail_drawdown_pct', label: '고점 대비 하락폭(미설정=미사용)', type: 'decimal', def: '' },
+        { k: 'trail_dual', label: 'ATR 라인과 이중 감시', type: 'bool', def: 1 },
     ]},
     { title: '타임스탑', fields: [
-        { k: 's1_time_stop_extend', label: '타임스탑 연장 허용', type: 'bool', def: 1 },
-        { k: 's1_time_stop_band', label: '정체 판정 수익밴드', type: 'decimal', def: 0.02 },
-        { k: 's1_time_stop_grace', label: '신고가 갱신 허용 봉수', type: 'int', def: 3 },
-        { k: 's1_max_hold_bars_hard', label: '절대 보유 한도', type: 'int', def: 20 },
+        { k: 'time_stop_extend', label: '타임스탑 연장 허용', type: 'bool', def: 1 },
+        { k: 'time_stop_band', label: '정체 판정 수익밴드', type: 'decimal', def: 0.02 },
+        { k: 'time_stop_grace', label: '신고가 갱신 허용 봉수', type: 'int', def: 3 },
+        { k: 'max_hold_bars_hard', label: '절대 보유 한도', type: 'int', def: 20 },
     ]},
 ];
 
-const ALL_KEYS = S1_GROUPS.flatMap(g => g.fields.map(f => f.k));
-const s1Form = reactive({});
-let s1Original = {};
+const ALL_KEYS = RECO_GROUPS.flatMap(g => g.fields.map(f => f.k));
+const recoForm = reactive({});
+let recoOriginal = {};
 
-const blankS1 = () => {
+const blankRecoForm = () => {
     const o = {};
-    S1_GROUPS.forEach(g => g.fields.forEach(f => { o[f.k] = f.def; }));
+    RECO_GROUPS.forEach(g => g.fields.forEach(f => { o[f.k] = f.def; }));
     return o;
 };
 
 const openStrategyPopup = async () => {
     popupOpen.value = true;
     optLoading.value = true;
-    Object.assign(s1Form, blankS1());
+    Object.assign(recoForm, blankRecoForm());
     try {
         const { data } = await aibeesApi.get('/api/v1/strategy/options');
         const d = data.data ?? {};
         ALL_KEYS.forEach(k => {
-            if (d[k] !== undefined && d[k] !== null) s1Form[k] = d[k];
+            if (d[k] !== undefined && d[k] !== null) recoForm[k] = d[k];
         });
-        s1Original = JSON.parse(JSON.stringify(s1Form));
+        recoOriginal = JSON.parse(JSON.stringify(recoForm));
     } catch (e) {
         console.error(e);
-        s1Original = JSON.parse(JSON.stringify(s1Form));
+        recoOriginal = JSON.parse(JSON.stringify(recoForm));
     } finally {
         optLoading.value = false;
     }
@@ -299,7 +299,7 @@ const openStrategyPopup = async () => {
 const closeStrategyPopup = () => { popupOpen.value = false; };
 
 const fieldType = (k) => {
-    for (const g of S1_GROUPS) for (const f of g.fields) if (f.k === k) return f.type;
+    for (const g of RECO_GROUPS) for (const f of g.fields) if (f.k === k) return f.type;
     return 'decimal';
 };
 
@@ -307,9 +307,9 @@ const saveStrategy = async () => {
     // 변경된 컬럼만 diff
     const diff = {};
     ALL_KEYS.forEach(k => {
-        if (String(s1Form[k]) !== String(s1Original[k])) {
+        if (String(recoForm[k]) !== String(recoOriginal[k])) {
             const t = fieldType(k);
-            const v = s1Form[k];
+            const v = recoForm[k];
             if (t === 'select') diff[k] = v;
             else if (v === '' || v === null) diff[k] = null;
             else diff[k] = Number(v);
@@ -322,7 +322,7 @@ const saveStrategy = async () => {
     optSaving.value = true;
     try {
         await aibeesApi.patch('/api/v1/strategy/options', diff);
-        s1Original = JSON.parse(JSON.stringify(s1Form));
+        recoOriginal = JSON.parse(JSON.stringify(recoForm));
         alert('저장되었습니다.');
         popupOpen.value = false;
     } catch (e) {

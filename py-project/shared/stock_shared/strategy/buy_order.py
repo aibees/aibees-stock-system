@@ -1,4 +1,4 @@
-"""매수타겟 정렬 규칙 (user_options.s1_buy_order).
+"""매수타겟 정렬 규칙 (user_option_reco.buy_order).
 
 worker(BuyExecutor)와 시뮬레이션이 **같은 순서로** 종목을 고르게 하려면
 정렬 규칙이 한 곳에만 있어야 한다. 식을 복제하면 한쪽만 고쳐져
@@ -59,7 +59,7 @@ ORDER_FIELDS = {
     # shape 모델 추론값(0~1). 2026-09 세션 리서치: 집계 지표(top-K% 정밀도)로는 개선돼
     # 보였지만, 실전과 동일한 순차 단일 포지션 복리 시뮬레이션에서는 갭하락 리스크에
     # 취약해 기존 scoring 방식보다 나빴다 — 그래서 rank_no 산정 기본값에서는 뺐다
-    # (assign_ranks 참고). 원하는 사용자가 s1_buy_order 에 opt-in 으로만 쓸 수 있게
+    # (assign_ranks 참고). 원하는 사용자가 reco_buy_order 에 opt-in 으로만 쓸 수 있게
     # 필드만 남겨둔다.
     "shape_proba": (lambda r: _num(r.get("shape_proba")), "desc"),
     # 2단계(top10→모멘텀 재정렬) 결과 순위(1~10, 그 외는 NULL). watch 게이트와 별개로

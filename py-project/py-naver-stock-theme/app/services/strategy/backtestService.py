@@ -1,23 +1,24 @@
 """
-backtestService.py — S1 전략 단일 종목 백테스트 (KospiStrategy1 위임)
+backtestService.py — RECO 전략 단일 종목 백테스트 (RecoStrategy 위임)
 
 라이브 OHLCV(KIS/yf)를 조회해 KisStockService.compute_indicator_df 로 지표를
-계산한 뒤, user_options 의 s1_* 값을 UserOptionMeta 에 실어
-KisBacktester + KospiStrategy1 으로 백테스트한다.
+계산한 뒤, user_options 의 user_option_reco 값을 UserOptionMeta 에 실어
+KisBacktester + RecoStrategy 으로 백테스트한다.
 
-진입/청산 판단은 전부 KospiStrategy1 이 담당하며(기존 _simulate 인라인 로직 제거),
+진입/청산 판단은 전부 RecoStrategy 이 담당하며(기존 _simulate 인라인 로직 제거),
 이 서비스는 데이터 준비와 위임만 한다. → /backtest/run 과 동일 엔진/결과 스키마.
 """
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from stock_shared.dao.userOptionRecoDao import META_PREFIX as RECO_META_PREFIX
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from app.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.yf.yfEngine import yfEngine
 from stock_shared.strategy.backtester import KisBacktester
 from app.services.kis.KisStockService import KisStockService
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.reco import RecoStrategy
 from app.utils.constants.Literal import Literal
 
 # compute_indicator_df 보조 윈도우 기본값.
@@ -36,20 +37,22 @@ class BacktestService:
     def _is_us(code: str) -> bool:
         return not (len(code) == 6 and code.isdigit())
 
-    # ── user_options s1_* → UserOptionMeta ─────────────────────────────
+    # ── user_option_reco → UserOptionMeta ─────────────────────────────
     def _build_user_info(self, user_opts: dict | None) -> UserOptionMeta:
-        """compute_indicator_df 용 윈도우 + s1_* 오버라이드를 실은 UserOptionMeta."""
+        """compute_indicator_df 용 윈도우 + user_option_reco 오버라이드를 실은 UserOptionMeta."""
         ui = UserOptionMeta()
         # 지표 계산 윈도우 (ingest 와 동일)
         ui.vol_surge          = _INGEST_VOL_SURGE
         ui.delay_date         = _INGEST_DELAY_DATE
         ui.macd_recent_day    = _INGEST_MACD_RECENT_DAY
         ui.bb_over_recent_day = _INGEST_BB_OVER_RECENT_DAY
-        # user_options s1_* 오버라이드 → KospiStrategy1.configure 가 읽어 적용
+        # user_option_reco 오버라이드 → RecoStrategy.configure 가 읽어 적용
+        #   API/테이블 키는 접두어가 없고 UserOptionMeta 는 reco_ 접두어로 담는다.
         if user_opts:
             for k, v in user_opts.items():
-                if hasattr(ui, k) and v is not None:
-                    setattr(ui, k, v)
+                attr = f'{RECO_META_PREFIX}{k}'
+                if hasattr(ui, attr) and v is not None:
+                    setattr(ui, attr, v)
         return ui
 
     # ── 진입점 ─────────────────────────────────────────────────────────
@@ -57,8 +60,8 @@ class BacktestService:
             user_opts: dict | None) -> dict:
         ui = self._build_user_info(user_opts)
 
-        # 지표 워밍업 확보: regime_window(s1) 또는 150봉 중 큰 값 + 여유 일수
-        warmup = max(int(ui.s1_regime_window or 0), 150)
+        # 지표 워밍업 확보: regime_window(추천매수 옵션) 또는 150봉 중 큰 값 + 여유 일수
+        warmup = max(int(ui.reco_regime_window or 0), 150)
         fetch_start = (
             datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=warmup + 60)
         ).strftime('%Y-%m-%d')
@@ -87,5 +90,5 @@ class BacktestService:
 
         rows = sim.to_dict('records')
 
-        backtester = KisBacktester(strategy=KospiStrategy1(), fee_rate=self.DEFAULT_FEE_RATE)
+        backtester = KisBacktester(strategy=RecoStrategy(), fee_rate=self.DEFAULT_FEE_RATE)
         return backtester.run_one(stock_code, rows, ui)

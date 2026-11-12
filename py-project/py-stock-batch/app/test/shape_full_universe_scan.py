@@ -1,10 +1,10 @@
 """
-테스트용 배치: KospiStrategy1 게이트를 거치지 않은 "진짜 전종목"(market_stop 활성 +
+테스트용 배치: RecoStrategy 게이트를 거치지 않은 "진짜 전종목"(market_stop 활성 +
 group_code in ST/RT/MF, get_stock_master_list('batches')와 동일 대상)을 스캔해서
 shape_proba(OLD/NEW 두 모델)를 계산하고 trade_shape_scan_stock 에 저장한다.
 
 trade_candle_data 는 TradeCandleBackfillJob이 "최근 60일 내 한 번이라도 추천된 종목"만
-채우기 때문에, 그걸로 만든 raw-universe 백테스트는 이미 old_score(=KospiStrategy1 게이트)
+채우기 때문에, 그걸로 만든 raw-universe 백테스트는 이미 old_score(=RecoStrategy 게이트)
 쪽으로 편향돼 있었다 — 이 스캔은 그 편향을 없애기 위해 진짜 전종목 시세를 새로 받는다.
 
 실행: 종목당 KIS API 호출 1.5초 슬립 → 전체 ~3,900종목 기준 1시간 이상 소요.

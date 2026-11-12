@@ -646,7 +646,7 @@ const toggleRow = (code) => { expandedCode.value = expandedCode.value === code ?
 
 /* ── 최우선타겟: 사용자가 매수추천 항목 중 하나를 직접 지정 ──
  * 서버(trade_buy_target_priority, 유저당 1건·날짜 무관 전역값)에 저장된다.
- * 다음 영업일 09:00 정규장 매수 라운드에서 worker(BuyExecutor1)가 이 값을 읽어
+ * 다음 영업일 09:00 정규장 매수 라운드에서 worker(RecoBuyExecutor)가 이 값을 읽어
  * 그 날 매수타겟 1순위로 승격시키고, 라운드가 끝나면(매수 성공·스킵 무관) 1회성으로
  * 초기화한다 — 그래서 프론트도 "선택 즉시 서버에 반영"만 하고 별도 유효기간은 두지 않는다.
  */

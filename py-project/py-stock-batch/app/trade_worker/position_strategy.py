@@ -23,18 +23,19 @@ from stock_shared.db.contextManager import get_session
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from app.ext_services.kis.component.KisStockService import KisService
 from stock_shared.strategy import STRATEGY_BY_MODE
+from stock_shared import trade_mode
 
 log = logging.getLogger("trade_worker.strategy")
 
 #: active_mode 를 못 읽었을 때 쓸 기본 모드.
 #: user_trade_mode 행이 없거나 조회에 실패해도 worker 가 죽지 않고 현행 전략으로 돈다.
-DEFAULT_MODE = "M1"
+DEFAULT_MODE = trade_mode.RECO
 
 #: 매매정지 모드(2026-10-11 개정): **신규 매수만 멈춘다.** 이미 보유한 종목은 손절·익절·트레일링·
 #: 타임스탑·수기등록 지정가 매도를 평소대로 추적·실행한다(보유분을 무방비로 두지 않는다).
 #: 전략 자체가 없는 모드라, 매도 라인 계산에는 DEFAULT_MODE 전략을 빌려 쓴다.
 #: 실제 차단 지점: BuyExecutor.run 진입부 + Broker._order_rest(BUY 안전망). 매도 경로는 막지 않는다.
-HALT_MODE = "M0"
+HALT_MODE = trade_mode.HALT
 
 
 class UnsupportedModeError(RuntimeError):
@@ -79,16 +80,19 @@ def _f(v, default=0.0):
         return default
 
 
-def _s1_fingerprint(meta) -> tuple:
-    """user_meta 의 s1_* 값들을 비교 가능한 튜플로. 설정 변경 감지용.
+#: 설정 변경 감지 대상 — 모드별 옵션 테이블에서 얹은 UserOptionMeta 접두어
+_MODE_OPTION_PREFIXES = ("reco_", "etf_switch_")
 
-    user_options 에 updated_at 이 없어서 타임스탬프 비교를 못 한다.
-    행 1건을 읽어 값 자체를 비교하는 편이 스키마 변경보다 싸고 정확하다
-    (되돌리기·재저장으로 타임스탬프만 바뀐 경우를 오탐하지도 않는다).
+
+def _mode_option_fingerprint(meta) -> tuple:
+    """user_meta 의 모드별 옵션(reco_* / etf_switch_*) 값들을 비교 가능한 튜플로. 설정 변경 감지용.
+
+    타임스탬프 대신 값 자체를 비교한다 — 되돌리기·재저장으로 시각만 바뀐 경우를
+    오탐하지 않고, 화면 외 경로(SQL 직접 수정)로 바뀐 값도 잡는다.
     """
     return tuple(
         (k, str(getattr(meta, k, None)))
-        for k in sorted(k for k in vars(meta) if k.startswith("s1_"))
+        for k in sorted(k for k in vars(meta) if k.startswith(_MODE_OPTION_PREFIXES))
     )
 
 
@@ -101,17 +105,17 @@ class SellStrategy:
         self.lookback = lookback_days
         self.repo = repo
         self.kis_service = KisService()         # _indicators() 가 지표 계산에 쓴다
-        with get_session() as s:                # s1_* 파라미터 포함 유저 옵션
+        with get_session() as s:                # 모드별 옵션(reco_* 등) 포함 유저 옵션
             self.user_meta = UserService().get_user_options(s, user_id)
         # 전략은 유저의 운용모드로 결정된다. 하드코딩하지 않는다.
         self.mode = self._read_mode()
         self.strategy = build_strategy(self.mode, self.user_meta)
-        self._fingerprint = _s1_fingerprint(self.user_meta)
+        self._fingerprint = _mode_option_fingerprint(self.user_meta)
         log.info("전략 초기화: mode=%s → %s", self.mode, type(self.strategy).__name__)
 
     @property
     def halted(self) -> bool:
-        """매매정지(M0)면 True — 신규 매수를 내지 않는다(보유분 매도는 계속)."""
+        """매매정지(HALT)면 True — 신규 매수를 내지 않는다(보유분 매도는 계속)."""
         return self.mode == HALT_MODE
 
     # ── 현재 운용모드 조회 ───────────────────────────────────────────
@@ -129,11 +133,16 @@ class SellStrategy:
             log.warning("user_trade_mode.active_mode 없음(user_id=%s) → 기본 %s",
                         self.user_id, DEFAULT_MODE)
             return DEFAULT_MODE
-        return str(mode)
+        normalized = trade_mode.normalize(mode)
+        if normalized != mode:
+            # sql/54 미적용 상태. 그대로 두면 'M0'(매매정지)이 모르는 모드 → RECO 로 떨어져 매수가 나간다.
+            log.warning("옛 모드 코드 %s 를 %s 로 해석(user_id=%s) — sql/54 적용 여부 확인 필요",
+                        mode, normalized, self.user_id)
+        return normalized
 
     # ── 장중 설정/모드 재적용 ────────────────────────────────────────
     def reload_if_changed(self) -> list[tuple[str, object, object]]:
-        """운용모드 또는 user_options(s1_*) 가 바뀌었으면 전략을 재구성한다.
+        """운용모드 또는 모드별 옵션(user_option_reco 등)이 바뀌었으면 전략을 재구성한다.
 
         반환: [(속성명, 이전값, 새값), ...] — 변경 없으면 빈 리스트.
 
@@ -148,7 +157,7 @@ class SellStrategy:
             new_meta = UserService().get_user_options(s, self.user_id)
 
         new_mode = self._read_mode()
-        new_fp = _s1_fingerprint(new_meta)
+        new_fp = _mode_option_fingerprint(new_meta)
         mode_changed = (new_mode != self.mode)
         if not mode_changed and new_fp == self._fingerprint:
             return []
@@ -182,10 +191,10 @@ class SellStrategy:
                 changes.append((attr, old_v, new_v))
 
         # 전략 객체에 없고 user_meta 에만 있는 값도 로그에 남긴다.
-        #   s1_buy_order·s1_gap_block_pct·s1_realtime_buy 는 전략 속성이 아니라 BuyExecutor 가 직접 읽는다.
+        #   reco_buy_order·reco_gap_block_pct·reco_realtime_buy 는 전략 속성이 아니라 BuyExecutor 가 직접 읽는다.
         #   위 루프만으로는 변경돼도 로그에 안 잡혀, 실제로 반영됐는지 사후 확인이
         #   불가능했다(매수 종목이 예상과 다를 때 원인 추적이 막힌다).
-        for key in ("s1_buy_order", "s1_gap_block_pct", "s1_realtime_buy"):
+        for key in ("reco_buy_order", "reco_gap_block_pct", "reco_realtime_buy"):
             old_v, new_v = getattr(old_meta, key, None), getattr(new_meta, key, None)
             if old_v != new_v:
                 changes.append((key, old_v, new_v))

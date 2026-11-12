@@ -2,11 +2,11 @@
 bt_reco_stop.py — 손절 체결 방식에 따라 실제 손실이 얼마나 달라지나.
 
 배경
-    eval_shape_proba.run_one_trade(지금까지 백테스트 표준)는 KospiStrategy1.get_action_in_active 를
+    eval_shape_proba.run_one_trade(지금까지 백테스트 표준)는 RecoStrategy.get_action_in_active 를
     **종가로** 판정하고 **다음 날 시가**에 판다. 그런데 이 판정의 손절 조건은
         종가 <= 진입가 × 0.95  AND  종가가 20일선 아래
     라서 20일선 위면 -5% 를 넘어도 버티고, 손절이 나도 갭하락을 그대로 맞는다.
-    반면 실전 워커(M1, modes/mode_1/sell_executor1.hit_line)는 **장중 체결가**가
+    반면 실전 워커(RECO, modes/reco/sell_executor.hit_line)는 **장중 체결가**가
     stop_price(진입가 × 0.95, 20일선 예외 없음)에 닿는 즉시 판다. 익절(+30%)·트레일도 장중.
     일봉 신호(타임스탑 등)만 개장 루틴에서 처리한다.
 
@@ -35,7 +35,7 @@ from app.test.eval_shape_proba import DB_URL, FEE_RATE, SELL_ACTIONS, _base_user
 from app.test.bt_reco_chart_analysis import load_bars
 from app.test.bt_reco_history import load_reco, dedupe
 from stock_shared.strategy.base import Action
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.reco import RecoStrategy
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 
 OUT_DIR = os.path.join(os.path.dirname(__file__), 'bt_reco_cache')
@@ -137,7 +137,7 @@ def sim_live(strategy, recs, i_sig, take: float = None):
 
 
 def evaluate(reco, engine) -> pd.DataFrame:
-    strategy = KospiStrategy1()
+    strategy = RecoStrategy()
     rows = []
     codes = reco['stock_code'].unique()
     for n, code in enumerate(codes, 1):

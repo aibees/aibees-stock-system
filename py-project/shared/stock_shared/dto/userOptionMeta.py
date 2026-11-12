@@ -95,53 +95,53 @@ class UserOptionMeta:
 
         self.upper_check_history = False
 
-        # ── KospiStrategy1 파라미터 (None이면 전략 클래스 기본값 사용) ────────
-        self.s1_stop_loss_pct         = None
-        self.s1_take_profit_pct       = None
-        self.s1_max_hold_bars         = None
-        self.s1_rsi_overbought        = None
-        self.s1_rsi_ideal_low         = None
-        self.s1_rsi_ideal_high        = None
-        self.s1_vol_ma_window         = None
-        self.s1_vol_ma_mult           = None
-        self.s1_regime_window         = None
-        self.s1_regime_threshold      = None
-        self.s1_strict_need_macd_up   = None
-        self.s1_loose_need_vol_surge  = None
-        self.s1_surge_relax_mult      = None
-        self.s1_downtrend_surge_bypass = None
-        self.s1_surge_bypass_mult     = None
-        self.s1_use_trailing          = None
-        self.s1_trail_basis           = None
-        self.s1_trail_activate_pct    = None
-        self.s1_k_trail_atr           = None
-        self.s1_trail_floor_pct       = None
-        self.s1_trail_drawdown_pct    = None   # 고점 대비 단순 -x% 라인 (0.05=-5%). None=미사용
-        self.s1_trail_giveback_pct    = None   # 평가이익 중 x% 반납 시 청산 (0.38=38%). None=미사용
-        self.s1_trail_dual            = None   # 1=ATR 라인까지 포함해 먼저 닿는 쪽 0=ATR 제외
-        self.s1_trail_fib_use         = None   # 피보나치 되돌림 트레일 사용 여부 (1/0)
-        self.s1_trail_fib_level       = None   # 되돌림 비율: 0.382 | 0.5 | 0.618
-        self.s1_time_stop_extend      = None
-        self.s1_time_stop_band        = None
-        self.s1_time_stop_grace       = None
-        self.s1_max_hold_bars_hard    = None
+        # ── RecoStrategy 파라미터 (None이면 전략 클래스 기본값 사용) ────────
+        self.reco_stop_loss_pct         = None
+        self.reco_take_profit_pct       = None
+        self.reco_max_hold_bars         = None
+        self.reco_rsi_overbought        = None
+        self.reco_rsi_ideal_low         = None
+        self.reco_rsi_ideal_high        = None
+        self.reco_vol_ma_window         = None
+        self.reco_vol_ma_mult           = None
+        self.reco_regime_window         = None
+        self.reco_regime_threshold      = None
+        self.reco_strict_need_macd_up   = None
+        self.reco_loose_need_vol_surge  = None
+        self.reco_surge_relax_mult      = None
+        self.reco_downtrend_surge_bypass = None
+        self.reco_surge_bypass_mult     = None
+        self.reco_use_trailing          = None
+        self.reco_trail_basis           = None
+        self.reco_trail_activate_pct    = None
+        self.reco_k_trail_atr           = None
+        self.reco_trail_floor_pct       = None
+        self.reco_trail_drawdown_pct    = None   # 고점 대비 단순 -x% 라인 (0.05=-5%). None=미사용
+        self.reco_trail_giveback_pct    = None   # 평가이익 중 x% 반납 시 청산 (0.38=38%). None=미사용
+        self.reco_trail_dual            = None   # 1=ATR 라인까지 포함해 먼저 닿는 쪽 0=ATR 제외
+        self.reco_trail_fib_use         = None   # 피보나치 되돌림 트레일 사용 여부 (1/0)
+        self.reco_trail_fib_level       = None   # 되돌림 비율: 0.382 | 0.5 | 0.618
+        self.reco_time_stop_extend      = None
+        self.reco_time_stop_band        = None
+        self.reco_time_stop_grace       = None
+        self.reco_max_hold_bars_hard    = None
 
-        # ── KospiStrategy1 매수 필터 on/off 스위치 (None이면 기본값 True 사용) ──
-        self.s1_enable_macd_filter      = None
-        self.s1_enable_rsi_filter       = None
-        self.s1_enable_bb_upper_filter  = None
-        self.s1_enable_vol_avg_filter   = None
-        self.s1_enable_regime_gate      = None
-        self.s1_enable_shape_exhaustion_filter = None  # 2026-09 세션 리서치. None이면 기본값 True
-        self.s1_enable_avg_vol_filter   = None  # None이면 기본값 True
-        self.s1_avg_vol_min             = None  # None이면 기본값 500,000
-        self.s1_enable_sma120_filter    = None  # 2026-09 세션, 저가>sma120 필수조건. None이면 기본값 True
+        # ── RecoStrategy 매수 필터 on/off 스위치 (None이면 기본값 True 사용) ──
+        self.reco_enable_macd_filter      = None
+        self.reco_enable_rsi_filter       = None
+        self.reco_enable_bb_upper_filter  = None
+        self.reco_enable_vol_avg_filter   = None
+        self.reco_enable_regime_gate      = None
+        self.reco_enable_shape_exhaustion_filter = None  # 2026-09 세션 리서치. None이면 기본값 True
+        self.reco_enable_avg_vol_filter   = None  # None이면 기본값 True
+        self.reco_avg_vol_min             = None  # None이면 기본값 500,000
+        self.reco_enable_sma120_filter    = None  # 2026-09 세션, 저가>sma120 필수조건. None이면 기본값 True
 
         # ── core 진입 신호 mode (None이면 기본값 'golden' 사용) ──
         # 'off'(사용안함) / 'golden'(골든크로스 여부) / 'slope'(기울기 상승여부)
-        self.s1_macd_signal_mode        = None
-        self.s1_obv_signal_mode         = None
-        self.s1_ma20_signal_mode        = None
+        self.reco_macd_signal_mode        = None
+        self.reco_obv_signal_mode         = None
+        self.reco_ma20_signal_mode        = None
 
         # ── worker 매수타겟 정렬 순서 (None이면 "score:desc,rank_no:asc") ──
         # "필드[:방향],..." 형식. 앞 키 동률일 때만 다음 키로 tie-break.
@@ -149,40 +149,40 @@ class UserOptionMeta:
         # 허용 필드는 trade_worker/repository.py 의 _ORDER_FIELDS 참조.
         # ※ 전략 판정이 아니라 '후보 중 무엇을 먼저 살지'를 정한다.
         #   BuyExecutor 는 이 순서의 첫 종목을 사므로 1순위 = 매수 종목.
-        self.s1_buy_order               = None
+        self.reco_buy_order               = None
 
         # ── worker 정규장 매수 시가갭 차단 기준 (None이면 0.02 = 2%) ──
         # |시가 − 전일종가| ÷ 전일종가 > 이 값이면 그 후보를 건너뛴다. 유저별 개인화.
-        self.s1_gap_block_pct           = None
+        self.reco_gap_block_pct           = None
 
         # ── worker 실시간 매수 (1=사용, None/0=미사용) ──
         # 정규장 중 계좌 보유가 0종목이 되면 가장 최신 매수타겟으로 매수 라운드를 다시 연다.
-        self.s1_realtime_buy            = None
+        self.reco_realtime_buy            = None
 
-        # ── KospiStrategy2 파라미터 (None이면 전략 클래스 기본값 사용) ────────
-        # M2: KODEX 코스피100 / 인버스를 **각각 독립적으로** 매매. 30분봉 기준.
+        # ── EtfSwitchStrategy 파라미터 (None이면 전략 클래스 기본값 사용) ────────
+        # ETF_SWITCH: KODEX 코스피100 / 인버스를 **각각 독립적으로** 매매. 30분봉 기준.
         #   진입 = MACD↑ · OBV↑ · MA20↑ · RSI<x  가 confirm_bars 봉 연속
         #   청산 = 가격라인(손절/익절/트레일링) 또는 모멘텀이탈(MACD↓·OBV↓·RSI↓)
-        self.s2_long_code              = None   # 정방향 ETF (기본 237350)
-        self.s2_short_code             = None   # 인버스 ETF (기본 114800)
+        self.etf_switch_long_code              = None   # 정방향 ETF (기본 237350)
+        self.etf_switch_short_code             = None   # 인버스 ETF (기본 114800)
         # 진입
-        self.s2_confirm_bars           = None   # 연속확인 봉수 (기본 3)
-        self.s2_rsi_overbought         = None   # 진입차단 RSI (기본 70)
-        self.s2_enable_macd_up         = None
-        self.s2_enable_obv_up          = None
-        self.s2_enable_ma20_up         = None
-        self.s2_enable_rsi_filter      = None
+        self.etf_switch_confirm_bars           = None   # 연속확인 봉수 (기본 3)
+        self.etf_switch_rsi_overbought         = None   # 진입차단 RSI (기본 70)
+        self.etf_switch_enable_macd_up         = None
+        self.etf_switch_enable_obv_up          = None
+        self.etf_switch_enable_ma20_up         = None
+        self.etf_switch_enable_rsi_filter      = None
         # 청산 — 모멘텀 이탈
-        self.s2_exit_on_reverse        = None   # 사용 여부 (기본 1)
-        self.s2_exit_macd_down         = None
-        self.s2_exit_obv_down          = None
-        self.s2_exit_rsi_down          = None
+        self.etf_switch_exit_on_reverse        = None   # 사용 여부 (기본 1)
+        self.etf_switch_exit_macd_down         = None
+        self.etf_switch_exit_obv_down          = None
+        self.etf_switch_exit_rsi_down          = None
         # 청산 — 가격 라인 (30분봉 스케일. 일봉용 -5% 는 거의 안 걸린다)
-        self.s2_stop_loss_pct          = None   # 기본 0.02 (-2%)
-        self.s2_take_profit_pct        = None   # 기본 미사용
-        self.s2_use_trailing           = None   # 기본 0
-        self.s2_trail_activate_pct     = None
-        self.s2_trail_drawdown_pct     = None
+        self.etf_switch_stop_loss_pct          = None   # 기본 0.02 (-2%)
+        self.etf_switch_take_profit_pct        = None   # 기본 미사용
+        self.etf_switch_use_trailing           = None   # 기본 0
+        self.etf_switch_trail_activate_pct     = None
+        self.etf_switch_trail_drawdown_pct     = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {k: _to_plain(v) for k, v in self.__dict__.items()}

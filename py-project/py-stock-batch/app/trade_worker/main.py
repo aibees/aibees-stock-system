@@ -30,7 +30,7 @@ from pytz import timezone
 from app.ext_services.kis.KisEngine import KisEngine
 from app.trade_worker import config
 from app.trade_worker.broker import Broker
-from app.trade_worker.modes.mode_1 import BuyExecutor1, SellExecutor1
+from app.trade_worker.modes.reco import RecoBuyExecutor, RecoSellExecutor
 from app.trade_worker.manual_buy import ManualBuyExecutor
 from app.trade_worker.notifier import Notifier
 from app.trade_worker.position_strategy import SellStrategy, UnsupportedModeError
@@ -251,23 +251,23 @@ def main():
             pass
         return
 
-    # 매매정지(M0) 안전망: 전략의 현재 모드를 Broker 주문 경로에 연결한다(장중 전환도 즉시 반영).
-    #   M0 는 신규 매수만 막는다 — 보유분 매도(손절·익절·트레일링·수기 지정가)는 허용.
+    # 매매정지(HALT) 안전망: 전략의 현재 모드를 Broker 주문 경로에 연결한다(장중 전환도 즉시 반영).
+    #   HALT 는 신규 매수만 막는다 — 보유분 매도(손절·익절·트레일링·수기 지정가)는 허용.
     broker.set_trading_gate(lambda side: side != "BUY" or not strategy.halted)
     if strategy.halted:
-        log.warning("[main] 매매정지(M0) 상태로 기동 — 신규 매수 없이 보유분 매도 감시만 수행")
+        log.warning("[main] 매매정지(HALT) 상태로 기동 — 신규 매수 없이 보유분 매도 감시만 수행")
         try:
-            repo.insert_worker_log(cfg.user_id, "boot", "INFO", "매매정지(M0) 상태로 기동 — 신규 매수 정지, 보유분 매도 감시")
-            notifier.send("[worker 기동] 매매정지(M0)",
+            repo.insert_worker_log(cfg.user_id, "boot", "INFO", "매매정지(HALT) 상태로 기동 — 신규 매수 정지, 보유분 매도 감시")
+            notifier.send("[worker 기동] 매매정지(HALT)",
                           "⏸ 매매정지 상태로 worker 가 시작됐습니다.\n"
                           "신규 매수는 하지 않고, 보유 종목의 손절·익절·트레일링 매도만 계속합니다.")
         except Exception:  # noqa: BLE001  (알림 실패로 기동을 막지 않는다)
             pass
 
-    # 7. 모드별 executor. 현재는 M1 고정 —
+    # 7. 모드별 executor. 현재는 RECO 고정 —
     #    다음 단계에서 RUNNER_BY_MODE[strategy.mode] 팩토리로 대체한다.
-    buy = BuyExecutor1(cfg, broker, repo, notifier, strategy=strategy)
-    sell = SellExecutor1(cfg, broker, repo, notifier, strategy=strategy)
+    buy = RecoBuyExecutor(cfg, broker, repo, notifier, strategy=strategy)
+    sell = RecoSellExecutor(cfg, broker, repo, notifier, strategy=strategy)
 
     # 부팅 시 실제 계좌 예수금 확인 + DB user_wallet 대조/동기화 + 보유종목 표시
     _boot_balance_check(cfg, broker, repo)
@@ -331,7 +331,7 @@ def main():
             #   폴링은 _POLL_START_HOUR(08시) 게이트 때문에 08시 전에는 즉시 return 하고,
             #   매수 cron 은 08:00:00 정각이라 첫 유효 폴링이 매수보다 늦게 도는 레이스가 있다.
             #   (2026-08-07 실제 사고: 08:00:00 매수가 기본 정렬로 나가고
-            #    08:00:35 에야 설정이 로드돼 유저의 s1_buy_order 가 반영되지 않았다)
+            #    08:00:35 에야 설정이 로드돼 유저의 reco_buy_order 가 반영되지 않았다)
             sell.apply_settings_change()
             # 개장 직후는 잔고 조회가 가장 신선한 시점이다 — 여기서 계좌와 한 번 대조해
             # 계좌에 없는 좀비 HOLDING 을 닫는다. 예전엔 이 대조가 **부팅 때만** 돌아서,
@@ -446,10 +446,10 @@ def main():
             _trading_cache[ymd] = trading
         return _trading_cache[ymd]
 
-    # ── 실시간 매수 (user_options.s1_realtime_buy=1) ──────────────────
+    # ── 실시간 매수 (user_option_reco.realtime_buy=1) ──────────────────
     #   정규장(cfg.realtime_buy_start~end) 중 계좌 보유가 0종목이 되면 **가장 최신 매수타겟**
     #   (장중 갱신 배치가 돌았으면 오늘 목록, 아니면 전날 최종 목록)으로 09:00 과 같은 라운드를 연다.
-    #     · 당일 손실 매도 종목은 후보에서 뺀다(BuyExecutor1.pick_candidates).
+    #     · 당일 손실 매도 종목은 후보에서 뺀다(RecoBuyExecutor.pick_candidates).
     #     · 갭 게이트 기준가 = 그 매수타겟의 close(장중 목록이면 배치 조회 시점 가격).
     #     · 하루 횟수 상한 없음. 다만 체결 없이 끝난 라운드(갭 초과·후보 없음)는
     #       cfg.realtime_buy_retry_sec 동안 다시 열지 않는다 — 10초 폴링마다 KIS 시세·매수가능
@@ -458,7 +458,7 @@ def main():
 
     def _maybe_realtime_buy(now_kst):
         meta = getattr(strategy, "user_meta", None)
-        if not meta or int(getattr(meta, "s1_realtime_buy", 0) or 0) != 1:
+        if not meta or int(getattr(meta, "reco_realtime_buy", 0) or 0) != 1:
             return
         if strategy.halted or not buy.supports_realtime():
             return
@@ -523,7 +523,7 @@ def main():
     else:
         log.info("계좌 주기 갱신 비활성 (WALLET_POLL_SEC=%d)", cfg.wallet_poll_sec)
 
-    # ── 설정(user_options s1_*) 변경 감지 ──────────────────────────────
+    # ── 설정(user_option_reco) 변경 감지 ──────────────────────────────
     #  worker 는 데몬이라 부팅 시 configure() 한 파라미터가 그대로 굳는다.
     #  이 폴링이 없으면 화면에서 매도 조건을 바꿔도 재기동 전까지 반영되지 않는다.
     #  단일 행 SELECT 1건이라 60초 주기면 부하는 사실상 0.
@@ -550,7 +550,7 @@ def main():
                  cfg.settings_poll_sec)
 
     # ── 수동 매수 ─────────────────────────────────────────────────────
-    #  화면 요청을 짧은 주기로 확인해 바로 주문한다(manual_buy.py). 매매정지(M0)여도 돈다.
+    #  화면 요청을 짧은 주기로 확인해 바로 주문한다(manual_buy.py). 매매정지(HALT)여도 돈다.
     #  휴장일 판단은 요청이 있을 때만 하고, 휴장일 요청은 주문 없이 거부한다.
     manual_buy = ManualBuyExecutor(cfg, broker, repo, sell, notifier)
     manual_buy.recover_after_boot()

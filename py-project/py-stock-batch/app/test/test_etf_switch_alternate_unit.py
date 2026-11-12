@@ -1,5 +1,5 @@
 """
-M2 교대매매 시뮬레이터 단위 검증 (DB / KIS 불필요).
+ETF_SWITCH 교대매매 시뮬레이터 단위 검증 (DB / KIS 불필요).
 
 무엇을 검증하나
     1. scoring.tech_score 가 추출 전 StockService._tech_score 와 수치가 동일한가
@@ -13,14 +13,14 @@ M2 교대매매 시뮬레이터 단위 검증 (DB / KIS 불필요).
     5. 수익률/MDD 집계가 맞는가
 
 전략을 mock 으로 갈아끼워 신호 시퀀스를 직접 통제한다.
-KospiStrategy1 자체는 기존 백테스트에서 이미 검증된 영역이라 여기선 다루지 않는다.
+RecoStrategy 자체는 기존 백테스트에서 이미 검증된 영역이라 여기선 다루지 않는다.
 
 실행
-    poetry run python -m app.test.test_m2_alternate_unit
+    poetry run python -m app.test.test_etf_switch_alternate_unit
 """
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from stock_shared.strategy import scoring
-from stock_shared.strategy.m2_alternate import M2AlternateSimulator, ScoreConfig
+from stock_shared.strategy.etf_alternate_sim import M2AlternateSimulator, ScoreConfig
 
 PASS, FAIL = [], []
 
@@ -109,7 +109,7 @@ def test_score_equivalence():
     now = scoring.total_score(tech, fund, liq)
     check('total_score 원본 가중치', abs(legacy - now) < 1e-12, f'{legacy} vs {now}')
 
-    # liq 정규화: 후보 2개면 항상 1.0 / 0.0 (M2 편향 경고의 근거)
+    # liq 정규화: 후보 2개면 항상 1.0 / 0.0 (ETF_SWITCH 편향 경고의 근거)
     liqs = scoring.normalize_liquidity([1e10, 1e8])
     check('normalize_liquidity 2종목 → [1.0, 0.0]',
           liqs == [1.0, 0.0], str(liqs))
@@ -342,7 +342,7 @@ def test_metrics():
 # ══════════════════════════════════════════════════════════════
 def main():
     print('=' * 70)
-    print('M2 교대매매 시뮬레이터 단위 검증')
+    print('ETF_SWITCH 교대매매 시뮬레이터 단위 검증')
     print('=' * 70)
     test_score_equivalence()
     test_align()

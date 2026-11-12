@@ -17,8 +17,8 @@ class MasterStrategyParam(Base):
     __tablename__ = 'master_strategy_param'
 
     # ── 식별 ──────────────────────────────────────────────────────────
-    strategy_code = Column(String(10), nullable=False)   # 'S1' = KospiStrategy1
-    param_key = Column(String(64), nullable=False)       # user_options 컬럼명
+    strategy_code = Column(String(10), nullable=False)   # 'RECO' = RecoStrategy
+    param_key = Column(String(64), nullable=False)       # 모드 옵션 테이블 컬럼명 (RECO → user_option_reco)
 
     # ── 그룹(평탄화) ──────────────────────────────────────────────────
     group_id = Column(String(4), nullable=False)

@@ -1,5 +1,5 @@
 """
-m2_alternate.py — M2 정·역 ETF 교대매매 시뮬레이터 (테스트 시나리오 1).
+etf_alternate_sim.py — ETF_SWITCH 정·역 ETF 교대매매 시뮬레이터 (테스트 시나리오 1).
 
 시나리오 1 정의
     대상 2종목. KODEX 코스피100(237350) / KODEX 인버스(114800). 30분봉.
@@ -27,7 +27,7 @@ score
     매수추천배치(StockBuyCheckJob → StockService.assign_ranks)와 동일한 계산.
     stock_shared.strategy.scoring 으로 추출해 양쪽이 같은 함수를 쓴다.
 
-    ⚠ M2 에서의 주의점 2가지:
+    ⚠ ETF_SWITCH 에서의 주의점 2가지:
       · fund(재무 30%): ETF 는 eps/per/pbr 이 없어 **양쪽 다 0점**. 상대비교에
         기여하지 않으므로 기본 가중치에서 제외한다(w_fund=0).
       · liq(유동성 20%): 후보가 2개뿐이라 min-max 정규화하면 항상 한쪽 1.0 /
@@ -57,7 +57,7 @@ __all__ = ["ScoreConfig", "M2AlternateSimulator"]
 
 @dataclass
 class ScoreConfig:
-    """score 가중치. 기본값은 M2(ETF 2종목) 에 맞춘 tech 100%.
+    """score 가중치. 기본값은 ETF_SWITCH(ETF 2종목) 에 맞춘 tech 100%.
 
     원본 매수추천배치와 동일하게 쓰려면 (0.5, 0.3, 0.2).
     """
@@ -87,7 +87,7 @@ class M2AlternateSimulator:
                  exit_on_reverse: bool = True,
                  flip_on_signal: bool = True):
         """
-        청산 라인 (KospiStrategy1 과 동일 개념. None 이면 미사용)
+        청산 라인 (RecoStrategy 과 동일 개념. None 이면 미사용)
             stop_loss_pct      : 진입가 대비 -x% 손절.        예) 0.02 = -2%
             take_profit_pct    : 진입가 대비 +x% 익절.        예) 0.05 = +5%
             trail_drawdown_pct : 보유 중 고점 대비 -x% 트레일링.

@@ -17,7 +17,7 @@ import pandas as pd
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from stock_shared.strategy.base import Action
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.reco import RecoStrategy
 from stock_shared.ml.shape_features import compute_shape_features, SHAPE_FEATURE_COLUMNS
 
 
@@ -30,9 +30,9 @@ class KisBacktester:
         # fee_rate: 편도 수수료+세금 근사 (왕복은 2*fee_rate 차감). KOSPI 매도세 등 감안 기본 0.15%/편도
         # gap_block_pct: 진입 봉 시가가 전봉 종가 대비 이만큼(비율) 넘게 갭이면 진입을 건너뛴다.
         #   None(기본)이면 갭 체크 없이 기존과 동일하게 동작한다.
-        #   BuyExecutor1(app/trade_worker/modes/mode_1/buy_executor1.py) 의 실거래
+        #   RecoBuyExecutor(app/trade_worker/modes/reco/buy_executor.py) 의 실거래
         #   GAP_BLOCK_PCT 게이트와 같은 의미 — worker/시뮬레이션이 같은 규칙을 쓰게 맞췄다.
-        self.strategy = strategy or KospiStrategy1()
+        self.strategy = strategy or RecoStrategy()
         self.fee_rate = fee_rate
         self.gap_block_pct = gap_block_pct
 
@@ -119,7 +119,7 @@ class KisBacktester:
         hma · chegyul_strength 컬럼이 없다. 라이브 경로는 compute_indicator_df 가
         채우지만, DB 재생 경로(백테스트/시뮬레이션)는 여기서 직접 만들어야 한다.
 
-        run_one 이 호출하며, M2 교대 시뮬레이터처럼 run_one 을 안 쓰는 경로도
+        run_one 이 호출하며, ETF_SWITCH 교대 시뮬레이터처럼 run_one 을 안 쓰는 경로도
         같은 전처리를 재사용할 수 있도록 분리해 뒀다.
         rows 는 datetime 오름차순 정렬 전제.
         """
@@ -170,7 +170,7 @@ class KisBacktester:
             cl = float(rows[i].get('close') or 0)
             rows[i]['chegyul_strength'] = ((cl - lo) / (hi - lo) * 200.0) if hi > lo else 100.0
 
-        # ── shape_* (14봉 정규화 가격패턴) 주입 — kospi1 소진게이트가 이 값을 읽는다.
+        # ── shape_* (14봉 정규화 가격패턴) 주입 — reco 소진게이트가 이 값을 읽는다.
         #    DB(trade_candle_data) 재생 경로엔 이 컬럼들이 없어 여기서 직접 계산해야 한다.
         shape_df = compute_shape_features(pd.DataFrame(rows))
         shape_df[SHAPE_FEATURE_COLUMNS + ['shape_ret_1d_today']] = \

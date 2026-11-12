@@ -14,13 +14,13 @@ eval_shape_proba.py — 편향 없는 전종목 스캔(trade_shape_scan_stock) �
 
 20일선 기울기 조건 (철회됨. variant 로 명시할 때만 동작):
   1) SELL_MA20_DOWN : 보유중 "당일 20일선 < 전일 20일선"(기울기 음전)이면 매도.
-                      kospi1 의 손절/익절/트레일보다 **먼저** 평가한다.
+                      reco 의 손절/익절/트레일보다 **먼저** 평가한다.
      - plain      : 음전이면 무조건 매도(원안).
      - grace      : 평가수익 > MA20_GRACE_PROFIT_MIN 이면 매도 보류 →
                     트레일링(고점-3ATR)/익절에 위임. 상승 구간을 살리고 손실 구간만 자른다.
      - 2day       : **연속 2일** 음전일 때만 매도(1일 노이즈 음전 무시).
      - grace+2day : 위 둘 동시 적용.
-     - plain+regime / grace+regime : kospi1 의 적응형 추세국면 분류기
+     - plain+regime / grace+regime : reco 의 적응형 추세국면 분류기
        (downtrend_ratio = 최근 REGIME_WINDOW 봉 중 close<ema60 비율)가
        **하락국면(>= REGIME_THRESHOLD)** 일 때만 음전매도를 켠다. 상승국면에서는
        기존 손절/익절/트레일에 그대로 맡긴다.
@@ -44,8 +44,8 @@ eval_shape_proba.py — 편향 없는 전종목 스캔(trade_shape_scan_stock) �
 체결/청산 규약 (KisBacktester.run_one 과 동일):
   - 시그널일 D 종가 기준 판단 → D+1 시초가 매수. 매도 시그널일 D' → D'+1 시초가 매도.
     (다음 봉이 없으면 당일 종가 체결)
-  - 매도판단 = KospiStrategy1.get_action_in_active 를 **그대로 호출**(식 복제 금지).
-    s1_* 옵션은 전부 None → kospi1 기본값(손절 -5%/익절 +30%/트레일 ATR3.0/타임스탑 12봉).
+  - 매도판단 = RecoStrategy.get_action_in_active 를 **그대로 호출**(식 복제 금지).
+    reco_* 옵션은 전부 None → reco 기본값(손절 -5%/익절 +30%/트레일 ATR3.0/타임스탑 12봉).
   - 진입 봉에서도 즉시 매도판정(bars_held=1 로 올린 뒤) — backtester 와 동일.
   - 왕복 수수료 = 2 * FEE_RATE.
 
@@ -99,7 +99,7 @@ eval_shape_proba.py — 편향 없는 전종목 스캔(trade_shape_scan_stock) �
   · 2day 는 1봉청산을 39→37건으로 거의 못 줄였다(음전이 이틀 이어지는 게 흔함).
     회전율 완화 목적이라면 grace 가 훨씬 효과적이다(39→22건).
 2026-09-23 실행 ③: regime 게이트(하락국면에서만 음전매도) — **가설 기각**.
-  kospi1 분류기(downtrend_ratio = 최근 90봉 중 close<ema60 비율, 임계 0.70) 기준.
+  reco 분류기(downtrend_ratio = 최근 90봉 중 close<ema60 비율, 임계 0.70) 기준.
   proba_top1 arm, 60거래:
     모드            승률%  평균%  평균익%  평균손%  -5%초과  -8%초과  1봉청산  보유봉  TREND발동
     base            36.7  +1.25   13.95   -6.11    23건    7건    4건   8.1     0
@@ -128,7 +128,7 @@ eval_shape_proba.py — 편향 없는 전종목 스캔(trade_shape_scan_stock) �
 최종: 세 차례 실행 모두 채택 근거가 안 나왔고(승률 개선은 구간별로 부호가 뒤집히고,
   평균손실 축소는 재현되지만 평균익·기대값을 같은 폭으로 내주며, regime 스위칭은
   이득 구간에서 게이트가 안 켜진다), 2026-09-23 사용자 판단으로 가정 자체를 철회했다.
-  → 운영(buy_order.py / kospi1.py / StockBuyCheckJob.py)에 반영된 것은 **없다**.
+  → 운영(buy_order.py / reco.py / StockBuyCheckJob.py)에 반영된 것은 **없다**.
   후속으로 남은 아이디어(미검증): 종목별 분류기 대신 **지수 레벨 국면**으로 스위칭.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -155,7 +155,7 @@ sys.path.insert(0, '../shared')
 
 from stock_shared.dto.userOptionMeta import UserOptionMeta
 from stock_shared.strategy.base import Action
-from stock_shared.strategy.kospi1 import KospiStrategy1
+from stock_shared.strategy.reco import RecoStrategy
 from stock_shared.vo.userCoinInfo import UserCoinInfo
 from stock_shared.ml.shape_label import LABEL_WIN_THRESHOLD_PCT
 from stock_shared.ml.shape_features import (
@@ -180,14 +180,14 @@ COMPOSITE_SMA20_TREND_BARS = 14
 COMPOSITE_MOMENTUM_COLS = ['obv_gap_norm', 'obv_slope3', 'ind_vol_ratio_today', 'ind_macd_hist_norm']
 
 # 기울기 음전 매도 'grace' 모드: 평가수익이 이 값을 넘으면 매도를 보류하고
-# kospi1 의 트레일링/익절에 위임한다(0.0 = 이익 중이면 무조건 유예).
+# reco 의 트레일링/익절에 위임한다(0.0 = 이익 중이면 무조건 유예).
 MA20_GRACE_PROFIT_MIN = 0.0
 
 # 추세국면 분류기 — KisStockService.compute_indicator_df / KisBacktester 와 동일 식.
 #   ema60 은 이름만 ema 이고 실제로는 60봉 단순이동평균(rolling(60).mean()).
 REGIME_WINDOW = 90
 REGIME_MIN_PERIODS = 20
-REGIME_THRESHOLD = 0.70        # kospi1.regime_threshold 와 동일
+REGIME_THRESHOLD = 0.70        # reco.regime_threshold 와 동일
 REGIME_CACHE = os.path.join(os.path.dirname(__file__), 'regime_cache.csv')
 REGIME_FETCH_SLEEP = 1.5
 
@@ -436,7 +436,7 @@ def pick(pool: pd.DataFrame, arm: str):
 # 단일 트레이드 실행 (independent / sequential 공용)
 # ══════════════════════════════════════════════════════════════════
 def _base_user_info() -> UserOptionMeta:
-    """s1_* 전부 None → kospi1 기본값(손절 -5%/익절 +30%/트레일ATR3.0/타임스탑 12봉)."""
+    """reco_* 전부 None → reco 기본값(손절 -5%/익절 +30%/트레일ATR3.0/타임스탑 12봉)."""
     ui = UserOptionMeta()
     ui.vol_limit = 0
     ui.vol_surge = 3.0
@@ -566,7 +566,7 @@ def daily_picks(df: pd.DataFrame, dates: list, arm: str, buy_ma20_up: bool) -> d
 def eval_independent(rows_by_coin, idx_by_coin, picks: dict, dates: list,
                      sell_mode) -> dict:
     """거래일마다 그날의 픽을 독립 트레이드로 평가(중복보유 허용)."""
-    strategy = KospiStrategy1()
+    strategy = RecoStrategy()
     trades = []
     for d in dates:
         row = picks.get(d)
@@ -585,7 +585,7 @@ def eval_independent(rows_by_coin, idx_by_coin, picks: dict, dates: list,
 def eval_sequential(rows_by_coin, idx_by_coin, picks: dict, dates: list,
                     sell_mode, all_dates: list = None) -> dict:
     """동시 보유 1종목 순차 복리. 매도한 날은 그날 바로 재탐색(실전 _open_routine 정책)."""
-    strategy = KospiStrategy1()
+    strategy = RecoStrategy()
     all_dates = all_dates or dates
     trades = []
     cash = float(INIT_CASH)
@@ -766,7 +766,7 @@ def main():
     rows_by_coin, idx_by_coin = build_index(df)
 
     print(f"[4/4] 시뮬레이션 (20일선={args.ma20}, proba={args.proba}, "
-          f"kospi1 기본 손절-5%/익절+30%/트레일ATR3/타임스탑12봉, "
+          f"reco 기본 손절-5%/익절+30%/트레일ATR3/타임스탑12봉, "
           f"진입=다음날시가, 왕복수수료 {2*FEE_RATE*100:.2f}%)", flush=True)
 
     results = {}

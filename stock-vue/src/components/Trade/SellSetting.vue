@@ -29,8 +29,8 @@
                 </button>
             </nav>
 
-            <!-- ══════════ M1 : 현행 설정 ══════════ -->
-            <template v-if="activeMode === 'M1'">
+            <!-- ══════════ RECO(추천매수) : 현행 설정 ══════════ -->
+            <template v-if="activeMode === 'RECO'">
 
             <!-- ── 매도 판정 우선순위: 한 줄 (손절 › 익절 › 트레일링 › 타임스탑) ── -->
             <section class="priority-bar" aria-label="매도 판정 우선순위">
@@ -158,7 +158,7 @@
                             </div>
                             <span class="field-hint">
                                 현재 전략 코드에 고정되어 있습니다. 조정하려면 백엔드
-                                <code>s1_stop_require_below_ema20</code> 컬럼 신설이 필요합니다.
+                                <code>stop_require_below_ema20</code> 컬럼 신설이 필요합니다.
                             </span>
                         </div> -->
                     </div>
@@ -198,7 +198,7 @@
             </form>
             </template>
 
-            <!-- ══════════ M2 : 준비중 ══════════ -->
+            <!-- ══════════ ETF_SWITCH(ETF 교대) : 준비중 ══════════ -->
             <section v-else class="mode-empty">
                 <span class="me-code">{{ activeMode }}</span>
                 <h3>{{ currentModeName }}</h3>
@@ -216,13 +216,13 @@ import mariaToast from '@scripts/mariaToast.js';
 const title = ref('매도 설정');
 
 /* ═══════════════════════════════════════════════════════════
- * 운용 모드 탭 (M1 만 현행 설정, M2 는 준비중)
+ * 운용 모드 탭 (RECO 만 현행 설정, ETF_SWITCH 는 준비중)
  * ═══════════════════════════════════════════════════════════ */
 const MODE_TABS = [
-    { code: 'M1', name: '추천매수' },
-    { code: 'M2', name: 'ETF 교대' },
+    { code: 'RECO', name: '추천매수' },
+    { code: 'ETF_SWITCH', name: 'ETF 교대' },
 ];
-const activeMode = ref('M1');
+const activeMode = ref('RECO');
 const currentModeName = computed(
     () => MODE_TABS.find(m => m.code === activeMode.value)?.name ?? ''
 );
@@ -238,7 +238,7 @@ const GROUPS = [
         id: 'A', priority: 1, short: '손절', title: '손실 감수매도 기준',
         fields: [
             {
-                k: 's1_stop_loss_pct',
+                k: 'stop_loss_pct',
                 label: '손실',
                 unit: '%',
                 type: 'pct',
@@ -253,17 +253,17 @@ const GROUPS = [
         id: 'B', priority: 2, short: '익절', title: '이익 실현매도 기준',
         fields: [
             {
-                k: 's1_take_profit_pct', label: '이익', unit: '%', type: 'pct', def: 0.30,
+                k: 'take_profit_pct', label: '이익', unit: '%', type: 'pct', def: 0.30,
                 min: 5, max: 100, step: 5,
             },
         ],
     },
     {
         id: 'C', priority: 3, short: '트레일링', title: '트레일링 스탑',
-        master: 's1_use_trailing',
+        master: 'use_trailing',
         fields: [
             {
-                k: 's1_trail_activate_pct', 
+                k: 'trail_activate_pct', 
                 label: '활성화 기준', 
                 unit: '%', 
                 type: 'pct', 
@@ -273,7 +273,7 @@ const GROUPS = [
                 step: 1,
             },
             {
-                k: 's1_k_trail_atr', 
+                k: 'k_trail_atr', 
                 label: 'ATR 배수 (k)', 
                 unit: '배', 
                 type: 'float', 
@@ -283,7 +283,7 @@ const GROUPS = [
                 step: 0.5,
             },
             {
-                k: 's1_trail_drawdown_pct', 
+                k: 'trail_drawdown_pct', 
                 label: '고점 대비 하락', 
                 unit: '%', 
                 type: 'pct',
@@ -295,19 +295,19 @@ const GROUPS = [
                 step: 0.5,
             },
             {
-                k: 's1_trail_dual',
+                k: 'trail_dual',
                 label: 'ATR 라인과 이중 감시',
                 type: 'bool',
                 def: 1,
             },
             {
-                k: 's1_trail_fib_use',
+                k: 'trail_fib_use',
                 label: '피보나치 되돌림 허용',
                 type: 'bool',
                 def: 0,
             },
             {
-                k: 's1_trail_fib_level',
+                k: 'trail_fib_level',
                 label: '되돌림 비율',
                 type: 'enum',
                 def: '0.382',
@@ -323,22 +323,22 @@ const GROUPS = [
         id: 'D', priority: 4, short: '타임스탑', title: '동적 타임스탑',
         fields: [
             {
-                k: 's1_max_hold_bars', label: '보유 한도', unit: '봉', type: 'int', def: 12,
+                k: 'max_hold_bars', label: '보유 한도', unit: '봉', type: 'int', def: 12,
                 min: 3, max: 60, step: 1,
             },
             {
-                k: 's1_time_stop_extend', label: '추세 생존 시 연장', type: 'bool', def: 1,
+                k: 'time_stop_extend', label: '추세 생존 시 연장', type: 'bool', def: 1,
             },
             {
-                k: 's1_time_stop_band', label: '정체 판정 수익밴드', unit: '%', type: 'pct', def: 0.02,
+                k: 'time_stop_band', label: '정체 판정 수익밴드', unit: '%', type: 'pct', def: 0.02,
                 min: 0, max: 10, step: 0.5,
             },
             {
-                k: 's1_time_stop_grace', label: '신고가 grace 봉수', unit: '봉', type: 'int', def: 3,
+                k: 'time_stop_grace', label: '신고가 grace 봉수', unit: '봉', type: 'int', def: 3,
                 min: 0, max: 10, step: 1, ui: 'stepper',
             },
             {
-                k: 's1_max_hold_bars_hard', label: '절대 보유 한도', unit: '봉', type: 'int', def: 20,
+                k: 'max_hold_bars_hard', label: '절대 보유 한도', unit: '봉', type: 'int', def: 20,
                 min: 3, max: 120, step: 1,
             },
         ],
@@ -363,7 +363,7 @@ const EXEC_FIELDS = [
 ];
 
 /* 마스터 토글은 폼 필드로도 관리해야 하므로 별도 등록 */
-const MASTER_FIELDS = [{ k: 's1_use_trailing', type: 'bool', def: 1 }];
+const MASTER_FIELDS = [{ k: 'use_trailing', type: 'bool', def: 1 }];
 
 const ALL_FIELDS = [
     ...MASTER_FIELDS,
@@ -377,17 +377,17 @@ const ALL_KEYS = ALL_FIELDS.map(f => f.k);
  *  - 값이 함수면 true 반환 시 비활성 (복합 조건용)
  */
 const DISABLE_RULES = {
-    s1_trail_activate_pct: 's1_use_trailing',
-    s1_k_trail_atr: 's1_use_trailing',
-    s1_trail_floor_pct: 's1_use_trailing',
-    s1_trail_drawdown_pct: 's1_use_trailing',
+    trail_activate_pct: 'use_trailing',
+    k_trail_atr: 'use_trailing',
+    trail_floor_pct: 'use_trailing',
+    trail_drawdown_pct: 'use_trailing',
     // 이중감시 스위치는 하락폭이 실제로 설정됐을 때만 의미가 있다
-    s1_trail_dual: () => !isOn('s1_use_trailing') || isBlank('s1_trail_drawdown_pct'),
-    s1_trail_fib_use: 's1_use_trailing',
+    trail_dual: () => !isOn('use_trailing') || isBlank('trail_drawdown_pct'),
+    trail_fib_use: 'use_trailing',
     // 되돌림 비율 선택은 트레일링 + 피보나치 사용 둘 다 켜졌을 때만 의미가 있다
-    s1_trail_fib_level: () => !isOn('s1_use_trailing') || !isOn('s1_trail_fib_use'),
-    s1_time_stop_band: 's1_time_stop_extend',
-    s1_time_stop_grace: 's1_time_stop_extend',
+    trail_fib_level: () => !isOn('use_trailing') || !isOn('trail_fib_use'),
+    time_stop_band: 'time_stop_extend',
+    time_stop_grace: 'time_stop_extend',
 };
 
 /* ═══════════════ 폼 상태 ═══════════════
@@ -503,10 +503,10 @@ const errors = computed(() => {
         }
     });
 
-    const hold = form.s1_max_hold_bars === '' ? FIELD_MAP.s1_max_hold_bars.def : Number(form.s1_max_hold_bars);
-    const hard = form.s1_max_hold_bars_hard === '' ? FIELD_MAP.s1_max_hold_bars_hard.def : Number(form.s1_max_hold_bars_hard);
+    const hold = form.max_hold_bars === '' ? FIELD_MAP.max_hold_bars.def : Number(form.max_hold_bars);
+    const hard = form.max_hold_bars_hard === '' ? FIELD_MAP.max_hold_bars_hard.def : Number(form.max_hold_bars_hard);
     if (hard < hold) {
-        e.s1_max_hold_bars_hard = `절대 보유 한도(${hard}봉)는 보유 한도(${hold}봉) 이상이어야 합니다.`;
+        e.max_hold_bars_hard = `절대 보유 한도(${hard}봉)는 보유 한도(${hold}봉) 이상이어야 합니다.`;
     }
     return e;
 });

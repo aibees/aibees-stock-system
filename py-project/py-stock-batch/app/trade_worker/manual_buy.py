@@ -2,7 +2,7 @@
 수동 매수 실행기 — trade_worker_manual_buy(sql/50_manual_buy.sql) 를 폴링해 KIS 로 주문한다.
 
 사용자가 화면에서 고른 종목·수량을 그대로 낸다. 추천·매수 게이트·1포지션 원칙을 보지 않고,
-매매정지(M0)여도 주문이 나간다(Broker.manual_buy 만 M0 게이트를 건너뛴다).
+매매정지(HALT)여도 주문이 나간다(Broker.manual_buy 만 HALT 게이트를 건너뛴다).
 
 주문은 한 번만 나간다:
   REQUESTED → claim(상태 조건 UPDATE) → ORDERING → 주문 → OPEN.

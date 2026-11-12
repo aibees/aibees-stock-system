@@ -161,16 +161,16 @@ class BaseBuyExecutor(ABC):
     def run(self, premarket: bool = False, realtime: bool = False):
         """premarket=False: 정규장 · 시장가 / True: NXT 프리마켓 · 지정가.
         realtime=True: 정규장 장중 실시간 라운드(시장가). 09:00 라운드와 같은 흐름이고
-        후보 선정만 모드가 self.realtime 을 보고 달리한다(BuyExecutor1 참고)."""
+        후보 선정만 모드가 self.realtime 을 보고 달리한다(RecoBuyExecutor 참고)."""
         uid = self.cfg.user_id
         tag = "NXT프리마켓" if premarket else ("실시간" if realtime else "정규장")
         self.realtime = realtime
         self.last_bought_code = None
 
-        # 매매정지(M0): 라운드 자체를 열지 않는다. try/finally(_finalize_round) **앞**에서 빠져야
+        # 매매정지(HALT): 라운드 자체를 열지 않는다. try/finally(_finalize_round) **앞**에서 빠져야
         # 최우선타겟 1회성 소비 같은 라운드 종료 처리도 일어나지 않는다(매수를 안 했으니 소비도 없다).
         if self.strategy is not None and getattr(self.strategy, "halted", False):
-            self.wlog.info("[매수] 매매정지(M0) → %s 라운드 skip", tag)
+            self.wlog.info("[매수] 매매정지(HALT) → %s 라운드 skip", tag)
             return
 
         self.wlog.info("[매수] 시작 user_id=%s (%s)", uid, tag)
@@ -226,7 +226,7 @@ class BaseBuyExecutor(ABC):
 
     def _finalize_round(self, premarket: bool):
         """라운드 종료 후 훅(기본 no-op). run() 이 어느 지점에서 끝나든(성공/스킵/거부
-        무관) 정확히 한 번 불린다. 모드별 1회성 상태 정리(예: BuyExecutor1 의
+        무관) 정확히 한 번 불린다. 모드별 1회성 상태 정리(예: RecoBuyExecutor 의
         최우선타겟 소비)에 재정의해서 쓴다."""
         pass
 

@@ -1,5 +1,5 @@
 """
-M2 (ETF 교대) 매도 — **미구현 스켈레톤**.
+ETF_SWITCH (ETF 교대) 매도 — **미구현 스켈레톤**.
 
 BaseSellExecutor 를 상속해 hit_line() 만 채우면 된다.
 비율 매도가 필요하면 sell_qty() 도 재정의한다(기본은 전량).
@@ -8,14 +8,15 @@ BaseSellExecutor 를 상속해 hit_line() 만 채우면 된다.
 """
 from decimal import Decimal
 
+from stock_shared import trade_mode
 from app.trade_worker.sell_executor import BaseSellExecutor
 
 
-class SellExecutor2(BaseSellExecutor):
-    """M2 : ETF 교대 의 매도 감시."""
+class EtfSwitchSellExecutor(BaseSellExecutor):
+    """ETF_SWITCH : ETF 교대 의 매도 감시."""
 
-    MODE_CODE = "M2"
+    MODE_CODE = trade_mode.ETF_SWITCH
 
     def hit_line(self, pos: dict, price: Decimal) -> str | None:
         # TODO: stop/target/trailing + 반대신호 강제청산(SELL_REGIME_FLIP)
-        raise NotImplementedError("SellExecutor2.hit_line 미구현")
+        raise NotImplementedError("EtfSwitchSellExecutor.hit_line 미구현")

@@ -1,5 +1,5 @@
 """
-M1 (추천매수) 매수 — 20:00 배치가 만든 trade_buy_target_stock 의 1순위를 익일 매수.
+RECO (추천매수) 매수 — 20:00 배치가 만든 trade_buy_target_stock 의 1순위를 익일 매수.
 
 BaseBuyExecutor 에서 갈리는 지점은 **후보 선정 하나**뿐이다.
 시세·수량·주문·체결추적·포지션반영은 전부 베이스가 처리한다.
@@ -22,27 +22,28 @@ BaseBuyExecutor 에서 갈리는 지점은 **후보 선정 하나**뿐이다.
 from decimal import Decimal
 from typing import Optional
 
+from stock_shared import trade_mode
 from app.trade_worker.buy_executor import BaseBuyExecutor, BuyCandidate
 from app.trade_worker.repository import describe_buy_order
 
 
-class BuyExecutor1(BaseBuyExecutor):
-    """M1 : 추천매수 자동매매."""
+class RecoBuyExecutor(BaseBuyExecutor):
+    """RECO : 추천매수 자동매매."""
 
-    MODE_CODE = "M1"
+    MODE_CODE = trade_mode.RECO
 
     # 장 시작 갭(현재가 vs 전일종가) 차단 임계값. 2026-09 세션 리서치 반영 —
     # 갭 그 자체를 게이트로 신설. 0%로 두면 정상 호가단위 노이즈만으로도 거의
     # 매번 걸리므로, "유의미한 갭"과 "체결 틱 노이즈"를 가르는 최소값을 둔다.
-    # 2026-10-15: 사용자별 설정(user_options.s1_gap_block_pct)으로 분리, 기본값 1% → 2%.
+    # 2026-10-15: 사용자별 설정(user_option_reco.gap_block_pct)으로 분리, 기본값 1% → 2%.
     #   값이 없거나(NULL) 이상하면 DEFAULT_GAP_BLOCK_PCT. 설정 폴링으로 재시작 없이 반영된다.
     #   ※ 최우선타겟은 이 게이트를 타지 않는다(_resolve_price 참고).
     DEFAULT_GAP_BLOCK_PCT = Decimal("0.02")   # 2%
 
     def _gap_block_pct(self) -> Decimal:
-        """유저 시가갭 차단 기준(user_options.s1_gap_block_pct). 없거나 0 이하면 기본값."""
+        """유저 시가갭 차단 기준(user_option_reco.gap_block_pct). 없거나 0 이하면 기본값."""
         meta = getattr(self.strategy, "user_meta", None)
-        raw = getattr(meta, "s1_gap_block_pct", None) if meta else None
+        raw = getattr(meta, "reco_gap_block_pct", None) if meta else None
         try:
             v = Decimal(str(raw)) if raw is not None else None
         except Exception:  # noqa: BLE001
@@ -65,7 +66,7 @@ class BuyExecutor1(BaseBuyExecutor):
         return True
 
     def supports_realtime(self) -> bool:
-        """정규장 중 계좌 0종목 실시간 매수 라운드를 쓴다(user_options.s1_realtime_buy=1 일 때만 열림)."""
+        """정규장 중 계좌 0종목 실시간 매수 라운드를 쓴다(user_option_reco.realtime_buy=1 일 때만 열림)."""
         return True
 
     # ── 1포지션 원칙 + 최우선타겟 예외 ───────────────────────────────
@@ -167,13 +168,13 @@ class BuyExecutor1(BaseBuyExecutor):
         return price
 
     def _buy_order_spec(self) -> str | None:
-        """유저 매수타겟 정렬 스펙(user_options.s1_buy_order).
+        """유저 매수타겟 정렬 스펙(user_option_reco.buy_order).
 
         user_meta 는 SellStrategy 가 이미 들고 있어(UserService.get_user_options)
         재조회하지 않는다. strategy 미주입(단위테스트 등)이면 None → repo 기본값.
         """
         meta = getattr(self.strategy, "user_meta", None)
-        return getattr(meta, "s1_buy_order", None) if meta else None
+        return getattr(meta, "reco_buy_order", None) if meta else None
 
     def pick_candidates(self, premarket: bool) -> list[BuyCandidate]:
         """전날 매수타겟을 유저 정렬 기준으로 정렬해 반환.

@@ -1,5 +1,5 @@
 """
-M2 교대매매 시뮬레이션 — 단순 조건 4개 + 2봉 연속 확정.
+ETF_SWITCH 교대매매 시뮬레이션 — 단순 조건 4개 + 2봉 연속 확정.
 
 매수신호 (전부 AND)
     1) MACD  기울기 상승   macd  > 직전봉 macd
@@ -44,24 +44,24 @@ M2 교대매매 시뮬레이션 — 단순 조건 4개 + 2봉 연속 확정.
     · 체결   : 신호/REVERSE → 다음 봉 시가.  라인 → 장중 터치 즉시(갭이면 시가).
 
 기본 손절 -2%
-    30분봉 스케일에 맞춘 값이다. KospiStrategy1 의 -5% 는 일봉 기준이라
+    30분봉 스케일에 맞춘 값이다. RecoStrategy 의 -5% 는 일봉 기준이라
     30분봉에서는 거의 안 걸린다(실측 30분봉 ATR/종가 0.82%).
     --sweep-stop 으로 손절폭 민감도를 볼 수 있다.
 
-sim_m2_simple_signal.py 가 '신호 지점' 만 찍는다면 이 파일은 그 신호로
+sim_etf_switch_simple_signal.py 가 '신호 지점' 만 찍는다면 이 파일은 그 신호로
 실제 매매를 돌려 수익을 낸다. 신호 정의는 두 파일이 동일하다.
 
 실행
-    poetry run python -m app.test.sim_m2_simple_trade            # 3봉 · RSI<70
-    poetry run python -m app.test.sim_m2_simple_trade --confirm 2 --rsi 65
-    poetry run python -m app.test.sim_m2_simple_trade --start 2026-07-01
-    poetry run python -m app.test.sim_m2_simple_trade --sweep    # confirm/rsi 민감도
+    poetry run python -m app.test.sim_etf_switch_simple_trade            # 3봉 · RSI<70
+    poetry run python -m app.test.sim_etf_switch_simple_trade --confirm 2 --rsi 65
+    poetry run python -m app.test.sim_etf_switch_simple_trade --start 2026-07-01
+    poetry run python -m app.test.sim_etf_switch_simple_trade --sweep    # confirm/rsi 민감도
 """
 import argparse
 
 from stock_shared.db.database import dbConn
-from app.test import sim_m2_alternate as sim
-from stock_shared.strategy.m2_alternate import M2AlternateSimulator, ScoreConfig
+from app.test import sim_etf_switch_alternate as sim
+from stock_shared.strategy.etf_alternate_sim import M2AlternateSimulator, ScoreConfig
 
 
 def _f(v, default=0.0) -> float:
@@ -77,10 +77,10 @@ class SimpleSignalStrategy:
     """조건 4개만 보는 매수 판정기.
 
     M2AlternateSimulator 는 strategy.get_action_with_prev(...) 만 호출하므로
-    KospiStrategy1 전체를 흉내 낼 필요가 없다. 그 메서드 하나와,
+    RecoStrategy 전체를 흉내 낼 필요가 없다. 그 메서드 하나와,
     KisBacktester.enrich_rows 가 참조하는 윈도우 속성 몇 개면 충분하다.
 
-    KospiStrategy1 을 쓰지 않는 이유:
+    RecoStrategy 을 쓰지 않는 이유:
         국면게이트 / ATR하한 / 거래량하한 등이 겹겹이 걸려 있고,
         그 임계값들이 일봉 기준이라 30분봉에서는 게이트가 영구히 닫힌다
         (실측 atr_ratio 0.82% vs atr_ratio_min 5%).
@@ -176,7 +176,7 @@ def print_detail(res: dict, rsi_max: float, confirm: int, fee: float, args=None)
 
     print()
     print('=' * 84)
-    print(f"M2 교대매매 — MACD↑ · OBV↑ · MA20↑ · RSI<{rsi_max:.0f} · {confirm}봉 연속")
+    print(f"ETF_SWITCH 교대매매 — MACD↑ · OBV↑ · MA20↑ · RSI<{rsi_max:.0f} · {confirm}봉 연속")
     lines = []
     if args:
         if args.stop_loss:
@@ -319,7 +319,7 @@ def sweep_stop(session, args):
 # ──────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser(
-        description='M2 교대매매 시뮬 (MACD↑·OBV↑·MA20↑·RSI<70, 3봉 연속)')
+        description='ETF_SWITCH 교대매매 시뮬 (MACD↑·OBV↑·MA20↑·RSI<70, 3봉 연속)')
     ap.add_argument('--rsi', type=float, default=70, help='RSI 상한 (기본 70)')
     ap.add_argument('--confirm', type=int, default=3, help='연속 확인 봉수 (기본 3)')
     ap.add_argument('--fee', type=float, default=0.0015, help='편도 수수료율')

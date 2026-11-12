@@ -190,7 +190,7 @@ class OrderWatch:
 
 
 class TradingHaltedError(RuntimeError):
-    """매매정지(M0) 상태에서 매수 주문을 시도했다(Broker 안전망). 매도는 막지 않는다."""
+    """매매정지(HALT) 상태에서 매수 주문을 시도했다(Broker 안전망). 매도는 막지 않는다."""
 
 
 class Broker:
@@ -208,8 +208,8 @@ class Broker:
         self._unknown_cb: Optional[Callable[[str, str, Decimal, Decimal], None]] = None
         self._lock = threading.Lock()
         self._exec_ticket = None
-        # 주문 허용 여부(매매정지 M0 안전망). 인자는 주문 방향("BUY"/"SELL").
-        # main 이 set_trading_gate 로 "M0 면 BUY 거부" 를 연결한다 — 매도(보유분 청산)는 M0 에서도 허용.
+        # 주문 허용 여부(매매정지 HALT 안전망). 인자는 주문 방향("BUY"/"SELL").
+        # main 이 set_trading_gate 로 "HALT 면 BUY 거부" 를 연결한다 — 매도(보유분 청산)는 HALT 에서도 허용.
         # 매수 실행기가 먼저 건너뛰므로 정상이라면 여기까지 오지 않는다 — 놓친 경로가 있어도 매수가 나가지 않게.
         self._trading_allowed: Callable[[str], bool] = lambda side: True
 
@@ -752,7 +752,7 @@ class Broker:
 
     def manual_buy(self, symbol: str, qty: Decimal, sess: MarketSession,
                    limit_price: Optional[Decimal] = None) -> OrderResult:
-        """사용자 수동 매수(manual_buy.py). 사용자가 직접 낸 주문이라 M0 게이트를 건너뛴다.
+        """사용자 수동 매수(manual_buy.py). 사용자가 직접 낸 주문이라 HALT 게이트를 건너뛴다.
         sess.limit_only 면 limit_price 로 지정가, 아니면 시장가."""
         qty = Decimal(qty)
         px = self.align_price(limit_price) if sess.limit_only else Decimal(0)
@@ -824,8 +824,8 @@ class Broker:
         body 에 거래소 구분만 추가한다.
         기본 시장가(ORD_DVSN='01', ORD_UNPR='0'), 지정가는 '00' + 실제 가격."""
         if not bypass_gate and not self._trading_allowed(side):
-            log.warning("[매매정지] %s %s qty=%s 주문 차단(M0)", side, symbol, qty)
-            raise TradingHaltedError(f"매매정지(M0) 상태라 {side} 주문을 내지 않습니다: {symbol}")
+            log.warning("[매매정지] %s %s qty=%s 주문 차단(HALT)", side, symbol, qty)
+            raise TradingHaltedError(f"매매정지(HALT) 상태라 {side} 주문을 내지 않습니다: {symbol}")
         from pykis.api.account.order import KisDomesticOrder
         account = self.kis.primary  # KisAccountNumber (CANO/ACNT_PRDT_CD)
         # TR 은 pykis 상수(DOMESTIC_ORDER_API_CODES)를 쓰지 않는다 — 그 상수는 구TR
