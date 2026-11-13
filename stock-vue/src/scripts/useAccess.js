@@ -81,3 +81,10 @@ export const hasRole = (code) =>
     assUserSession().access.roles.some(r => String(r).toUpperCase() === String(code).toUpperCase());
 
 export const WORKER_ROLE = 'WORKER_USER';
+
+/**
+ * 매수추천에서 열람 가능한 최고 단계(1 기본 / 2 고급 / 3 실전). 서버 RecoLevel.user_level 과 같은 기준이다.
+ *   실전 = WORKER_USER 권한(운영자가 직접 부여), 고급 = RECO_ADVANCED 기능(광고·구독으로 부여 예정), 그 외·비로그인 = 기본.
+ * 화면 구성용이다. 권한 밖 정보는 서버가 응답에서 지운다.
+ */
+export const recoLevel = () => (hasRole(WORKER_ROLE) ? 3 : (hasFeature('RECO_ADVANCED') ? 2 : 1));

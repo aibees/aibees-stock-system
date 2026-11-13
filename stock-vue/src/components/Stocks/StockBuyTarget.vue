@@ -20,6 +20,36 @@
                 </div>
             </section>
 
+            <!-- ── 추천 단계: 열람 가능한 단계 + 바로 위 한 단계(잠금)만 보인다. 그 위 단계는 존재 자체를 숨긴다 ── -->
+            <div class="stage-chips" role="tablist" aria-label="추천 단계">
+                <button v-for="s in visibleStages" :key="s.code" type="button" role="tab" class="stage-chip"
+                    :class="{ on: s.code === stageCode, locked: s.locked }"
+                    :aria-selected="s.code === stageCode ? 'true' : 'false'" @click="stageCode = s.code">
+                    <svg v-if="s.locked" class="stage-lock" width="13" height="13" viewBox="0 0 16 16" fill="none"
+                        stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+                        <rect x="3" y="7" width="10" height="7" rx="2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+                    </svg>
+                    {{ s.name }}
+                    <span class="stage-count">{{ s.locked ? '비공개' : (s.ready === false ? '준비 중' : stageCount(s.rank)) }}</span>
+                </button>
+            </div>
+
+            <!-- 잠금 단계를 고른 경우: 내용 대신 안내만(개수·종목은 서버가 내려주지 않는다) -->
+            <section v-if="activeStage.locked" class="stage-locked">
+                <svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
+                    stroke-linecap="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></svg>
+                <p class="stage-locked-title">{{ activeStage.name }} 추천이 따로 있어요</p>
+                <p class="stage-locked-desc">{{ activeStage.desc }}</p>
+                <p v-if="activeStage.unlock" class="stage-locked-unlock">{{ activeStage.unlock }}</p>
+            </section>
+
+            <!-- 아직 알고리즘이 확정되지 않은 단계(실전): 빈 목록 대신 준비 중 안내 -->
+            <section v-else-if="activeStage.ready === false" class="stage-locked">
+                <p class="stage-locked-title">{{ activeStage.name }} 추천을 준비하고 있어요</p>
+                <p class="stage-locked-desc">{{ activeStage.desc }}</p>
+            </section>
+
+            <template v-else>
             <!-- ── 정렬 (홈과 동일: 기준 select + 방향 버튼) ── -->
             <div v-if="!isLoading && resultData.length > 0" class="list-head">
                 <h2>추천 종목 <span class="count">{{ sortedData.length }}</span></h2>
@@ -155,6 +185,7 @@
                     <p>분석된 데이터가 없습니다. 날짜를 변경해 보세요.</p>
                 </div>
             </section>
+            </template>
         </div>
     </div>
 </template>
@@ -163,6 +194,7 @@
 import CandlestickChart from '../common/comp/CandlestickChart.vue';
 import { buyTargetCandleData, miniCandleOptions } from '@scripts/miniCandle.js';
 import aibeesApi from '@scripts/aibeesApi.js';
+import { recoLevel } from '@scripts/useAccess.js';
 import {
     numOrNull, formatNumber, hasValue, changeInfo, conditionSummary,
     kstNowParts, isMarketOpenNow, weekdayKo, toYmdString, getLatestBatchDate,
@@ -235,7 +267,20 @@ const openDatePicker = () => dateInput.value?.showPicker();
  *   · 값이 없는(null) 종목은 정렬 방향과 무관하게 항상 뒤
  *   · 전부 동점이면 stock_code 로 최종 결정 (매 조회마다 순서가 흔들리지 않도록)
  */
-const SORT_OPTIONS = [
+// 열람 가능한 최고 단계. 실전 = WORKER_USER 권한(운영자 부여), 고급 = RECO_ADVANCED 기능 플래그(광고·구독으로 부여 예정).
+// 서버(/buy-target)가 같은 기준으로 권한 밖 정보를 응답에서 지운다 — 여기는 화면 구성용일 뿐 보안이 아니다.
+const route = useRoute();
+const userLevel = computed(() => {
+    if (import.meta.env.DEV) {   // 개발 중 미리보기 전용(?level=1|2|3)
+        const q = Number(route.query.level);
+        if (q >= 1 && q <= 3) return q;
+    }
+    return recoLevel();
+});
+
+// 고급 단계 이상에서만 값이 내려오는 정렬 기준(기본 단계에는 서버가 이 필드를 주지 않는다)
+const ADVANCED_SORT_KEYS = ['composite_rank_no', 'shape_proba', 'frgn_amt', 'orgn_amt'];
+const SORT_ALL = [
     { key: 'composite_rank_no', label: '종합 순위(신규)', dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
     { key: 'rank_no',     label: '추천순위',     dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
     { key: 'score',       label: '점수',         dir: 'desc', ascLabel: '낮은 점수 먼저', descLabel: '높은 점수 먼저' },
@@ -246,19 +291,24 @@ const SORT_OPTIONS = [
     { key: 'frgn_amt',    label: '외국인 순매수', dir: 'desc', ascLabel: '순매도 큰 순',   descLabel: '순매수 큰 순' },
     { key: 'orgn_amt',    label: '기관 순매수',   dir: 'desc', ascLabel: '순매도 큰 순',   descLabel: '순매수 큰 순' },
 ];
+// 단계마다 알고리즘이 달라 쓸 수 있는 정렬 기준도 다르다.
+//   기본 단계: 옛 알고리즘이 채우는 추천순위·점수 / 고급 단계: 2파 알고리즘의 종합순위·모델 확률·수급
+const BASIC_ONLY_SORT_KEYS = ['rank_no', 'score'];
+const SORT_OPTIONS = computed(() => (activeStage.value.rank >= 2
+    ? SORT_ALL.filter(o => !BASIC_ONLY_SORT_KEYS.includes(o.key))
+    : SORT_ALL.filter(o => !ADVANCED_SORT_KEYS.includes(o.key))));
 
-// 2026-09 세션 후속: watch 게이트와 병행하는 2단계(top10→모멘텀 재정렬) 방식이 실전
-// 시뮬레이션에서 재현성 있게 우수해 기본 정렬을 composite_rank_no 로 승격.
-const sortKey = ref('composite_rank_no');
+// 2026-09 세션 후속: 2단계(top10→모멘텀 재정렬) 방식이 우수해 고급 단계 기본 정렬은 composite_rank_no. 기본 단계는 추천순위.
+const sortKey = ref('rank_no');
 const sortDir = ref('asc');
 
 const currentSort = computed(
-    () => SORT_OPTIONS.find(o => o.key === sortKey.value) ?? SORT_OPTIONS[0]);
+    () => SORT_OPTIONS.value.find(o => o.key === sortKey.value) ?? SORT_OPTIONS.value[0]);
 
 // select 의 v-model 이 sortKey 를 이미 바꿔 놓은 뒤에 불린다. 기준을 바꾸면 그 필드의 기본 방향으로 되돌린다.
 // (거래량을 고르고 '적은 순'이 남아 있으면 의도와 반대 결과가 나온다)
 const onSortKeyChange = () => {
-    sortDir.value = SORT_OPTIONS.find(o => o.key === sortKey.value)?.dir ?? 'desc';
+    sortDir.value = SORT_OPTIONS.value.find(o => o.key === sortKey.value)?.dir ?? 'desc';
 };
 const toggleSortDir = () => { sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc'; };
 
@@ -274,10 +324,45 @@ const sortNum = (v) => {
     return Number.isNaN(n) ? null : n;
 };
 
+/* ══════════════ 추천 단계(기본 → 고급 → 실전) ══════════════
+ * 단계 이름·설명은 임시 — 확정되면 STAGE_DEFS 만 바꾼다. desc 는 잠겼을 때도 보이므로 내부 용어를 쓰지 않는다.
+ * 단계마다 알고리즘이 다른 별개의 목록이다. 서버(RecoLevel.py)가 행마다 reco_stages(속한 단계 번호, 사용자 단계까지)를 준다.
+ *   기본 = 옛 기계식 / 고급 = 2파 돌파 + 모델 확률 + 외국인·기관 수급 / 실전 = 고급 종목의 30분봉 재검증(연구 중).
+ * 서버는 사용자 권한 밖 종목·정보를 응답에서 지운다(화면 가림은 보안이 아니다).
+ */
+const STAGE_DEFS = [
+    // 기본 = 옛 기계식 알고리즘(이평 정배열·MACD/OBV 기울기·거래량 급증 등)
+    { code: 'BASIC', rank: 1, name: '기본', desc: '이동평균·거래량 같은 규칙으로 1차로 고른 후보예요.' },
+    // 고급 = 현재 제공 알고리즘(2파 하락 추세선 돌파 + 모델 확률 + 외국인·기관 수급). 잠겼을 때도 보이는 문구라 내부 용어는 쓰지 않는다.
+    //   광고 시청·정기결제 연동 전이라 버튼은 아직 없다.
+    { code: 'ADVANCED', rank: 2, name: '고급', desc: '차트 패턴과 모델 분석, 수급 흐름까지 더해 고른 종목이에요.',
+      unlock: '광고를 보거나 정기결제를 하면 열려요.' },
+    // 실전 = 고급 종목을 30분봉으로 다시 검증해 순위를 재정비한 목록(다른 세션에서 연구 중 — ready:false).
+    //   private: 운영자가 직접 권한(WORKER_USER)을 준 사람만. 신청·결제 경로가 없으므로 권한이 없으면 칩 자체를 숨긴다.
+    { code: 'LIVE', rank: 3, name: '실전', desc: '고급 종목을 30분봉으로 한 번 더 검증한 최종 후보를 곧 보여드릴게요.', private: true, ready: false },
+];
+const visibleStages = computed(() =>
+    STAGE_DEFS
+        .filter(d => d.rank <= userLevel.value + 1)
+        .map(d => ({ ...d, locked: d.rank > userLevel.value }))
+        .filter(d => !(d.locked && d.private)));
+const stageCode = ref('BASIC');
+const activeStage = computed(() => visibleStages.value.find(s => s.code === stageCode.value) ?? visibleStages.value[0]);
+// 단계를 바꾸면 그 단계의 기본 정렬로 되돌린다(단계마다 쓸 수 있는 정렬 기준이 다르다)
+watch(stageCode, () => {
+    sortKey.value = activeStage.value.rank >= 2 ? 'composite_rank_no' : 'rank_no';
+    sortDir.value = 'asc';
+});
+// 단계 k 의 목록 = 서버가 reco_stages 에 k 를 담아 준 종목. 단계마다 알고리즘이 달라 서로 다른 목록이며
+// 두 알고리즘에 모두 걸린 종목은 양쪽에 나온다. reco_stages 가 없으면(구 응답) 기본 단계로 본다.
+const stageItems = (rank) => resultData.value.filter(it => (it.reco_stages ?? [1]).includes(rank));
+const stageCount = (rank) => stageItems(rank).length;
+
 const sortedData = computed(() => {
     const key = sortKey.value;
     const desc = sortDir.value === 'desc';
-    return [...resultData.value].sort((a, b) => {
+    const base = activeStage.value.locked ? [] : stageItems(activeStage.value.rank);
+    return base.sort((a, b) => {
         const va = sortNum(a[key]);
         const vb = sortNum(b[key]);
         if (va === null && vb === null) return 0;
@@ -327,8 +412,11 @@ const rows = computed(() =>
             capShort: formatCapShort(item.market_cap), market: marketInfo(item),
             recentBars: (item.chart_data || []).slice(-RECENT_BARS),
             facts: [
-                { name: '외국인', value: formatNetAmtShort(item.frgn_amt), cls: signClass(item.frgn_amt) },
-                { name: '기관',   value: formatNetAmtShort(item.orgn_amt), cls: signClass(item.orgn_amt) },
+                // 수급은 고급 정보 — 기본 단계는 서버가 값을 주지 않으므로 칸도 그리지 않는다
+                ...(userLevel.value >= 2 && activeStage.value.rank >= 2 ? [
+                    { name: '외국인', value: formatNetAmtShort(item.frgn_amt), cls: signClass(item.frgn_amt) },
+                    { name: '기관',   value: formatNetAmtShort(item.orgn_amt), cls: signClass(item.orgn_amt) },
+                ] : []),
                 { name: 'PER',    value: formatRatio(item.per, { lossLabel: '적자' }), cls: '' },
                 { name: 'PBR',    value: formatRatio(item.pbr), cls: '' },
             ],
@@ -387,6 +475,27 @@ $blue:     #7A4423;
 }
 
 .head-desc { display: flex; margin-bottom: 12px; }
+
+/* ── 추천 단계 칩: 정렬 칩(SortChips)과 같은 pill 톤. 잠금은 빗금 + 자물쇠 ── */
+.stage-chips { display: flex; gap: 8px; margin: 0 0 14px; }
+.stage-chip {
+    flex: 1; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px;
+    border: 0; border-radius: 999px; background: #F6F1E4; color: #6B5B4E; font: inherit; font-size: 15px; font-weight: 700;
+    white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition-property: background-color, color, scale; transition-duration: .15s; transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    &:active { scale: 0.96; }
+    &.on { background: #74462A; color: #FFF8E1; }
+    &.locked { background: repeating-linear-gradient(135deg, #F6F1E4 0 6px, #EFE6CF 6px 12px); }
+    &.locked.on { background: #74462A; }
+    &:focus-visible { outline: 2px solid #7A4423; outline-offset: 2px; }
+    .stage-count { font-size: 12px; font-weight: 600; opacity: .75; font-variant-numeric: tabular-nums; }
+}
+.stage-locked {
+    display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 32px 20px; border-radius: 16px; background: #FAF6EA; text-align: center; color: #2B1D14;
+    .stage-locked-title { margin: 4px 0 0; font-size: 16px; font-weight: 800; }
+    .stage-locked-desc { margin: 0; font-size: 14px; line-height: 1.5; color: #6B5B4E; text-wrap: pretty; }
+    .stage-locked-unlock { margin: 6px 0 0; padding: 6px 12px; border-radius: 999px; background: #fff; font-size: 13px; font-weight: 700; color: #74462A; }
+}
 /* ── Head Actions ── */
 .head-actions {
     display: flex;

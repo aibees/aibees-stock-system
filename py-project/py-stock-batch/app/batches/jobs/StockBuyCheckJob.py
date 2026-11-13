@@ -59,16 +59,12 @@ COMPOSITE_MOMENTUM_COLS = ['obv_gap_norm', 'obv_slope3', 'ind_vol_ratio_today', 
 #   신호 판정이 실패하면 그날은 MOMENTUM 으로 자동 폴백한다.
 BUY_RANK_MODE_DEFAULT = 'WAVE2'
 WAVE2_TOP_N = 10
-# ── 기본 매수추천(watch 게이트 → score/rank_no) 보류 (2026-10-26) ──────────────
-#   공통코드 master_codes(stock/setting/batch/BASE_RECO) — 매 실행마다 읽는다.
-#     N (기본, 행 없을 때도) : 보류. 판정은 그대로 돌리되(action_type/지표/학습셋에 필요) 매수추천 목록에
-#                              **저장하지 않는다** → 목록·메일에는 2파 돌파 신호(종합순위) 종목만 남는다.
-#     Y                      : 이전처럼 기본 매수추천도 함께 저장.
-#   사용자 결정: "매수추천은 2파만. 기존 추천 알고리즘은 삭제하지 말고 보류." 그 전엔 기본 추천과
-#   2파 신호가 같은 목록에 섞여, 2파가 아닌 종목(10/23 나노엔텍)이 2파 추천처럼 보였다.
-#   BUY_RANK_MODE=MOMENTUM 이면 worker 가 score 순 폴백에 기본 추천을 쓰므로 BASE_RECO 와 무관하게 저장한다
-#   (MOMENTUM 으로 되돌리면 예전 목록이 그대로 돌아온다).
-BASE_RECO_DEFAULT = 'N'
+# ── 기본 매수추천(옛 기계식 watch 게이트 → score/rank_no) 재개 (2026-11) ───────────
+#   2026-10-26 에 앱 배포를 우선해 목록에서 뺐던(BASE_RECO=N) 것을, 단계별 추천(기본/고급/실전) 확장을 위해
+#   다시 항상 저장한다(공통코드 BASE_RECO 는 폐기). 단, 워커가 읽는 trade_buy_target_stock(2파 종합순위)과는
+#   별도 테이블 trade_buy_target_basic 에 저장해 매매 경로와 분리한다.
+#   단계(기본/고급/실전)와 알고리즘 코드(BASIC/PREMIUM/PRIVATE)의 대응은 공통코드 master_codes(stock/setting/reco_algo),
+#   단계 판정은 서버(RecoLevel).
 
 # 2파 판정은 ZigZag 를 일봉 처음부터 진행시키므로 조회 봉수를 넉넉히(250봉 필터 + 여유). KIS 1회 100봉이라 300봉도 3회 호출.
 OHLCV_MIN_BARS = 300
@@ -221,6 +217,7 @@ class StockBuyCheckJob(Job):
         #   하루 한 번(20:00)일 땐 문제가 없었지만, 장중 매시 갱신에서는 그 사이
         #   화면·worker(get_latest_buy_target_ymd)가 오늘 목록을 못 보고 전날 목록으로 떨어진다.
         deleted_cnt = self.stockServiceImpl.clean_buy_target_stock_by_ymd(self.session, ymd)
+        self.stockServiceImpl.clean_buy_target_basic_by_ymd(self.session, ymd)
         deleted_chart_cnt = self.stockServiceImpl.clean_buy_target_chart_by_ymd(self.session, ymd)
         self.session.commit()
         print(f'[{ymd}] 기존 데이터 {deleted_cnt}건(차트 {deleted_chart_cnt}건) 삭제 완료', flush=True)
@@ -275,14 +272,11 @@ class StockBuyCheckJob(Job):
             self.session.rollback()
             print(f"[2단계 top10 저장 실패, watch 게이트 결과는 유지됨] {e}", flush=True)
 
-        # ── 기본 매수추천 보류 여부(BASE_RECO) ──
-        if not self._base_reco_enabled():
-            print(f"[기본 매수추천] 보류(BASE_RECO=N) → watch 게이트 {len(result_list)}건 저장 생략 "
-                  f"· 목록은 종합순위 {len(composite_rows)}건만", flush=True)
-            result_list = composite_rows
-
         # ── 메인 스레드: 후보 전체 모은 뒤 랭크 산정 → 한 번에 저장 ──
-        elif result_list:
+        #   기본 단계(옛 기계식 watch 게이트)는 항상 저장하되, 워커가 읽는 trade_buy_target_stock 이 아니라
+        #   별도 테이블 trade_buy_target_basic 에 저장한다(매매 경로와 분리). 서버(RecoLevel)가 기본 단계 목록으로 쓴다.
+        #   예외: BUY_RANK_MODE=MOMENTUM 은 워커가 score 순 폴백에 이 종목들을 쓰므로 예전처럼 원래 테이블에도 저장한다.
+        if result_list:
             try:
                 recent_codes = self.stockServiceImpl.get_recent_target_codes(
                     self.session, ymd, REPEAT_PENALTY_DAYS)
@@ -291,9 +285,11 @@ class StockBuyCheckJob(Job):
                 recent_codes = set()
             result_list = self.stockServiceImpl.assign_ranks(result_list, recent_codes=recent_codes)
             try:
-                self.stockServiceImpl.save_buy_target_stocks_bulk(self.session, result_list)
+                self.stockServiceImpl.save_buy_target_basic_bulk(self.session, result_list)
+                if self._buy_rank_mode() == 'MOMENTUM':
+                    self.stockServiceImpl.save_buy_target_stocks_bulk(self.session, result_list)
                 self.session.commit()
-                print(f"매수타겟 일괄 저장 완료: {len(result_list)}건 (랭크 포함)", flush=True)
+                print(f"기본 단계 추천 저장 완료: {len(result_list)}건 (trade_buy_target_basic, 랭크 포함)", flush=True)
             except Exception as e:
                 self.session.rollback()
                 print(f"[일괄 저장 실패] {e}", flush=True)
@@ -315,16 +311,8 @@ class StockBuyCheckJob(Job):
         }
         print(f"result ==> {len(result_list)}", flush=True)
 
-        if not self.FINAL_RUN:
-            return return_result
-
-        # 이메일 전송 (rank_no 오름차순으로 정렬해 발송) — 최종 배치에서만
-        mail_sorted = sorted(result_list, key=lambda x: x.get('rank_no', 10 ** 9))
-        created_html = self.stockServiceImpl.create_mail_html(mail_sorted)
-        email_list = self.userServiceImpl.get_user_email_by_condition(self.session, 'email')
-        for email in email_list:
-            self.send_mail_buy_target_stock(created_html, email, len(result_list))
-
+        # 추천 종목 메일 발송은 폐기했다(2026-11). 메일 전송 로직(send_mail_buy_target_stock 등)은
+        # 비밀번호 초기화·가입 인증 메일에 쓸 수 있어 남겨 둔다.
         return return_result
 
     def _buy_rank_mode(self) -> str:
@@ -339,21 +327,6 @@ class StockBuyCheckJob(Job):
         except Exception as e:
             print(f"[종합순위] BUY_RANK_MODE 조회 실패 → 기본 {BUY_RANK_MODE_DEFAULT}: {e}", flush=True)
             return BUY_RANK_MODE_DEFAULT
-
-    def _base_reco_enabled(self) -> bool:
-        """기본 매수추천(watch 게이트) 저장 여부. 공통코드 stock/setting/batch/BASE_RECO, 없으면 보류(N).
-        MOMENTUM 모드는 worker 의 score 폴백이 기본 추천에 기대므로 항상 저장한다."""
-        if self._buy_rank_mode() == 'MOMENTUM':
-            return True
-        try:
-            row = self.session.execute(text(
-                "SELECT `desc` FROM master_codes WHERE `system` = 'stock' AND source = 'setting' "
-                " AND category = 'batch' AND code = 'BASE_RECO'")).first()
-            v = ((row[0] if row else '') or BASE_RECO_DEFAULT).strip().upper()
-        except Exception as e:
-            print(f"[기본 매수추천] BASE_RECO 조회 실패 → 기본 {BASE_RECO_DEFAULT}: {e}", flush=True)
-            v = BASE_RECO_DEFAULT
-        return v == 'Y'
 
     def _select_top10(self, composite_pool: list, wave2_pool: list, ymd: str) -> list:
         """종합순위 산정 방식 선택(BUY_RANK_MODE). WAVE2 산정이 실패하면 MOMENTUM 으로 폴백."""

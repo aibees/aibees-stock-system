@@ -259,12 +259,11 @@ class TradeBuyTargetStockDao(BaseDao):
             session.execute(upsert_stmt)
 
     def upsert_composite_top10(self, session, data_list: list[dict]) -> None:
-        """2단계(top10→모멘텀 재정렬) 결과 upsert.
+        """2단계(top10→모멘텀 재정렬 / 2파 돌파) 결과 upsert.
 
-        watch 게이트(upsert_trade_buy_target_stock)와 병행으로 채워지는 컬럼이라,
-        이미 그날 행이 있으면(watch 게이트도 통과) momentum_composite/composite_rank_no
-        만 갱신하고 나머지는 건드리지 않는다. 행이 없으면(watch 게이트 미통과, 2단계
-        전용 픽) stock_name/close/shape_proba 까지만 채운 최소 행을 새로 만든다.
+        이미 그날 행이 있으면 momentum_composite/composite_rank_no 등만 갱신하고, 없으면
+        stock_name/close/shape_proba 까지만 채운 최소 행을 새로 만든다.
+        (옛 기계식 알고리즘 BASIC 종목은 이 테이블이 아니라 trade_buy_target_basic 에 따로 저장한다.)
 
         data 키: ymd, stock_code, stock_name, close, shape_proba, momentum_composite,
                  composite_rank_no

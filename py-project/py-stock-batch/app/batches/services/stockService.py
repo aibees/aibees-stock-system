@@ -1,6 +1,7 @@
 from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
 from stock_shared.dao.tradeBuyTargetChartDao import TradeBuyTargetChartDao
+from stock_shared.dao.tradeBuyTargetBasicDao import TradeBuyTargetBasicDao
 from stock_shared.strategy import scoring
 
 
@@ -9,6 +10,7 @@ class StockService:
         self.__name__ = "StockService"
         self.stockMasterDaoImpl = MasterStockDao()
         self.tradeBuyTargetStockDaoImpl = TradeBuyTargetStockDao()
+        self.tradeBuyTargetBasicDaoImpl = TradeBuyTargetBasicDao()
         self.tradeBuyTargetChartDaoImpl = TradeBuyTargetChartDao()
 
     def get_stock_master_list(self, session, search_type: str) -> list:
@@ -54,8 +56,16 @@ class StockService:
         self.tradeBuyTargetStockDaoImpl.upsert_trade_buy_target_stock(session, data)
 
     def save_composite_top10(self, session, data: list) -> None:
-        """2단계(top10→모멘텀 재정렬) 결과 upsert. watch 게이트와 병행 저장."""
+        """2단계(top10→모멘텀 재정렬)/2파 종합순위 결과 upsert. 워커가 읽는 trade_buy_target_stock 에 저장한다."""
         self.tradeBuyTargetStockDaoImpl.upsert_composite_top10(session, data)
+
+    # ── 기본 단계(BASIC, 옛 기계식 알고리즘) — 워커가 읽는 테이블과 분리된 trade_buy_target_basic ──
+    def clean_buy_target_basic_by_ymd(self, session, ymd: str) -> int:
+        return self.tradeBuyTargetBasicDaoImpl.delete_by_ymd(session, ymd)
+
+    def save_buy_target_basic_bulk(self, session, data: list) -> None:
+        """기본 단계 추천(score/rank_no 포함)을 trade_buy_target_basic 에 upsert."""
+        self.tradeBuyTargetBasicDaoImpl.upsert_bulk(session, data)
 
     # ──────────────────────────────────────────────────────────────────
     # 종합 적합도 점수 & 순위 (기술 50% + 재무 30% + 유동성 20%)
@@ -150,7 +160,9 @@ class StockService:
         to_ymd = (dt - timedelta(days=1)).strftime('%Y%m%d')
         if to_ymd < from_ymd:
             return set()
-        return self.tradeBuyTargetStockDaoImpl.select_recent_codes(session, from_ymd, to_ymd)
+        # 2파 목록(trade_buy_target_stock) + 기본 단계 목록(trade_buy_target_basic) 모두에서 본다.
+        return (self.tradeBuyTargetStockDaoImpl.select_recent_codes(session, from_ymd, to_ymd)
+                | self.tradeBuyTargetBasicDaoImpl.select_recent_codes(session, from_ymd, to_ymd))
 
     def evaluate_financials(self, key, value_str):
         # 2026-10-11 재무지표 계산 수정 이후 값이 없으면 None 으로 저장된다(PEG: 순이익 증가율 ≤ 0 등).

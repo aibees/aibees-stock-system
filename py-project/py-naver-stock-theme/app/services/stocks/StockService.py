@@ -2,6 +2,8 @@ import logging
 import pandas as pd
 
 from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
+from stock_shared.dao.tradeBuyTargetBasicDao import TradeBuyTargetBasicDao
+from stock_shared.reco_algo import merge_reco_sources
 from stock_shared.dao.tradeBuyTargetChartDao import TradeBuyTargetChartDao
 from stock_shared.dao.tradeBuyTargetPriorityDao import TradeBuyTargetPriorityDao
 from stock_shared.dao.masterStockDao import MasterStockDao
@@ -18,6 +20,7 @@ class StockService:
 
     def __init__(self):
         self.buyTargetStockDaoImpl = TradeBuyTargetStockDao()
+        self.buyTargetBasicDaoImpl = TradeBuyTargetBasicDao()
         self.buyTargetChartDaoImpl = TradeBuyTargetChartDao()
         self.buyTargetPriorityDaoImpl = TradeBuyTargetPriorityDao()
         self.masterStockDaoImpl = MasterStockDao()
@@ -26,12 +29,26 @@ class StockService:
         self.kis = KisEngine(virtual=False)
 
     def get_buy_target_stock_list(self, session, ymd):
-        results = self.buyTargetStockDaoImpl.select_trade_buy_target_daily(session, ymd)
+        """매수추천 목록. 두 테이블을 종목당 한 줄로 합치고 행마다 algos(걸린 알고리즘)를 붙인다.
+
+          · trade_buy_target_stock : 2파 종합순위(PREMIUM). 워커가 읽는 테이블.
+                                     rank_no 가 남아 있는 옛 행(기본 알고리즘이 같은 테이블에 저장되던 시절)은 BASIC 도 겸한다.
+          · trade_buy_target_basic : 옛 기계식 알고리즘(BASIC).
+        단계 판정·권한별 가공은 RecoLevel.apply_levels 가 한다.
+        """
+        # ymd 미지정이면 두 테이블 중 더 최근 영업일을 쓴다(한쪽만 비는 날에도 다른 쪽이 나오게).
+        if not ymd.get(Literal.YMD):
+            latest = [y for y in (self.buyTargetStockDaoImpl.select_latest_ymd(session),
+                                  self.buyTargetBasicDaoImpl.select_latest_ymd(session)) if y]
+            ymd = {**ymd, Literal.YMD: max(latest) if latest else None}
+
+        main_rows = self.buyTargetStockDaoImpl.select_trade_buy_target_daily(session, ymd)
+        basic_rows = self.buyTargetBasicDaoImpl.select_daily(session, ymd.get(Literal.YMD))
+        results = merge_reco_sources(main_rows, basic_rows)
         if not results:
             return results
 
-        # 전 종목이 같은 날짜(ymd 미지정 시 DAO가 자동 resolve한 최신 영업일)이므로
-        # 첫 행의 ymd로 차트 데이터를 한 번에 조회해 붙인다(종목별 N회 조회 대신).
+        # 전 종목이 같은 날짜이므로 첫 행의 ymd로 차트 데이터를 한 번에 조회해 붙인다(종목별 N회 조회 대신).
         resolved_ymd = results[0]["ymd"]
         chart_map = self.buyTargetChartDaoImpl.select_by_ymd(session, resolved_ymd)
         for item in results:

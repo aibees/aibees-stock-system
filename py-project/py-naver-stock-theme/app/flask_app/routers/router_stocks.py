@@ -5,6 +5,11 @@ from flask import Blueprint, request, g
 from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.stockInvestorDailyDao import StockInvestorDailyDao
 from app.flask_app.routers.router_oauth import require_auth
+from app.flask_app.routers.router_master import optional_auth
+from app.domains.dao.roleMenuDao import RoleMenuDao
+from app.services.stocks import RecoLevel
+from app.domains.dao.masterCodesDao import MasterCodesDao
+from stock_shared.reco_algo import algo_stage_map, MASTER_CODES_KEY
 from app.flask_app.utils.apiResponse import ApiResponse
 from app.services.stocks.StockService import StockService
 from app.services.stocks.RecoPerformanceService import RecoPerformanceService
@@ -22,6 +27,7 @@ stockServiceImpl = StockService()
 recoPerformanceServiceImpl = RecoPerformanceService()
 financeServiceImpl = FinanceService()
 sectorServiceImpl = SectorService()
+roleMenuDaoImpl = RoleMenuDao()
 
 # STOCKS ROUTE :: ROOT
 # ===============================================================================
@@ -49,14 +55,29 @@ def select_master_stock_search():
     
 
 @stocks_bp.route('/buy-target')
+@optional_auth
 def select_buy_target_stock():
-
+    """매수추천 목록. 비로그인도 열리지만 **열람 단계에 맞춰** 응답을 가공한다(RecoLevel).
+    기본(비로그인 포함)은 고급 정보(shape_proba·종합순위·수급)를 뺀 목록, 고급은 RECO_ADVANCED 기능,
+    실전은 WORKER_USER 권한자에게만 단계가 열린다."""
     search_params = {
         Literal.YMD: request.args.get(Literal.YMD),
     }
 
     try:
+        user_id = g.current_user_id
+        auth_ids = roleMenuDaoImpl.select_user_auth_ids(g.db, user_id) if user_id is not None else []
+        features = roleMenuDaoImpl.select_features_for_user(g.db, auth_ids)
+        level = RecoLevel.user_level(auth_ids, features)
+
         results = stockServiceImpl.get_buy_target_stock_list(g.db, search_params)
+        # 알고리즘→단계 대응은 공통코드(stock/setting/reco_algo). 못 읽으면 기본 대응(BASIC 1·PREMIUM 2·PRIVATE 3).
+        try:
+            algo_stage = algo_stage_map(MasterCodesDao().select_master_code(g.db, MASTER_CODES_KEY))
+        except Exception as e:
+            logging.warning(f"[buy-target] reco_algo 공통코드 조회 실패 → 기본 대응: {e}")
+            algo_stage = None
+        results = RecoLevel.apply_levels(results, level, algo_stage)
         return ApiResponse.success(results)
     except Exception as e:
         logging.error(str(e))

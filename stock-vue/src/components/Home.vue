@@ -331,7 +331,7 @@ import AdBanner from './common/AdBanner.vue';
 import AdSlot from './common/AdSlot.vue';
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
-import { hasRole, WORKER_ROLE } from '@scripts/useAccess.js';
+import { hasRole, WORKER_ROLE, recoLevel } from '@scripts/useAccess.js';
 import { useShowAds } from '@scripts/useAds.js';
 import { isNativeAdsEnabled } from '@scripts/useAdMob.js';
 import { NOTICE_LIST_PATH, NOTICE_DETAIL_PATH, noticeCategoryClass, noticeDateText } from '@scripts/notice.js';
@@ -556,7 +556,9 @@ const getStockMainData = async () => {
         const searchParam = { 'ymd': selectedDate.value.replaceAll('-', '') };
         const { data } = await aibeesApi.get('/api/v1/stocks/buy-target', { params: searchParam });
 
-        resultData.value = data.data.length == 0 ? [] : data.data;
+        // 홈 목록은 열람 가능한 알고리즘 중 상위 것만: 고급 이상이면 고급(2파) 목록, 아니면 기본 목록(서버가 기본 종목만 내려준다).
+        const rows = data.data.length == 0 ? [] : data.data;
+        resultData.value = recoLv >= 2 ? rows.filter(r => (r.reco_stages ?? []).includes(2)) : rows;
     } catch (e) {
         console.error(e);
     }
@@ -580,17 +582,21 @@ const stepSelectedDate = (deltaDays) => {
 };
 
 /* ══════════════ 매수타겟 정렬 ══════════════ */
-const SORT_OPTIONS = [
+// 고급 단계 이상에서만 값이 내려오는 기준(기본 단계·비로그인은 서버가 필드를 주지 않는다 — 매수추천 단계 참고)
+const ADVANCED_SORT_KEYS = ['composite_rank_no', 'shape_proba'];
+const SORT_ALL = [
     { key: 'composite_rank_no', label: '종합 순위', dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
     { key: 'rank_no',     label: '추천순위',     dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
     { key: 'score',       label: '점수',         dir: 'desc', ascLabel: '낮은 점수 먼저', descLabel: '높은 점수 먼저' },
     { key: 'volume',      label: '거래량',       dir: 'desc', ascLabel: '적은 순',        descLabel: '많은 순' },
     { key: 'shape_proba', label: '급등패턴 순위', dir: 'desc', ascLabel: '낮은 확률 먼저', descLabel: '높은 확률 먼저' },
 ];
+const recoLv = recoLevel();
+const SORT_OPTIONS = recoLv >= 2 ? SORT_ALL : SORT_ALL.filter(o => !ADVANCED_SORT_KEYS.includes(o.key));
 
 // 2026-09 세션 후속: watch 게이트와 병행하는 2단계(top10→모멘텀 재정렬) 방식이 실전
-// 시뮬레이션에서 재현성 있게 우수해 기본 정렬을 composite_rank_no 로 승격.
-const sortKey = ref('composite_rank_no');
+// 시뮬레이션에서 재현성 있게 우수해 기본 정렬을 composite_rank_no 로 승격(고급 이상). 기본 단계는 추천순위.
+const sortKey = ref(recoLv >= 2 ? 'composite_rank_no' : 'rank_no');
 const sortDir = ref('asc');
 
 const currentSort = computed(

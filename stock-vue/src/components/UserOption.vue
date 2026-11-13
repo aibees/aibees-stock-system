@@ -103,27 +103,7 @@
                     </div>
                 </section>
 
-                <!-- ════════════ 알림 설정 (user_options) ════════════ -->
-                <section class="setting-card">
-                    <header class="card-head">
-                        <h3>알림</h3>
-                    </header>
-
-                    <div class="field-grid">
-                        <div class="form-field switch-field">
-                            <div class="switch-text">
-                                <label>매수 추천 종목 메일 수신</label>
-                            </div>
-                            <button type="button"
-                                :class="['toggle-btn', form.user_options.stock_buy_target_mail_flag === 'Y' ? 'active' : 'inactive']"
-                                @click="toggleMailFlag"
-                                role="switch"
-                                :aria-checked="form.user_options.stock_buy_target_mail_flag === 'Y'">
-                                <span class="toggle-knob"></span>
-                            </button>
-                        </div>
-                    </div>
-                </section>
+                <!-- 매수 추천 종목 메일 수신 설정은 폐기(2026-11): 추천 메일 발송을 없앴다. user_options 컬럼은 그대로 둔다. -->
 
                 <!-- ════════════ 저장 바 ════════════ -->
                 <div class="save-bar">
@@ -215,12 +195,6 @@ const fetchOptions = async () => {
 };
 
 onMounted(fetchOptions);
-
-/* ── 토글 ── */
-const toggleMailFlag = () => {
-    form.user_options.stock_buy_target_mail_flag =
-        form.user_options.stock_buy_target_mail_flag === 'Y' ? 'N' : 'Y';
-};
 
 /* ── 변경분(diff) 계산: table 별로 바뀐 컬럼만 ── */
 const buildDiff = () => {
