@@ -8,6 +8,7 @@ from app.services.anthropic.stockAiContentService import (
     RefreshCooldownError,
     AnnouncementMonthRequiredError,
 )
+from stock_shared.dao.masterStockDao import MasterStockDao
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +17,28 @@ anthropic_bp = Blueprint("anthropic", __name__)
 # 모듈 레벨에서 한 번만 생성 → 동일 client 재사용
 anthropicServiceImpl = AnthropicService()
 stockAiContentServiceImpl = StockAiContentService()
+masterStockDaoImpl = MasterStockDao()
 
 ADMIN_USER_ID = 1
+
+# AI 를 새로 부르는(비용이 드는) 엔드포인트의 공통 규칙 (2026-11-15):
+#   - 로그인 필요. /chat·/stream 은 화면에서 쓰지 않으므로 관리자(user_id=1)만.
+#     예전에는 인증 없이 열려 있어, 주소만 알면 누구나 모델·max_tokens 를 골라 회사 키로 호출할 수 있었다.
+#   - 종목 분석은 master_stock 에 있는 종목코드만 생성한다(없는 코드로 생성 요청을 반복해 비용을 쓰게 하는 것 방지).
+
+
+def _admin_only():
+    """관리자가 아니면 403 응답, 관리자면 None."""
+    if g.current_user_id != ADMIN_USER_ID:
+        return ApiResponse.error("관리자만 사용할 수 있습니다.", status=403)
+    return None
+
+
+def _unknown_stock(stock_code: str):
+    """master_stock 에 없는 종목이면 400 응답, 있으면 None."""
+    if not masterStockDaoImpl.select_master_stock_by_id(g.db, {"stock_code": stock_code}):
+        return ApiResponse.error("없는 종목코드입니다.", status=400)
+    return None
 
 
 # ANTHROPIC ROUTE :: ROOT
@@ -37,7 +58,10 @@ def anthropic_index():
 #     "max_tokens": 8096                           (optional)
 #   }
 @anthropic_bp.route("/chat", methods=["POST"])
+@require_auth
 def chat():
+    if (denied := _admin_only()):
+        return denied
     body = request.get_json(silent=True) or {}
     messages = body.get("messages")
 
@@ -62,7 +86,10 @@ def chat():
 # Request body: chat와 동일
 # Response: text/event-stream  →  data: <chunk>\n\n  … data: [DONE]\n\n
 @anthropic_bp.route("/stream", methods=["POST"])
+@require_auth
 def stream():
+    if (denied := _admin_only()):
+        return denied
     body = request.get_json(silent=True) or {}
     messages = body.get("messages")
 
@@ -117,6 +144,8 @@ def refresh_overview():
     stock_code = _get_stock_code()
     if not stock_code:
         return ApiResponse.error("stock_code 파라미터가 필요합니다.")
+    if (bad := _unknown_stock(stock_code)):
+        return bad
 
     body = request.get_json(silent=True) or {}
     is_admin = (g.current_user_id == ADMIN_USER_ID)
@@ -153,6 +182,8 @@ def refresh_theme():
     stock_code = _get_stock_code()
     if not stock_code:
         return ApiResponse.error("stock_code 파라미터가 필요합니다.")
+    if (bad := _unknown_stock(stock_code)):
+        return bad
 
     body = request.get_json(silent=True) or {}
     is_admin = (g.current_user_id == ADMIN_USER_ID)
@@ -168,13 +199,18 @@ def refresh_theme():
         return ApiResponse.error(str(e)[:255])
 
 
-# GET /api/v1/anthropic/stock-analysis/news?stock_code=005930
+# GET /api/v1/anthropic/stock-analysis/news?stock_code=005930  (로그인 필요)
 # 버튼 없음 — 마지막 갱신 후 2시간 지났으면 서버가 알아서 KIS 헤드라인 기반으로 재생성한다.
+#   조회가 곧 생성(AI 호출 + 1번 사용자의 실투자 KIS 키로 뉴스 조회)이라 로그인한 사용자만 부른다.
+#   화면(StockInfo.vue)은 로그인해야 열리는 메뉴라 영향 없다.
 @anthropic_bp.route("/stock-analysis/news", methods=["GET"])
+@require_auth
 def get_news():
     stock_code = _get_stock_code()
     if not stock_code:
         return ApiResponse.error("stock_code 파라미터가 필요합니다.")
+    if (bad := _unknown_stock(stock_code)):
+        return bad
 
     try:
         result = stockAiContentServiceImpl.get_or_refresh_news(g.db, stock_code)

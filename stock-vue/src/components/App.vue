@@ -2,11 +2,11 @@
 import Lnb from './common/Lnb.vue';
 import AdSideBanners from './common/AdSideBanners.vue';
 import AdBottomBanner from './common/AdBottomBanner.vue';
-import { isAuthPath } from '@scripts/authPaths.js';
+import { isFocusPath } from '@scripts/authPaths.js';
 
-// 로그인·가입 화면에는 탭바(Lnb)를 그리지 않는다 — 로그인 전에는 갈 수 있는 메뉴가 없다.
+// 로그인·가입 화면과 온보딩에는 탭바(Lnb)를 그리지 않는다 — 그 화면 하나에만 집중하게 한다.
 const route = useRoute();
-const showLnb = computed(() => !isAuthPath(route.path));
+const showLnb = computed(() => !isFocusPath(route.path));
 </script>
 
 <template>

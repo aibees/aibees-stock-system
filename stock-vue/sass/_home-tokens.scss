@@ -1,0 +1,20 @@
+// 홈 계열 화면(간편 홈·온보딩) 디자인 토큰. 전문가 홈(Home.vue)의 스코프 토큰과 같은 값이다
+// (Home.vue 는 동결이라 그쪽은 손대지 않고 새 화면만 이 파일을 쓴다).
+$bg:        #FFFBEA;
+$bar:       #FFF6D2;
+$card:      #FFFFFF;
+$line:      #EFE2BC;
+$line-2:    #EAD9A6;
+$line-soft: #F3EAD2;
+$brown:     #7A4423;
+$brown-ink: #5C3118;
+$accent:    #A0662F;
+$yellow:    #F6C445;
+$ink:       #2B1D14;
+$sub:       #6B5B4E;
+$sub-2:     #7A6B5D;
+$up:        #C8282A;   // 상승 = 빨강(국내 관습)
+$down:      #1F5BD1;   // 하락 = 파랑
+
+$font-body:  'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
+$font-brand: 'Do Hyeon', 'Pretendard', sans-serif;

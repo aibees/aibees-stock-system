@@ -5,7 +5,8 @@ import { assUserSession } from "./stores/user-stores";
 import { ensureAccess } from "./useAccess.js";
 import { consumeAdPass, countGateEntry, gateInterval } from "./useAdGate.js";
 import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
-import { isAuthPath } from "./authPaths.js";
+import { isAuthPath, isGuestPath, ONBOARDING_PATH } from "./authPaths.js";
+import { usePersonaStore } from "./stores/persona-store.js";
 import { NOTICE_DETAIL_PATH, NOTICE_LIST_PATH } from "./notice.js";
 import AdGate from '@/components/AdGate.vue';
 import NaverCallback from '@/components/NaverCallback.vue';
@@ -13,7 +14,9 @@ import SignupConsent from '@/components/SignupConsent.vue';
 import Signup from '@/components/Signup.vue';
 
 // ----- import components -----
-import Home from '@/components/Home.vue'
+// 홈은 간편/전문가 모드로 갈린다(HomeEntry). 기존 Home.vue 는 전문가 모드 화면으로 그대로 둔다.
+import HomeEntry from '@/components/Home/HomeEntry.vue'
+import Onboarding from '@/components/Home/Onboarding.vue'
 import Login from '@/components/Login.vue'
 import App from '@/components/App.vue'
 import UserOption from '@/components/UserOption.vue';
@@ -33,10 +36,16 @@ const routes = [
         redirect: '/home'
     },
     {
-        // 비로그인 접근 가능. dynamic menu API 실패해도 항상 존재하도록 static 등록.
+        // 비로그인 접근 가능(authPaths.GUEST_PATHS). dynamic menu API 실패해도 항상 존재하도록 static 등록.
         path: "/home",
         name: "home",
-        component: Home
+        component: HomeEntry
+    },
+    {
+        // 성향 질문(온보딩). 비로그인 접근 가능. ?pick=1 이면 질문 없이 유형 고르기 화면부터.
+        path: ONBOARDING_PATH,
+        name: "onboarding",
+        component: Onboarding
     },
     {
         path: "/login",
@@ -175,7 +184,8 @@ const getRouteList = async () => {
   }
 }
 
-// 로그인 없이 열 수 있는 화면은 로그인·가입 흐름뿐이다(authPaths.js). 홈을 포함한 나머지는 전부 로그인 필요.
+// 로그인 없이 열 수 있는 화면은 로그인·가입 흐름과 홈·온보딩뿐이다(authPaths.js). 나머지는 전부 로그인 필요.
+//   (2026-10-10 에 홈까지 로그인 전용으로 막았다가 2026-11-15 "가입 없이 홈 전체 공개" 결정으로 다시 열었다)
 
 export const setRouterToApp = async () => {
     const dynamicRoutes = await getRouteList();
@@ -202,26 +212,39 @@ export const setRouterToApp = async () => {
         const isAuth = isAuthPath(to.path);
         const target = normPath(to.path);
 
-        // 비로그인: 로그인·가입 화면만 연다. 나머지는 모두 로그인 화면으로.
+        const isGuest = isGuestPath(target);
+
         if (!loggedIn) {
-            return isAuth ? true : { path: '/login' };
-        }
-        // 로그인 상태에서 로그인·가입 화면으로 오면 홈으로(네이버 콜백·동의 화면은 흐름 중이라 그대로 둔다).
-        if (to.path === '/login' || to.path === '/signup') {
+            // 비로그인: 로그인·가입 흐름은 그대로, 홈·온보딩은 게스트로 연다. 나머지는 모두 로그인 화면으로.
+            if (isAuth) return true;
+            if (!isGuest) return { path: '/login' };
+        } else if (to.path === '/login' || to.path === '/signup') {
+            // 로그인 상태에서 로그인·가입 화면으로 오면 홈으로(네이버 콜백·동의 화면은 흐름 중이라 그대로 둔다).
             return { path: '/home' };
         }
 
         // 권한(메뉴/기능)을 받는다. Lnb 가 sessionStorage 의 menuList 를 읽는데 그 값이 권한 반영본이어야 한다.
+        // 비로그인이면 게스트 권한(공개 메뉴·설정값)을 받는다 — 광고 노출과 성향 설정(공통코드)이 이 값을 쓴다.
         // 받아 둔 권한이 로그인 상태와 어긋나면(예: 게스트 때 받은 권한이 남음) 다시 받는다.
         const stale = userSession.access.loaded && userSession.access.asGuest === loggedIn;
         const access = isAuth ? null : await ensureAccess(stale);
         const allowed = !!access && access.paths.includes(target);
         const isMenuPath = restrictedPaths.has(target);
 
-        // 로그인했지만 권한(role_menu)에 없는 메뉴.
-        if (!isAuth && isMenuPath && !allowed) {
+        // 권한(role_menu)에 없는 메뉴. 게스트 화면(홈·온보딩)은 메뉴 권한과 무관하게 열린다.
+        if (!isAuth && !isGuest && isMenuPath && !allowed) {
             alert("접근 권한이 없는 메뉴입니다.");
             return { path: '/home' };
+        }
+
+        // 성향: 로그인 상태의 첫 이동 때 계정 저장값과 맞춘다(새 기기에서 로그인하면 계정 값을 받아 온다).
+        //   이미 맞췄으면 바로 돌아온다. 실패해도 기기 값으로 진행한다.
+        const persona = usePersonaStore();
+        if (loggedIn) await persona.syncWithAccount();
+
+        // 처음 실행: 홈으로 들어올 때 성향 질문을 한 번 연다(권한을 받은 뒤라 매매 사용자는 제외된다).
+        if (target === '/home' && persona.needsOnboarding()) {
+            return { path: ONBOARDING_PATH };
         }
 
         // 광고 게이트: 접근이 허용된 게이트 대상 메뉴에 들어올 때. AD_FREE 보유자는 건너뛴다.

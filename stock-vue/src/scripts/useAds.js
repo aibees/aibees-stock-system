@@ -8,7 +8,7 @@ import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute } from 'vue-router';
 import { assUserSession } from './stores/user-stores.js';
 import { AD_ENABLED } from './adConfig.js';
-import { isAuthPath } from './authPaths.js';
+import { isFocusPath } from './authPaths.js';
 
 export const useShowAds = () => {
     const store = assUserSession();
@@ -17,7 +17,7 @@ export const useShowAds = () => {
         AD_ENABLED
         && store.access.loaded
         && !store.access.features.includes('AD_FREE')
-        && !isAuthPath(route.path)   // 로그인·가입 화면에는 광고를 띄우지 않는다
+        && !isFocusPath(route.path)  // 로그인·가입 화면과 온보딩(첫 사용 흐름)에는 광고를 띄우지 않는다
     );
 };
 

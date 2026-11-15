@@ -1,0 +1,75 @@
+{
+  "defaultType": "balanced",
+  "types": [
+    {
+      "key": "stable",
+      "name": "안정형",
+      "desc": "이름을 들어 본 큰 회사부터 보여 드리고, 정리할 가격은 가깝게 잡습니다.",
+      "bMin": 0,
+      "bMax": 1,
+      "order": "market_cap",
+      "stopPct": 5
+    },
+    {
+      "key": "balanced",
+      "name": "균형형",
+      "desc": "시장이 주목하는 순서 그대로 보여 드리고, 정리할 가격은 중간으로 잡습니다.",
+      "bMin": 2,
+      "bMax": 2,
+      "order": "default",
+      "stopPct": 8
+    },
+    {
+      "key": "aggressive",
+      "name": "공격형",
+      "desc": "가격이 크게 움직이는 종목부터 보여 드리고, 정리할 가격은 멀게 잡습니다.",
+      "bMin": 3,
+      "bMax": 4,
+      "order": "volatility",
+      "stopPct": 12
+    }
+  ],
+  "questions": [
+    {
+      "key": "experience",
+      "text": "주식을 사 본 경험이 있으신가요?",
+      "options": [
+        { "label": "아직 없습니다", "mode": "simple" },
+        { "label": "몇 번 사 봤습니다", "mode": "simple" },
+        { "label": "꾸준히 하고 있습니다", "mode": "expert" }
+      ]
+    },
+    {
+      "key": "hold",
+      "text": "산 종목을 얼마나 지켜볼 생각이신가요?",
+      "options": [
+        { "label": "몇 주는 기다릴 수 있습니다", "b": false },
+        { "label": "며칠 안에 결과를 보고 싶습니다", "b": true }
+      ]
+    },
+    {
+      "key": "drop",
+      "text": "산 종목이 일주일 만에 10% 내렸습니다. 어떻게 하시겠습니까?",
+      "options": [
+        { "label": "더 내리기 전에 정리합니다", "b": false },
+        { "label": "정해 둔 가격까지는 지켜봅니다", "b": true }
+      ]
+    },
+    {
+      "key": "swing",
+      "text": "어느 쪽이 더 마음 편하신가요?",
+      "options": [
+        { "label": "조금씩 꾸준히 움직이는 종목", "b": false },
+        { "label": "크게 오르내려도 기회가 큰 종목", "b": true }
+      ]
+    },
+    {
+      "key": "size",
+      "text": "어떤 회사에 더 눈이 가시나요?",
+      "options": [
+        { "label": "이름을 들어 본 큰 회사", "b": false },
+        { "label": "덜 알려졌지만 요즘 주목받는 회사", "b": true }
+      ]
+    }
+  ]
+}
