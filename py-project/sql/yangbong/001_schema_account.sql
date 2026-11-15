@@ -31,9 +31,9 @@
 CREATE DATABASE IF NOT EXISTS yangbong DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 
 -- 접속 호스트는 API 가 붙는 위치로 좁힐 수 있으면 좁힌다('%' = 어디서나).
-CREATE USER IF NOT EXISTS 'yangbong_api'@'%' IDENTIFIED BY '<비밀번호>';
-ALTER USER 'yangbong_api'@'%' WITH MAX_USER_CONNECTIONS 15;
+CREATE USER IF NOT EXISTS 'yangbong'@'%' IDENTIFIED BY '<비밀번호>';
+ALTER USER 'yangbong'@'%' WITH MAX_USER_CONNECTIONS 15;
 
 -- 읽기는 스키마 전체(서비스 테이블 + 시장 데이터 뷰). 쓰기 권한은 002 에서 서비스 테이블마다 따로 준다
 -- — 스키마 단위로 주면 단일 테이블 뷰가 '갱신 가능한 뷰'라서 뷰를 통해 `stock` 시장 데이터를 고칠 수 있게 된다.
-GRANT SELECT ON yangbong.* TO 'yangbong_api'@'%';
+GRANT SELECT ON yangbong.* TO 'yangbong'@'%';

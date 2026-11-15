@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+    stock-vue-app:
+        container_name: stock-vue-app
+        build:
+            context: .
+            dockerfile: Dockerfile
+            args:
+                VITE_ENV: prd
+        ports:
+        - "5556:5556"
+        # volumes:
+        #   - type: bind
+        #     source: /app/gallery
+        #     target: /usr/share/nginx/html
+        networks:
+            aibees:
+                ipv4_address: 172.21.1.6
+        restart: unless-stopped
+
+networks:
+    aibees:
+        external: true

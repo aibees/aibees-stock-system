@@ -1,0 +1,20 @@
+# 빌드 컨텍스트 슬림화 (context = stock-vue/)
+# COPY . . 로 통째로 들어가므로, 컨테이너 안에서 재생성되는 것들은 제외한다.
+
+node_modules
+dist
+.git
+.idea
+.vscode
+.DS_Store
+
+# 배포 스크립트 / 컨테이너 정의 자체는 이미지에 불필요
+moveBuildFiles.sh
+docker-compose.yml
+Dockerfile
+README.md
+batch_test.http
+stock_query.py
+
+# ※ .env.* 는 제외하지 않는다 — Dockerfile 이 .env.${VITE_ENV} 를 복사해 빌드한다.
+#   (builder 스테이지에만 남고 최종 nginx 이미지에는 dist 만 들어간다)

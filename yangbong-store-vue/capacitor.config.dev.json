@@ -1,0 +1,22 @@
+{
+  "appId": "com.aibeesworld.stocks",
+  "appName": "양봉상회",
+  "webDir": "dist",
+  "server": {
+    "url": "http://localhost:19010",
+    "cleartext": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "launchFadeOutDuration": 300,
+      "backgroundColor": "#FFFDD0",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    }
+  }
+}

@@ -2,10 +2,22 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "dev",
+      "name": "yangbong",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "stock-vue"],
+      "runtimeArgs": ["run", "dev", "--prefix", "yangbong-store-vue"],
       "port": 19010
+    },
+    {
+      "name": "yangbong-mock",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:mock", "--prefix", "yangbong-store-vue"],
+      "port": 19010
+    },
+    {
+      "name": "secret",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "secret-store-vue"],
+      "port": 19011
     },
     {
       "name": "api",
