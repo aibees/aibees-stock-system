@@ -59,6 +59,20 @@ COMPOSITE_MOMENTUM_COLS = ['obv_gap_norm', 'obv_slope3', 'ind_vol_ratio_today', 
 #   신호 판정이 실패하면 그날은 MOMENTUM 으로 자동 폴백한다.
 BUY_RANK_MODE_DEFAULT = 'WAVE2'
 WAVE2_TOP_N = 10
+# ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+# ┃ ⚠ 비밀상회(private 고객) 실전 자동매매 로직 — 수정·삭제 금지                                               ┃
+# ┃   이 블록과 아래 '실전 게이트' 표시가 붙은 코드(run_batch 의 wave2_universe, _process_chunk 의 univ_rows·vol20, ┃
+# ┃   _select_top10 의 gate_pool 호출, _setting_float)는 워커가 실제 돈으로 사는 종목(composite_rank_no)을 정한다.   ┃
+# ┃   사용자(대표)의 명시적 승인 없이 다른 작업(양봉상회·지표 저장·리팩터링 등)에서 지우거나 기준을 바꾸지 말 것.    ┃
+# ┃   구조를 바꿔야 하면 게이트 결과(같은 신호·같은 순위)가 그대로인지 app/test/test_wave2_gate_unit.py 로 확인할 것.  ┃
+# ┃   근거: app/test/bt_final_*.py · 메모리 research-direction-inflection-clusters · sql/stock/003_final_strategy_apply.sql ┃
+# ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+# ── 실전 매수 게이트 (2026-11-16 사용자 확정, 연구: app/test/bt_final_*.py) ─────────────
+#   2파 신호 중 그날 모집단(2파 사전 필터 통과 종목) 안에서 20일 변동성 백분위가 WAVE2_MIN_VOL_PCT 이상인 것만 순위를 매기고,
+#   시장 폭(모집단 중 종가 > 20일선 비율)이 WAVE2_MIN_BREADTH 미만인 날은 순위를 하나도 매기지 않는다(워커는 그날 신호 매수 없음).
+#   공통코드 master_codes(stock/setting/batch/WAVE2_MIN_VOL_PCT·WAVE2_MIN_BREADTH) 우선, 없거나 이상하면 기본값. 0 이면 끔.
+WAVE2_MIN_VOL_PCT_DEFAULT = 2 / 3
+WAVE2_MIN_BREADTH_DEFAULT = 0.40
 # ── 기본 매수추천(옛 기계식 watch 게이트 → score/rank_no) 재개 (2026-11) ───────────
 #   2026-10-26 에 앱 배포를 우선해 목록에서 뺐던(BASE_RECO=N) 것을, 단계별 추천(기본/고급/실전) 확장을 위해
 #   다시 항상 저장한다(공통코드 BASE_RECO 는 폐기). 단, 워커가 읽는 trade_buy_target_stock(2파 종합순위)과는
@@ -175,6 +189,7 @@ class StockBuyCheckJob(Job):
         result_list = []
         composite_pool = []
         wave2_pool = []
+        wave2_universe = []      # 실전 게이트 모집단(vol20·above20) — ⚠ 비밀상회 실전 매매, 승인 없이 수정·삭제 금지(파일 상단 참고)
         train_rows = []
         with ThreadPoolExecutor(max_workers=n) as ex:
             futures = []
@@ -188,11 +203,12 @@ class StockBuyCheckJob(Job):
                 ))
             for f in futures:
                 try:
-                    chunk_results, chunk_composite, chunk_train, chunk_wave2 = f.result()
+                    chunk_results, chunk_composite, chunk_train, chunk_wave2, chunk_univ = f.result()
                     result_list.extend(chunk_results)
                     composite_pool.extend(chunk_composite)
                     train_rows.extend(chunk_train)
                     wave2_pool.extend(chunk_wave2)
+                    wave2_universe.extend(chunk_univ)
                 except Exception as e:
                     print(f"[run_batch] 워커 실패: {e}", flush=True)
 
@@ -233,7 +249,7 @@ class StockBuyCheckJob(Job):
         composite_top10 = []
         composite_rows = []          # 저장된 종합순위 행(재무 포함) — 기본 추천 보류 시 메일 본문
         try:
-            composite_top10 = self._select_top10(composite_pool, wave2_pool, ymd)
+            composite_top10 = self._select_top10(composite_pool, wave2_pool, ymd, wave2_universe)
             if composite_top10:
                 empty_fin = {'eps': None, 'pbr': None, 'per': None, 'roe': None, 'peg': None}
                 # 재무(PER/PBR 등) — watch 게이트 종목만 스레드에서 조회해 왔기 때문에 2단계로만 뽑힌 종목은
@@ -328,12 +344,36 @@ class StockBuyCheckJob(Job):
             print(f"[종합순위] BUY_RANK_MODE 조회 실패 → 기본 {BUY_RANK_MODE_DEFAULT}: {e}", flush=True)
             return BUY_RANK_MODE_DEFAULT
 
-    def _select_top10(self, composite_pool: list, wave2_pool: list, ymd: str) -> list:
-        """종합순위 산정 방식 선택(BUY_RANK_MODE). WAVE2 산정이 실패하면 MOMENTUM 으로 폴백."""
+    def _setting_float(self, code: str, default: float) -> float:
+        """공통코드 stock/setting/batch/<code> 숫자. 없거나 숫자가 아니거나 0~1 밖이면 기본값.
+        ⚠ 실전 게이트 기준값을 읽는다 — 비밀상회 실전 매매, 승인 없이 수정·삭제 금지(파일 상단 참고)."""
+        try:
+            row = self.session.execute(text(
+                "SELECT `desc` FROM master_codes WHERE `system` = 'stock' AND source = 'setting' "
+                " AND category = 'batch' AND code = :c"), {'c': code}).first()
+            if row and row[0] is not None and str(row[0]).strip() != '':
+                v = float(str(row[0]).strip())
+                if 0.0 <= v <= 1.0:
+                    return v
+        except Exception as e:
+            print(f"[종합순위] {code} 조회 실패 → 기본 {default}: {e}", flush=True)
+        return default
+
+    def _select_top10(self, composite_pool: list, wave2_pool: list, ymd: str, wave2_universe: list = None) -> list:
+        """종합순위 산정 방식 선택(BUY_RANK_MODE). WAVE2 산정이 실패하면 MOMENTUM 으로 폴백.
+        WAVE2 는 실전 매수 게이트(변동성 백분위·시장 폭)를 먼저 건다 — 게이트로 0건이 된 날은 폴백하지 않는다(쉬는 날)."""
         mode = self._buy_rank_mode()
         if mode == 'WAVE2':
             try:
-                top = self._compute_wave2_top10(wave2_pool, ymd)
+                # ⚠ 실전 게이트(비밀상회 실전 매매) — 승인 없이 수정·삭제 금지. 게이트로 0건인 날은 쉬는 날이다(폴백 금지).
+                min_vol = self._setting_float('WAVE2_MIN_VOL_PCT', WAVE2_MIN_VOL_PCT_DEFAULT)
+                min_br = self._setting_float('WAVE2_MIN_BREADTH', WAVE2_MIN_BREADTH_DEFAULT)
+                pool, info = wave2_breakout.gate_pool(wave2_pool, wave2_universe or [], min_vol, min_br)
+                br = '모집단 없음(게이트 생략)' if info['breadth'] is None else f"{info['breadth'] * 100:.1f}%"
+                print(f"[실전 게이트] 모집단 {info['universe']}종목 · 시장 폭 {br}(하한 {min_br * 100:.0f}%) · "
+                      f"변동성 백분위 하한 {min_vol:.2f} → 2파 신호 {len(wave2_pool)}건 중 {info['kept']}건"
+                      + (' · 시장 폭 미달로 오늘은 쉼' if info['skipped_day'] else ''), flush=True)
+                top = self._compute_wave2_top10(pool, ymd)
                 print(f"[종합순위] WAVE2 — 2파 돌파 신호 {len(wave2_pool)}건 → {len(top)}건 순위 부여", flush=True)
                 return top
             except Exception as e:
@@ -488,6 +528,7 @@ class StockBuyCheckJob(Job):
         results = []
         composite_pool = []
         wave2_pool = []          # 2파 하락 추세선 돌파 + 거래량 2배↑ 신호(종합순위 WAVE2 모드)
+        univ_rows = []           # 실전 게이트 모집단(2파 사전 필터 통과 종목의 vol20·above20) — ⚠ 비밀상회 실전 매매, 승인 없이 수정·삭제 금지
         train_rows = []          # 재학습 학습셋(전종목, 게이트 통과 무관)
         idx = 0
 
@@ -573,6 +614,15 @@ class StockBuyCheckJob(Job):
                 except Exception as e:
                     print(f"[{tag}] 2파 판정 실패 {stock_code}: {e}", flush=True)
                     w2 = None
+                # ⚠ 실전 게이트 모집단 수집(비밀상회 실전 매매) — 승인 없이 수정·삭제 금지. 모든 종목 지표 저장 등으로
+                #   구조를 바꾸더라도 '2파 사전 필터 통과 종목 전체의 vol20·above20' 이 같은 값으로 게이트에 들어가야 한다.
+                try:
+                    ustat = wave2_breakout.universe_stats(ohlcv, stock.get('listed_shares'), bad, stock_code)
+                except Exception as e:
+                    print(f"[{tag}] 실전 게이트 모집단 계산 실패 {stock_code}: {e}", flush=True)
+                    ustat = None
+                if ustat is not None:
+                    univ_rows.append({'stock_code': stock_code, **ustat})
                 if w2 is not None:
                     wave2_pool.append({
                         'stock_code': stock_code,
@@ -580,6 +630,7 @@ class StockBuyCheckJob(Job):
                         'close': float(last_close),
                         'proba': shape_proba,
                         'vol_ratio': w2['vol_ratio'],
+                        'vol20': ustat['vol20'] if ustat else None,
                         'action_type': result['action_type'],
                         'today_stock': result['todayStock'],
                         'indicator': result['indicator'],
@@ -627,7 +678,7 @@ class StockBuyCheckJob(Job):
 
         print(f"[{tag}] 청크 완료: watch게이트 후보 {len(results)}건 / 2단계 pool {len(composite_pool)}건 "
               f"/ 2파 돌파 {len(wave2_pool)}건 / 학습셋 {len(train_rows)}건", flush=True)
-        return results, composite_pool, train_rows, wave2_pool
+        return results, composite_pool, train_rows, wave2_pool, univ_rows
 
 
     # smtpUtils.py 파일에서 emailUtils 객체를 임포트한다고 가정합니다.

@@ -94,6 +94,63 @@ def scan(df: pd.DataFrame, a: np.ndarray) -> list:
     return out
 
 
+# ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+# ┃ ⚠ 비밀상회(private 고객) 실전 자동매매 게이트 — 수정·삭제 금지                                         ┃
+# ┃   universe_stats·gate_pool 은 StockBuyCheckJob 이 워커가 실제 돈으로 사는 종목(composite_rank_no)을 고를 때 쓴다. ┃
+# ┃   사용자(대표)의 명시적 승인 없이 정의(사전 필터·vol20·above20·백분위 계산·쉬는 날 규칙)를 바꾸지 말 것.        ┃
+# ┃   백테스트(app/test/bt_final_*.py)와 같은 정의여야 한다. 확인: app/test/test_wave2_gate_unit.py                ┃
+# ┃   today_signal·scan(2파 판정)도 같은 매매 경로이므로 같은 원칙을 따른다.                                       ┃
+# ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+def universe_stats(df: pd.DataFrame, listed_shares, bad: bool, code: str) -> dict | None:
+    """2파 후보 필터(today_signal 과 같은 사전 필터)를 통과한 종목의 그날 값 — 실전 매수 게이트용 모집단.
+        vol20   : 최근 20봉 일간 로그수익 표준편차(그날 모집단 안 백분위로 변동성 상위 1/3 판정)
+        above20 : 종가 > 20일 단순이동평균(그날 모집단 비율 = 시장 폭)
+    필터를 못 넘거나 봉이 모자라면 None."""
+    n = len(df)
+    if n < MIN_BARS or bad or not str(code).endswith('0') or not listed_shares:
+        return None
+    c = df['close'].to_numpy(float)
+    v = df['volume'].to_numpy(float)
+    amt20 = float(np.mean(c[-20:] * v[-20:]))
+    if c[-1] < MIN_PRICE or amt20 < MIN_AMOUNT or c[-1] * float(listed_shares) < MIN_CAP:
+        return None
+    lr = np.diff(np.log(np.where(c[-21:] > 0, c[-21:], np.nan)))
+    vol20 = float(np.nanstd(lr, ddof=1)) if np.isfinite(lr).sum() >= 20 else None
+    if vol20 is None or not np.isfinite(vol20):
+        return None
+    return {'vol20': vol20, 'above20': bool(c[-1] > float(np.mean(c[-20:])))}
+
+
+def gate_pool(pool: list, universe: list, min_vol_pct: float, min_breadth: float) -> tuple[list, dict]:
+    """실전 매수 게이트(2026-11-16 확정). pool 의 각 항목은 'vol20' 을 가진다.
+    시장 폭(universe 중 above20 비율)이 min_breadth 미만이면 그날은 쉰다(빈 목록).
+    아니면 universe 안 vol20 백분위가 min_vol_pct 이상인 신호만 남긴다(pandas rank(pct=True) 와 같은 평균 순위).
+    universe 가 비어 있으면 게이트를 걸지 않는다(배치 일부 실패로 모집단을 못 모은 날 매수가 멈추지 않게)."""
+    info = {'universe': len(universe), 'breadth': None, 'kept': len(pool), 'skipped_day': False}
+    if not universe:
+        return list(pool), info
+    vols = np.array([u['vol20'] for u in universe], float)
+    breadth = float(np.mean([u['above20'] for u in universe]))
+    info['breadth'] = breadth
+    if breadth < min_breadth:
+        info['kept'], info['skipped_day'] = 0, True
+        return [], info
+    out = []
+    m = len(vols)
+    for r in pool:
+        x = r.get('vol20')
+        if x is None:
+            continue
+        less, equal = float(np.sum(vols < x)), float(np.sum(vols == x))
+        # 후보는 보통 모집단 안에 있다(같은 값 ≥1개) → 평균 순위. 없으면 끼워 넣은 자리로 계산.
+        pct = (less + (equal + 1) / 2) / m if equal else (less + 1) / (m + 1)
+        r = {**r, 'vol_pct': pct}
+        if pct >= min_vol_pct:
+            out.append(r)
+    info['kept'] = len(out)
+    return out, info
+
+
 def today_signal(df: pd.DataFrame, listed_shares, bad: bool, code: str) -> dict | None:
     """df(일봉 오름차순, open/high/low/close/volume)의 **마지막 봉**이 매수 신호면 정보 dict, 아니면 None."""
     n = len(df)
