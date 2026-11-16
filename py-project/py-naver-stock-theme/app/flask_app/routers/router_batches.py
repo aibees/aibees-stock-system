@@ -7,11 +7,14 @@ from flask import Blueprint, request, g
 from stock_shared.dao.batchJobMasterDao import BatchJobMasterDao
 from app.domains.dao.nBatchLogDao import BatchLogDao
 from app.flask_app.utils.apiResponse import ApiResponse
+from app.flask_app.routers.router_master import require_admin
 from stock_shared.db.database import dbConn
 
 logging.basicConfig(level=logging.ERROR)
 
 batch_bp = Blueprint("batches", __name__)
+# 배치 정의·실행·로그는 관리자만(@require_admin). 예전엔 인증이 없어 주소만 알면 누구나 배치를 돌릴 수 있었다.
+# 양봉상회 서버에는 이 블루프린트를 등록하지 않는다(yangbong 스키마에 배치 테이블이 없다).
 
 batchJobMasterDaoImpl = BatchJobMasterDao()
 batchLogDaoImpl = BatchLogDao()
@@ -33,6 +36,7 @@ def batches_index():
 # 1-1. 배치 목록 조회
 # -------------------------------------------------------------------------------
 @batch_bp.route("/master/batch-jobs", methods=['GET'])
+@require_admin
 def select_batch_job_list():
     try:
         results = batchJobMasterDaoImpl.select_all(g.db)
@@ -52,6 +56,7 @@ def select_batch_job_list():
 # 1-2. 배치 등록
 # -------------------------------------------------------------------------------
 @batch_bp.route("/master/batch-jobs", methods=['POST'])
+@require_admin
 def insert_batch_job():
     data = request.get_json(silent=True) or {}
     job_id = data.get('job_id')
@@ -77,6 +82,7 @@ def insert_batch_job():
 # 1-3. 배치 수정
 # -------------------------------------------------------------------------------
 @batch_bp.route("/master/batch-jobs/<job_id>", methods=['PUT'])
+@require_admin
 def update_batch_job(job_id):
     data = request.get_json(silent=True) or {}
 
@@ -99,6 +105,7 @@ def update_batch_job(job_id):
 # 1-4. 사용/미사용 토글 (PATCH)
 # -------------------------------------------------------------------------------
 @batch_bp.route("/master/batch-jobs/<job_id>", methods=['PATCH'])
+@require_admin
 def patch_batch_job_enabled(job_id):
     data = request.get_json(silent=True) or {}
     enabled_flag = data.get('enabled_flag')
@@ -124,6 +131,7 @@ def patch_batch_job_enabled(job_id):
 # 1-5. 배치 삭제
 # -------------------------------------------------------------------------------
 @batch_bp.route("/master/batch-jobs/<job_id>", methods=['DELETE'])
+@require_admin
 def delete_batch_job(job_id):
     try:
         exists = batchJobMasterDaoImpl.select_by_job_id(g.db, job_id)
@@ -143,6 +151,7 @@ def delete_batch_job(job_id):
 # 1-6. 배치 단독실행
 # -------------------------------------------------------------------------------
 @batch_bp.route("/batch/execute/<job_id>", methods=['POST'])
+@require_admin
 def execute_batch_job(job_id):
     run_params = request.get_json(silent=True)
     if run_params is None:
@@ -237,6 +246,7 @@ def _run_batch_job(batch_seq, job, run_params):
 # 2-1. 배치 로그 목록 조회
 # -------------------------------------------------------------------------------
 @batch_bp.route("/batch-logs", methods=['GET'])
+@require_admin
 def select_batch_log_page():
     try:
         page = int(request.args.get('page', 0))

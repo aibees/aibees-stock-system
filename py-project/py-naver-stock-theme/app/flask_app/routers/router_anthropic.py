@@ -7,6 +7,7 @@ from app.services.anthropic.stockAiContentService import (
     StockAiContentService,
     RefreshCooldownError,
     AnnouncementMonthRequiredError,
+    GenerationQuotaError,
 )
 from stock_shared.dao.masterStockDao import MasterStockDao
 
@@ -25,6 +26,7 @@ ADMIN_USER_ID = 1
 #   - 로그인 필요. /chat·/stream 은 화면에서 쓰지 않으므로 관리자(user_id=1)만.
 #     예전에는 인증 없이 열려 있어, 주소만 알면 누구나 모델·max_tokens 를 골라 회사 키로 호출할 수 있었다.
 #   - 종목 분석은 master_stock 에 있는 종목코드만 생성한다(없는 코드로 생성 요청을 반복해 비용을 쓰게 하는 것 방지).
+#   - 하루 생성 한도(사용자별·서버 전체, 2026-11-16) — StockAiContentService 머리말 참고. 넘으면 429.
 
 
 def _admin_only():
@@ -152,11 +154,11 @@ def refresh_overview():
     force = is_admin and bool(body.get("force"))
 
     try:
-        result = stockAiContentServiceImpl.refresh_overview(g.db, stock_code, is_admin, force)
+        result = stockAiContentServiceImpl.refresh_overview(g.db, stock_code, g.current_user_id, is_admin, force)
         return ApiResponse.success(result)
     except AnnouncementMonthRequiredError as e:
         return ApiResponse.error(str(e))
-    except RefreshCooldownError as e:
+    except (RefreshCooldownError, GenerationQuotaError) as e:
         return ApiResponse.error(str(e), status=429)
     except Exception as e:
         logger.error(e, exc_info=True)
@@ -190,9 +192,9 @@ def refresh_theme():
     force = is_admin and bool(body.get("force"))
 
     try:
-        result = stockAiContentServiceImpl.refresh_theme(g.db, stock_code, is_admin, force)
+        result = stockAiContentServiceImpl.refresh_theme(g.db, stock_code, g.current_user_id, is_admin, force)
         return ApiResponse.success(result)
-    except RefreshCooldownError as e:
+    except (RefreshCooldownError, GenerationQuotaError) as e:
         return ApiResponse.error(str(e), status=429)
     except Exception as e:
         logger.error(e, exc_info=True)
@@ -213,7 +215,8 @@ def get_news():
         return bad
 
     try:
-        result = stockAiContentServiceImpl.get_or_refresh_news(g.db, stock_code)
+        result = stockAiContentServiceImpl.get_or_refresh_news(
+            g.db, stock_code, g.current_user_id, g.current_user_id == ADMIN_USER_ID)
         return ApiResponse.success(result)
     except Exception as e:
         logger.error(e, exc_info=True)

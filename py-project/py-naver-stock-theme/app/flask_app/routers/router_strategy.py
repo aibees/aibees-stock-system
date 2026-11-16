@@ -54,7 +54,6 @@ masterStockDaoImpl = MasterStockDao()
 backtestSvc        = BacktestService()
 kisStockSvc        = KisStockService()
 kisBacktester      = KisBacktester()
-kisEngine          = KisEngine(virtual=False)
 paramGuideSvc      = StrategyParamGuideService()
 paramGuideDao      = MasterStrategyParamDao()
 
@@ -760,7 +759,8 @@ def post_backtest_ingest():
         code = stock.get('stock_code')
         name = stock.get('stock_name', code)
         try:
-            ohlcv = kisEngine.getOHLCV(code, start_date, end_date)
+            # KisEngine 은 쓸 때 만든다(싱글톤). import 시점에 만들면 KIS 키가 없는 DB 에서 서버가 안 뜬다.
+            ohlcv = KisEngine(virtual=False).getOHLCV(code, start_date, end_date)
             if ohlcv is None or ohlcv.empty:
                 results.append({'code': code, 'status': 'skip', 'reason': '데이터 없음'})
                 continue

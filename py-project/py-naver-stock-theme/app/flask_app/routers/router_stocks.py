@@ -11,6 +11,7 @@ from app.services.stocks import RecoLevel
 from app.domains.dao.masterCodesDao import MasterCodesDao
 from stock_shared.reco_algo import algo_stage_map, MASTER_CODES_KEY
 from app.flask_app.utils.apiResponse import ApiResponse
+from app.utils.service import KisDisabledError
 from app.services.stocks.StockService import StockService
 from app.services.stocks.RecoPerformanceService import RecoPerformanceService
 from app.services.stocks.FinanceService import FinanceService
@@ -222,6 +223,8 @@ def select_stock_finance(stock_code):
         return ApiResponse.error("종목코드 형식이 아닙니다.")
     try:
         return ApiResponse.success(financeServiceImpl.get_fundamentals(stock_code))
+    except KisDisabledError as e:
+        return ApiResponse.error(str(e), status=404)
     except Exception as e:
         logging.error(f"[stocks/finance] {stock_code}: {e}")
         traceback.print_exc()

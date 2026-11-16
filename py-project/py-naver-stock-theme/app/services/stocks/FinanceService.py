@@ -9,6 +9,7 @@
 import time
 
 from app.ext_services.kis.KisEngine import KisEngine
+from app.utils.service import KIS_ENABLED, KisDisabledError
 
 CACHE_TTL_SECONDS = 600
 _cache = {}   # {stock_code: (조회 시각, result)}
@@ -17,6 +18,8 @@ _cache = {}   # {stock_code: (조회 시각, result)}
 class FinanceService:
 
     def get_fundamentals(self, stock_code: str) -> dict:
+        if not KIS_ENABLED:   # 양봉상회: 재무 출처 미정(KIS 키 없음)
+            raise KisDisabledError('재무 지표')
         now = time.time()
         cached = _cache.get(stock_code)
         if cached and now - cached[0] < CACHE_TTL_SECONDS:

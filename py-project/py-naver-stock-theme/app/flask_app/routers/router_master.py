@@ -91,6 +91,8 @@ def master_index():
         'msg': 'aibees flask :: master home'
     }
     
+# 전체 메뉴 목록은 공개로 둔다 — 프런트 router.js 가 비로그인 상태에서도 이 목록으로 화면 라우트를 만든다.
+# 메뉴 추가·수정·켜고 끄기와 관리 화면용 조회(head·sub)는 관리자만.
 @master_bp.route("/menus")
 def select_master_menu_list():
     result_list = []
@@ -126,6 +128,7 @@ def select_master_menu_list():
     return ApiResponse.success(sorted(result_list, key=lambda x: x['sort']))
 
 @master_bp.route("/menus/head")
+@require_admin
 def select_master_menu_master():
     search_params = {
         'menu_code': (request.args.get('menuCode') or '').replace(' ', '%').upper(),
@@ -138,6 +141,7 @@ def select_master_menu_master():
         return ApiResponse.error(e.__cause__)
 
 @master_bp.route("/menus", methods=['POST'])
+@require_admin
 def insert_master_menu():
     data = request.get_json()
     try:
@@ -147,6 +151,7 @@ def insert_master_menu():
         return ApiResponse.error(e.__cause__)
 
 @master_bp.route("/menus/<menu_code>", methods=['PUT'])
+@require_admin
 def update_master_menu(menu_code):
     data = request.get_json()
     data['menu_code'] = menu_code
@@ -157,6 +162,7 @@ def update_master_menu(menu_code):
         return ApiResponse.error(e.__cause__)
 
 @master_bp.route("/menus/<menu_code>", methods=['PATCH'])
+@require_admin
 def patch_menu_enabled(menu_code):
     params = {
         'menu_code': menu_code
@@ -167,6 +173,7 @@ def patch_menu_enabled(menu_code):
         return ApiResponse.error(e.__cause__)
 
 @master_bp.route("/menus/sub")
+@require_admin
 def select_master_menu_sub():
     search_params = {
         'menu_parents': (request.args.get('menuParents') or '')
@@ -178,6 +185,7 @@ def select_master_menu_sub():
         return ApiResponse.error(e.__cause__)
     
 @master_bp.route("/menus/sub/<menu_code>")
+@require_admin
 def select_master_menu_by_id(menu_code):
     search_params = {
         'menu_code': menu_code

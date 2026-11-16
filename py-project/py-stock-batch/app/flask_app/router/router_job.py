@@ -3,8 +3,11 @@ from flask import Blueprint, request, g, jsonify
 
 from app.scheduler_app.runner import scheduleManage, run_job_once
 from app.flask_app.utils.apiResponse import ApiResponse
+from app.flask_app.utils.auth import require_admin
 
 job_bp = Blueprint("jobs", __name__)
+# 배치 실행·재적재·상태 조회는 관리자만(관리자 토큰 또는 X-Batch-Key). 웹 nginx 가 /api/v1/jobs 를 그대로 넘기므로
+# 예전엔 주소만 알면 누구나 배치를 돌릴 수 있었다. 자동 스케줄(APScheduler)은 HTTP 를 거치지 않아 영향이 없다.
 # BATCHES ROUTE ROOT :: TEST
 # ===============================================================================
 @job_bp.route("")
@@ -14,16 +17,19 @@ def jobs_index():
     }
     
 @job_bp.route("/start")
+@require_admin
 def schedule_start():
     pass
 
 
 @job_bp.route("/stop")
+@require_admin
 def schedule_stop():
     pass
 
 
 @job_bp.route("/once/<job_id>", methods=["POST"])
+@require_admin
 def schedule_run_once(job_id):
     try:
         job = scheduleManage.scheduler.get_job(job_id)
@@ -57,6 +63,7 @@ def schedule_run_once(job_id):
 
 
 @job_bp.route("/reload")
+@require_admin
 def schedule_reload():
     try:
         scheduleManage.load_jobs()
@@ -67,6 +74,7 @@ def schedule_reload():
 
 
 @job_bp.route("/status")
+@require_admin
 def schedule_status():
     try:
         return ApiResponse.success(__get_schedule_status())
@@ -88,6 +96,7 @@ def __get_schedule_status():
 
 
 @job_bp.route("/running", methods=["GET"])
+@require_admin
 def schedule_running():
     try:
         running_jobs = []

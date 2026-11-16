@@ -12,12 +12,14 @@ AuthService — 이메일 로그인 / 토큰 재발급 / 로그아웃 비즈니�
 import os
 import re
 import hmac
+import logging
 import time
 import secrets
 import hashlib
 from datetime import datetime, timedelta, timezone
 
 import jwt  # PyJWT 패키지 (pyproject.toml에 PyJWT = "^2.8.0" 추가됨)
+from dotenv import load_dotenv
 
 from stock_shared.dao.userMasterDao import UserMasterDao
 from app.domains.dao.userRefreshTokenDao import UserRefreshTokenDao  # [신규] refreshToken DAO
@@ -30,11 +32,29 @@ import requests
 
 
 # ── JWT 서명 시크릿 ──────────────────────────────────────────────────
-# 환경변수 JWT_SECRET_KEY 에서 읽어옴.
-# ⚠️ 프로덕션에서는 반드시 충분한 엔트로피의 실제 시크릿으로 교체해야 함.
-#    예: python -c "import secrets; print(secrets.token_hex(32))"
-JWT_SECRET = os.environ.get('JWT_SECRET_KEY', 'CHANGE_THIS_TO_A_STRONG_SECRET_IN_PRODUCTION')
+# 환경변수 JWT_SECRET_KEY 에서 읽는다. 없으면 프로젝트 폴더의 .env(gitignored)에서.
+#   운영: docker-compose.yml 의 env_file(.env) 로 넣는다. 만들기: python -c "import secrets; print(secrets.token_hex(32))"
+#   비밀상회 API·배치 서버는 같은 값, 양봉상회 API 는 다른 값이어야 한다.
+# 예전엔 값이 없으면 코드에 적힌 고정 문자열로 서명했다 → 그 문자열을 아는 사람은 누구든 관리자 토큰을 만들 수 있었다.
+# 이제 값이 없거나 짧으면 로그인 발급·토큰 검증을 모두 거절한다(fail closed). MCP 서버처럼 로그인을 안 쓰는
+# 프로세스도 이 모듈을 import 하므로 import 자체는 막지 않는다.
+load_dotenv()
+_JWT_PLACEHOLDER = 'CHANGE_THIS_TO_A_STRONG_SECRET_IN_PRODUCTION'
+_JWT_MIN_LENGTH = 32
+_jwt_env = (os.environ.get('JWT_SECRET_KEY') or '').strip()
+JWT_SECRET_MISSING = (not _jwt_env) or _jwt_env == _JWT_PLACEHOLDER or len(_jwt_env) < _JWT_MIN_LENGTH
+if JWT_SECRET_MISSING:
+    logging.critical("[auth] JWT_SECRET_KEY 가 없거나 %d자 미만입니다. 로그인·인증 API 를 모두 거절합니다. "
+                     ".env 또는 docker-compose env_file 에 넣고 재시작하세요.", _JWT_MIN_LENGTH)
+    # 서명값이 필요한 상수(CONSENT/SIGNUP 시크릿)가 문자열이어야 해서 무작위 값을 둔다. 어차피 발급·검증 단계에서 거절된다.
+    JWT_SECRET = secrets.token_hex(32)
+else:
+    JWT_SECRET = _jwt_env
 JWT_ALGORITHM = 'HS256'  # 명세 허용 알고리즘: HS256 또는 RS256
+
+
+class JwtSecretMissingError(Exception):
+    """JWT_SECRET_KEY 가 설정되지 않아 토큰을 발급할 수 없다."""
 
 # ── 만료 시간 설정 ───────────────────────────────────────────────────
 # 명세: accessToken 30분 이내 / refreshToken 7~30일
@@ -664,6 +684,8 @@ class AuthService:
             - DB에 저장해 서버 측 폐기(revoke) 가능
             - REFRESH_TOKEN_EXPIRE_DAYS(14일) 후 만료
         """
+        if JWT_SECRET_MISSING:
+            raise JwtSecretMissingError("서버 인증 설정이 없어 로그인할 수 없습니다. 관리자에게 알려 주세요.")
         now = datetime.now(tz=timezone.utc)
 
         # ── accessToken 생성 ─────────────────────────────────────────

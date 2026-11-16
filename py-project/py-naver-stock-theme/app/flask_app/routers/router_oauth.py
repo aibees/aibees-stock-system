@@ -19,7 +19,8 @@ import jwt  # PyJWT
 
 from flask import Blueprint, request, g
 
-from app.services.common.authService import AuthService, JWT_SECRET, JWT_ALGORITHM, SocialLoginError, SignupError
+from app.services.common.authService import (AuthService, JWT_SECRET, JWT_ALGORITHM, JWT_SECRET_MISSING,
+                                             SocialLoginError, SignupError)
 from app.exceptions import ResetRequiredException  # 단일 출처 임포트
 from app.domains.dao.masterInfoDao import MasterInfosDao
 from app.domains.dao.accessLogDao import AccessLogDao
@@ -77,6 +78,11 @@ def require_auth(f):
             return ApiResponse.unauthorized("Authorization 헤더가 없거나 형식이 올바르지 않습니다.")
 
         token = auth_header.split(' ', 1)[1]  # 'Bearer ' 이후의 토큰 문자열만 추출
+
+        # 서명 키가 설정되지 않은 서버는 어떤 토큰도 믿지 않는다(fail closed). 401 이 아니라 503 —
+        # 401 이면 프런트가 재발급·재로그인을 반복하므로 설정 문제임을 구분해 돌려준다.
+        if JWT_SECRET_MISSING:
+            return ApiResponse.error("서버 인증 설정이 없습니다. 관리자에게 알려 주세요.", status=503)
 
         try:
             # ── 서명 검증 + 만료 확인 ────────────────────────────────

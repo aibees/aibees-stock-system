@@ -1,0 +1,44 @@
+# 양봉상회 API — 비밀상회 API(docker-compose.yml)와 같은 이미지(py-stock-web), 설정만 다르다.
+#
+#   APP_SERVICE=yangbong : 공개용 블루프린트만 등록(배치·전략·매매·공통코드 관리 없음),
+#                          KIS 를 쓰지 않음(차트·추천 기록은 DB 일봉, 재무·뉴스는 '아직 제공하지 않음').
+#   .env.yangbong        : DB_URL(yangbong 전용 계정, sql/yangbong/001) · JWT_SECRET_KEY(비밀상회와 **다른** 값).
+#                          .env.yangbong.example 참고. gitignored, 이미지에도 안 들어간다.
+#
+# 띄우기(py-project/ 에서 이미지를 먼저 빌드했다면):
+#   docker compose -f py-naver-stock-theme/docker-compose.yangbong.yml up -d
+# 아직 nginx 가 이 컨테이너로 보내지 않는다 — 양봉상회 웹의 /api 프록시를 yangbong-web-flask-app:5556 으로 바꿔야 한다
+# (도메인 결정 후, yangbong-store-vue/conf.d/http.conf).
+#
+# aibees 네트워크 고정 IP: 172.21.1.8 (docker-compose.yml 의 배정 현황 참고)
+
+services:
+    app:
+        image: py-stock-web
+        container_name: yangbong-web-flask-app
+        working_dir: /workdir
+        build:
+            context: ..
+            dockerfile: py-naver-stock-theme/Dockerfile
+        pull_policy: never
+        env_file:
+            - .env.yangbong
+        environment:
+            - TZ=Asia/Seoul
+            - APP_SERVICE=yangbong
+            # yangbong 전용 계정은 MAX_USER_CONNECTIONS 15 (sql/yangbong/001). 워커 4개 × (2+1) = 최대 12.
+            - DB_POOL_SIZE=2
+            - DB_MAX_OVERFLOW=1
+        logging:
+            driver: json-file
+            options:
+                max-size: "20m"
+                max-file: "5"
+        networks:
+            aibees:
+                ipv4_address: 172.21.1.8
+        restart: unless-stopped
+
+networks:
+    aibees:
+        external: true

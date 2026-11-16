@@ -9,6 +9,9 @@ from stock_shared.dao.tradeBuyTargetPriorityDao import TradeBuyTargetPriorityDao
 from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.stockInvestorDailyDao import StockInvestorDailyDao
 from app.ext_services.kis.KisEngine import KisEngine
+from app.services.stocks import dailyBarSource
+from app.utils.service import KIS_ENABLED
+from stock_shared.kis.credentials import KisCredentialError
 from app.services.stocks.StockModService import StockModService
 from stock_shared import chart_analysis
 from app.domains.dao.masterCodesDao import MasterCodesDao
@@ -26,7 +29,33 @@ class StockService:
         self.masterStockDaoImpl = MasterStockDao()
         self.investorDaoImpl = StockInvestorDailyDao()
         self.modService = StockModService()
-        self.kis = KisEngine(virtual=False)
+        # KisEngine 은 처음 쓸 때 만든다. 예전엔 여기서 바로 만들어 **라우터 import 시점에**
+        # 1번 사용자의 KIS 키를 DB 에서 읽었다 → KIS 키가 없는 DB(양봉상회)로는 서버가 아예 뜨지 않았다.
+        self._kis_engine = None
+
+    @property
+    def kis(self) -> KisEngine:
+        if self._kis_engine is None:
+            self._kis_engine = KisEngine(virtual=False)
+        return self._kis_engine
+
+    # 시세 출처: KIS(실시간·장중 봉 포함) 또는 DB 일봉(전 거래일까지).
+    #   KIS_ENABLED=false(양봉상회 기본)면 DB 만 쓴다. KIS 를 쓰는 서버라도 키가 없으면 DB 로 그린다.
+    def _period_bars(self, session, stock_code, count, unit):
+        if KIS_ENABLED:
+            try:
+                return self.kis.get_ohlcv_period_unit(stock_code, count, unit=unit)
+            except KisCredentialError as e:
+                logging.warning(f"[chart] KIS 키 없음 → DB 일봉 사용: {e}")
+        return dailyBarSource.recent_bars(session, stock_code, count, unit)
+
+    def _bars_between(self, session, stock_code, date_from, date_to):
+        if KIS_ENABLED:
+            try:
+                return self.kis.getOHLCV(stock_code, date_from, date_to)
+            except KisCredentialError as e:
+                logging.warning(f"[rec-record] KIS 키 없음 → DB 일봉 사용: {e}")
+        return dailyBarSource.bars_between(session, stock_code, date_from, date_to)
 
     def get_buy_target_stock_list(self, session, ymd):
         """매수추천 목록. 두 테이블을 종목당 한 줄로 합치고 행마다 algos(걸린 알고리즘)를 붙인다.
@@ -135,7 +164,7 @@ class StockService:
             date_from = (today - timedelta(days=30)).strftime("%Y-%m-%d")
             date_to = (today - timedelta(days=1)).strftime("%Y-%m-%d")
 
-            ohlcv = self.kis.getOHLCV(stock_code, date_from, date_to)
+            ohlcv = self._bars_between(session, stock_code, date_from, date_to)
             if ohlcv is None or ohlcv.empty:
                 # 거래정지(master_stock.market_stop) 등으로 시세가 없으면 400 대신 '데이터 없음'.
                 # (예전엔 예외 → 400 → 화면이 빈 객체로 렌더돼 TypeError)
@@ -170,7 +199,7 @@ class StockService:
             date_from = date_from_form.strftime("%Y-%m-%d")
             date_to = datetime.now().strftime("%Y-%m-%d")
 
-            ohlcv:pd.DataFrame = self.kis.getOHLCV(stock_code, date_from, date_to)
+            ohlcv:pd.DataFrame = self._bars_between(session, stock_code, date_from, date_to)
             if ohlcv is None or ohlcv.empty or not rec_close:
                 return None
             max_row = ohlcv.loc[ohlcv['close'].idxmax(), ['ymd', 'close']]
@@ -207,9 +236,9 @@ class StockService:
 
         # 일봉만 분석(스윙·피보·패턴 등)을 붙인다. 분석을 켜면 지표 워밍업용으로 봉을 더 받는다(화면은 그대로 200봉)
         modules = self._chart_analysis_modules(session) if (period or "day") == "day" else []
-        ohlcv:pd.DataFrame = self.kis.get_ohlcv_period_unit(stock_code, 350 if modules else 200, unit=period or "day")
+        ohlcv:pd.DataFrame = self._period_bars(session, stock_code, 350 if modules else 200, period or "day")
 
-        if ohlcv is None:
+        if ohlcv is None or ohlcv.empty:
             raise Exception("DF is NONE")
 
         # OPEN, HIGH, CLOSE, LOW, VOLUME, SMA(5, 20, 60, 120), BB(UPPER, MID, LOWER) 들어있는 dataframe

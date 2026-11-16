@@ -9,3 +9,6 @@ __pycache__/
 # 시크릿 — .env.mcp.example 만 커밋한다
 .env
 .env.mcp
+
+# 양봉상회 API 시크릿 — .env.yangbong.example 만 커밋한다
+.env.yangbong

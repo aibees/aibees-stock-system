@@ -2,18 +2,17 @@
 푸시 디바이스 토큰 등록/해제 — Capacitor 앱이 FCM 토큰을 발급받으면 이
 엔드포인트로 올린다(usePushNotifications.js 참고).
 
-인증 관련 주의:
-  이 Flask 앱에는 JWT 디코드/사용자 식별 미들웨어가 전혀 없다. user_id/roles 는
-  프런트가 로그인 세션에서 그대로 실어보낸다 — 이 앱의 기존 보안 수준(무인증
-  내부망 batch-admin 서비스)을 그대로 따른다. 비로그인 상태(user_id=null)로도
-  등록 자체는 허용하지만, 지금 실제로 발송되는 알림은 모두 user 스코프다
-  (배치 시작/종료=운영자 1명 to_common, 체결=worker 소유자 to_user). 따라서
-  user_id=null 로 등록된 디바이스는 아래 /test-send scope=broadcast 로 수동
-  발송할 때만 대상이 된다 — 로그인 후 재등록(upsert)되면 user_id 가 채워진다.
+인증:
+  /register 의 user_id·roles 는 이제 요청 본문이 아니라 accessToken 에서 정한다
+  (app.flask_app.utils.auth). 예전엔 본문 값을 그대로 믿어서, 아무나 user_id=1 로 자기
+  기기를 등록해 소유자의 체결 알림을 받을 수 있었다. 토큰이 없으면(비로그인) user_id=null
+  로 등록되고, 이런 기기는 /test-send scope=broadcast 로 수동 발송할 때만 대상이 된다.
+  /test-send 는 관리자만.
 """
-from flask import Blueprint, request
+from flask import Blueprint, g, request
 
 from app.flask_app.utils.apiResponse import ApiResponse
+from app.flask_app.utils.auth import optional_user, require_admin, user_auth_ids
 from stock_shared.db.database import dbConn
 from stock_shared.dao.devicePushTokenDao import DevicePushTokenDao
 from app.batches.services.notifyService import notifyService
@@ -23,6 +22,7 @@ _dao = DevicePushTokenDao()
 
 
 @notify_bp.route("/register", methods=["POST"])
+@optional_user
 def register_token():
     body = request.get_json(silent=True) or {}
     device_token = body.get("device_token")
@@ -30,17 +30,13 @@ def register_token():
     if not device_token or platform not in ("ios", "android"):
         return ApiResponse.error("device_token, platform(ios|android) 이 필요합니다.", status=400)
 
-    raw_user_id = body.get("user_id")
-    try:
-        user_id = int(raw_user_id) if raw_user_id not in (None, "") else None
-    except (TypeError, ValueError):
-        user_id = None
-
-    roles = body.get("roles")
-    roles_csv = ",".join(str(r) for r in roles) if isinstance(roles, list) and roles else None
+    # 본문의 user_id·roles 는 무시한다(옛 앱이 아직 보내지만 믿지 않는다).
+    user_id = g.current_user_id
 
     session = dbConn.get_session()
     try:
+        roles = user_auth_ids(session, user_id) if user_id is not None else []
+        roles_csv = ",".join(roles) if roles else None
         _dao.upsert_token(session, {
             "device_token": device_token,
             "platform": platform,
@@ -76,6 +72,7 @@ def unregister_token():
 
 
 @notify_bp.route("/test-send", methods=["POST"])
+@require_admin
 def test_send():
     """FCM 설정 확인용 수동 발송. scope: 'broadcast'(기본) | 'user' | 'role'.
     Firebase 콘솔/APNs 키 설정을 실제 배치를 기다리지 않고 바로 검증하는 용도."""

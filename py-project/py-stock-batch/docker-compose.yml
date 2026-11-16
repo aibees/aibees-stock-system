@@ -10,6 +10,11 @@ services:
         image: py-stock-batch
         container_name: stock-batch-flask-app
         working_dir: /workdir
+        # 시크릿은 이 폴더의 .env(gitignored)에서 읽는다. .env.example 참고.
+        #   JWT_SECRET_KEY  : 비밀상회 API(py-naver-stock-theme/.env)와 같은 값. 관리자 토큰 검증용.
+        #   BATCH_ADMIN_KEY : (선택) 서버 안에서 curl 로 배치를 돌릴 때 X-Batch-Key 헤더로 보내는 키.
+        env_file:
+            - .env
         ports:
           - "5557:5557"
         environment:
