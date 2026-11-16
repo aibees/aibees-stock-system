@@ -1,31 +1,33 @@
 <template>
     <div id="stock-buy-target">
-        <BrandHeader :title="title" back="/stock" />
+        <!-- 주식분석 탭의 첫 화면이라 뒤로 버튼이 없다(/stock 은 여기로 다시 온다). -->
+        <BrandHeader :title="title" />
 
         <div class="contents">
-            <section class="head-desc">
-                <div class="head-actions">
-                    <div class="date-picker-trigger" @click="openDatePicker">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                        <span class="date-value">{{ dateLabel }}</span>
-                        <input type="date" ref="dateInput" class="hidden-input" v-model="selectedDate"
-                            @change="handleDateChange" />
-                    </div>
+            <!-- ── 날짜: ‹ 날짜(요일) › — 가운데를 눌러 달력으로 고르고, 양옆으로 하루씩(주말 건너뜀) 옮긴다 ── -->
+            <div class="date-nav">
+                <button type="button" class="nav-btn" aria-label="이전 영업일" @click="stepSelectedDate(-1)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+                </button>
+                <div class="date-center">
+                    <button type="button" class="date-btn" aria-label="날짜 선택" @click="openDatePicker">
+                        {{ dateLabel }}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                    </button>
+                    <input type="date" ref="dateInput" class="hidden-input" v-model="selectedDate"
+                        @change="handleDateChange" tabindex="-1" aria-hidden="true" />
                 </div>
-            </section>
+                <button type="button" class="nav-btn" aria-label="다음 영업일" :disabled="!canStepForward" @click="stepSelectedDate(1)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+                </button>
+            </div>
 
-            <!-- ── 내 성향: 목록 순서(기본 정렬)와 정리할 가격이 이 성향을 따른다 ── -->
-            <p class="persona-line">
-                내 성향 <b>{{ personaType.name }}</b>
-                <span class="persona-sub">순서와 정리할 가격(−{{ personaType.stopPct }}%)에 반영돼요</span>
-                <button type="button" class="persona-change" @click="router.push({ path: ONBOARDING_PATH, query: { pick: '1' } })">바꾸기</button>
-            </p>
+            <!-- ── 내 설정: 한 줄. 왼쪽 성향 이름·바꾸기, 오른쪽 목록 범위(내 조건만 ↔ 전체) ── -->
+            <div class="persona-line">
+                <span class="pl-label">내 설정 <b>{{ personaType.name }}</b></span>
+                <button type="button" class="pl-link" @click="router.push('/stock/preset')">바꾸기</button>
+                <button type="button" class="pl-link pl-scope" @click="mineOnly = !mineOnly">{{ mineOnly ? '전체 보기' : '내 조건만 보기' }}</button>
+            </div>
 
             <!-- ── 추천 단계: 열람 가능한 단계 + 바로 위 한 단계(잠금)만 보인다. 그 위 단계는 존재 자체를 숨긴다 ── -->
             <div class="stage-chips" role="tablist" aria-label="추천 단계">
@@ -37,7 +39,7 @@
                         <rect x="3" y="7" width="10" height="7" rx="2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
                     </svg>
                     {{ s.name }}
-                    <span class="stage-count">{{ s.locked ? '비공개' : (s.ready === false ? '준비 중' : stageCount(s.rank)) }}</span>
+                    <span class="stage-count">{{ s.locked ? '' : (s.ready === false ? '준비 중' : stageCount(s.rank)) }}</span>
                 </button>
             </div>
 
@@ -96,7 +98,7 @@
                             </span>
                             <span class="px">
                                 <span class="price">{{ formatNumber(r.item.close) }}</span>
-                                <span class="stop">정리 {{ r.stopText }}</span>
+                                <span class="stop">내 조건 {{ r.passText }}</span>
                                 <span class="chg" :class="r.chg.cls">
                                     <span class="chg-full">{{ r.chg.text }}</span>
                                     <span class="chg-short">{{ r.chgShort }}</span>
@@ -203,12 +205,14 @@ import CandlestickChart from '../common/comp/CandlestickChart.vue';
 import { buyTargetCandleData, miniCandleOptions } from '@scripts/miniCandle.js';
 import aibeesApi from '@scripts/aibeesApi.js';
 import { recoLevel } from '@scripts/useAccess.js';
+import { addRecent } from '@scripts/recentStocks.js';
 import { usePersonaStore } from '@scripts/stores/persona-store.js';
-import { orderForType, stopPrice } from '@scripts/persona.js';
+import { orderForType } from '@scripts/persona.js';
+import { evaluate } from '@scripts/indicators.js';
 import { ONBOARDING_PATH } from '@scripts/authPaths.js';
 import {
     numOrNull, formatNumber, hasValue, changeInfo, conditionSummary,
-    kstNowParts, isMarketOpenNow, weekdayKo, toYmdString, getLatestBatchDate,
+    kstNowParts, isMarketOpenNow, weekdayKo, toYmdString, shiftDate, getLatestBatchDate,
 } from '@scripts/stockSignals.js';
 import {
     formatEok, formatCapShort, formatNetAmt, formatNetAmtShort, formatNetQty, formatRatio, signClass, shortYmd,
@@ -268,7 +272,22 @@ const getStockMainData = async () => {
 };
 
 const handleDateChange = () => getStockMainData();
-const openDatePicker = () => dateInput.value?.showPicker();
+const openDatePicker = () => dateInput.value?.showPicker?.();
+
+/* ── 날짜 ±1 이동 (예전 홈과 같은 규칙: 주말은 건너뛴다 — 금요일 +1 → 월요일, 월요일 −1 → 금요일) ──
+ *   가장 최근 배치일보다 뒤로는 데이터가 없어 › 를 막는다(달력으로 고르는 건 그대로 둔다). */
+const latestBatchDate = getLatestBatchDate();
+const canStepForward = computed(() => selectedDate.value < latestBatchDate);
+const stepSelectedDate = (deltaDays) => {
+    if (deltaDays > 0 && !canStepForward.value) return;
+    const [y, m, d] = selectedDate.value.split('-').map(Number);
+    let next = shiftDate(y, m, d, deltaDays);
+    while (next.weekday === 0 || next.weekday === 6) {
+        next = shiftDate(next.year, next.month, next.day, deltaDays > 0 ? 1 : -1);
+    }
+    selectedDate.value = toYmdString(next.year, next.month, next.day);
+    getStockMainData();
+};
 
 /* ══════════════ 매수타겟 정렬 ══════════════
  * 조회는 하루치 전체를 한 번에 받아오므로 클라이언트에서 정렬한다(재조회 없음).
@@ -278,7 +297,7 @@ const openDatePicker = () => dateInput.value?.showPicker();
  *   · 값이 없는(null) 종목은 정렬 방향과 무관하게 항상 뒤
  *   · 전부 동점이면 stock_code 로 최종 결정 (매 조회마다 순서가 흔들리지 않도록)
  */
-// 열람 가능한 최고 단계. 실전 = WORKER_USER 권한(운영자 부여), 고급 = RECO_ADVANCED 기능 플래그(광고·구독으로 부여 예정).
+// 열람 가능한 최고 단계. 실전 = WORKER_USER 권한(운영자 부여), 프리미엄 = RECO_ADVANCED 기능 플래그(광고·구독으로 부여 예정).
 // 서버(/buy-target)가 같은 기준으로 권한 밖 정보를 응답에서 지운다 — 여기는 화면 구성용일 뿐 보안이 아니다.
 const route = useRoute();
 const userLevel = computed(() => {
@@ -289,7 +308,7 @@ const userLevel = computed(() => {
     return recoLevel();
 });
 
-// 고급 단계 이상에서만 값이 내려오는 정렬 기준(기본 단계에는 서버가 이 필드를 주지 않는다)
+// 프리미엄 단계 이상에서만 값이 내려오는 정렬 기준(기본 단계에는 서버가 이 필드를 주지 않는다)
 const ADVANCED_SORT_KEYS = ['composite_rank_no', 'shape_proba', 'frgn_amt', 'orgn_amt'];
 const SORT_ALL = [
     { key: 'persona',    label: '내 성향 순서',  dir: 'asc',  ascLabel: '성향에 맞는 순',  descLabel: '거꾸로' },
@@ -304,15 +323,17 @@ const SORT_ALL = [
     { key: 'orgn_amt',    label: '기관 순매수',   dir: 'desc', ascLabel: '순매도 큰 순',   descLabel: '순매수 큰 순' },
 ];
 // 단계마다 알고리즘이 달라 쓸 수 있는 정렬 기준도 다르다.
-//   기본 단계: 옛 알고리즘이 채우는 추천순위·점수 / 고급 단계: 2파 알고리즘의 종합순위·모델 확률·수급
+//   기본 단계: 옛 알고리즘이 채우는 추천순위·점수 / 프리미엄 단계: 2파 알고리즘의 종합순위·모델 확률·수급
 const BASIC_ONLY_SORT_KEYS = ['rank_no', 'score'];
 const persona = usePersonaStore();
 const personaType = computed(() => persona.currentType);
+// 내 설정의 보조지표로 다시 거른 목록만 볼지(기본) 서버 후보 전체를 볼지
+const mineOnly = ref(true);
 const SORT_OPTIONS = computed(() => (activeStage.value.rank >= 2
     ? SORT_ALL.filter(o => !BASIC_ONLY_SORT_KEYS.includes(o.key))
     : SORT_ALL.filter(o => !ADVANCED_SORT_KEYS.includes(o.key))));
 
-// 2026-09 세션 후속: 2단계(top10→모멘텀 재정렬) 방식이 우수해 고급 단계 기본 정렬은 composite_rank_no. 기본 단계는 추천순위.
+// 2026-09 세션 후속: 2단계(top10→모멘텀 재정렬) 방식이 우수해 프리미엄 단계 기본 정렬은 composite_rank_no. 기본 단계는 추천순위.
 const sortKey = ref('persona');   // 기본 정렬 = 내 성향 순서(안정형 시가총액 큰 순 / 균형형 서버 순서 / 공격형 변동 큰 순)
 const sortDir = ref('asc');
 
@@ -338,22 +359,22 @@ const sortNum = (v) => {
     return Number.isNaN(n) ? null : n;
 };
 
-/* ══════════════ 추천 단계(기본 → 고급 → 실전) ══════════════
+/* ══════════════ 추천 단계(기본 → 프리미엄 → 실전) ══════════════
  * 단계 이름·설명은 임시 — 확정되면 STAGE_DEFS 만 바꾼다. desc 는 잠겼을 때도 보이므로 내부 용어를 쓰지 않는다.
  * 단계마다 알고리즘이 다른 별개의 목록이다. 서버(RecoLevel.py)가 행마다 reco_stages(속한 단계 번호, 사용자 단계까지)를 준다.
- *   기본 = 옛 기계식 / 고급 = 2파 돌파 + 모델 확률 + 외국인·기관 수급 / 실전 = 고급 종목의 30분봉 재검증(연구 중).
+ *   기본 = 옛 기계식 / 프리미엄 = 2파 돌파 + 모델 확률 + 외국인·기관 수급 / 실전 = 프리미엄 종목의 30분봉 재검증(연구 중).
  * 서버는 사용자 권한 밖 종목·정보를 응답에서 지운다(화면 가림은 보안이 아니다).
  */
 const STAGE_DEFS = [
     // 기본 = 옛 기계식 알고리즘(이평 정배열·MACD/OBV 기울기·거래량 급증 등)
     { code: 'BASIC', rank: 1, name: '기본', desc: '이동평균·거래량 같은 규칙으로 1차로 고른 후보예요.' },
-    // 고급 = 현재 제공 알고리즘(2파 하락 추세선 돌파 + 모델 확률 + 외국인·기관 수급). 잠겼을 때도 보이는 문구라 내부 용어는 쓰지 않는다.
+    // 프리미엄 = 현재 제공 알고리즘(2파 하락 추세선 돌파 + 모델 확률 + 외국인·기관 수급). 잠겼을 때도 보이는 문구라 내부 용어는 쓰지 않는다.
     //   광고 시청·정기결제 연동 전이라 버튼은 아직 없다.
-    { code: 'ADVANCED', rank: 2, name: '고급', desc: '차트 패턴과 모델 분석, 수급 흐름까지 더해 고른 종목이에요.',
+    { code: 'ADVANCED', rank: 2, name: '프리미엄', desc: '차트 패턴과 모델 분석, 수급 흐름까지 더해 고른 종목이에요.',
       unlock: '광고를 보거나 정기결제를 하면 열려요.' },
-    // 실전 = 고급 종목을 30분봉으로 다시 검증해 순위를 재정비한 목록(다른 세션에서 연구 중 — ready:false).
+    // 실전 = 프리미엄 종목을 30분봉으로 다시 검증해 순위를 재정비한 목록(다른 세션에서 연구 중 — ready:false).
     //   private: 운영자가 직접 권한(WORKER_USER)을 준 사람만. 신청·결제 경로가 없으므로 권한이 없으면 칩 자체를 숨긴다.
-    { code: 'LIVE', rank: 3, name: '실전', desc: '고급 종목을 30분봉으로 한 번 더 검증한 최종 후보를 곧 보여드릴게요.', private: true, ready: false },
+    { code: 'LIVE', rank: 3, name: '실전', desc: '프리미엄 종목을 30분봉으로 한 번 더 검증한 최종 후보를 곧 보여드릴게요.', private: true, ready: false },
 ];
 const visibleStages = computed(() =>
     STAGE_DEFS
@@ -375,7 +396,8 @@ const stageCount = (rank) => stageItems(rank).length;
 const sortedData = computed(() => {
     const key = sortKey.value;
     const desc = sortDir.value === 'desc';
-    const base = activeStage.value.locked ? [] : stageItems(activeStage.value.rank);
+    let base = activeStage.value.locked ? [] : stageItems(activeStage.value.rank);
+    if (mineOnly.value) base = base.filter(it => evaluate(it, personaType.value.settings).match);
     if (key === 'persona') {
         // 같은 성향이면 누가 보든 같은 순서(동률은 서버 순서). 방향 버튼은 이 순서를 뒤집는다.
         const ordered = orderForType(base, personaType.value);
@@ -428,11 +450,11 @@ const rows = computed(() =>
         const chg = changeInfo(item);
         return {
             item, chg, chgShort: shortChange(chg),
-            stopText: (() => { const v = stopPrice(item.close, personaType.value.stopPct); return v === null ? '–' : formatNumber(v); })(), summary: conditionSummary(item),
+            passText: (() => { const e = evaluate(item, personaType.value.settings); return e.total ? `${e.pass}/${e.total}` : '–'; })(), summary: conditionSummary(item),
             capShort: formatCapShort(item.market_cap), market: marketInfo(item),
             recentBars: (item.chart_data || []).slice(-RECENT_BARS),
             facts: [
-                // 수급은 고급 정보 — 기본 단계는 서버가 값을 주지 않으므로 칸도 그리지 않는다
+                // 수급은 프리미엄 정보 — 기본 단계는 서버가 값을 주지 않으므로 칸도 그리지 않는다
                 ...(userLevel.value >= 2 && activeStage.value.rank >= 2 ? [
                     { name: '외국인', value: formatNetAmtShort(item.frgn_amt), cls: signClass(item.frgn_amt) },
                     { name: '기관',   value: formatNetAmtShort(item.orgn_amt), cls: signClass(item.orgn_amt) },
@@ -445,8 +467,12 @@ const rows = computed(() =>
 
 /* ── 아코디언: 한 번에 하나만 펼침 ── */
 const expandedCode = ref(null);
-const toggleRow = (code) => { expandedCode.value = expandedCode.value === code ? null : code; };
-watch([sortKey, sortDir, selectedDate], () => { expandedCode.value = null; });
+const toggleRow = (code) => {
+    expandedCode.value = expandedCode.value === code ? null : code;
+    // 상세를 연 회사는 주식분석 대시보드의 "최근 본 회사"에 남는다
+    if (expandedCode.value) addRecent(code, resultData.value.find(it => it.stock_code === code)?.stock_name);
+};
+watch([sortKey, sortDir, selectedDate, mineOnly], () => { expandedCode.value = null; });
 
 /* ── 매수타겟 카드 간이차트 (최근 120영업일 봉차트 + 5/20/60/120일선) ──
  * 기본 숨김 — "차트보기" 버튼으로 종목별 개별 토글. ChartStock.vue(전체 차트 페이지)와
@@ -494,7 +520,6 @@ $blue:     #7A4423;
     padding: 16px 16px 24px;
 }
 
-.head-desc { display: flex; margin-bottom: 12px; }
 
 /* ── 추천 단계 칩: 정렬 칩(SortChips)과 같은 pill 톤. 잠금은 빗금 + 자물쇠 ── */
 .stage-chips { display: flex; gap: 8px; margin: 0 0 14px; }
@@ -516,44 +541,58 @@ $blue:     #7A4423;
     .stage-locked-desc { margin: 0; font-size: 14px; line-height: 1.5; color: #6B5B4E; text-wrap: pretty; }
     .stage-locked-unlock { margin: 6px 0 0; padding: 6px 12px; border-radius: 999px; background: #fff; font-size: 13px; font-weight: 700; color: #74462A; }
 }
-/* ── Head Actions ── */
-.head-actions {
+/* ── 날짜: ‹ [가운데 넓은 날짜] › — 테두리 없이 옅은 바탕 ── */
+.date-nav {
     display: flex;
     align-items: center;
-    gap: 10px;
-
-    @media (max-width: 600px) {
-        width: 100%;
-    }
+    gap: 6px;
+    margin-bottom: 10px;
 }
-
-/* ── Date Picker ── */
-.date-picker-trigger {
-    position: relative;
+.nav-btn {
+    flex: none;
+    width: 44px;
+    height: 44px;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 0 14px;
-    min-height: 44px;
-    border-radius: 14px;
-    border: 1px solid $gray-300;
-    background: $white;
-    color: $gray-700;
-    font-size: 0.88rem;
-    font-weight: 600;
+    justify-content: center;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: #74462A;
     cursor: pointer;
-    transition: border-color .15s;
-
-    &:hover { border-color: $blue; }
-
-    .date-value { color: $blue; }
-
-    .hidden-input {
-        position: absolute;
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
+    -webkit-tap-highlight-color: transparent;
+    &:active:not(:disabled) { background: #F6F1E4; }
+    &:disabled { color: #D6CCBA; cursor: default; }
+}
+.date-center { position: relative; flex: 1; min-width: 0; }
+.date-btn {
+    width: 100%;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 0;
+    border-radius: 12px;
+    background: #F6F1E4;
+    color: #2B1D14;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    svg { color: #A0662F; }
+    &:active { filter: brightness(.97); }
+}
+.hidden-input {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* ── 정렬 (홈과 동일) ── */
@@ -873,20 +912,23 @@ $blue:     #7A4423;
     50%       { opacity: .9; }
 }
 
+/* 내 설정: 한 줄(줄바꿈 없음). 왼쪽 "내 설정 균형형 바꾸기", 오른쪽 끝 목록 범위 전환 */
 .persona-line {
-    margin: 0 0 8px;
+    margin: 0 0 12px;
     display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 4px 8px;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
     font-size: 13px;
     color: #6B5B4E;
-    b { color: #2B1D14; font-weight: 700; }
-    .persona-sub { font-size: 12px; color: #7A6B5D; }
-    .persona-change {
-        margin-left: auto; min-height: 32px; padding: 0 2px; border: 0; background: transparent;
+    white-space: nowrap;
+    .pl-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    b { margin-left: 2px; color: #2B1D14; font-weight: 700; }
+    .pl-link {
+        flex: none; min-height: 32px; padding: 0 2px; border: 0; background: transparent;
         color: #A0662F; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
         text-decoration: underline; text-underline-offset: 3px;
     }
+    .pl-scope { margin-left: auto; color: #6B5B4E; }
 }
 </style>

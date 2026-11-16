@@ -16,9 +16,9 @@ export const ONBOARDING_PATH = '/onboarding';
  * 홈이 부르는 API(시황·공지·주목 종목·성과)는 서버에서도 비로그인을 허용한다. 이 밖의 화면은 로그인해야 열린다.
  */
 // 홈에서 이어지는 화면(매수추천·공지)도 연다 — 안 그러면 홈의 "전체 보기"·공지를 누른 비로그인이 로그인 화면으로 튕긴다.
-export const GUEST_PATHS = ['/home', ONBOARDING_PATH, '/menu', '/stock', '/stock/buy-target', '/stock/info', '/stock/chart', '/board/notice', '/board/notice/detail'];
+export const GUEST_PATHS = ['/home', ONBOARDING_PATH, '/menu', '/stock', '/stock/preset', '/stock/buy-target', '/stock/info', '/stock/chart', '/board/notice', '/board/notice/detail'];
 
-/** 트레이닝(/training, /training/<강의>)도 가입 없이 연다(2026-11-15 목업). 메뉴 권한과 무관한 정적 라우트다. */
+/** 트레이닝(/training, /training/<장>, /training/<장>/<단계>)도 가입 없이 연다. 메뉴 권한과 무관한 정적 라우트다. */
 export const GUEST_PREFIXES = ['/training'];
 
 export const isGuestPath = (path) =>

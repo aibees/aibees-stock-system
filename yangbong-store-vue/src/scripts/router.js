@@ -18,6 +18,7 @@ import Signup from '@/components/Signup.vue';
 import HomeEntry from '@/components/Home/HomeEntry.vue'
 import Menu from '@/components/Menu.vue'
 import Onboarding from '@/components/Home/Onboarding.vue'
+import StockPreset from '@/components/Stocks/StockPreset.vue'
 import TrainingHome from '@/components/Training/TrainingHome.vue'
 import TrainingLesson from '@/components/Training/TrainingLesson.vue'
 import Login from '@/components/Login.vue'
@@ -57,14 +58,26 @@ const routes = [
         component: Menu
     },
     {
-        // 트레이닝(차트·기업분석 보는 법) 목차와 강의. 비로그인 접근 가능(authPaths.GUEST_PREFIXES). 정적 라우트.
+        // 내 설정(preset). 주식분석 그룹의 화면이지만 서버 메뉴와 무관한 정적 라우트(비로그인도 연다).
+        path: "/stock/preset",
+        name: "stock-preset",
+        component: StockPreset
+    },
+    {
+        // 트레이닝 커리큘럼(장 → 단계, 순서대로 잠금). 비로그인 접근 가능(authPaths.GUEST_PREFIXES). 정적 라우트.
         path: "/training",
         name: "training",
         component: TrainingHome
     },
     {
-        path: "/training/:slug",
-        name: "training-lesson",
+        // 장 바로가기(전체 메뉴의 장 항목·단계 화면의 뒤로): 같은 목차 화면을 그 장 위치로 연다(scrollBehavior).
+        path: "/training/:chapter",
+        name: "training-chapter",
+        component: TrainingHome
+    },
+    {
+        path: "/training/:chapter/:stage",
+        name: "training-stage",
         component: TrainingLesson
     },
     {
@@ -215,7 +228,12 @@ export const setRouterToApp = async () => {
       // 화면이 바뀌면 뒤로가기를 포함해 항상 맨 위에서 시작한다. 없으면 이전 화면의 스크롤 위치가 그대로 남는다.
       // 쿼리만 바뀌는 같은 화면 안의 이동은 읽던 위치를 유지한다.
       scrollBehavior(to, from) {
-        return to.path === from.path ? false : { top: 0, left: 0 };
+        if (to.path === from.path) return false;
+        // 트레이닝 장 바로가기는 그 장 제목으로(고정 머리글 높이만큼 띄운다). 없는 장이면 맨 위.
+        if (to.name === 'training-chapter' && document.getElementById(`ch-${to.params.chapter}`)) {
+            return { el: `#ch-${to.params.chapter}`, top: 84 };
+        }
+        return { top: 0, left: 0 };
       },
     });
 
@@ -231,6 +249,10 @@ export const setRouterToApp = async () => {
         const loggedIn = userSession.isUserSession();
         const isAuth = isAuthPath(to.path);
         const target = normPath(to.path);
+
+        // 주식분석(/stock)으로 바로 오면 매수추천을 연다(2026-11-15: 주식분석 대시보드 → 매수추천으로 대체).
+        //   하단 탭·각 화면의 뒤로(back="/stock")가 모두 여기로 온다. 이동한 뒤 권한·광고 게이트는 매수추천 기준으로 다시 본다.
+        if (target === '/stock') return { path: '/stock/buy-target', query: to.query, replace: true };
 
         const isGuest = isGuestPath(target);
 

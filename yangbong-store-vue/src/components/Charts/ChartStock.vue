@@ -116,6 +116,7 @@ import ChartAnalysisSummary from '../common/comp/chartAnalysis/ChartAnalysisSumm
 import { LAYERS } from '../common/comp/chartAnalysis/layers.js';
 import { useChartLayers } from '../common/comp/chartAnalysis/useChartLayers.js';
 import aibeesApi from '@scripts/aibeesApi.js';
+import { addRecent } from '@scripts/recentStocks.js';
 import { formatEok, formatNetAmt, signClass, shortYmd } from '@scripts/marketFormat.js';
 
 const route = useRoute();
@@ -172,6 +173,7 @@ const setStockInfo = async (code) => {
     const { data } = await aibeesApi.get('/api/v1/stocks/id/' + code);
     searchParam.code = data.data.stock_code;
     searchParam.name = data.data.stock_name;
+    addRecent(searchParam.code, searchParam.name);   // 주식분석 대시보드의 "최근 본 회사"
     setSummary(data.data);
 };
 

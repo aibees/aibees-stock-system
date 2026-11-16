@@ -55,7 +55,7 @@
                     <p v-if="!pickOnly" class="ob-lead">
                         답하신 내용으로 보면 <b>{{ suggestedType.name }}</b>에 가깝습니다. 세 가지 중에서 직접 골라 주세요.
                     </p>
-                    <p v-else class="ob-lead">고른 성향에 맞춰 종목의 순서와 정리할 가격이 바뀝니다.</p>
+                    <p v-else class="ob-lead">고른 성향에 맞춰 보조지표 수치와 회사 순서가 정해집니다. 세부 수치는 주식분석의 내 설정에서 고칠 수 있어요.</p>
 
                     <ul class="ob-types" role="radiogroup" aria-label="성향">
                         <li v-for="t in types" :key="t.key">
@@ -68,7 +68,7 @@
                                         <span v-if="pickOnly && t.key === persona.currentType.key" class="t-mark">· 지금 설정</span>
                                     </span>
                                     <span class="t-desc">{{ t.desc }}</span>
-                                    <span class="t-stop">정리할 가격: 산 가격보다 {{ t.stopPct }}% 내려가면</span>
+                                    <span class="t-stop">{{ passRuleText(normalizeSettings(t.settings)) }}</span>
                                 </span>
                                 <span class="ob-check" aria-hidden="true">{{ chosen === t.key ? '✓' : '' }}</span>
                             </button>
@@ -96,6 +96,7 @@
 import { assUserSession } from '@scripts/stores/user-stores.js';
 import { usePersonaStore } from '@scripts/stores/persona-store.js';
 import { suggestFromAnswers, findType } from '@scripts/persona.js';
+import { passRuleText, normalizeSettings } from '@scripts/indicators.js';
 
 const router = useRouter();
 const route = useRoute();

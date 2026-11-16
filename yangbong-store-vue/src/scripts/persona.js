@@ -1,16 +1,14 @@
 /**
- * 성향(persona) — 온보딩 질문, 유형 판정, 유형별 종목 순서·정리할 가격 계산. 화면 의존 없는 순수 함수.
+ * 성향(persona) — 온보딩 질문, 유형 판정, 유형별 목록 순서. 화면 의존 없는 순수 함수.
  *
- * 유형·질문은 코드가 아니라 데이터다(기획안 3.4 "유형을 데이터로 관리").
+ * 유형은 코드가 아니라 데이터다(기획안 3.4 "유형을 데이터로 관리").
  *   정본: 공통코드 master_codes stock/setting/screen 의 PERSONA_CONFIG (desc 에 JSON 한 덩어리)
  *         → /master/menus/my 응답의 settings 로 온다(비로그인 포함).
  *   기본값: data/personaConfig.json — 공통코드가 없거나 형식이 틀리면 이걸 쓴다.
  *   앱은 웹 빌드를 내장하므로 기본값을 바꾸면 새 빌드가 필요하다. 공통코드는 배포 없이 바뀐다.
  *
- * 2026-11-15 초안 결정(기획안 15장):
- *   - 성향은 목록을 거르지 않고 순서만 바꾼다(안정 = 시가총액 큰 순, 균형 = 서버 순서, 공격 = 변동 큰 순).
- *   - 살 만한 가격 = 표시일 종가, 정리할 가격 = 종가 × (1 − stopPct%) 를 호가 단위로 내림.
- *   - 같은 설정이면 누가 보든 같은 목록이어야 한다(동률은 서버 순서로 고정).
+ * 유형(preset)은 보조지표 수치 묶음(types[].settings)이다 — 지표 정의·판정은 scripts/indicators.js.
+ * 손절·익절 같은 매도 기준은 양봉상회에 없다(2026-11-15). 같은 설정이면 누가 보든 같은 목록이어야 한다.
  */
 import DEFAULT_CONFIG from './data/personaConfig.json';
 import { numOrNull, volumeFacts } from './stockSignals.js';
@@ -19,7 +17,7 @@ export const SETTING_CODE = 'PERSONA_CONFIG';
 
 const validConfig = (c) =>
     c && Array.isArray(c.types) && c.types.length > 0
-    && c.types.every(t => t && t.key && t.name && Number.isFinite(Number(t.stopPct)))
+    && c.types.every(t => t && t.key && t.name && t.settings && typeof t.settings === 'object')
     && Array.isArray(c.questions) && c.questions.length > 0
     && c.questions.every(q => q && q.text && Array.isArray(q.options) && q.options.length >= 2);
 
@@ -108,52 +106,8 @@ export const orderForType = (items, type) => {
         .map(x => x.item);
 };
 
-/** 국내 주식 호가 단위(2023-01-25 이후 코스피·코스닥 공통). */
-export const tickSize = (price) => {
-    if (price < 2000) return 1;
-    if (price < 5000) return 5;
-    if (price < 20000) return 10;
-    if (price < 50000) return 50;
-    if (price < 200000) return 100;
-    if (price < 500000) return 500;
-    return 1000;
-};
-
-/** 정리할 가격: 종가 × (1 − stopPct%) 를 호가 단위로 내림. 종가가 없으면 null. */
-export const stopPrice = (close, stopPct) => {
-    const c = numOrNull(close);
-    const p = Number(stopPct);
-    if (c === null || c <= 0 || !Number.isFinite(p)) return null;
-    const raw = c * (1 - p / 100);
-    const tick = tickSize(raw);
-    return Math.floor(raw / tick) * tick;
-};
-
-/* ── 한 줄 이유: 기존 조건 플래그를 쉬운 말로. 앞에서부터 최대 2개 ──
- * 용어 풀이(기획안 4.3): 거래량 급증 → "평소보다 N배 많이 거래됨". 지표 이름은 쓰지 않는다. */
-const ratioText = (r) => (r >= 10 ? Math.round(r).toLocaleString() : r.toFixed(1));
-/**
- * 한 줄 이유 목록(앞에서부터 쓴다). 한 항목은 한 줄에 들어가게 짧게 쓴다(홈에서 항목마다 줄을 나눠 그린다).
- * 용어 풀이(기획안 4.3): 거래량 급증 → 평소보다 N배. 지표 이름(MACD·OBV·볼린저)은 쓰지 않는다.
- */
-export const plainReasons = (item) => {
-    const out = [];
-    const { avgRatio } = volumeFacts(item);
-    if (avgRatio !== null && avgRatio >= 1.5) out.push(`거래량이 평소의 ${ratioText(avgRatio)}배`);
-    else if (item.is_vol_surge === 'Y') out.push('거래가 갑자기 늘었어요');
-    if (item.is_bb_mid_breakout === 'Y') out.push('최근 평균 가격 위로 올라섰어요');
-    if (item.macd_cross === 'G') out.push('내리던 흐름이 오름으로 바뀌었어요');
-    if (item.obv_cross === 'G') out.push('사려는 거래가 늘고 있어요');
-    if (item.is_bb_mid_breakout !== 'Y' && item.is_over_on_mid === 'Y') out.push('최근 평균 가격보다 위에 있어요');
-    if (item.is_under_bb_upper === 'Y') out.push('아직 크게 오르진 않았어요');
-    return out;
-};
-export const reasonText = (item) => plainReasons(item).slice(0, 2).join(' · ') || '여러 조건을 함께 만족';
-/** 홈 카드용: 이유 최대 2줄. 없으면 한 줄 기본 문구. */
-export const reasonLines = (item, max = 2) => {
-    const r = plainReasons(item).slice(0, max);
-    return r.length ? r : ['여러 조건을 함께 만족했어요'];
-};
+/** 사용자가 직접 정한 설정의 유형 key(preset 이 아님). 값은 persona 스토어의 custom 에 있다. */
+export const CUSTOM_KEY = 'custom';
 
 /**
  * 오늘 시장을 날씨로 비유한다(2026-11-15). 기준은 코스피·코스닥의 오늘 등락률 평균(avg).
@@ -164,23 +118,40 @@ export const reasonLines = (item, max = 2) => {
  * 오늘 등락률은 rate_1d, 없으면 spark(최근 종가들)의 마지막 두 값으로 구한다. 둘 다 없으면 null(줄을 그리지 않는다).
  * 임계값은 초안 — 바꾸려면 아래 상수만 고친다.
  */
-export const WEATHER_BIG_UP = 1.5;
+export const WEATHER_BIG_UP = 2;
 export const WEATHER_STORM = -5;
+
 const dailyRate = (m) => {
     const r = numOrNull(m?.rate_1d);
-    if (r !== null) return r;
+    if (r !== null) {
+        return r;
+    }
     const sp = (m?.spark || []).map(numOrNull).filter(v => v !== null);
-    if (sp.length < 2 || !sp[sp.length - 2]) return null;
+
+    if (sp.length < 2 || !sp[sp.length - 2]) {
+        return null;
+    }
     return (sp[sp.length - 1] / sp[sp.length - 2] - 1) * 100;
 };
+
 export const marketWeather = (snapshot) => {
     const a = dailyRate((snapshot || []).find(m => m.key === 'kospi'));
     const b = dailyRate((snapshot || []).find(m => m.key === 'kosdaq'));
-    if (a === null || b === null) return null;
+
+    if (a === null || b === null) {
+        return null
+    };
     const avg = (a + b) / 2;
     const base = { avg, kospi: a, kosdaq: b };
-    if (Math.min(a, b) <= WEATHER_STORM) return { ...base, key: 'storm', text: '천둥번개', desc: '시장이 크게 흔들리는 날이에요', cls: 'down' };
-    if (avg >= WEATHER_BIG_UP) return { ...base, key: 'sunny', text: '쾌청', desc: '시장이 많이 오른 날이에요', cls: 'up' };
-    if (avg >= 0) return { ...base, key: 'warm', text: '따뜻', desc: '시장이 조금 오른 날이에요', cls: 'up' };
+
+    if (Math.min(a, b) <= WEATHER_STORM) {
+        return { ...base, key: 'storm', text: '천둥번개', desc: '시장이 크게 흔들리는 날이에요', cls: 'down' }
+    };
+    if (avg >= WEATHER_BIG_UP) {
+        return { ...base, key: 'sunny', text: '쾌청', desc: '시장이 많이 오른 날이에요', cls: 'up' };
+    }
+    if (avg >= 0) {
+        return { ...base, key: 'warm', text: '따뜻', desc: '시장이 조금 오른 날이에요', cls: 'up' };
+    }
     return { ...base, key: 'cloudy', text: '흐림', desc: '시장이 조금 내린 날이에요', cls: 'down' };
 };

@@ -1,13 +1,7 @@
 <template>
     <div id="stocks-view">
-        <!-- /stock 으로 바로 오면 주식분석 허브(매수추천·AI 분석·차트 확인)를 보여준다 -->
-        <router-view v-slot="{ Component }">
-            <component :is="Component" v-if="Component" />
-            <StockDashboard v-else />
-        </router-view>
+        <!-- 주식분석 하위 화면. /stock 으로 바로 오면 라우터 가드가 매수추천(/stock/buy-target)으로 보낸다
+             (2026-11-15 주식분석 대시보드 → 매수추천으로 대체. StockDashboard.vue 는 지금 쓰지 않는다). -->
+        <router-view />
     </div>
 </template>
-
-<script setup>
-import StockDashboard from './StockDashboard.vue';
-</script>

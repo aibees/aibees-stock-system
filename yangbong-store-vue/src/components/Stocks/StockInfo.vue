@@ -259,6 +259,7 @@
 import { ref, computed } from 'vue';
 import { marked } from 'marked';
 import aibeesApi from '@scripts/aibeesApi.js';
+import { addRecent } from '@scripts/recentStocks.js';
 import { assUserSession } from '@scripts/stores/user-stores';
 import {
     numOrNull, formatNumber as fmtNum, hasValue, changeInfo, fundamentalRows, technicalRows,
@@ -426,6 +427,7 @@ const goToChart = () => {
 
 const stockSearchHandler = (code) => {
     if (!code) return;
+    addRecent(code, inputName.value);   // 주식분석 대시보드의 "최근 본 회사"
     stockDetail.value = { code };
     tab.value = 'analysis';
     finCode = null;      // 종목이 바뀌면 재무를 새로 조회(첫 탭이 분석내용이라 바로 부른다)
@@ -505,6 +507,8 @@ const refreshOverview = async () => {
         overview.value = data.data;
     } catch (e) {
         console.error(e);
+        // 한도 초과(429)·쿨다운·실적발표월 제한은 서버 문구를 그대로 보여 준다.
+        alert(e?.response?.data?.error?.message || 'AI 분석을 새로 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
         overviewRefreshing.value = false;
     }
@@ -533,6 +537,8 @@ const refreshTheme = async () => {
         theme.value = data.data;
     } catch (e) {
         console.error(e);
+        // 한도 초과(429)·쿨다운·실적발표월 제한은 서버 문구를 그대로 보여 준다.
+        alert(e?.response?.data?.error?.message || 'AI 분석을 새로 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
         themeRefreshing.value = false;
     }

@@ -51,7 +51,7 @@
 <script setup>
 import { ensureAccess } from '@scripts/useAccess.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
-import { allCourses, trainingGroups } from '@scripts/training.js';
+import { chapters } from '@scripts/training.js';
 
 const router    = useRouter();
 const userStore = assUserSession();
@@ -66,21 +66,28 @@ const userInitial = computed(() => (userName.value?.[0] ?? '?').toUpperCase());
  * 여기서 다시 거르지 않는다. */
 const searchQuery = ref('');
 
-// 트레이닝은 정적 화면이라 서버 메뉴와 무관하게 맨 위에 둔다(강의 목록은 scripts/training.js).
-const courseTitle = (c) => {
-    const g = trainingGroups().find(x => x.courses.includes(c));
-    return g?.title && g.title !== c.name ? `${g.title} · ${c.name}` : c.name;
-};
+// 트레이닝은 정적 화면이라 서버 메뉴와 무관하게 맨 위에 둔다. 항목은 장(chapter) — 누르면 목차의 그 장으로 간다
+// (/training/<장>, 장·단계 목록은 scripts/training.js).
 const trainingGroup = {
     menu_code: 'TrainingGroup', menu_name: '트레이닝', menu_title: '트레이닝', display_flag: 'Y',
     menu_path: 'training',
-    children: allCourses().filter(c => !c.soon).map(c => ({
-        menu_code: `Training_${c.slug}`, menu_path: c.slug, display_flag: 'Y',
-        menu_name: c.name, menu_title: courseTitle(c),
+    children: chapters().map(ch => ({
+        menu_code: `Training_${ch.slug}`, menu_path: ch.slug, display_flag: 'Y',
+        menu_name: ch.name, menu_title: ch.name,
     })),
 };
+// 내 설정(preset)은 주식분석 그룹의 정적 화면 — 서버 메뉴에 그 그룹이 있으면 그 끝에 붙이고, 없으면 혼자 한 그룹으로 둔다.
+const presetItem = { menu_code: 'StockPreset', menu_path: 'preset', display_flag: 'Y', menu_name: '내 설정', menu_title: '내 설정' };
+const withPreset = (menus) => {
+    const isStock = (m) => String(m.menu_path ?? '').replace(/^\/+|\/+$/g, '') === 'stock';
+    if (menus.some(isStock)) {
+        return menus.map(m => (isStock(m) && !(m.children ?? []).some(c => c.menu_code === 'StockPreset')
+            ? { ...m, children: [...(m.children ?? []), presetItem] } : m));
+    }
+    return [...menus, { menu_code: 'StockGroup', menu_path: 'stock', display_flag: 'Y', menu_name: '주식분석', menu_title: '주식분석', children: [presetItem] }];
+};
 const menuList = computed(() =>
-    [trainingGroup, ...(userStore.user.menuList ?? [])]
+    withPreset([trainingGroup, ...(userStore.user.menuList ?? [])])
         .filter(m => m.display_flag === 'Y')
         .map(m => ({ ...m, children: (m.children ?? []).filter(sm => sm.display_flag === 'Y') }))
         .filter(m => m.children.length > 0)
@@ -136,7 +143,7 @@ const ICON = {
     dot:     'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
 };
 const ICON_BY_CODE = {
-    StockBuyTarget: 'star', StockInfo: 'list', StockSector: 'grid', ChartStock: 'chart', ChartTheme: 'chart', StockThemeDetail: 'list',
+    StockBuyTarget: 'star', StockPreset: 'sliders', StockInfo: 'list', StockSector: 'grid', ChartStock: 'chart', ChartTheme: 'chart', StockThemeDetail: 'list',
     WorldIndicators: 'globe',
     BatchSetting: 'history', BatchLogSetting: 'doc', RouteList: 'route',
     RoleMenuSetting: 'shield', UserAuthSetting: 'user', MasterInfoSetting: 'key',

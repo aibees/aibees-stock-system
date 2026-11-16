@@ -83,61 +83,38 @@
                 </div>
             </section>
 
-            <!-- ── 2. 시장이 주목하는 회사: 내 성향 순서로 3개 + 나머지는 펼쳐 보기 ── -->
+            <!-- ── 2. AI 분석 종목: 내 설정 순서로 3개 + 나머지는 펼쳐 보기. 종목마다 AI 분석·차트 확인 링크 ── -->
             <section class="watch" aria-labelledby="watch-title">
                 <div class="list-head">
-                    <h2 id="watch-title">시장이 주목하는 회사</h2>
+                    <h2 id="watch-title">AI 분석 종목 TOP 3</h2>
                     <span v-if="basisText" class="basis">{{ basisText }}</span>
                 </div>
-                <p class="persona-line">
-                    내 성향 <b>{{ type.name }}</b>
-                    <button type="button" class="text-link" @click="router.push({ path: ONBOARDING_PATH, query: { pick: '1' } })">바꾸기</button>
-                </p>
 
                 <div v-if="isLoading" class="w-skeleton" aria-busy="true" aria-label="불러오는 중">
                     <i v-for="n in 3" :key="n"></i>
                 </div>
-                <p v-else-if="!ordered.length" class="w-empty">오늘은 조건에 맞는 종목이 없습니다.</p>
+                <div v-else-if="!ordered.length" class="w-empty">
+                    <p>오늘은 AI 기준에 충족된 종목이 없습니다.</p>
+                    <button v-if="items.length" type="button" class="text-link" @click="router.push('/stock/preset')">설정 조정하기</button>
+                </div>
                 <template v-else>
                     <ol class="w-list">
                         <li v-for="(w, i) in visibleRows" :key="w.code" class="w-item">
-                            <component :is="canOpenDetail ? 'button' : 'div'" :type="canOpenDetail ? 'button' : undefined"
-                                class="w-row" :class="{ link: canOpenDetail }" @click="canOpenDetail && goToStock(w.item)">
+                            <div class="w-row">
                                 <span class="w-name-line">
-                                    <span class="rank">{{ String(i + 1).padStart(2, '0') }}</span>
+                                    <span class="rank">{{ String(i + 1) }}위</span>
                                     <span class="name">{{ w.name }}</span>
                                     <span class="chg" :class="w.chg.cls">{{ w.chg.text }}</span>
                                 </span>
-                                <span class="w-reasons">
-                                    <span v-for="(r, ri) in w.reasons" :key="ri" class="w-reason"><i aria-hidden="true">✓</i>{{ r }}</span>
-                                </span>
-                                <span class="w-prices">
-                                    <span class="w-price">
-                                        <span class="w-label">살 만한 가격</span>
-                                        <b>{{ w.buyText }}</b>
-                                    </span>
-                                    <span class="w-price">
-                                        <span class="w-label">정리할 가격 <em>−{{ type.stopPct }}%</em></span>
-                                        <b>{{ w.stopText }}</b>
-                                    </span>
-                                </span>
-                            </component>
+                                <!-- 예전 홈처럼 종목마다 두 버튼: AI 분석(/stock/info) · 차트 확인(/stock/chart) -->
+                                <div v-if="canOpen(AI_PATH) || canOpen(CHART_PATH)" class="w-actions">
+                                    <button v-if="canOpen(AI_PATH)" type="button" class="btn-sm strong" @click="goToStock(w.item)">AI 분석</button>
+                                    <button v-if="canOpen(CHART_PATH)" type="button" class="btn-sm" @click="goToChart(w.item)">차트 확인</button>
+                                </div>
+                            </div>
                         </li>
                     </ol>
-                    <button v-if="restCount > 0" type="button" class="more-btn" :aria-expanded="showAll ? 'true' : 'false'"
-                        @click="showAll = !showAll">
-                        {{ showAll ? '접기' : `전체 보기 · ${restCount}개 더` }}
-                    </button>
-                    <p class="w-note">
-                        살 만한 가격은 표시일 종가입니다. 정리할 가격은 그보다 {{ type.stopPct }}% 낮은 가격으로,
-                        여기까지 내려가면 정리를 생각해 볼 기준입니다.
-                    </p>
                 </template>
-            </section>
-
-            <!-- 광고 1자리: 주목 종목과 성과 사이(AD_FREE·앱 네이티브 광고 환경에서는 비어 있다) -->
-            <section v-if="heroAdVisible" class="hero-ad" aria-label="광고">
-                <AdSlot placement="homeHero" />
             </section>
 
             <!-- ── 3. 지난달 성과(현행 계산 유지, 표시만 쉬운 말로) ── -->
@@ -187,6 +164,11 @@
                 </p>
             </section>
 
+            <!-- 광고 1자리: 주목 종목과 성과 사이(AD_FREE·앱 네이티브 광고 환경에서는 비어 있다) -->
+            <section v-if="heroAdVisible" class="hero-ad" aria-label="광고">
+                <AdSlot placement="homeHero" />
+            </section>
+
             <!-- ── 공지사항 ── -->
             <section class="notice" aria-labelledby="notice-title">
                 <div class="list-head">
@@ -220,24 +202,23 @@
 
 <script setup>
 /**
- * 간편 모드 홈(2026-11-15 개편 1차). 순서: 시황 → 시장이 주목하는 회사(≤3) → 지난달 성과 → 공지.
- * 데이터는 기존 홈과 같은 API(전부 비로그인 허용)를 쓴다. 알고리즘·계산은 그대로, 보여 주는 말만 바꾼다.
- *   - '추천' 대신 '시장이 주목하는 회사'. 지표 이름 대신 쉬운 말(persona.reasonLines — 항목마다 한 줄).
- *   - 성향은 목록을 거르지 않고 순서와 정리할 가격만 바꾼다(persona.orderForType / stopPrice).
- * 날짜 이동·정렬·조건 목록·차트·최우선 타겟은 전문가 모드(Home.vue)에만 있다.
+ * 양봉상회 홈(2026-11-15 개편 1차). 순서: 시황 → AI 분석 종목(≤3) → 지난달 성과 → 공지.
+ * 데이터는 기존 홈과 같은 API(전부 비로그인 허용)를 쓴다. 알고리즘·계산은 그대로다.
+ *   - AI 분석 종목: 종목 이름·등락과 AI 분석·차트 확인 버튼만(근거·살 만한 가격·내 조건 충족은 2026-11-15 뺌).
+ *   - 내 설정(보조지표 수치)으로 서버 후보를 다시 걸러 설정한 순서로 보여 준다(indicators.evaluate / persona.orderForType).
  */
 import AdSlot from '../common/AdSlot.vue';
-import { MOCK_ENABLED } from '@scripts/mock/mockApi.js';
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
 import { usePersonaStore } from '@scripts/stores/persona-store.js';
 import { hasRole, WORKER_ROLE } from '@scripts/useAccess.js';
 import { useShowAds } from '@scripts/useAds.js';
 import { isNativeAdsEnabled } from '@scripts/useAdMob.js';
-import { ONBOARDING_PATH } from '@scripts/authPaths.js';
+import { ONBOARDING_PATH, isGuestPath } from '@scripts/authPaths.js';
 import { NOTICE_LIST_PATH, NOTICE_DETAIL_PATH, noticeDateText, noticeCategoryClass } from '@scripts/notice.js';
 import { numOrNull, formatNumber, changeInfo } from '@scripts/stockSignals.js';
-import { orderForType, stopPrice, reasonLines, marketWeather } from '@scripts/persona.js';
+import { orderForType, marketWeather } from '@scripts/persona.js';
+import { evaluate, passRuleText } from '@scripts/indicators.js';
 
 const router = useRouter();
 const userSession = assUserSession();
@@ -248,8 +229,10 @@ const userName = computed(() => userSession.getUserInfo || '');
 const userInitial = computed(() => (userName.value?.[0] ?? '?').toUpperCase());
 const isWorker = computed(() => hasRole(WORKER_ROLE));
 const showAds = useShowAds();
+
 // 앱(AdMob)은 네이티브 광고가 화면 위에 겹쳐 그려져 스크롤되는 자리에 못 넣는다 → 하단 배너가 맡는다.
 const heroAdVisible = computed(() => !isWorker.value && showAds.value && !isNativeAdsEnabled());
+
 // 종목 상세(/stock/info)는 로그인하고 그 메뉴 권한이 있는 사용자만 연다. 아니면 목록 행을 누를 수 없게 그린다
 // (게스트 권한에 공개 메뉴로 들어 있어도 비로그인은 홈·온보딩 밖으로 못 나가므로 누르면 로그인 화면으로 튕긴다).
 const canOpenDetail = computed(() => isLoggedIn.value && userSession.access.paths.includes('/stock/info'));
@@ -261,13 +244,17 @@ const onDocClick = (e) => {
     if (menuOpen.value && accountRef.value && !accountRef.value.contains(e.target)) menuOpen.value = false;
 };
 const onKeyDown = (e) => { if (e.key === 'Escape') menuOpen.value = false; };
+
 const goTo = (path) => { menuOpen.value = false; router.push(path); };
+
 const logout = () => {
     menuOpen.value = false;
     userSession.logoutUser();
     router.push('/login');
 };
+
 const scrolled = ref(false);
+
 const onScroll = () => {
     const next = window.scrollY > 8;
     if (next !== scrolled.value) scrolled.value = next;
@@ -286,7 +273,6 @@ const priceText = (v) => {
     return n === null ? '–' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 const mdText = (ymd) => `${Number(String(ymd).slice(4, 6))}/${Number(String(ymd).slice(6, 8))}`;
-const wonText = (v) => (numOrNull(v) === null ? '–' : `${formatNumber(v)}원`);
 
 /* ── 1. 시황 ── (서버 1분 캐시 → 화면도 1분마다) */
 const marketData = ref([]);
@@ -335,10 +321,14 @@ const fxItem = computed(() => {
 });
 const weather = computed(() => marketWeather(marketData.value));
 
-/* ── 2. 시장이 주목하는 종목 ── (날짜를 보내지 않으면 서버가 가장 최근 표시일을 고른다) */
+/* ── 2. AI 분석 종목 ── (날짜를 보내지 않으면 서버가 가장 최근 표시일을 고른다)
+ *   2026-11-15 '시장이 주목하는 회사'(근거·살 만한 가격·내 조건 충족)에서 되돌림: 종목 이름·등락과 AI 분석·차트 확인 버튼만. */
 const HOME_COUNT = 3;
-// 목업 미리보기(?reasons=all): 이유를 2줄로 자르지 않고 전부 보여 준다. 평소에는 2줄.
-const REASON_MAX = (MOCK_ENABLED && new URLSearchParams(location.search).get('reasons') === 'all') ? 99 : 2;
+const AI_PATH = '/stock/info';
+const CHART_PATH = '/stock/chart';
+// 비로그인 공개 경로(authPaths.GUEST_PATHS)거나 서버가 이 사용자에게 허용한 메뉴면 버튼을 보인다.
+const canOpen = (path) => isGuestPath(path) || userSession.access.paths.includes(path);
+
 const items = ref([]);
 const isLoading = ref(true);
 const showAll = ref(false);
@@ -356,27 +346,30 @@ const loadItems = async () => {
 };
 
 const type = computed(() => persona.currentType);
-const ordered = computed(() => orderForType(items.value, type.value).map(item => ({
-    item,
-    code: item.stock_code,
-    name: item.stock_name,
-    chg: changeInfo(item),
-    reasons: reasonLines(item, REASON_MAX),
-    buyText: wonText(item.close),
-    stopText: wonText(stopPrice(item.close, type.value.stopPct)),
-})));
+// 서버가 준 후보를 내 설정의 보조지표로 다시 판정해 걸러 낸 뒤, 설정의 순서로 정렬한다.
+const passRule = computed(() => passRuleText(type.value.settings));
+const ordered = computed(() => {
+    const judged = items.value.map(item => ({ item, ev: evaluate(item, type.value.settings) })).filter(x => x.ev.match);
+    return orderForType(judged.map(x => x.item), type.value).map(item => ({
+        item,
+        code: item.stock_code,
+        name: item.stock_name,
+        chg: changeInfo(item),
+    }));
+});
 const visibleRows = computed(() => (showAll.value ? ordered.value : ordered.value.slice(0, HOME_COUNT)));
 const restCount = computed(() => Math.max(0, ordered.value.length - HOME_COUNT));
 const basisText = computed(() => {
     const ymd = items.value[0]?.ymd;
     return ymd ? `${mdText(String(ymd).replaceAll('-', ''))} 종가 기준` : '';
 });
-watch(() => type.value.key, () => { showAll.value = false; });
+watch(() => type.value, () => { showAll.value = false; });
 
 const goToStock = (item) => router.push({
-    path: '/stock/info',
+    path: AI_PATH,
     query: { stock_code: item.stock_code, stock_name: item.stock_name, ymd: String(item.ymd ?? '').replaceAll('-', '') },
 });
+const goToChart = (item) => router.push({ path: CHART_PATH, query: { code: item.stock_code } });
 
 /* ── 3. 지난달 성과 ── (서버가 표시일 종가 → 5거래일 내 최고가를 계산, 6시간 캐시) */
 const perf = ref(null);
@@ -407,8 +400,11 @@ const loadNotices = async () => {
     try {
         const { data } = await aibeesApi.get('/api/v1/notices', { params: { page: 0, size: 3 } });
         notices.value = Array.isArray(data?.data) ? data.data : [];
-    } catch (e) { notices.value = []; }
+    } catch (e) {
+        notices.value = [];
+    }
 };
+
 const goToNotice = (n) => router.push({ path: NOTICE_DETAIL_PATH, query: { id: n.notice_id, from: 'home' } });
 
 onMounted(() => {
@@ -422,6 +418,7 @@ onMounted(() => {
     loadPerformance();
     loadNotices();
 });
+
 onBeforeUnmount(() => {
     clearInterval(marketTimer);
     document.removeEventListener('click', onDocClick, true);
@@ -561,7 +558,7 @@ onBeforeUnmount(() => {
     }
 }
 
-/* ── 본문: 블록 사이는 옅은 선 한 줄 ── */
+/* ── 본문: 선은 섹션 사이에만 한 줄. 섹션 안(목록 줄·카드)은 선 없이 여백·바탕으로(2026-11-15 테두리 최소화) ── */
 .home-main {
     max-width: 640px;
     margin: 0 auto;
@@ -630,8 +627,7 @@ onBeforeUnmount(() => {
 .mk-card {
     min-width: 0;
     padding: 12px 12px 10px;
-    background: $card;
-    border: 1px solid $line;
+    background: $bg;           // 테두리 대신 옅은 바탕으로 구분
     border-radius: 12px;
     display: flex;
     flex-direction: column;
@@ -669,21 +665,16 @@ onBeforeUnmount(() => {
     color: $sub;
     b { color: $ink; font-weight: 700; }
 }
-.w-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid $line; }
-.w-item { border-bottom: 1px solid $line; }
+// 종목마다 옅은 박스(테두리 없이 바탕색). 모서리는 같은 화면의 시황·성과 카드와 같은 12px.
+.w-list { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .w-row {
-    width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 14px 0;
-    border: 0;
-    background: transparent;
+    gap: 8px;
+    padding: 12px 12px 12px 14px;
+    border-radius: 12px;
+    background: $bg;
     color: $ink;
-    text-align: left;
-    font: inherit;
-    &.link { cursor: pointer; }
-    &.link:active { background: $bg; }
 }
 .w-name-line {
     display: flex;
@@ -694,29 +685,23 @@ onBeforeUnmount(() => {
     .name { font-size: 17px; font-weight: 700; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .chg { margin-left: auto; flex-shrink: 0; font-size: 13px; font-weight: 600; white-space: nowrap; }
 }
-.w-reasons { display: flex; flex-direction: column; gap: 3px; }
-.w-reason {
-    display: flex;
-    gap: 6px;
-    font-size: 14px;
-    line-height: 1.4;
-    color: $ink;
-    i { font-style: normal; font-weight: 700; color: $accent; flex: none; }
-}
-.w-prices {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: 4px;
-    padding-top: 10px;
-    border-top: 1px solid $line-soft;
-}
-.w-price {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    & + & { padding-left: 16px; border-left: 1px solid $line-soft; }
-    .w-label { font-size: 12px; color: $sub-2; em { font-style: normal; color: $down; font-weight: 600; margin-left: 2px; } }
-    b { font-size: 17px; font-weight: 700; color: $ink; }
+// AI 분석·차트 확인: 작은 버튼 두 개를 오른쪽으로 모은다. 테두리 없이 바탕색으로만.
+.w-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.btn-sm {
+    height: 30px;
+    padding: 0 11px;
+    border: 0;
+    border-radius: 8px;
+    background: $card;          // 옅은 박스 위라 흰 바탕으로 띄운다
+    color: $brown-ink;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    &:active { filter: brightness(.95); }
+    &.strong { background: $brown; color: #fff; }
 }
 .more-btn {
     width: 100%;
@@ -732,12 +717,12 @@ onBeforeUnmount(() => {
     @media (hover: hover) { &:hover { background: $bg; } }
 }
 .w-note { margin: 8px 0 0; font-size: 12px; line-height: 1.6; color: $sub-2; word-break: keep-all; }
-.w-empty { margin: 0; padding: 20px 0; font-size: 14px; color: $sub; text-align: center; border-top: 1px solid $line; }
+.w-empty { padding: 20px 0; font-size: 14px; color: $sub; text-align: center; p { margin: 0 0 6px; } }
 .w-skeleton {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    i { display: block; height: 84px; border-radius: 10px; background: $bg; animation: pulse 1.6s infinite ease-in-out; }
+    i { display: block; height: 84px; border-radius: 12px; background: $bg; animation: pulse 1.6s infinite ease-in-out; }
 }
 @keyframes pulse { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .w-skeleton i { animation: none; } }
@@ -763,14 +748,13 @@ onBeforeUnmount(() => {
     flex: 0 0 176px;
     scroll-snap-align: start;
     box-sizing: border-box;
-    border: 1px solid $line;
     border-radius: 12px;
-    background: $card;
+    background: $bg;           // 테두리 대신 옅은 바탕
     display: flex;
     flex-direction: column;
     gap: 2px;
     padding: 10px 12px;
-    &.summary { background: $bg; justify-content: center; }
+    &.summary { background: $bar; justify-content: center; }
 }
 .pc-body {
     display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 0;
@@ -798,8 +782,7 @@ onBeforeUnmount(() => {
 .perf-note { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: $sub-2; }
 
 /* ── 공지(작게) ── */
-.notice-empty { margin: 0; padding: 14px 0; font-size: 13px; color: $sub; border-top: 1px solid $line; }
-.notice-list { border-top: 1px solid $line; }
+.notice-empty { margin: 0; padding: 14px 0; font-size: 13px; color: $sub; }
 .notice-list { margin: 0; padding: 0; list-style: none; }
 .notice-row {
     width: 100%;
@@ -808,7 +791,6 @@ onBeforeUnmount(() => {
     gap: 8px;
     padding: 9px 0;
     border: 0;
-    border-bottom: 1px solid $line;
     background: transparent;
     color: $ink;
     text-align: left;

@@ -37,10 +37,10 @@
         <a v-for="t in visibleTabs" :key="t.key" class="tab" :class="{ active: isTabActive(t) }"
             :href="t.path" :aria-current="isTabActive(t) ? 'page' : undefined" @click.prevent="goPath(t.path)">
             <svg v-if="t.key === 'home'" width="24" height="24" viewBox="0 0 24 24" :fill="isTabActive(t) ? '#F6C445' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>
-            <!-- 분석: 돋보기 안에 작은 막대그래프(차트 탭의 꺾은선과 구분) -->
-            <svg v-else-if="t.key === 'stocks'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7"></circle><path d="M21 21l-5.5-5.5"></path><path d="M7.5 13v-2M10.5 13V8M13.5 13v-3" stroke-width="1.8"></path></svg>
             <!-- 트레이닝: 펼친 책 -->
             <svg v-else-if="t.key === 'training'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5C10.3 5.3 7.9 4.7 4 4.7V18c3.9 0 6.3.6 8 1.8 1.7-1.2 4.1-1.8 8-1.8V4.7c-3.9 0-6.3.6-8 1.8z"></path><path d="M12 6.5v13.3"></path></svg>
+            <!-- 분석: 돋보기 안에 작은 막대그래프(차트 탭의 꺾은선과 구분) -->
+            <svg v-else-if="t.key === 'stocks'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7"></circle><path d="M21 21l-5.5-5.5"></path><path d="M7.5 13v-2M10.5 13V8M13.5 13v-3" stroke-width="1.8"></path></svg>
             <svg v-else-if="t.key === 'menu'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
             <span class="tab-label">{{ t.label }}</span>
         </a>
@@ -59,10 +59,11 @@ const userSession = assUserSession();
 /* ── 하단 탭바 ── */
 const TABS = [
     { key: 'home',     label: '홈',       path: '/home',     match: ['/home'], always: true },
-    // 주식분석: 매수추천·AI 분석·차트 확인을 한 탭으로 묶는다(허브 /stock 에서 하위 화면으로). 권한이 없으면 서버 경로에 없어 숨는다.
-    { key: 'stocks',   label: '주식분석', path: '/stock',    match: ['/stock'] },
     // 트레이닝(차트·기업분석 보는 법): 정적 라우트라 권한과 무관하게 항상 보인다.
     { key: 'training', label: '트레이닝', path: '/training', match: ['/training'], always: true },
+    // 주식분석: 누르면 매수추천이 열린다(/stock → 라우터 가드가 /stock/buy-target 으로, 2026-11-15 대시보드 대체).
+    //   AI 분석·차트 확인 등 다른 하위 화면도 /stock 아래라 이 탭이 켜진다. 권한이 없으면 서버 경로에 없어 숨는다.
+    { key: 'stocks',   label: '주식분석', path: '/stock',    match: ['/stock'] },
     // 전체 메뉴: 항상 맨 오른쪽에 둔다(권한과 무관 — 공개 메뉴라 비로그인도 열린다).
     { key: 'menu',     label: '메뉴',     path: '/menu',     match: ['/menu'], always: true },
 ];

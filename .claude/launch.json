@@ -14,6 +14,18 @@
       "port": 19010
     },
     {
+      "name": "yangbong-alt",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "yangbong-store-vue", "--", "--port", "19012", "--strictPort"],
+      "port": 19012
+    },
+    {
+      "name": "yangbong-mock-alt",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:mock", "--prefix", "yangbong-store-vue", "--", "--port", "19013", "--strictPort"],
+      "port": 19013
+    },
+    {
       "name": "secret",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "secret-store-vue"],

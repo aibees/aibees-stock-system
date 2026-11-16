@@ -47,7 +47,7 @@ const tickDown = (p) => {
 /** 일봉 chart_data 를 만든다. dayVol = 일 변동폭(비율), surge = 마지막 날 거래량 배수. */
 const makeCandles = (seed, endClose, dayVol, surge) => {
     const rand = rng(seed);
-    const dates = tradingDates(40);
+    const dates = tradingDates(80);
     // 끝에서 거꾸로 걸어 올라가 종가가 endClose 로 끝나게 한다.
     const closes = [endClose];
     for (let i = 1; i < dates.length; i++) {
