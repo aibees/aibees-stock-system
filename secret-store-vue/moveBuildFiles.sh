@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# stock-vue 배포. 빌드 컨텍스트는 이 디렉토리(stock-vue/) 다.
+# 비밀상회 웹(secret-store-vue) 배포. 빌드 컨텍스트는 이 디렉토리다.
 # 어디서 실행하든 스크립트 위치로 이동한 뒤 동작한다.
 set -euo pipefail  # 에러/미정의 변수/파이프 실패 시 즉시 중단
 
 cd "$(dirname "$0")" || exit 1
 
 BRANCH="${BRANCH:-main}"
-CONTAINER="stock-vue-app"
+CONTAINER="secret-store-vue-app"
 
 trap 'echo ">>> [ERROR] 배포 실패 (line $LINENO). 기존 컨테이너는 유지됩니다." >&2' ERR
 

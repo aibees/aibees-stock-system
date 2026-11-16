@@ -11,10 +11,10 @@ const path = require('path')
 const REQUIRED_ENV = [
   'VITE_SERVER_URL',
   'VITE_REDIRECT_URL',
-  'VITE_SERVICE_KEY',
-  'VITE_ENCRYPT_KEY',
   'VITE_BATCH_SERVER_URL',
 ];
+// ※ VITE_SERVICE_KEY·VITE_ENCRYPT_KEY 는 넣지 않는다. define 값은 번들(JS)에 평문으로 들어가
+//   누구나 개발자도구로 볼 수 있다. 화면에서 쓰는 곳도 없어 2026-11-17 뺐다.
 
 // AdSense 스크립트(index.html 의 adsense:start ~ adsense:end)는 웹 운영 빌드에만 남긴다.
 //   - dev 서버: 필요 없음(앱 cap:dev 도 dev 서버 화면을 그대로 띄운다)
@@ -60,8 +60,6 @@ export default defineConfig(({ mode, command }) => {
     aibeesGlobal: {
       API_SERVER_URL : env.VITE_SERVER_URL,
       API_REDIRECT_URL : env.VITE_REDIRECT_URL,
-      SERVICE_KEY : env.VITE_SERVICE_KEY,
-      ENCRYPT_KEY : env.VITE_ENCRYPT_KEY,
       BATCH_SERVER_URL : env.VITE_BATCH_SERVER_URL
     }
   },

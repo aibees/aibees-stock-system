@@ -8,7 +8,7 @@ stock-vue → Capacitor 네이티브 앱 테스트 가이드. `android/`, `ios/`
 
 ```bash
 cd stock-vue
-cp .env.prd .env      # 실제 서버(stock.aibeesworld.com) 대상 빌드
+cp .env.prd .env      # 실제 서버(yangbong-store.chagoklabs.com) 대상 빌드
 yarn build             # dist/ 생성
 npx cap sync           # dist/ → ios/android 네이티브 프로젝트로 복사 + 플러그인 동기화
 ```
@@ -102,7 +102,7 @@ Chrome 주소창에 `chrome://inspect#devices` 입력 (PC의 Chrome, USB 연결�
 
 ## 3. 테스트 시 꼭 확인할 것 (최근 수정 사항 검증)
 
-앱은 웹과 달리 `https://localhost`(iOS/Android WebView) 라는 별개 origin에서 뜨기 때문에, API 서버(`stock.aibeesworld.com`)로의 모든 호출이 진짜 cross-origin이 됨. 아래를 Web Inspector / DevTools 네트워크 탭에서 확인:
+앱은 웹과 달리 `https://localhost`(iOS/Android WebView) 라는 별개 origin에서 뜨기 때문에, API 서버(`yangbong-store.chagoklabs.com`)로의 모든 호출이 진짜 cross-origin이 됨. 아래를 Web Inspector / DevTools 네트워크 탭에서 확인:
 
 - [ ] 이메일 로그인 (`/api/oauth/email`) — 정상 응답 오는지, CORS 에러 안 뜨는지
       → ROOT 서버(별도 저장소, 5556) CORS 설정에 `Authorization` 헤더 허용 안 돼있으면 여기서 막힘.
@@ -161,7 +161,7 @@ yarn build && npx cap sync
 ### 5-3. 공통 체크리스트
 
 - [ ] `yarn cap:prod` 로 운영 설정 상태 확인 (dev config로 패키징하면 안 됨)
-- [ ] `.env.prd` 기준으로 빌드됐는지 확인 (`stock.aibeesworld.com` 대상)
+- [ ] `.env.prd` 기준으로 빌드됐는지 확인 (`yangbong-store.chagoklabs.com` 대상)
 - [ ] 버전/빌드 번호 갱신 (iOS: Xcode General 탭, Android: `android/app/build.gradle`의 `versionCode`/`versionName`)
 - [ ] 앱 아이콘/스플래시는 이미 준비돼 있음 (`ios/App/App/Assets.xcassets`, `android/app/src/main/res/mipmap-*`) — 로고 바꾸고 싶으면 별도로 알려줘, `@capacitor/assets` 같은 도구로 한번에 재생성 가능
 

@@ -1,21 +1,25 @@
 version: '3.8'
+# 비밀상회 웹(secret-store.chagoklabs.com).
+#   클라우드 서버에서 정적 파일만 서빙한다. TLS·/api 분기는 클라우드 호스트 nginx 가 맡는다(conf.d/stock-api.conf).
+#
+# 클라우드 aibees 네트워크(172.23.0.0/16) 고정 IP 배정 현황(중복 금지):
+#   172.23.0.2  yangbong-vue-app  127.0.0.1:5555  (yangbong-store-vue)
+#   172.23.0.3  secret-vue-app    127.0.0.1:5556  (secret-store-vue)
+# 네트워크가 없으면 먼저: docker network create --subnet 172.23.0.0/16 aibees
 services:
-    stock-vue-app:
-        container_name: stock-vue-app
+    secret-vue-app:
+        container_name: secret-vue-app
         build:
             context: .
             dockerfile: Dockerfile
             args:
                 VITE_ENV: prd
+        # 호스트 nginx 만 접근하도록 루프백에만 공개
         ports:
-        - "5556:5556"
-        # volumes:
-        #   - type: bind
-        #     source: /app/gallery
-        #     target: /usr/share/nginx/html
+            - "127.0.0.1:5556:5556"
         networks:
             aibees:
-                ipv4_address: 172.21.1.6
+                ipv4_address: 172.23.0.3
         restart: unless-stopped
 
 networks:
