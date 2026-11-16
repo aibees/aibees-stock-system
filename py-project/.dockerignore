@@ -23,3 +23,11 @@
 # 대용량/런타임 불필요 산출물
 **/*.png
 **/docs_cache
+
+# 시크릿 env 파일 — 이미지에 굽지 않는다. 컨테이너에는 docker-compose 의 env_file 로 넣는다.
+**/.env
+**/.env.mcp
+**/.env.yangbong
+
+# 연구팀 백테스트 스크립트(py-stock-batch/app/test/bt_*) — 실 운영과 무관, 이미지에 넣지 않는다.
+**/app/test/bt_*
