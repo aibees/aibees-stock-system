@@ -20,7 +20,7 @@
             <!-- 잠긴 단계(주소로 바로 들어온 경우) -->
             <template v-else-if="!store.isOpen(stage.key)">
                 <p class="tl-msg">앞 단계를 먼저 마쳐 주세요. 앞 단계를 마치면 이 단계가 열립니다.</p>
-                <button v-if="next" type="button" class="tl-cta" @click="go(next)">{{ next.no }}. {{ next.title }} 하러 가기</button>
+                <button v-if="next" type="button" class="tl-cta" @click="go(next)">{{ next.no }}. {{ next.short || next.title }} 하러 가기</button>
                 <button type="button" class="tl-cta ghost" @click="goChapter">목차로 돌아가기</button>
             </template>
 
@@ -79,7 +79,7 @@
                 </template>
                 <template v-else>
                     <p class="tl-done">✓ 마친 단계입니다.</p>
-                    <button v-if="following && following.lesson" type="button" class="tl-cta" @click="go(following)">다음 단계: {{ following.title }}</button>
+                    <button v-if="following && following.lesson" type="button" class="tl-cta" @click="go(following)">다음 단계: {{ following.short || following.title }}</button>
                     <button type="button" class="tl-cta ghost" @click="goChapter">목차로</button>
                 </template>
             </div>
@@ -142,14 +142,14 @@ const finish = () => {
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 6px 16px 8px 4px;
+    padding: 6px $pad-x 8px 4px;
     background: $bar;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid $line-soft;
     position: sticky;
     top: env(safe-area-inset-top, 0px);
     z-index: 10;
 
-    h1 { margin: 0; font-size: 1.02rem; line-height: 1.35; font-weight: 800; color: $brown-ink; word-break: keep-all; }
+    h1 { margin: 0; font-size: 17px; line-height: 1.35; font-weight: 700; letter-spacing: -0.4px; color: $ink; word-break: keep-all; }
 }
 .tl-head-text { min-width: 0; padding-top: 2px; }
 .tl-crumb { margin: 0 0 1px; font-size: .74rem; color: $sub-2; font-variant-numeric: tabular-nums; }
@@ -159,7 +159,7 @@ const finish = () => {
     display: inline-flex; align-items: center; justify-content: center;
     background: none; border: 0; color: $brown-ink; cursor: pointer;
 }
-.tl-main { max-width: 640px; margin: 0 auto; padding: 18px 16px 24px; }
+.tl-main { max-width: 640px; margin: 0 auto; padding: 20px $pad-x 24px; }
 .tl-msg, .tl-lead { margin: 0 0 18px; font-size: .95rem; line-height: 1.6; color: $sub; word-break: keep-all; }
 
 /* ── 본문 ── */
@@ -168,7 +168,7 @@ const finish = () => {
 .tl-h { margin: 26px 0 10px; font-size: 1.05rem; font-weight: 800; color: $brown-ink; }
 .tl-note {
     margin: 0 0 14px; padding: 10px 12px;
-    border-left: 3px solid $yellow; background: $bg;
+    border-radius: 10px; background: $honey-50;
     font-size: .9rem; line-height: 1.65; color: $sub;
 }
 .tl-terms {
@@ -188,7 +188,7 @@ const finish = () => {
 .tq-list { list-style: none; margin: 0; padding: 0; }
 .tq + .tq { margin-top: 26px; }
 .tq-q { margin: 0 0 10px; font-size: 1rem; line-height: 1.55; font-weight: 700; word-break: keep-all; }
-.tq-no { color: $accent; font-variant-numeric: tabular-nums; }
+.tq-no { color: $amber-700; font-variant-numeric: tabular-nums; }
 .tq-options { list-style: none; margin: 0; padding: 0; border-top: 1px solid $line; }
 .tq-option {
     width: 100%;
@@ -205,7 +205,7 @@ const finish = () => {
     &.wrong { color: $sub-2; .tq-label { text-decoration: line-through; } }
 }
 .tq-label { font-size: .98rem; line-height: 1.45; word-break: keep-all; }
-.tq-mark { flex: none; width: 20px; text-align: center; font-weight: 700; color: $accent; }
+.tq-mark { flex: none; width: 20px; text-align: center; font-weight: 700; color: $amber-700; }
 .tq-option.wrong .tq-mark { color: $sub-2; }
 .tq-explain {
     margin: 10px 0 0; font-size: .88rem; line-height: 1.6; color: $sub; word-break: keep-all;
@@ -215,15 +215,15 @@ const finish = () => {
 /* ── 하단 ── */
 .tl-foot { margin-top: 28px; display: flex; flex-direction: column; gap: 10px; }
 .tl-count { margin: 0; font-size: .84rem; color: $sub-2; text-align: center; font-variant-numeric: tabular-nums; }
-.tl-done { margin: 0; font-size: .92rem; font-weight: 700; color: $accent; text-align: center; }
+.tl-done { margin: 0; font-size: .92rem; font-weight: 700; color: $amber-700; text-align: center; }
 .tl-cta {
     width: 100%;
     min-height: 52px;
     padding: 0 16px;
     border: 0;
-    border-radius: 14px;
-    background: $yellow;
-    color: #3A200F;
+    border-radius: $radius;
+    background: $honey-300;
+    color: $honey-ink;
     font: inherit;
     font-size: 1rem;
     font-weight: 700;
@@ -232,7 +232,12 @@ const finish = () => {
     transition: transform .1s ease;
     &:active:not(:disabled) { transform: scale(.98); }
     &:disabled { background: $line-soft; color: $sub-2; cursor: default; }
-    &.ghost { background: $card; border: 1px solid $line-2; color: $brown-ink; }
+    &.ghost { background: $band; border: 0; color: $ink; }
 }
 .tl-msg + .tl-cta, .tl-cta + .tl-cta { margin-top: 10px; }
+
+/* 2026-11-17 꿀빛 톤: 맞힌 보기·문항 번호 앰버, 다음 버튼 꿀색 */
+.tl-crumb { color: $amber-700; }
+.tq-option.right { color: $amber-700; }
+.tq-explain.right { color: $honey-ink; }
 </style>

@@ -312,7 +312,8 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
 .lg-logo { width: 64px; height: 64px; }
 .lg-name {
     margin: 0;
-    font-family: 'Do Hyeon', 'Pretendard', sans-serif;
+    font-family: 'Pretendard', sans-serif;
+    font-weight: 700;
     font-size: 34px;
     font-weight: 400;
     color: $brown-ink;

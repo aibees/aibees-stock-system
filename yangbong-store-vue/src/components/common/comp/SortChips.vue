@@ -39,10 +39,11 @@ onMounted(() => scrollToActive(false));
 </script>
 
 <style scoped lang="scss">
+// 2026-11-17 화이트 톤 개편: 선택된 칩만 연회색 알약, 나머지는 바탕 없는 회색 글자(2단계 필터)
 .sort-chips {
     display: flex;
-    gap: 8px;
-    // 본문 좌우 여백(16px)까지 끝까지 넘겨 보이게
+    gap: 4px;
+    // 본문 좌우 여백까지 끝까지 넘겨 보이게
     margin: 0 -16px 14px;
     padding: 2px 16px;
     overflow-x: auto;
@@ -54,20 +55,20 @@ onMounted(() => scrollToActive(false));
 
 .chip {
     flex-shrink: 0;
-    min-height: 40px;
-    padding: 0 16px;
+    min-height: 36px;
+    padding: 0 12px;
     border: 0;
     border-radius: 999px;
-    background: #F6F1E4;
-    color: #6B5B4E;
-    font-size: 15px;
-    font-weight: 600;
+    background: transparent;
+    color: #8B95A1;
+    font-size: 14px;
+    font-weight: 500;
     font-family: inherit;
     white-space: nowrap;
     cursor: pointer;
     transition: background .15s, color .15s;
 
-    &.on { background: #74462A; color: #FFF8E1; }
-    &:focus-visible { outline: 2px solid #7A4423; outline-offset: 2px; }
+    &.on { background: #F2F4F6; color: #191F28; font-weight: 600; }
+    &:focus-visible { outline: 2px solid #191F28; outline-offset: 2px; }
 }
 </style>

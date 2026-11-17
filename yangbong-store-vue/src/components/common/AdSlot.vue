@@ -179,7 +179,7 @@ onBeforeUnmount(() => {
     position: relative;
     overflow: hidden;
     background: #fff;
-    border: 1px dashed #F9E076;   /* 브랜드 허니색. 실제 광고가 들어가면 광고가 면을 덮는다 */
+    border: 1px dashed #E5E8EB;   /* 연회색(화이트 톤). 실제 광고가 들어가면 광고가 면을 덮는다 */
     border-radius: 6px;
     box-sizing: border-box;
 
@@ -195,10 +195,10 @@ onBeforeUnmount(() => {
     align-items: center;
     justify-content: center;
     gap: 4px;
-    color: #895129;
-    opacity: .6;
+    color: #B0B8C1;
+    opacity: 1;
     font-size: 12px;
-    &.row { flex-direction: row; gap: 8px; border: 1px dashed #F9E076; box-sizing: border-box; }
+    &.row { flex-direction: row; gap: 8px; border: 1px dashed #E5E8EB; box-sizing: border-box; }
     .tag { font-weight: 700; letter-spacing: 1px; }
     .hint { font-size: 11px; }
 }

@@ -36,7 +36,7 @@
     <nav id="comm-lnb" aria-label="주요 메뉴">
         <a v-for="t in visibleTabs" :key="t.key" class="tab" :class="{ active: isTabActive(t) }"
             :href="t.path" :aria-current="isTabActive(t) ? 'page' : undefined" @click.prevent="goPath(t.path)">
-            <svg v-if="t.key === 'home'" width="24" height="24" viewBox="0 0 24 24" :fill="isTabActive(t) ? '#F6C445' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>
+            <svg v-if="t.key === 'home'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>
             <!-- 트레이닝: 펼친 책 -->
             <svg v-else-if="t.key === 'training'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5C10.3 5.3 7.9 4.7 4 4.7V18c3.9 0 6.3.6 8 1.8 1.7-1.2 4.1-1.8 8-1.8V4.7c-3.9 0-6.3.6-8 1.8z"></path><path d="M12 6.5v13.3"></path></svg>
             <!-- 분석: 돋보기 안에 작은 막대그래프(차트 탭의 꺾은선과 구분) -->
@@ -147,8 +147,9 @@ onMounted(() => {
     position: sticky;
     top: 0;
     z-index: 900;
-    background: $yb-brown;
-    border-bottom: 3px solid $yb-yellow;
+    background: $dc-white;
+    border-bottom: 1px solid #E5E8EB;
+    font-family: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', sans-serif;
 
     @include mobile {
         display: block;
@@ -169,8 +170,8 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 8px;
-    color: $yb-cream;
-    font-weight: 800;
+    color: #191F28;
+    font-weight: 700;
     font-size: 1rem;
     letter-spacing: .02em;
     white-space: nowrap;
@@ -209,7 +210,7 @@ onMounted(() => {
         gap: 6px;
         height: 100%;
         padding: 0 14px;
-        color: rgba($yb-cream, .78);
+        color: #8B95A1;
         font-size: 0.86rem;
         font-weight: 600;
         white-space: nowrap;
@@ -219,8 +220,8 @@ onMounted(() => {
 
     &:hover .lnb-item-label,
     &.active .lnb-item-label {
-        color: $yb-cream;
-        border-bottom-color: $yb-yellow;
+        color: #191F28;
+        border-bottom-color: #191F28;
     }
 
     .caret {
@@ -262,12 +263,12 @@ onMounted(() => {
         transition: background .12s, color .12s;
 
         &:hover {
-            background: $yb-cream;
+            background: #F2F4F6;
         }
 
         &.active {
-            background: $yb-yellow;
-            color: $yb-ink;
+            background: #F2F4F6;
+            color: #191F28;
             font-weight: 700;
         }
     }
@@ -310,14 +311,15 @@ onMounted(() => {
      * 아이콘/라벨은 항상 --lnb-height 안에 있게 한다(App.vue 의 --lnb-total 과 같은 출처). */
     height: var(--lnb-total);
     box-sizing: border-box;
-    background-color: #FFF6D2;
-    border-top: 1px solid #EFE2BC;
+    background-color: #FFFFFF;
+    border-top: 1px solid #ECEBE6;
     padding: 6px 4px env(safe-area-inset-bottom, 0px);
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
     align-items: start;
     z-index: 1000;
+    font-family: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', sans-serif;
 
     @include mobile {
         display: none;
@@ -328,16 +330,19 @@ onMounted(() => {
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 3px;
+        gap: 4px;
         min-height: 48px;
-        color: #7A6B5D;          // 비활성도 대비 4.5:1 이상 유지
+        color: #8B95A1;          // 비활성: 회색(흰 바탕 대비 3:1 이상, 아이콘+라벨 함께)
         font-size: 11px;
         text-decoration: none;
         -webkit-tap-highlight-color: transparent;
 
+        svg { width: 22px; height: 22px; }
+
         &.active {
-            color: #5C3118;
-            font-weight: 700;
+            color: #191F28;
+            font-weight: 600;
+            svg { fill: #F8C844; }   // 꿀빛 포인트: 지금 탭 아이콘만 꿀색으로 채운다(선은 진한 글자색)
         }
     }
 }

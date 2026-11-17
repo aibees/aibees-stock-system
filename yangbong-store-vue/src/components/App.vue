@@ -1,7 +1,7 @@
 <script setup>
 import Lnb from './common/Lnb.vue';
 import AdSideBanners from './common/AdSideBanners.vue';
-import AdBottomBanner from './common/AdBottomBanner.vue';
+// 하단 탭바 아래 고정 배너(AdBottomBanner)는 2026-11-17 기획 결정으로 뺐다 — 컴포넌트 파일은 다시 켤 때를 위해 남겨 둔다.
 import { isFocusPath } from '@scripts/authPaths.js';
 import { MOCK_ENABLED } from '@scripts/mock/mockApi.js';
 
@@ -16,7 +16,6 @@ const showLnb = computed(() => !isFocusPath(route.path));
   <div class="app-shell" :class="{ 'no-lnb': !showLnb }">
     <Lnb v-if="showLnb" />
     <AdSideBanners />
-    <AdBottomBanner />
     <router-view />
     <!-- 목업 모드(npm run dev:mock)에서만: 화면의 종목·시황·성과가 가짜 값임을 알린다 -->
     <p v-if="MOCK_ENABLED" class="mock-note">목업 데이터</p>
@@ -60,7 +59,7 @@ const showLnb = computed(() => !isFocusPath(route.path));
   bottom: calc(var(--lnb-total) + 4px);
   margin: 0;
   font-size: 11px;
-  color: #7A6B5D;
+  color: #B0B8C1;
   pointer-events: none;
   z-index: 1100;
 }
@@ -95,7 +94,7 @@ body::before {
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  background: #FFF6D2;
+  background: #FFFFFF;
   z-index: 2000;
   pointer-events: none;
 }
@@ -115,13 +114,13 @@ body {
 
 body {
   height: 100%;
-  background-color: #f7f7f7;
+  background-color: #FFFFFF;
   margin: 0;
 
 }
 #app {
   height: 100%;
-  font-family: "맑은 고딕", "Malgun Gothics", sans-serif;
+  font-family: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
@@ -135,6 +134,10 @@ body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
+
+/* 입력 요소(select·input·textarea·button)는 브라우저 기본 글꼴(Arial 등)을 따로 쓰므로
+ * 앱 글꼴(Pretendard)을 물려받게 한다 — 2026-11-17 글꼴 통일 */
+#app button, #app input, #app select, #app textarea, #app optgroup { font-family: inherit; }
 
 /* ── iOS 입력 포커스 시 자동 확대 방지 ─────────────────────────────────────
  * iOS Safari/WKWebView 는 폰트가 16px 미만인 입력요소에 포커스가 가면 화면을

@@ -155,22 +155,18 @@ const NOTE = {};
 </script>
 
 <style scoped lang="scss">
-/* 양봉상회 전체 메뉴 v2 (목업 기준 토큰) */
-$bg:     #FFFBEA;
-$bar:    #FFF6D2;
-$line:   #EFE2BC;
-$line-2: #EAD9A6;
-$ink:    #2B1D14;
-$sub:    #7A6B5D;
-$brown:  #7A4423;
-$yellow: #F6C445;
+@use '@@/_home-tokens.scss' as *;
 
+/* 양봉상회 전체 메뉴 — 2026-11-17 화이트 톤 개편.
+ * 그룹 = 흰 판, 그룹 사이 = 연회색 띠. 항목 사이 선 없이 높이로 나눈다(메뉴 행: 아이콘 · 이름 · ›). */
 #menu-page {
     min-height: 100vh;
-    background: $bg;
+    background: $band;
     color: $ink;
     text-align: left;
-    font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
+    font-family: $font-body;
+    letter-spacing: -0.2px;
+    -webkit-font-smoothing: antialiased;
 }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -180,9 +176,8 @@ $yellow: #F6C445;
     position: sticky;
     top: env(safe-area-inset-top, 0px);   // 상태바 영역은 App.vue 의 고정 덮개가 가린다
     z-index: 50;
-    background: $bar;
-    border-bottom: 1px solid $line;
-    padding: 12px 16px;
+    background: $card;
+    padding: 12px $pad-x 16px;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -190,13 +185,13 @@ $yellow: #F6C445;
     @media (min-width: 640px) { position: static; }
 }
 
-.account-row { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+.account-row { display: flex; align-items: center; gap: 12px; min-height: 56px; }
 .avatar {
     width: 44px;
     height: 44px;
     border-radius: 22px;
-    background: $yellow;
-    color: #3A200F;
+    background: $honey-100;
+    color: $amber-700;
     font-weight: 700;
     font-size: 17px;
     display: flex;
@@ -204,14 +199,14 @@ $yellow: #F6C445;
     justify-content: center;
     flex-shrink: 0;
 }
-.who { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
-.who-name { font-size: 17px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.who { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.who-name { font-size: 18px; font-weight: 700; letter-spacing: -0.4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .who-link {
     border: 0;
     background: transparent;
     padding: 0;
-    min-height: 28px;
-    font-size: 12px;
+    min-height: 24px;
+    font-size: 13px;
     color: $sub;
     cursor: pointer;
     font-family: inherit;
@@ -221,9 +216,8 @@ $yellow: #F6C445;
     display: flex;
     align-items: center;
     gap: 8px;
-    background: #fff;
-    border: 1px solid $line-2;
-    border-radius: 14px;
+    background: $band;
+    border-radius: 12px;
     padding: 0 14px;
     min-height: 44px;
     color: $sub;
@@ -239,6 +233,7 @@ $yellow: #F6C445;
         color: $ink;
         -webkit-appearance: none;
         appearance: none;
+        &::placeholder { color: $sub; }
         &::-webkit-search-cancel-button { -webkit-appearance: none; }
     }
 }
@@ -247,60 +242,54 @@ $yellow: #F6C445;
 .menu-main {
     max-width: 640px;
     margin: 0 auto;
-    padding: 16px 16px 24px;
+    padding: $band-h 0 24px;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: $band-h;
 }
 
 .group {
+    background: $card;
+    padding: 20px 0 8px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
 
-    h2 { margin: 0 4px; font-size: 13px; font-weight: 600; color: $sub; }
+    h2 { margin: 0 $pad-x 4px; font-size: 14px; font-weight: 600; color: $sub; }
 }
 
-.card {
-    background: #fff;
-    border: 1px solid $line;
-    border-radius: 16px;
-    overflow: hidden;
-}
+.card { background: transparent; }
 
 .item {
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 12px;
-    min-height: 54px;
-    padding: 0 14px;
+    gap: 14px;
+    min-height: 56px;
+    padding: 0 $pad-x;
     border: 0;
-    border-bottom: 1px solid #F5EEDA;
-    background: #fff;
+    background: transparent;
     text-align: left;
     cursor: pointer;
     font-family: inherit;
     color: $ink;
     -webkit-tap-highlight-color: transparent;
 
-    &:last-child { border-bottom: 0; }
-    &:active { background: #FFFDF5; }
+    &:active { background: $honey-50; }
 
     .icon-box {
-        width: 32px;
-        height: 32px;
+        width: 36px;
+        height: 36px;
         border-radius: 10px;
-        background: #FFF4CC;
-        color: $brown;
+        background: $honey-50;
+        color: $amber-700;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
     }
-    .label { flex: 1; min-width: 0; font-size: 15px; }
-    .note { font-size: 12px; color: #A0662F; }
-    .chev { color: #B8A890; flex-shrink: 0; }
+    .label { flex: 1; min-width: 0; font-size: 16px; }
+    .note { font-size: 12px; color: $sub; }
+    .chev { color: $sub-2; flex-shrink: 0; }
 }
 
 .empty { margin: 24px 0; text-align: center; font-size: 14px; color: $sub; }
@@ -316,4 +305,7 @@ $yellow: #F6C445;
     cursor: pointer;
     font-family: inherit;
 }
+
+/* 2026-11-17 꿀빛 톤: 아바타·메뉴 아이콘 칸 꿀색 */
+.who-link { color: $amber-700; font-weight: 600; }
 </style>

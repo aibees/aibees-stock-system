@@ -5,12 +5,12 @@
       "name": "차트 보는 법 · 기초",
       "summary": "캔들과 거래량, 이동평균선처럼 차트를 처음 볼 때 필요한 것만 짚습니다.",
       "stages": [
-        { "id": "candle", "title": "캔들 한 개 읽는 법 (시가·고가·저가·종가)" },
-        { "id": "bull-bear", "title": "양봉과 음봉" },
-        { "id": "volume", "title": "거래량이 말해 주는 것" },
-        { "id": "ma", "title": "이동평균선이란" },
-        { "id": "sr", "title": "지지선과 저항선" },
-        { "id": "check", "title": "차트 기초 확인" }
+        { "id": "candle", "title": "캔들 한 개 읽는 법 (시가·고가·저가·종가)", "short": "캔들 읽는 법", "sub": "시가·고가·저가·종가" },
+        { "id": "bull-bear", "title": "양봉과 음봉", "short": "양봉과 음봉", "sub": "오른 날과 내린 날 구분하기" },
+        { "id": "volume", "title": "거래량이 말해 주는 것", "short": "거래량 읽기", "sub": "얼마나 많이 사고팔았는지 보기" },
+        { "id": "ma", "title": "이동평균선이란", "short": "이동평균선", "sub": "며칠 동안의 평균 가격 흐름" },
+        { "id": "sr", "title": "지지선과 저항선", "short": "지지선과 저항선", "sub": "가격이 자주 멈추는 자리" },
+        { "id": "check", "title": "차트 기초 확인", "short": "기초 확인", "sub": "문제로 한 번 더 짚기" }
       ]
     },
     {
@@ -18,12 +18,12 @@
       "name": "차트 보는 법 · 고급",
       "summary": "추세선, 보조지표, 돌파와 눌림처럼 신호를 조합해서 보는 법입니다.",
       "stages": [
-        { "id": "trendline", "title": "추세선과 채널 그리기" },
-        { "id": "price-volume", "title": "가격과 거래량을 함께 보기" },
-        { "id": "bb", "title": "볼린저밴드" },
-        { "id": "macd-obv", "title": "MACD와 OBV" },
-        { "id": "pullback", "title": "돌파와 되돌림(눌림)" },
-        { "id": "check", "title": "차트 고급 확인" }
+        { "id": "trendline", "title": "추세선과 채널 그리기", "short": "추세선 그리기", "sub": "가격 흐름을 선으로 잇기" },
+        { "id": "price-volume", "title": "가격과 거래량을 함께 보기", "short": "가격과 거래량", "sub": "둘을 함께 보면 보이는 것" },
+        { "id": "bb", "title": "볼린저밴드", "short": "볼린저밴드", "sub": "가격이 움직이는 폭" },
+        { "id": "macd-obv", "title": "MACD와 OBV", "short": "MACD와 OBV", "sub": "흐름이 바뀌는 신호" },
+        { "id": "pullback", "title": "돌파와 되돌림(눌림)", "short": "돌파와 눌림", "sub": "넘어선 뒤 잠깐 쉬어 갈 때" },
+        { "id": "check", "title": "차트 고급 확인", "short": "고급 확인", "sub": "문제로 한 번 더 짚기" }
       ]
     },
     {
@@ -31,12 +31,12 @@
       "name": "차트 보는 법 · 심화",
       "summary": "파동과 여러 기간의 차트를 겹쳐 보고, 신호가 틀렸을 때를 대비하는 법입니다.",
       "stages": [
-        { "id": "wave", "title": "파동으로 보기 (1파 고점과 2파 돌파)" },
-        { "id": "box", "title": "박스권을 벗어날 때" },
-        { "id": "multi-tf", "title": "일봉·주봉·월봉 함께 보기" },
-        { "id": "wrong", "title": "신호가 틀렸을 때 정리하는 기준" },
-        { "id": "backtest", "title": "내 조건으로 과거 차트 점검하기" },
-        { "id": "check", "title": "차트 심화 확인" }
+        { "id": "wave", "title": "파동으로 보기 (1파 고점과 2파 돌파)", "short": "파동 읽기", "sub": "1파 고점과 2파 돌파" },
+        { "id": "box", "title": "박스권을 벗어날 때", "short": "박스권 돌파", "sub": "갇혀 있던 가격이 벗어날 때" },
+        { "id": "multi-tf", "title": "일봉·주봉·월봉 함께 보기", "short": "일·주·월봉 보기", "sub": "여러 기간을 겹쳐 보기" },
+        { "id": "wrong", "title": "신호가 틀렸을 때 정리하는 기준", "short": "틀렸을 때 대처", "sub": "손실을 줄이는 기준" },
+        { "id": "backtest", "title": "내 조건으로 과거 차트 점검하기", "short": "과거 차트 점검", "sub": "내 조건을 지난 차트에 대 보기" },
+        { "id": "check", "title": "차트 심화 확인", "short": "심화 확인", "sub": "문제로 한 번 더 짚기" }
       ]
     },
     {
@@ -44,12 +44,12 @@
       "name": "기업분석 보는 법",
       "summary": "회사가 어떻게 돈을 벌고 얼마나 튼튼한지, 숫자 몇 개로 훑어보는 법입니다.",
       "stages": [
-        { "id": "business", "title": "이 회사는 무엇으로 돈을 버나 (사업 구조)" },
-        { "id": "income", "title": "매출과 영업이익 읽기" },
-        { "id": "debt", "title": "빚은 얼마나 되나 (부채비율)" },
-        { "id": "valuation", "title": "싼가 비싼가 (PER·PBR)" },
-        { "id": "disclosure", "title": "공시와 뉴스 확인하기" },
-        { "id": "check", "title": "기업분석 확인" }
+        { "id": "business", "title": "이 회사는 무엇으로 돈을 버나 (사업 구조)", "short": "돈 버는 방법", "sub": "이 회사의 사업 구조" },
+        { "id": "income", "title": "매출과 영업이익 읽기", "short": "매출과 이익", "sub": "얼마 팔고 얼마 남겼나" },
+        { "id": "debt", "title": "빚은 얼마나 되나 (부채비율)", "short": "빚 살펴보기", "sub": "부채비율" },
+        { "id": "valuation", "title": "싼가 비싼가 (PER·PBR)", "short": "싼지 비싼지", "sub": "PER·PBR" },
+        { "id": "disclosure", "title": "공시와 뉴스 확인하기", "short": "공시와 뉴스", "sub": "회사 소식 확인하기" },
+        { "id": "check", "title": "기업분석 확인", "short": "기업분석 확인", "sub": "문제로 한 번 더 짚기" }
       ]
     }
   ],
