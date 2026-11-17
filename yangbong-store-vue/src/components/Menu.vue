@@ -190,8 +190,8 @@ const NOTE = {};
     width: 44px;
     height: 44px;
     border-radius: 22px;
-    background: $band;
-    color: $sub-ink;
+    background: $honey-100;
+    color: $amber-700;
     font-weight: 700;
     font-size: 17px;
     display: flex;
@@ -274,14 +274,14 @@ const NOTE = {};
     color: $ink;
     -webkit-tap-highlight-color: transparent;
 
-    &:active { background: $bg; }
+    &:active { background: $honey-50; }
 
     .icon-box {
         width: 36px;
         height: 36px;
         border-radius: 10px;
-        background: $band;
-        color: $sub-ink;
+        background: $honey-50;
+        color: $amber-700;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -305,4 +305,7 @@ const NOTE = {};
     cursor: pointer;
     font-family: inherit;
 }
+
+/* 2026-11-17 꿀빛 톤: 아바타·메뉴 아이콘 칸 꿀색 */
+.who-link { color: $amber-700; font-weight: 600; }
 </style>

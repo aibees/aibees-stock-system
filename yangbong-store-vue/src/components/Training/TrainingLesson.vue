@@ -168,7 +168,7 @@ const finish = () => {
 .tl-h { margin: 26px 0 10px; font-size: 1.05rem; font-weight: 800; color: $brown-ink; }
 .tl-note {
     margin: 0 0 14px; padding: 10px 12px;
-    border-radius: 10px; background: $bg;
+    border-radius: 10px; background: $honey-50;
     font-size: .9rem; line-height: 1.65; color: $sub;
 }
 .tl-terms {
@@ -188,7 +188,7 @@ const finish = () => {
 .tq-list { list-style: none; margin: 0; padding: 0; }
 .tq + .tq { margin-top: 26px; }
 .tq-q { margin: 0 0 10px; font-size: 1rem; line-height: 1.55; font-weight: 700; word-break: keep-all; }
-.tq-no { color: $accent; font-variant-numeric: tabular-nums; }
+.tq-no { color: $amber-700; font-variant-numeric: tabular-nums; }
 .tq-options { list-style: none; margin: 0; padding: 0; border-top: 1px solid $line; }
 .tq-option {
     width: 100%;
@@ -205,7 +205,7 @@ const finish = () => {
     &.wrong { color: $sub-2; .tq-label { text-decoration: line-through; } }
 }
 .tq-label { font-size: .98rem; line-height: 1.45; word-break: keep-all; }
-.tq-mark { flex: none; width: 20px; text-align: center; font-weight: 700; color: $accent; }
+.tq-mark { flex: none; width: 20px; text-align: center; font-weight: 700; color: $amber-700; }
 .tq-option.wrong .tq-mark { color: $sub-2; }
 .tq-explain {
     margin: 10px 0 0; font-size: .88rem; line-height: 1.6; color: $sub; word-break: keep-all;
@@ -215,15 +215,15 @@ const finish = () => {
 /* ── 하단 ── */
 .tl-foot { margin-top: 28px; display: flex; flex-direction: column; gap: 10px; }
 .tl-count { margin: 0; font-size: .84rem; color: $sub-2; text-align: center; font-variant-numeric: tabular-nums; }
-.tl-done { margin: 0; font-size: .92rem; font-weight: 700; color: $accent; text-align: center; }
+.tl-done { margin: 0; font-size: .92rem; font-weight: 700; color: $amber-700; text-align: center; }
 .tl-cta {
     width: 100%;
     min-height: 52px;
     padding: 0 16px;
     border: 0;
-    border-radius: 12px;
-    background: $yellow;
-    color: #FFFFFF;
+    border-radius: $radius;
+    background: $honey-300;
+    color: $honey-ink;
     font: inherit;
     font-size: 1rem;
     font-weight: 700;
@@ -235,4 +235,9 @@ const finish = () => {
     &.ghost { background: $band; border: 0; color: $ink; }
 }
 .tl-msg + .tl-cta, .tl-cta + .tl-cta { margin-top: 10px; }
+
+/* 2026-11-17 꿀빛 톤: 맞힌 보기·문항 번호 앰버, 다음 버튼 꿀색 */
+.tl-crumb { color: $amber-700; }
+.tq-option.right { color: $amber-700; }
+.tq-explain.right { color: $honey-ink; }
 </style>

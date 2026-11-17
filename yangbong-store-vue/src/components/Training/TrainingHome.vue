@@ -183,12 +183,12 @@ button { font: inherit; letter-spacing: inherit; }
 /* ── 이어서 하기 ── */
 .tr-top { padding-top: 4px; }
 .tr-resume {
-    background: $bg;
+    background: $honey-strip;
     border-radius: 16px;
     padding: 18px 18px 16px;
     p { margin: 0; }
 }
-.tr-resume-cap { font-size: 13px; color: $sub; }
+.tr-resume-cap { font-size: 13px; font-weight: 600; color: $amber-700; }
 .tr-resume .tr-resume-title { margin-top: 6px; font-size: 19px; font-weight: 700; letter-spacing: -0.5px; }
 .tr-resume .tr-resume-sub { margin-top: 4px; font-size: 14px; color: $sub-ink; }
 .tr-resume-btn {
@@ -197,8 +197,8 @@ button { font: inherit; letter-spacing: inherit; }
     margin-top: 16px;
     border: 0;
     border-radius: 12px;
-    background: $ink;
-    color: #fff;
+    background: $honey-300;
+    color: $honey-ink;
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
@@ -209,9 +209,9 @@ button { font: inherit; letter-spacing: inherit; }
 .tr-prog { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
 .tr-bar {
     flex: 1; height: 6px; border-radius: 3px; background: $band; overflow: hidden;
-    span { display: block; height: 100%; min-width: 6px; border-radius: 3px; background: $ink; transition: width .3s ease; }
+    span { display: block; height: 100%; min-width: 6px; border-radius: 3px; background: $honey-dot; transition: width .3s ease; }
 }
-.tr-prog-count { flex: none; font-size: 13px; color: $sub; font-variant-numeric: tabular-nums; b { color: $ink; font-weight: 600; } }
+.tr-prog-count { flex: none; font-size: 13px; color: $sub; font-variant-numeric: tabular-nums; b { color: $amber-700; font-weight: 700; } }
 
 /* ── 장 ── */
 .tr-chapter.folded { padding-top: 8px; padding-bottom: 8px; }
@@ -245,6 +245,7 @@ button { font: inherit; letter-spacing: inherit; }
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     color: $ink;
+    &.now, &.all { color: $amber-700; }
     &.locked { color: $sub-2; font-weight: 500; }
 }
 .tr-chev { width: 16px; height: 16px; color: $sub-2; transition: transform .15s ease; }
@@ -295,12 +296,12 @@ button { font: inherit; letter-spacing: inherit; }
 .tr-state { flex: none; display: inline-flex; align-items: center; font-size: 13px; color: $sub; }
 
 .tr-row.done {
-    .tr-no { background: $ink; color: #fff; }
+    .tr-no { background: $honey-dot; color: $honey-ink; }
     .tr-state { color: $sub-ink; }
 }
 .tr-row.now {
-    .tr-no { background: $card; box-shadow: inset 0 0 0 1.5px $ink; color: $ink; }
-    .tr-state { color: $ink; font-weight: 600; }
+    .tr-no { background: $card; box-shadow: inset 0 0 0 1.5px $amber-700; color: $amber-700; }
+    .tr-state { color: $amber-700; font-weight: 600; }
 }
 .tr-row.locked {
     .tr-no { background: transparent; box-shadow: inset 0 0 0 1px $line; color: $sub-2; }
@@ -312,8 +313,12 @@ button { font: inherit; letter-spacing: inherit; }
 .tr-soon-title { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: $sub; }
 .tr-soon-list {
     list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px;
-    li { height: 30px; padding: 0 12px; border-radius: 15px; background: $bg; font-size: 13px; color: $sub; display: inline-flex; align-items: center; }
+    li { height: 30px; padding: 0 12px; border-radius: 8px; background: $honey-50; font-size: 13px; color: $sub; display: inline-flex; align-items: center; }
 }
 
 .tr-note { margin: 0; padding: 12px $pad-x 8px; font-size: 12px; line-height: 1.6; color: $sub-2; }
+
+/* 2026-11-17 꿀빛 톤: 이어서 하기 카드 = 꿀빛 그라데이션, 진행 막대·마친 단계 = 꿀색, 지금 차례 = 앰버 */
+.tr-resume { border-radius: $radius; }
+.tr-resume-btn { border-radius: $radius; }
 </style>
