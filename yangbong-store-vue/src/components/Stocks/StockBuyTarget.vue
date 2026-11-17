@@ -84,41 +84,30 @@
                             :aria-expanded="expandedCode === r.item.stock_code ? 'true' : 'false'"
                             @click="toggleRow(r.item.stock_code)">
                             <span class="rank">{{ rankNumber(idx) }}</span>
-                            <span class="who">
-                                <span class="name-line">
-                                    <span class="name">{{ r.item.stock_name }}</span>
-                                    <span v-if="r.item.sector_name" class="sector">{{ r.item.sector_name }}</span>
-                                </span>
-                                <span class="code">{{ r.item.stock_code }}<template v-if="r.capShort"> · 시총 {{ r.capShort }}</template></span>
-                            </span>
-                            <span class="px">
-                                <span class="price">{{ formatNumber(r.item.close) }}</span>
-                                <span class="badge" :class="r.chg.cls">{{ r.chgPct }}</span>
-                            </span>
+                            <span class="name">{{ r.item.stock_name }}</span>
+                            <span class="price">{{ formatNumber(r.item.close) }}</span>
+                            <span class="badge" :class="r.chg.cls">{{ r.chgPct }}</span>
 
-                            <span v-if="expandedCode !== r.item.stock_code && r.reasons.top" class="why">
-                                <span class="why-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg></span>
-                                <span class="why-tx">{{ r.reasons.top.text }}</span>
-                                <span v-if="r.reasons.rest" class="why-more">+{{ r.reasons.rest }}</span>
-                            </span>
-                            <span class="r2">
-                                <span class="match" :aria-label="`내 조건 ${r.passText} 충족`">
-                                    내 조건
-                                    <span v-if="r.passTotal" class="dots" aria-hidden="true">
-                                        <i v-for="n in r.passTotal" :key="n" :class="{ f: n <= r.passCount }"></i>
-                                    </span>
-                                    <b>{{ r.passText }}</b>
-                                </span>
-                                <span class="more-hint" aria-hidden="true">
-                                    {{ expandedCode === r.item.stock_code ? '접기' : '' }}
-                                    <svg class="more-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+                            <!-- 추천 이유 한 줄 + 나머지 개수 + 내 조건 점(펼치면 '내 조건 N개 중 M개 충족'으로 풀어 쓴다) -->
+                            <span v-if="expandedCode !== r.item.stock_code && (r.reasons.top || r.passTotal)" class="why">
+                                <template v-if="r.reasons.top">
+                                    <span class="why-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg></span>
+                                    <span class="why-tx">{{ r.reasons.top.text }}<em v-if="r.reasons.rest">+{{ r.reasons.rest }}</em></span>
+                                </template>
+                                <span v-else class="why-tx muted">충족한 지표가 없어요</span>
+                                <span v-if="r.passTotal" class="dots" :title="`내 조건 ${r.passTotal}개 중 ${r.passCount}개 충족`"
+                                    :aria-label="`내 조건 ${r.passTotal}개 중 ${r.passCount}개 충족`">
+                                    <i v-for="n in r.passTotal" :key="n" :class="{ f: n <= r.passCount }"></i>
                                 </span>
                             </span>
                         </button>
 
                         <!-- 펼침: 이유(말) → 아직 아닌 것 → 숫자 → 버튼 -->
                         <div v-if="expandedCode === r.item.stock_code" class="reco-detail">
+                            <p class="rd-meta">
+                                {{ r.item.stock_code }}<template v-if="r.capShort"> · 시총 {{ r.capShort }}</template><template v-if="r.item.sector_name"> · {{ r.item.sector_name }}</template>
+                                <span v-if="r.passTotal" class="rd-match">내 조건 {{ r.passTotal }}개 중 <b>{{ r.passCount }}개</b> 충족</span>
+                            </p>
                             <template v-if="r.reasons.passed.length">
                                 <h4 class="rd-h">추천 이유 {{ r.reasons.passed.length }}가지</h4>
                                 <ul class="rs">
@@ -818,5 +807,46 @@ button { font: inherit; letter-spacing: inherit; }
 @keyframes pulse {
     0%, 100% { opacity: .5; }
     50%       { opacity: .9; }
+}
+
+/* ── 2026-11-17 v3 '숨 쉬는 버전': 종목 하나 = 2층(한 줄 + 이유 띠). 코드·시총·내 조건 글자는 펼쳤을 때만 ── */
+.band { margin-top: 0; }
+.top-bar { padding-bottom: 16px; }
+.list-head { padding-top: 32px; }
+.filters { padding-top: 14px; padding-bottom: 8px; }
+.reco-row {
+    grid-template-columns: 28px minmax(0, 1fr) auto auto;
+    column-gap: 0;
+    align-items: center;
+    padding: 20px 0;
+    .name {
+        display: block;
+        min-width: 0;
+        padding-right: 12px;
+        font-size: 16px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        -webkit-line-clamp: unset;
+    }
+    .price { font-size: 16px; font-weight: 600; margin-right: 12px; }
+    .badge { min-width: 62px; justify-content: center; height: 24px; }
+    .why { margin-top: 12px; }
+    .why-tx em { font-style: normal; margin-left: 4px; font-weight: 600; color: $amber-700; }
+    .why-tx.muted { color: $sub; }
+}
+.why .dots { display: inline-flex; gap: 3px; flex: none; }
+.why .dots i { width: 6px; height: 6px; border-radius: 3px; background: #E8E2D0; }
+.why .dots i.f { background: $amber-700; }
+.reco-detail { margin-left: 28px; }
+.rd-meta {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: $sub;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 12px;
+    .rd-match { color: $sub-ink; b { color: $amber-700; font-weight: 600; } }
 }
 </style>

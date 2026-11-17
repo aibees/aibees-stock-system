@@ -62,37 +62,25 @@
                         <b class="wx-desc">{{ weather.desc }}</b>
                     </span>
                 </div>
-                <!-- 코스피·코스닥·원/달러: 카드 없이 같은 모양의 리스트 3줄(2026-11-17 심플 버전으로 되돌림) -->
-                <ul class="rows">
-                    <li v-for="m in indexCards" :key="m.key" class="row">
-                        <span class="r-main">
-                            <b class="r-name">{{ m.label }}</b>
-                            <small class="r-sub">
-                                <template v-for="(p, i) in m.periods" :key="p.label">{{ i ? ' · ' : '' }}{{ p.label }} <i :class="p.cls">{{ p.text }}</i></template>
-                            </small>
-                        </span>
-                        <svg v-if="m.sparkPoints" class="r-spark" :class="m.sparkCls" viewBox="0 0 64 24" preserveAspectRatio="none" aria-hidden="true">
+                <!-- 코스피·코스닥·원/달러: 한 줄씩(이름 · 미니 차트 · 지수 · 오늘 등락). 2026-11-17 v3 '숨 쉬는 버전' -->
+                <ul class="rows idx-rows">
+                    <li v-for="m in indexCards" :key="m.key" class="row idx-row">
+                        <span class="idx-name">{{ m.label }}</span>
+                        <svg v-if="m.sparkPoints" class="idx-spark" :class="m.sparkCls" viewBox="0 0 64 24" preserveAspectRatio="none" aria-hidden="true">
                             <polyline :points="m.sparkPoints" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
                         </svg>
-                        <span class="r-val">
-                            <b>{{ m.priceText }}</b>
-                            <small :class="m.todayCls">{{ m.todayText }}</small>
-                        </span>
+                        <b class="idx-price">{{ m.priceText }}</b>
+                        <span class="idx-chg" :class="m.todayCls">{{ m.todayText }}</span>
                     </li>
-                    <li v-if="fxItem" class="row">
-                        <span class="r-main">
-                            <b class="r-name">원/달러</b>
-                            <small class="r-sub">환율</small>
-                        </span>
-                        <span class="r-val">
-                            <b>{{ fxItem.priceText }}</b>
-                            <small :class="fxItem.cls">{{ fxItem.chgText }}</small>
-                        </span>
+                    <li v-if="fxItem" class="row idx-row">
+                        <span class="idx-name">원/달러</span>
+                        <b class="idx-price">{{ fxItem.priceText }}</b>
+                        <span class="idx-chg" :class="fxItem.cls">{{ fxItem.pctText }}</span>
                     </li>
                 </ul>
             </section>
 
-            <!-- ── 2. AI 분석 종목 TOP 3: 순위 리스트. 줄을 누르면 AI 분석, 아래 작은 글자 링크로 차트 ── -->
+            <!-- ── 2. AI 분석 종목 TOP 3: 한 줄씩(순위 · 이름 · 가격 · 등락 배지). 줄을 누르면 AI 분석 ── -->
             <section class="sec watch" aria-labelledby="watch-title">
                 <div class="sec-head">
                     <h2 id="watch-title">AI 분석 종목 TOP 3</h2>
@@ -107,31 +95,33 @@
                     <button v-if="items.length" type="button" class="text-link" @click="router.push('/stock/preset')">설정 조정하기</button>
                 </div>
                 <ol v-else class="rows">
-                    <li v-for="(w, i) in visibleRows" :key="w.code" class="row rank-row">
-                        <span class="r-rank">{{ i + 1 }}</span>
-                        <span class="r-main">
-                            <component :is="canOpen(AI_PATH) ? 'button' : 'b'" :type="canOpen(AI_PATH) ? 'button' : undefined"
-                                class="r-name" :class="{ link: canOpen(AI_PATH) }" @click="canOpen(AI_PATH) && goToStock(w.item)">{{ w.name }}</component>
-                            <small class="r-sub r-links">
-                                <button v-if="canOpen(AI_PATH)" type="button" @click="goToStock(w.item)">AI 분석</button>
-                                <button v-if="canOpen(CHART_PATH)" type="button" @click="goToChart(w.item)">차트</button>
-                            </small>
-                        </span>
-                        <span class="r-val">
-                            <b>{{ formatNumber(w.item.close) }}</b>
+                    <li v-for="(w, i) in visibleRows" :key="w.code">
+                        <component :is="canOpen(AI_PATH) ? 'button' : 'div'" :type="canOpen(AI_PATH) ? 'button' : undefined"
+                            class="row line-row" :class="{ link: canOpen(AI_PATH) }" :aria-label="canOpen(AI_PATH) ? `${w.name} AI 분석 보기` : undefined"
+                            @click="canOpen(AI_PATH) && goToStock(w.item)">
+                            <span class="r-rank">{{ i + 1 }}</span>
+                            <span class="line-name">{{ w.name }}</span>
+                            <b class="line-price">{{ formatNumber(w.item.close) }}</b>
                             <span class="badge" :class="w.chg.cls">{{ w.pctText }}</span>
-                        </span>
+                        </component>
                     </li>
                 </ol>
                 <button v-if="canOpen(BUY_TARGET_PATH)" type="button" class="more" @click="router.push(BUY_TARGET_PATH)">매수추천 전체 보기</button>
             </section>
 
-            <!-- ── 3. 지난달 성과: 큰 숫자 하나 + 상위 종목 리스트(현행 계산 유지) ── -->
+            <!-- ── 3. 지난달 성과: 큰 숫자 하나 + 1위 종목. 계산 기준 안내는 ⓘ 뒤로, 나머지 종목은 '전체 보기'로 펼친다 ── -->
             <section v-if="perf && perf.evaluated_count" class="sec perf" aria-labelledby="perf-title">
                 <div class="sec-head">
-                    <h2 id="perf-title">{{ perfMonthLabel }} 양봉상회 성과</h2>
+                    <h2 id="perf-title">
+                        {{ perfMonthLabel }} 양봉상회 성과
+                        <button type="button" class="info-btn" :aria-expanded="perfInfo ? 'true' : 'false'" aria-label="성과 계산 기준 보기"
+                            @click="perfInfo = !perfInfo">i</button>
+                    </h2>
                 </div>
-                <p class="sec-sub">표시일 이후 {{ perf.hold_days }}거래일 안 최고가 기준</p>
+                <p v-if="perfInfo" class="foot-note">
+                    표시일 종가 대비 이후 {{ perf.hold_days }}거래일 중 가장 높았던 가격 기준이며, 실제로 판 가격과 다를 수 있습니다.
+                    같은 종목은 그 달 처음 표시된 1건만 셉니다.
+                </p>
 
                 <div class="hero">
                     <span class="hero-label">상위 {{ perf.top_pct }}% 평균 · {{ perf.top_count }}종목</span>
@@ -139,25 +129,25 @@
                     <span class="hero-sub">전체 평균 <b :class="clsOf(perf.avg_return)">{{ pctText(perf.avg_return) }}</b> · {{ perf.evaluated_count }}종목</span>
                 </div>
 
-                <ol class="rows perf-rows">
-                    <li v-for="(p, i) in perfRows" :key="p.stock_code" class="row rank-row">
+                <component v-if="!perfAll && perf.top_list.length" :is="canOpenDetail ? 'button' : 'div'" :type="canOpenDetail ? 'button' : undefined"
+                    class="best" :class="{ link: canOpenDetail }" @click="canOpenDetail && goToPerfStock(perf.top_list[0])">
+                    <span class="best-tag">1위</span>
+                    <span class="line-name">{{ perf.top_list[0].stock_name }}</span>
+                    <span class="badge" :class="clsOf(perf.top_list[0].max_return)">{{ pctText(perf.top_list[0].max_return) }}</span>
+                </component>
+                <ol v-else-if="perfAll" class="rows">
+                    <li v-for="(p, i) in perf.top_list" :key="p.stock_code">
                         <component :is="canOpenDetail ? 'button' : 'div'" :type="canOpenDetail ? 'button' : undefined"
-                            class="row-hit" :class="{ link: canOpenDetail }" @click="canOpenDetail && goToPerfStock(p)">
+                            class="row line-row" :class="{ link: canOpenDetail }" @click="canOpenDetail && goToPerfStock(p)">
                             <span class="r-rank">{{ i + 1 }}</span>
-                            <span class="r-main">
-                                <b class="r-name">{{ p.stock_name }}</b>
-                                <small class="r-sub">{{ mdText(p.ymd) }} {{ formatNumber(p.entry_price) }} → {{ mdText(p.peak_ymd) }} {{ formatNumber(p.peak_price) }}</small>
-                            </span>
-                            <span class="r-val"><span class="badge" :class="clsOf(p.max_return)">{{ pctText(p.max_return) }}</span></span>
+                            <span class="line-name">{{ p.stock_name }}</span>
+                            <span class="line-sub">{{ mdText(p.ymd) }} → {{ mdText(p.peak_ymd) }}</span>
+                            <span class="badge" :class="clsOf(p.max_return)">{{ pctText(p.max_return) }}</span>
                         </component>
                     </li>
                 </ol>
-                <p class="foot-note">
-                    표시일 종가 대비 이후 {{ perf.hold_days }}거래일 중 가장 높았던 가격 기준이며, 실제로 판 가격과 다를 수 있습니다.
-                    같은 종목은 그 달 처음 표시된 1건만 셉니다.
-                </p>
-                <button v-if="perf.top_list.length > PERF_COUNT" type="button" class="more" :aria-expanded="perfAll ? 'true' : 'false'"
-                    @click="perfAll = !perfAll">{{ perfAll ? '접기' : '상위 종목 더 보기' }}</button>
+                <button v-if="perf.top_list.length > 1" type="button" class="more" :aria-expanded="perfAll ? 'true' : 'false'"
+                    @click="perfAll = !perfAll">{{ perfAll ? '접기' : '상위 종목 전체 보기' }}</button>
             </section>
 
             <!-- 광고 1자리: 성과와 공지 사이(AD_FREE·앱 네이티브 광고 환경에서는 비어 있다) -->
@@ -165,21 +155,18 @@
                 <AdSlot placement="homeHero" />
             </section>
 
-            <!-- ── 공지사항 ── -->
+            <!-- ── 공지사항: 최신 1줄만. 나머지는 '전체 보기' ── -->
             <section class="sec notice" aria-labelledby="notice-title">
                 <div class="sec-head">
                     <h2 id="notice-title">공지사항</h2>
+                    <button type="button" class="meta-link" @click="router.push(NOTICE_LIST_PATH)">전체 보기</button>
                 </div>
                 <p v-if="!notices.length" class="notice-empty">등록된 공지사항이 없습니다.</p>
-                <ul v-else class="notice-list">
-                    <li v-for="n in notices" :key="n.notice_id">
-                        <button type="button" class="notice-row" @click="goToNotice(n)">
-                            <span class="notice-title"><span class="notice-cat">{{ n.category }}</span>{{ n.title }}</span>
-                            <span class="notice-date">{{ noticeDateText(n.created_date) }}</span>
-                        </button>
-                    </li>
-                </ul>
-                <button type="button" class="more" @click="router.push(NOTICE_LIST_PATH)">더 보기</button>
+                <button v-else type="button" class="notice-line" @click="goToNotice(notices[0])">
+                    <span class="notice-cat">{{ notices[0].category }}</span>
+                    <span class="notice-title">{{ notices[0].title }}</span>
+                    <span class="notice-date">{{ noticeDateText(notices[0].created_date).slice(5) }}</span>
+                </button>
             </section>
 
             <!-- ── 고지: 연회색 바탕 맨 아래 ── -->
@@ -314,6 +301,7 @@ const fxItem = computed(() => {
     return {
         priceText: priceText(m.price),
         chgText: rate === null ? '' : `${chgPart}(${Math.abs(rate).toFixed(2)}%)`,
+        pctText: rate === null ? '' : `${signed(rate, 1)}%`,
         cls: clsOf(rate),
     };
 });
@@ -386,6 +374,7 @@ const perfMonthLabel = computed(() => (perf.value ? `${Number(perf.value.ym.slic
 // 성과 리스트: 상위 3종목만 먼저, 나머지는 '더 보기'로 펼친다.
 const PERF_COUNT = 3;
 const perfAll = ref(false);
+const perfInfo = ref(false);   // ⓘ: 성과 계산 기준 안내 펼침
 const perfRows = computed(() => {
     const list = perf.value?.top_list ?? [];
     return perfAll.value ? list : list.slice(0, PERF_COUNT);
@@ -808,4 +797,96 @@ button { font: inherit; letter-spacing: inherit; }
 }
 .notice { padding-bottom: 8px; }
 .simple-foot .notes { color: $sub; }
+
+/* ── 2026-11-17 v3 '숨 쉬는 버전': 줄마다 한 줄, 섹션 위 여백 32px, 회색 보조 줄 최소화 ── */
+.sec { padding-top: 32px; padding-bottom: 12px; }
+.market { padding-top: 16px; }
+.sec-head { align-items: center; margin-bottom: 12px; h2 { display: inline-flex; align-items: center; gap: 6px; } }
+.weather { margin-top: 0; margin-bottom: 8px; }
+.rows { margin-top: 0; }
+.more { margin-top: 12px; margin-bottom: -12px; }
+
+// 지수: 이름 · 미니 차트 · 지수 · 오늘 등락
+.idx-row { min-height: 56px; gap: 12px; }
+.idx-name { flex: 1; min-width: 0; font-size: 16px; color: $sub-ink; }
+.idx-spark { width: 48px; height: 20px; flex: none; }
+.idx-price { flex: none; min-width: 84px; text-align: right; font-size: 16px; font-weight: 600; }
+.idx-chg { flex: none; min-width: 52px; text-align: right; font-size: 14px; font-weight: 600; }
+
+// 한 줄 종목: 순위 · 이름 · 가격 · 배지
+.line-row {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 56px;
+    gap: 12px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    &.link { cursor: pointer; }
+    .r-rank { width: 16px; }
+}
+.line-name { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.line-price { flex: none; font-size: 16px; font-weight: 600; }
+.line-sub { flex: none; font-size: 13px; color: $sub; }
+.badge { height: 24px; min-width: 62px; justify-content: center; }
+
+// 성과
+.info-btn {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1.5px solid $sub-2;
+    border-radius: 9px;
+    background: transparent;
+    color: $sub-2;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    &[aria-expanded="true"] { border-color: $ink; color: $ink; }
+}
+.perf .foot-note { margin: -4px 0 12px; }
+.hero { margin: 0; padding: 0; background: transparent; border-radius: 0; .hero-big { font-size: 36px; margin-top: 4px; } }
+.best {
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 20px;
+    padding: 14px 16px;
+    border: 0;
+    border-radius: $radius;
+    background: $honey-50;
+    color: inherit;
+    text-align: left;
+    &.link { cursor: pointer; }
+    .best-tag { flex: none; font-size: 13px; font-weight: 700; color: $amber-700; }
+    .line-name { font-size: 15px; }
+}
+.perf .rows { margin-top: 12px; }
+
+// 공지: 최신 1줄
+.notice { padding-top: 24px; padding-bottom: 8px; .sec-head { margin-bottom: 4px; } }
+.notice-line {
+    width: 100%;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: $ink;
+    text-align: left;
+    cursor: pointer;
+    .notice-cat { flex: none; font-size: 15px; font-weight: 600; color: $amber-700; }
+    .notice-title { flex: 1; min-width: 0; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .notice-date { flex: none; font-size: 13px; color: $sub; }
+}
 </style>
