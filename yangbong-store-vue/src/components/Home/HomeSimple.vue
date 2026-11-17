@@ -54,12 +54,12 @@
                             <polyline :points="m.sparkPoints" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
                         </svg>
                         <b class="idx-price">{{ m.priceText }}</b>
-                        <span class="idx-chg" :class="m.todayCls">{{ m.todayText }}</span>
+                        <span class="badge" :class="m.todayCls">{{ m.todayText }}</span>
                     </li>
                     <li v-if="fxItem" class="row idx-row">
                         <span class="idx-name">원/달러</span>
                         <b class="idx-price">{{ fxItem.priceText }}</b>
-                        <span class="idx-chg" :class="fxItem.cls">{{ fxItem.pctText }}</span>
+                        <span class="badge" :class="fxItem.cls">{{ fxItem.pctText }}</span>
                     </li>
                 </ul>
             </section>
@@ -795,7 +795,7 @@ button { font: inherit; letter-spacing: inherit; }
 .idx-name { flex: 1; min-width: 0; font-size: 16px; color: $sub-ink; }
 .idx-spark { width: 48px; height: 20px; flex: none; }
 .idx-price { flex: none; min-width: 84px; text-align: right; font-size: 16px; font-weight: 600; }
-.idx-chg { flex: none; min-width: 52px; text-align: right; font-size: 14px; font-weight: 600; }
+// 오늘 등락은 TOP 3 와 같은 .badge(빨강·파랑 둥근 박스)로 통일
 
 // 한 줄 종목: 순위 · 이름 · 가격 · 배지
 .line-row {
