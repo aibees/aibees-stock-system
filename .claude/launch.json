@@ -32,6 +32,12 @@
       "port": 19011
     },
     {
+      "name": "yangbong-api",
+      "runtimeExecutable": "py-project/py-naver-stock-theme/.venv/Scripts/python",
+      "runtimeArgs": ["py-project/py-naver-stock-theme/run_yangbong_local.py"],
+      "port": 5556
+    },
+    {
       "name": "api",
       "runtimeExecutable": "sh",
       "runtimeArgs": ["-c", "cd /Users/user/Documents/workspace3/aibees-stock-system/py-project/py-naver-stock-theme && .venv/bin/python3 -m app.main"],
