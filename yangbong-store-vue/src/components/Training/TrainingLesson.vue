@@ -20,7 +20,7 @@
             <!-- 잠긴 단계(주소로 바로 들어온 경우) -->
             <template v-else-if="!store.isOpen(stage.key)">
                 <p class="tl-msg">앞 단계를 먼저 마쳐 주세요. 앞 단계를 마치면 이 단계가 열립니다.</p>
-                <button v-if="next" type="button" class="tl-cta" @click="go(next)">{{ next.no }}. {{ next.title }} 하러 가기</button>
+                <button v-if="next" type="button" class="tl-cta" @click="go(next)">{{ next.no }}. {{ next.short || next.title }} 하러 가기</button>
                 <button type="button" class="tl-cta ghost" @click="goChapter">목차로 돌아가기</button>
             </template>
 
@@ -79,7 +79,7 @@
                 </template>
                 <template v-else>
                     <p class="tl-done">✓ 마친 단계입니다.</p>
-                    <button v-if="following && following.lesson" type="button" class="tl-cta" @click="go(following)">다음 단계: {{ following.title }}</button>
+                    <button v-if="following && following.lesson" type="button" class="tl-cta" @click="go(following)">다음 단계: {{ following.short || following.title }}</button>
                     <button type="button" class="tl-cta ghost" @click="goChapter">목차로</button>
                 </template>
             </div>
