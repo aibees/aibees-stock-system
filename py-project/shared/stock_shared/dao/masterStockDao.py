@@ -122,6 +122,19 @@ class MasterStockDao(BaseDao):
         result = session.execute(stmt).scalars().all()
         return [obj.to_dict() for obj in result]
 
+    def select_inverse_etf_list(self, session) -> list:
+        """거래 중인 ETF(group_code='EF') 중 이름에 '인버스'가 들어간 것 전부(달러·채권 등 포함).
+        어떤 걸 쓸지는 호출하는 쪽이 고른다(StockBuyCheckJob.pick_inverse_etfs)."""
+        stmt = (
+            select(MasterStock)
+            .where(MasterStock.group_code == "EF",
+                   MasterStock.market_stop == "N",
+                   MasterStock.stock_name.like("%인버스%"))
+            .order_by(MasterStock.stock_code.asc())
+        )
+        result = session.execute(stmt).scalars().all()
+        return [obj.to_dict() for obj in result]
+
     # ------------------------------------------------------------------
     # insert / update
     # ------------------------------------------------------------------

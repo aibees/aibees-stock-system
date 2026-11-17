@@ -83,6 +83,31 @@ WAVE2_MIN_BREADTH_DEFAULT = 0.40
 # 2파 판정은 ZigZag 를 일봉 처음부터 진행시키므로 조회 봉수를 넉넉히(250봉 필터 + 여유). KIS 1회 100봉이라 300봉도 3회 호출.
 OHLCV_MIN_BARS = 300
 
+# ── 인버스 ETF 매수타겟 추가 (2026-11-17 사용자 결정) ─────────────────────────────
+#   주식 인버스 ETF(국내·해외 지수, 섹터, 단일종목)를 배치 대상에 더한다. 달러·채권·원자재 인버스는 뺀다(ETF 만, ETN 없음).
+#   다른 종목과 똑같이 판정하므로 2파 신호가 나면 종합순위(= 워커 실전 매수 후보)에도 들어간다(사용자 승인: "실전(워커)까지").
+#   단 실전 게이트 모집단(시장 폭·변동성 백분위)과 shape 학습셋에는 넣지 않는다 — 게이트 기준은 지금 모집단 그대로 유지.
+#   이름이 '…인버스'로 끝나고 '선물'이 없는 3종목(KODEX·TIGER·ACE 인버스)은 원래 배치 목록(masterStockDao.select_stock_list)에
+#   있던 종목이라 예전과 똑같이 다룬다(모집단 포함). 여기서 더하는 건 그 목록에 없던 인버스 ETF 뿐이다.
+#   공통코드 stock/setting/batch/INVERSE_ETF(Y/N, 기본 Y), INVERSE_ETF_EXCLUDE(이름에 들어가면 뺄 낱말, 쉼표 구분).
+INVERSE_ETF_DEFAULT = 'Y'
+INVERSE_ETF_EXCLUDE_DEFAULT = '달러,엔선물,유로,위안,국채,국고채,채권,금리,원유,WTI,골드,금선물,은선물,팔라듐,구리,천연가스,농산물'
+INVERSE_ADDED_KEY = '_inverse_etf_added'
+
+
+def pick_inverse_etfs(rows: list, exclude_keywords: list, existing_codes: set) -> list:
+    """인버스 ETF 후보 중 주식 인버스만, 원래 배치 목록에 없던 것만. 고른 행에는 INVERSE_ADDED_KEY=True 를 붙인다."""
+    out = []
+    for r in rows:
+        name = str(r.get('stock_name') or '')
+        code = r.get('stock_code')
+        if '인버스' not in name or not code or code in existing_codes:
+            continue
+        if any(k and k.upper() in name.upper() for k in exclude_keywords):
+            continue
+        out.append({**r, INVERSE_ADDED_KEY: True})
+    return out
+
 
 class StockBuyCheckJob(Job):
     # ── 장중 갱신 / 최종 배치 구분 (2026-10-17) ─────────────────────────
@@ -153,6 +178,9 @@ class StockBuyCheckJob(Job):
         today = date.today()
 
         stock_list = self.stockServiceImpl.get_stock_master_list(self.session, 'batches')
+        inverse_etfs = self._inverse_etf_targets(stock_list)
+        if inverse_etfs:
+            stock_list = stock_list + inverse_etfs
         stock_option_meta: UserOptionMeta = self.userServiceImpl.get_user_options(self.session)
 
         end_date = kwargs.get('end_date', today.strftime('%Y-%m-%d'))
@@ -343,6 +371,34 @@ class StockBuyCheckJob(Job):
         except Exception as e:
             print(f"[종합순위] BUY_RANK_MODE 조회 실패 → 기본 {BUY_RANK_MODE_DEFAULT}: {e}", flush=True)
             return BUY_RANK_MODE_DEFAULT
+
+    def _setting_str(self, code: str, default: str) -> str:
+        """공통코드 stock/setting/batch/<code> 문자열. 없거나 비었거나 읽기 실패면 기본값."""
+        try:
+            row = self.session.execute(text(
+                "SELECT `desc` FROM master_codes WHERE `system` = 'stock' AND source = 'setting' "
+                " AND category = 'batch' AND code = :c"), {'c': code}).first()
+            if row and row[0] is not None and str(row[0]).strip() != '':
+                return str(row[0]).strip()
+        except Exception as e:
+            print(f"[설정] {code} 조회 실패 → 기본 {default}: {e}", flush=True)
+        return default
+
+    def _inverse_etf_targets(self, stock_list: list) -> list:
+        """배치 대상에 더할 인버스 ETF(파일 상단 INVERSE_ETF 주석). 끄거나 조회 실패면 빈 목록 — 본 배치는 그대로 돈다."""
+        if self._setting_str('INVERSE_ETF', INVERSE_ETF_DEFAULT).upper() != 'Y':
+            print("[인버스 ETF] 공통코드 INVERSE_ETF=N → 추가 안 함", flush=True)
+            return []
+        exclude = [k.strip() for k in self._setting_str('INVERSE_ETF_EXCLUDE', INVERSE_ETF_EXCLUDE_DEFAULT).split(',')]
+        try:
+            rows = self.stockServiceImpl.get_inverse_etf_list(self.session)
+        except Exception as e:
+            print(f"[인버스 ETF] 목록 조회 실패 → 추가 안 함: {e}", flush=True)
+            return []
+        picked = pick_inverse_etfs(rows, exclude, {s.get('stock_code') for s in stock_list})
+        print(f"[인버스 ETF] {len(picked)}종목 추가(이름에 '인버스' {len(rows)}개 중, 원래 목록에 있던 것·제외 낱말 뺌): "
+              + ', '.join(f"{r['stock_name']}({r['stock_code']})" for r in picked), flush=True)
+        return picked
 
     def _setting_float(self, code: str, default: float) -> float:
         """공통코드 stock/setting/batch/<code> 숫자. 없거나 숫자가 아니거나 0~1 밖이면 기본값.
@@ -536,6 +592,8 @@ class StockBuyCheckJob(Job):
             stock = chunk[idx]
             stock_code = stock.get('stock_code')
             stock_name = stock.get('stock_name')
+            # 2026-11-17 추가 인버스 ETF — 판정·후보는 똑같이, 실전 게이트 모집단·학습셋에서만 뺀다(파일 상단 INVERSE_ETF 주석)
+            added_inverse = bool(stock.get(INVERSE_ADDED_KEY))
             print(f"[{tag}][{idx}] {stock_name}({stock_code})", flush=True)
 
             try:
@@ -599,7 +657,7 @@ class StockBuyCheckJob(Job):
                 #    "low > sma120" 필터 결과가 여기 보존된다)
                 is_eligible = self._composite_eligible(computed, stock)
 
-                if train_row is not None:
+                if train_row is not None and not added_inverse:
                     train_row['shape_proba_at_scan'] = shape_proba
                     train_row['composite_eligible'] = 'Y' if is_eligible else 'N'
                     train_row['action_type'] = result.get('action_type')
@@ -621,7 +679,9 @@ class StockBuyCheckJob(Job):
                 except Exception as e:
                     print(f"[{tag}] 실전 게이트 모집단 계산 실패 {stock_code}: {e}", flush=True)
                     ustat = None
-                if ustat is not None:
+                #   추가 인버스 ETF 는 모집단에 넣지 않는다(2026-11-17 사용자 승인 — 게이트 기준은 지금 모집단 그대로).
+                #   vol20 은 위에서 계산했으니 후보로서의 변동성 백분위 판정(gate_pool)은 다른 종목과 같다.
+                if ustat is not None and not added_inverse:
                     univ_rows.append({'stock_code': stock_code, **ustat})
                 if w2 is not None:
                     wave2_pool.append({

@@ -25,6 +25,10 @@ class StockService:
 
         return self.stockMasterDaoImpl.select_stock_list(session, param)
 
+    def get_inverse_etf_list(self, session) -> list:
+        """이름에 '인버스'가 들어간 거래 중 ETF 전부. 매수타겟 배치가 주식 인버스만 골라 쓴다."""
+        return self.stockMasterDaoImpl.select_inverse_etf_list(session)
+
     def clean_stock_master(self, session):
         self.stockMasterDaoImpl.clean_stock_list_all(session)
 
