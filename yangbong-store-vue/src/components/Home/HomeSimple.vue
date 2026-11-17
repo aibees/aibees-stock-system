@@ -79,7 +79,7 @@
                     <button v-if="items.length" type="button" class="text-link" @click="router.push('/stock/preset')">설정 조정하기</button>
                 </div>
                 <ol v-else class="rows">
-                    <li v-for="(w, i) in visibleRows" :key="w.code">
+                    <li v-for="(w, i) in visibleRows" :key="w.code" class="w-li">
                         <component :is="canOpen(AI_PATH) ? 'button' : 'div'" :type="canOpen(AI_PATH) ? 'button' : undefined"
                             class="row line-row" :class="{ link: canOpen(AI_PATH) }" :aria-label="canOpen(AI_PATH) ? `${w.name} AI 분석 보기` : undefined"
                             @click="canOpen(AI_PATH) && goToStock(w.item)">
@@ -87,6 +87,12 @@
                             <span class="line-name">{{ w.name }}</span>
                             <b class="line-price">{{ formatNumber(w.item.close) }}</b>
                             <span class="badge" :class="w.chg.cls">{{ w.pctText }}</span>
+                        </component>
+                        <!-- 가장 주요한 추천 이유 1개(매수추천 탭과 같은 문장·같은 띠) -->
+                        <component v-if="w.reasons.top" :is="canOpen(AI_PATH) ? 'button' : 'div'" :type="canOpen(AI_PATH) ? 'button' : undefined"
+                            class="why" :class="{ link: canOpen(AI_PATH) }" tabindex="-1" @click="canOpen(AI_PATH) && goToStock(w.item)">
+                            <span class="why-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg></span>
+                            <span class="why-tx">{{ w.reasons.top.text }}<em v-if="w.reasons.rest">+{{ w.reasons.rest }}</em></span>
                         </component>
                     </li>
                 </ol>
@@ -185,6 +191,7 @@ import { NOTICE_LIST_PATH, NOTICE_DETAIL_PATH, noticeDateText } from '@scripts/n
 import { numOrNull, formatNumber, changeInfo } from '@scripts/stockSignals.js';
 import { orderForType, marketWeather } from '@scripts/persona.js';
 import { evaluate, passRuleText } from '@scripts/indicators.js';
+import { recoReasons } from '@scripts/recoReasons.js';
 
 const router = useRouter();
 const userSession = assUserSession();
@@ -326,6 +333,7 @@ const ordered = computed(() => {
         code: item.stock_code,
         name: item.stock_name,
         chg: changeInfo(item),
+        reasons: recoReasons(item),   // 가장 주요한 추천 이유 1개를 띠로
     })).map(w => ({
         ...w,
         pctText: w.chg.pct === null ? '–' : `${signed(w.chg.pct, 2)}%`,
@@ -877,4 +885,43 @@ button { font: inherit; letter-spacing: inherit; }
 /* 날씨 그림: 이모지 스타일 이미지 — 크림 바탕 칸 */
 .weather .wx-box { width: 48px; height: 48px; border-radius: $radius; background: $honey-50; }
 .weather .wx-img { width: 36px; height: 36px; display: block; }
+
+/* ── TOP 3 추천 이유 띠 + 꿀빛 그라데이션(한국투자 AI 말풍선 참고, 노랑 계열 안에서만) ── */
+.w-li { padding-bottom: 12px; .line-row { min-height: 48px; } }
+.why {
+    width: calc(100% - 28px);
+    box-sizing: border-box;
+    margin-left: 28px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 10px;
+    background: $honey-strip;
+    color: $honey-ink;
+    text-align: left;
+    &.link { cursor: pointer; }
+}
+.why-ic {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    background: $honey-dot;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    svg { width: 10px; height: 10px; fill: none; stroke: $honey-ink; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+}
+.why-tx {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    em { font-style: normal; margin-left: 4px; font-weight: 600; color: $amber-700; }
+}
+.best { background: $honey-strip; }
 </style>

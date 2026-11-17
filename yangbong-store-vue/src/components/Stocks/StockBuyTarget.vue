@@ -849,4 +849,9 @@ button { font: inherit; letter-spacing: inherit; }
     gap: 4px 12px;
     .rd-match { color: $sub-ink; b { color: $amber-700; font-weight: 600; } }
 }
+
+/* 꿀빛 그라데이션(홈과 같은 토큰): 이유 띠와 체크 원 */
+.reco-row .why { background: $honey-strip; }
+.why-ic, .rs-k { background: $honey-dot; }
+.rs.off li .rs-k { background: $band; }
 </style>
