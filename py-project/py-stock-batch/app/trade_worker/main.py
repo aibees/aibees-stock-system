@@ -139,12 +139,6 @@ def _boot_balance_check(cfg, broker, repo):
                      deposit, stock_amount, total_asset)
         except Exception as e:  # noqa: BLE001
             log.warning("[부팅] user_wallet 스냅샷 갱신 실패: %s", e)
-        try:
-            repo.insert_worker_log(cfg.user_id, "boot", "INFO",
-                                   f"매수가능={cash} 예수금={deposit} "
-                                   f"보유평가={stock_amount} 총자산={total_asset}")
-        except Exception:  # noqa: BLE001
-            pass
 
 
 def _reconcile_positions(cfg, broker, repo):
@@ -195,15 +189,7 @@ def _reconcile_positions(cfg, broker, repo):
             log.warning("[대조] %s 외부청산 추정가 조회 실패 → pnl 미기록: %s", code, e)
             est_px = None
         repo.close_position(cfg.user_id, code, est_px, None, "EXTERNAL_CLOSED")
-        log.warning("[대조] %s 실제 미보유 → 포지션 종료(외부청산)", code)
-        # worker 로그(DB)에도 남긴다 — 운영자가 보는 곳은 trade_worker_log 다.
-        # 여기 안 남기면 "왜 포지션이 사라졌나"를 컨테이너 stdout 에서만 찾아야 한다.
-        try:
-            repo.insert_worker_log(
-                cfg.user_id, "sell", "WARN",
-                f"[대조] {code} 계좌 실보유 없음 → 포지션 종료(EXTERNAL_CLOSED) · 타채널 수기매도 추정")
-        except Exception:  # noqa: BLE001
-            pass
+        log.warning("[대조] %s 실제 미보유 → 포지션 종료(외부청산) · 타채널 수기매도 추정", code)
 
     # 3) 흡수하지 않은 계좌 보유(수동매수) 는 감시 대상이 아님을 명시적으로 남긴다
     untracked = held.keys() - holding.keys()
@@ -243,7 +229,6 @@ def main():
         log.error("[main] %s → worker 를 시작하지 않습니다. "
                   "화면에서 구현된 모드로 되돌리거나 해당 전략을 구현하세요.", e)
         try:
-            repo.insert_worker_log(cfg.user_id, "boot", "ERROR", f"미구현 모드로 기동 중단: {e}")
             notifier.send(f"[worker 기동 중단] 운용모드 {e.mode} 미구현",
                           f"⚠️ 운용모드 <b>{e.mode}</b> 의 전략이 구현되지 않아 worker 를 시작하지 못했습니다.\n"
                           f"자동매매가 동작하지 않습니다. 화면에서 모드를 되돌려 주세요.")
@@ -257,7 +242,6 @@ def main():
     if strategy.halted:
         log.warning("[main] 매매정지(HALT) 상태로 기동 — 신규 매수 없이 보유분 매도 감시만 수행")
         try:
-            repo.insert_worker_log(cfg.user_id, "boot", "INFO", "매매정지(HALT) 상태로 기동 — 신규 매수 정지, 보유분 매도 감시")
             notifier.send("[worker 기동] 매매정지(HALT)",
                           "⏸ 매매정지 상태로 worker 가 시작됐습니다.\n"
                           "신규 매수는 하지 않고, 보유 종목의 손절·익절·트레일링 매도만 계속합니다.")

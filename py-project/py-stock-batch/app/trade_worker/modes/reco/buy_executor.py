@@ -298,7 +298,7 @@ class RecoBuyExecutor(BaseBuyExecutor):
                 return
             try:
                 if self.repo.clear_priority_target(self.cfg.user_id):
-                    self.wlog.info("[매수] 최우선타겟 1회성 소비 완료 → 초기화")
+                    self.wlog.setting("[설정] 최우선타겟 1회성 소비 완료 → 초기화")
             except Exception as e:  # noqa: BLE001
                 self.wlog.warn("[매수] 최우선타겟 초기화 실패: %s", e)
         finally:

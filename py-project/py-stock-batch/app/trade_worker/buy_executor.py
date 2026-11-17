@@ -327,7 +327,7 @@ class BaseBuyExecutor(ABC):
                                          sync=self.cfg.sync_wallet_on_trade, tag="매수")
         self.repo.insert_trade_log(uid, code, "BUY", fill_px, res.filled_qty, final_balance,
                                    note=f"{cand.log_note} {res.status}".strip())
-        self.wlog.info("[매수] 완료 %s(%s) 매수수량=%s @~%s 잔고=%s (%s)",
+        self.wlog.fill("[매수] 완료 %s(%s) 매수수량=%s @~%s 잔고=%s (%s)",
                        name, code, res.filled_qty, fill_px, final_balance, res.status)
         if self.notifier:
             self.notifier.trade("BUY", name, code, res.filled_qty, fill_px, final_balance,
@@ -374,7 +374,7 @@ class BaseBuyExecutor(ABC):
                                        sync=self.cfg.sync_wallet_on_trade, tag="매수잔량")
             self.repo.insert_trade_log(uid, ev.symbol, "BUY", ev.last_price, ev.delta_qty, balance,
                                        note=f"late fill {ev.filled_qty}/{ev.order_qty}")
-            self.wlog.info("[매수] %s 잔량체결 +%s주 @%s (누적 %s/%s) 평단=%s%s",
+            self.wlog.fill("[매수] %s 잔량체결 +%s주 @%s (누적 %s/%s) 평단=%s%s",
                            ev.symbol, ev.delta_qty, ev.last_price,
                            ev.filled_qty, ev.order_qty, ev.avg_price,
                            " · 전량완료" if ev.complete else "")

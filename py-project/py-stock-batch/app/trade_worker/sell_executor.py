@@ -145,6 +145,7 @@ class BaseSellExecutor(ABC):
         # 주문이 나갈 수 있다. symbol 키였다면 나중 주문이 먼저 것의 pending 정보를
         # 덮어써 late-fill 이 엉뚱한 티어를 완료 처리하는 사고가 난다.
         self._manual_sells: dict[str, list[dict]] = {}  # symbol -> 매도 수기등록(ARMED) 티어 리스트(가격 오름차순). 있으면 모드 rule 무시
+        self._manual_loaded = False   # 기동 후 첫 수기등록 적재 여부 — 첫 적재는 '변경'이 아니라 DB 로그에 안 남긴다
         self._acct_miss: dict[str, int] = {}   # symbol -> 계좌 실보유에서 연속 미발견 횟수(wallet_sync._close_vanished_positions)
         self._lock = threading.Lock()
 
@@ -178,23 +179,38 @@ class BaseSellExecutor(ABC):
             fresh.setdefault(r["stock_code"], []).append(r)
         for tiers in fresh.values():
             tiers.sort(key=lambda t: Decimal(str(t["sell_price"])))
+        def _sig(tiers):
+            # 티어 구성(가격·방향)만 비교한다. filled_qty 는 부분체결로 메모리에서 바뀌므로 제외.
+            return tuple(sorted((str(t.get("id")), str(t.get("sell_price")), tier_trigger(t)) for t in tiers))
+
         with self._lock:
-            added = fresh.keys() - self._manual_sells.keys()
-            removed = self._manual_sells.keys() - fresh.keys()
+            old = self._manual_sells
+            added = fresh.keys() - old.keys()
+            removed = old.keys() - fresh.keys()
+            changed = {c for c in fresh.keys() & old.keys() if _sig(fresh[c]) != _sig(old[c])}
             self._manual_sells = fresh
-        for code in added:
+            first = not self._manual_loaded
+            self._manual_loaded = True
+        if first:
+            # 기동 직후 첫 적재는 이미 등록돼 있던 것을 불러온 것뿐이라 콘솔에만 남긴다
+            # (예전엔 재기동할 때마다 종목별 '감지' 로그가 DB 에 다시 쌓였다).
+            if fresh:
+                self.wlog.info("[지정가] 기동 시 수기등록 %d종목 불러옴: %s", len(fresh),
+                               ", ".join(f"{c}@[{', '.join(tier_label(t) for t in fresh[c])}]" for c in sorted(fresh)))
+            return
+        for code in sorted(added | changed):
+            prices = ", ".join(tier_label(t) for t in fresh[code])
             if code not in self.positions:
                 # 아직 trade_worker_position 에 없는 종목 — wallet_sync.reconcile_wallet
                 # 의 주기 편입(WALLET_POLL_SEC)이 이 종목을 계좌 실보유에서 찾아 넣어줄
                 # 때까지 일시적으로 감시 밖이다(영구 미구현이 아니라 다음 폴링까지의 지연).
-                self.wlog.warn("[매도] %s 수기등록됐지만 아직 worker 편입 전 → 다음 계좌 동기화 후 감시 시작",
-                               code)
+                self.wlog.limit_sync("[지정가] %s 수기등록 %s @[%s] · 아직 worker 편입 전 → 다음 계좌 동기화 후 감시 시작",
+                                     code, "변경" if code in changed else "반영", prices)
                 continue
-            prices = ", ".join(tier_label(t) for t in fresh[code])
-            self.wlog.info("[매도] %s 수기등록 감지 @[%s] → 이후 자동 rule 대신 지정가만 감시",
-                           code, prices)
-        for code in removed:
-            self.wlog.info("[매도] %s 수기등록 해제(취소/체결) → 자동 rule 로 복귀", code)
+            self.wlog.limit_sync("[지정가] %s 수기등록 %s @[%s] → 이후 자동 rule 대신 지정가만 감시",
+                                 code, "변경" if code in changed else "반영", prices)
+        for code in sorted(removed):
+            self.wlog.limit_sync("[지정가] %s 수기등록 해제(취소/체결) → 자동 rule 로 복귀", code)
 
     def _complete_manual_if_needed(self, symbol: str, reason: str, fill_px, filled_qty,
                                    manual_id: int | None = None):
@@ -408,16 +424,16 @@ class BaseSellExecutor(ABC):
             key, old_mode, new_mode = mode_change
             failed = key.endswith("(전환실패)")
             if failed:
-                self.wlog.warn("[설정] 운용모드 %s → %s 전환 실패(미구현) · 기존 전략 유지",
-                               old_mode, new_mode)
+                self.wlog.setting("[설정] 운용모드 %s → %s 전환 실패(미구현) · 기존 전략 유지",
+                                  old_mode, new_mode, level="WARN")
                 self._notify_mode_change(old_mode, new_mode, failed=True)
                 # 전략이 그대로라 라인을 다시 계산할 이유가 없다.
                 return False
-            self.wlog.info("[설정] 운용모드 전환 %s → %s · 전략=%s",
-                           old_mode, new_mode, type(self.strategy.strategy).__name__)
+            self.wlog.setting("[설정] 운용모드 전환 %s → %s · 전략=%s",
+                              old_mode, new_mode, type(self.strategy.strategy).__name__)
             self._notify_mode_change(old_mode, new_mode, failed=False)
 
-        self.wlog.info("[설정] 변경 감지 → 전략 재적용 (%s)", summary)
+        self.wlog.setting("[설정] 변경 감지 → 전략 재적용 (%s)", summary)
 
         with self._lock:
             targets = list(self.positions.items())
@@ -437,9 +453,9 @@ class BaseSellExecutor(ABC):
                 if cur is not None:
                     cur.update(state)
             applied += 1
-            self.wlog.info("[설정] %s 라인 재계산 stop=%s target=%s trail=%s",
-                           code, state.get("stop_price"), state.get("target_price"),
-                           state.get("trail_line"))
+            self.wlog.setting("[설정] %s 라인 재계산 stop=%s target=%s trail=%s",
+                              code, state.get("stop_price"), state.get("target_price"),
+                              state.get("trail_line"))
 
         if self.notifier and applied:
             try:
@@ -815,13 +831,13 @@ class BaseSellExecutor(ABC):
                     p = self.positions.get(symbol)
                     if p is not None:
                         p["hold_qty"] = remain
-                self.wlog.info("[매도] 부분체결 %s qty=%s @~%s 잔량=%s주 → 감시 유지 (%s/%s)",
+                self.wlog.fill("[매도] 부분체결 %s qty=%s @~%s 잔량=%s주 → 감시 유지 (%s/%s)",
                                symbol, filled_total, fill_px, remain, reason, res.status)
             else:
                 self.positions.pop(symbol, None)
                 self._unsubscribe(symbol)   # 전량 청산 → 실시간 감시 비활성
                 self._sold.add(symbol)
-                self.wlog.info("[매도] 완료 %s qty=%s @~%s 잔고=%s (%s/%s)",
+                self.wlog.fill("[매도] 완료 %s qty=%s @~%s 잔고=%s (%s/%s)",
                                symbol, filled_total, fill_px, final_balance, reason, res.status)
 
             self._fail_count.pop(symbol, None)
@@ -1004,7 +1020,7 @@ class BaseSellExecutor(ABC):
                     p = self.positions.get(symbol)
                     if p is not None:
                         p["hold_qty"] = remain
-                self.wlog.info("[매도] %s 잔량체결 -%s주 @%s → 보유 %s주 유지",
+                self.wlog.fill("[매도] %s 잔량체결 -%s주 @%s → 보유 %s주 유지",
                                symbol, ev.delta_qty, ev.last_price, remain)
             else:
                 with self._lock:
@@ -1012,7 +1028,7 @@ class BaseSellExecutor(ABC):
                 self._unsubscribe(symbol)
                 self._sold.add(symbol)
                 self._cooldown.pop(symbol, None)
-                self.wlog.info("[매도] %s 잔량체결로 전량 청산 완료 @%s 잔고=%s",
+                self.wlog.fill("[매도] %s 잔량체결로 전량 청산 완료 @%s 잔고=%s",
                                symbol, ev.last_price, balance)
             if manual_id is not None and not ev.complete:
                 # 아직 주문이 다 안 끝난 중간 체결분 — 티어 누적 체결수량에 반영(ARMED 유지)

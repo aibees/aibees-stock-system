@@ -216,10 +216,12 @@ class ManualBuyExecutor:
 
     def _after_finish(self, row: dict, state: str, filled: Decimal, avg) -> None:
         code, name = row["stock_code"], row.get("stock_name") or ""
-        self.wlog.info("[수동매수] %s(%s) 종료 state=%s 체결=%s/%s @%s",
-                       name, code, state, filled, row["qty"], avg)
         if filled <= 0:
+            self.wlog.info("[수동매수] %s(%s) 종료 state=%s 체결=%s/%s @%s",
+                           name, code, state, filled, row["qty"], avg)
             return
+        self.wlog.fill("[수동매수] %s(%s) 체결 state=%s 체결=%s/%s @%s",
+                       name, code, state, filled, row["qty"], avg)
         uid = self.cfg.user_id
         try:
             balance = reconcile_wallet(self.broker, self.repo, uid, sync=True, tag="수동매수",
