@@ -36,7 +36,7 @@
     <nav id="comm-lnb" aria-label="주요 메뉴">
         <a v-for="t in visibleTabs" :key="t.key" class="tab" :class="{ active: isTabActive(t) }"
             :href="t.path" :aria-current="isTabActive(t) ? 'page' : undefined" @click.prevent="goPath(t.path)">
-            <svg v-if="t.key === 'home'" width="24" height="24" viewBox="0 0 24 24" :fill="isTabActive(t) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>
+            <svg v-if="t.key === 'home'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>
             <!-- 트레이닝: 펼친 책 -->
             <svg v-else-if="t.key === 'training'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5C10.3 5.3 7.9 4.7 4 4.7V18c3.9 0 6.3.6 8 1.8 1.7-1.2 4.1-1.8 8-1.8V4.7c-3.9 0-6.3.6-8 1.8z"></path><path d="M12 6.5v13.3"></path></svg>
             <!-- 분석: 돋보기 안에 작은 막대그래프(차트 탭의 꺾은선과 구분) -->
@@ -312,7 +312,7 @@ onMounted(() => {
     height: var(--lnb-total);
     box-sizing: border-box;
     background-color: #FFFFFF;
-    border-top: 1px solid #E5E8EB;
+    border-top: 1px solid #ECEBE6;
     padding: 6px 4px env(safe-area-inset-bottom, 0px);
     display: grid;
     grid-auto-flow: column;
@@ -342,6 +342,7 @@ onMounted(() => {
         &.active {
             color: #191F28;
             font-weight: 600;
+            svg { fill: #F6B60C; }   // 꿀빛 포인트: 지금 탭 아이콘만 꿀색으로 채운다(선은 진한 글자색)
         }
     }
 }

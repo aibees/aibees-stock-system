@@ -10,7 +10,7 @@
                 </button>
 
                 <div class="hh-actions">
-                    <button type="button" class="guide-btn" @click="router.push(ONBOARDING_PATH)">처음이세요?</button>
+                    <button type="button" class="guide-btn" @click="router.push(ONBOARDING_PATH)"><i class="dot" aria-hidden="true"></i>처음이세요?</button>
                     <div class="account" ref="accountRef">
                         <button v-if="isLoggedIn" type="button" class="icon-btn" :aria-label="`내 계정 · ${userName} 님`"
                             aria-haspopup="menu" :aria-expanded="menuOpen ? 'true' : 'false'" @click.stop="menuOpen = !menuOpen">
@@ -62,33 +62,23 @@
                         <b class="wx-desc">{{ weather.desc }}</b>
                     </span>
                 </div>
-                <ul class="rows">
-                    <li v-for="m in indexCards" :key="m.key" class="row">
-                        <span class="r-main">
-                            <b class="r-name">{{ m.label }}</b>
-                            <small class="r-sub">
-                                <template v-for="(p, i) in m.periods" :key="p.label">{{ i ? ' · ' : '' }}{{ p.label }} <i :class="p.cls">{{ p.text }}</i></template>
-                            </small>
-                        </span>
-                        <svg v-if="m.sparkPoints" class="r-spark" :class="m.sparkCls" viewBox="0 0 64 24" preserveAspectRatio="none" aria-hidden="true">
+                <div class="idx-cards">
+                    <article v-for="m in indexCards" :key="m.key" class="idx-card">
+                        <span class="ic-name">{{ m.label }}</span>
+                        <b class="ic-price">{{ m.priceText }}</b>
+                        <span class="ic-today" :class="m.todayCls">{{ m.todayArrow }} {{ m.todayAbs }}</span>
+                        <svg v-if="m.sparkPoints" class="ic-spark" :class="m.sparkCls" viewBox="0 0 64 24" preserveAspectRatio="none" aria-hidden="true">
                             <polyline :points="m.sparkPoints" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
                         </svg>
-                        <span class="r-val">
-                            <b>{{ m.priceText }}</b>
-                            <small :class="m.todayCls">{{ m.todayText }}</small>
+                        <span class="ic-period">
+                            <template v-for="(p, i) in m.periods" :key="p.label">{{ i ? ' · ' : '' }}{{ p.label }} {{ p.text }}</template>
                         </span>
-                    </li>
-                    <li v-if="fxItem" class="row">
-                        <span class="r-main">
-                            <b class="r-name">원/달러</b>
-                            <small class="r-sub">환율</small>
-                        </span>
-                        <span class="r-val">
-                            <b>{{ fxItem.priceText }}</b>
-                            <small :class="fxItem.cls">{{ fxItem.chgText }}</small>
-                        </span>
-                    </li>
-                </ul>
+                    </article>
+                </div>
+                <div v-if="fxItem" class="fx-row">
+                    <span class="fx-label">원/달러</span>
+                    <span class="fx-val"><b>{{ fxItem.priceText }}</b><span class="badge" :class="fxItem.cls">{{ fxItem.chgText }}</span></span>
+                </div>
             </section>
 
             <!-- ── 2. AI 분석 종목 TOP 3: 순위 리스트. 줄을 누르면 AI 분석, 아래 작은 글자 링크로 차트 ── -->
@@ -108,6 +98,7 @@
                 <ol v-else class="rows">
                     <li v-for="(w, i) in visibleRows" :key="w.code" class="row rank-row">
                         <span class="r-rank">{{ i + 1 }}</span>
+                        <span class="r-logo" aria-hidden="true">{{ w.name.slice(0, 1) }}</span>
                         <span class="r-main">
                             <component :is="canOpen(AI_PATH) ? 'button' : 'b'" :type="canOpen(AI_PATH) ? 'button' : undefined"
                                 class="r-name" :class="{ link: canOpen(AI_PATH) }" @click="canOpen(AI_PATH) && goToStock(w.item)">{{ w.name }}</component>
@@ -117,8 +108,8 @@
                             </small>
                         </span>
                         <span class="r-val">
-                            <b :class="w.chg.cls">{{ w.pctText }}</b>
-                            <small>{{ w.absText }}</small>
+                            <b>{{ formatNumber(w.item.close) }}</b>
+                            <span class="badge" :class="w.chg.cls">{{ w.pctText }}</span>
                         </span>
                     </li>
                 </ol>
@@ -147,7 +138,7 @@
                                 <b class="r-name">{{ p.stock_name }}</b>
                                 <small class="r-sub">{{ mdText(p.ymd) }} {{ formatNumber(p.entry_price) }} → {{ mdText(p.peak_ymd) }} {{ formatNumber(p.peak_price) }}</small>
                             </span>
-                            <span class="r-val"><b :class="clsOf(p.max_return)">{{ pctText(p.max_return) }}</b></span>
+                            <span class="r-val"><span class="badge" :class="clsOf(p.max_return)">{{ pctText(p.max_return) }}</span></span>
                         </component>
                     </li>
                 </ol>
@@ -168,18 +159,17 @@
             <section class="sec notice" aria-labelledby="notice-title">
                 <div class="sec-head">
                     <h2 id="notice-title">공지사항</h2>
-                    <button type="button" class="meta-link" @click="router.push(NOTICE_LIST_PATH)">전체 보기</button>
                 </div>
                 <p v-if="!notices.length" class="notice-empty">등록된 공지사항이 없습니다.</p>
                 <ul v-else class="notice-list">
                     <li v-for="n in notices" :key="n.notice_id">
                         <button type="button" class="notice-row" @click="goToNotice(n)">
-                            <span class="notice-cat">{{ n.category }}</span>
-                            <span class="notice-title">{{ n.title }}</span>
-                            <span class="notice-date">{{ noticeDateText(n.created_date).slice(5) }}</span>
+                            <span class="notice-title"><span class="notice-cat">{{ n.category }}</span>{{ n.title }}</span>
+                            <span class="notice-date">{{ noticeDateText(n.created_date) }}</span>
                         </button>
                     </li>
                 </ul>
+                <button type="button" class="more" @click="router.push(NOTICE_LIST_PATH)">더 보기</button>
             </section>
 
             <!-- ── 고지: 연회색 바탕 맨 아래 ── -->
@@ -297,6 +287,8 @@ const indexCards = computed(() => marketData.value.filter(m => m.key !== 'usdkrw
         sparkPoints: sparkPoints(m.spark),
         sparkCls: clsOf(r20),
         todayText: r1 === null ? '' : `${signed(r1, 1)}%`,
+        todayArrow: r1 === null ? '' : (r1 > 0 ? '▲' : (r1 < 0 ? '▼' : '–')),
+        todayAbs: r1 === null ? '' : `${Math.abs(r1).toFixed(1)}%`,
         todayCls: clsOf(r1),
         periods: [
             { label: '5일', text: r5 === null ? '–' : `${signed(r5, 1)}%`, cls: clsOf(r5) },
@@ -310,7 +302,7 @@ const fxItem = computed(() => {
     const rate = numOrNull(m.rate);
     const change = numOrNull(m.change);
     const dir = dirOf(rate ?? 0);
-    const chgPart = change !== null && dir !== 0 ? `${signed(change, 2)} ` : '';
+    const chgPart = change !== null && dir !== 0 ? `${signed(change, 2)} ` : '';  // 예) −4.70 (0.34%)
     return {
         priceText: priceText(m.price),
         chgText: rate === null ? '' : `${chgPart}(${Math.abs(rate).toFixed(2)}%)`,
@@ -477,13 +469,19 @@ button { font: inherit; letter-spacing: inherit; }
 }
 .hh-actions { display: flex; align-items: center; gap: 2px; }
 .guide-btn {
-    min-height: 44px;
-    padding: 0 8px;
-    border: 0;
+    height: 32px;
+    margin-right: 4px;
+    padding: 0 12px;
+    border: 1px solid $line;
+    border-radius: 8px;
     background: transparent;
-    color: $sub;
-    font-size: 14px;
+    color: $sub-ink;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     cursor: pointer;
+    .dot { width: 6px; height: 6px; border-radius: 3px; background: $honey-500; }
 }
 .icon-btn {
     width: 44px;
@@ -634,7 +632,7 @@ button { font: inherit; letter-spacing: inherit; }
     text-align: left;
     &.link { cursor: pointer; }
 }
-.r-rank { width: 28px; flex-shrink: 0; font-size: 17px; font-weight: 700; color: $ink; }
+.r-rank { width: 28px; flex-shrink: 0; font-size: 17px; font-weight: 700; color: $amber-700; }
 .r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .r-name {
     display: block;
@@ -740,7 +738,11 @@ button { font: inherit; letter-spacing: inherit; }
 .notice-row {
     width: 100%;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 14px 0 !important;
+    border-bottom: 1px solid $line !important;
     min-height: 52px;
     padding: 0;
     border: 0;
@@ -765,4 +767,74 @@ button { font: inherit; letter-spacing: inherit; }
         color: $sub-2;
     }
 }
+
+/* ── 2026-11-17 꿀빛 톤(한국투자 참고): 크림 카드 · 앰버 순위 · 등락 배지. 모서리는 $radius(12px) ── */
+.idx-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.idx-card {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 16px 16px 14px;
+    border-radius: $radius;
+    background: $honey-50;
+    .ic-name { font-size: 14px; color: $sub-ink; }
+    .ic-price { margin-top: 8px; font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
+    .ic-today { margin-top: 2px; font-size: 13px; font-weight: 600; }
+    .ic-spark { width: 100%; height: 22px; margin-top: 8px; }
+    .ic-period { margin-top: 8px; font-size: 12px; color: $sub; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+.fx-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 52px;
+    margin-top: 4px;
+    .fx-label { font-size: 14px; color: $sub-ink; }
+    .fx-val { display: flex; align-items: center; gap: 8px; b { font-size: 16px; font-weight: 600; } }
+}
+.badge {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: $radius-sm;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: $sub;
+    background: $band;
+    &.up   { color: $up;   background: $up-bg; }
+    &.down { color: $down; background: $down-bg; }
+}
+.r-logo {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    margin-right: 12px;
+    border-radius: 20px;
+    background: $honey-100;
+    color: $amber-700;
+    font-size: 15px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.row { min-height: 68px; }
+.r-val { gap: 4px; align-items: flex-end; }
+.hero {
+    margin: 16px 0 4px;
+    padding: 18px;
+    border-radius: $radius;
+    background: $honey-50;
+}
+.perf-rows { margin-top: 8px; padding-top: 0; border-top: 0; }
+.notice-list li:last-child .notice-row { border-bottom: 0 !important; }
+.notice-row {
+    .notice-title { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .notice-cat { width: auto; margin-right: 6px; font-size: 15px; font-weight: 600; color: $amber-700; }
+    .notice-date { margin-left: 0; font-size: 13px; color: $sub; }
+}
+.notice { padding-bottom: 8px; }
+.simple-foot .notes { color: $sub; }
 </style>
