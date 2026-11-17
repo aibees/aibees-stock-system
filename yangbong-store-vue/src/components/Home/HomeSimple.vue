@@ -37,25 +37,9 @@
                     <h2 id="market-title">오늘 시장</h2>
                 </div>
                 <div v-if="weather" class="weather" :class="weather.key" role="status">
+                    <!-- 날씨 그림: 이모지 스타일 3D 그림(Microsoft Fluent Emoji, MIT — public/img/weather/LICENSE-fluentui-emoji.txt) -->
                     <span class="wx-box" aria-hidden="true">
-                        <svg class="wx-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-                            <template v-if="weather.key === 'sunny'">
-                                <circle cx="24" cy="24" r="8"></circle>
-                                <path d="M24 6v5M24 37v5M6 24h5M37 24h5M11.3 11.3l3.5 3.5M33.2 33.2l3.5 3.5M11.3 36.7l3.5-3.5M33.2 14.8l3.5-3.5"></path>
-                            </template>
-                            <template v-else-if="weather.key === 'warm'">
-                                <circle cx="19" cy="18" r="6"></circle>
-                                <path d="M19 6v3M7 18h3M10.5 9.5l2 2M27.5 9.5l-2 2"></path>
-                                <path d="M17 40h18a6.5 6.5 0 0 0 .6-13 9 9 0 0 0-17-2A7.6 7.6 0 0 0 17 40z"></path>
-                            </template>
-                            <template v-else-if="weather.key === 'cloudy'">
-                                <path d="M14 36h20a7.5 7.5 0 0 0 .7-15 10.5 10.5 0 0 0-20-2.4A8.8 8.8 0 0 0 14 36z"></path>
-                            </template>
-                            <template v-else>
-                                <path d="M14 30h20a7.5 7.5 0 0 0 .7-15 10.5 10.5 0 0 0-20-2.4A8.8 8.8 0 0 0 14 30z"></path>
-                                <path d="M25 30l-5 8h6l-4 8"></path>
-                            </template>
-                        </svg>
+                        <img class="wx-img" :src="`/img/weather/${weather.key}.png`" alt="" width="36" height="36" />
                     </span>
                     <span class="wx-text">
                         <span class="wx-name">{{ weather.text }}</span>
@@ -889,4 +873,8 @@ button { font: inherit; letter-spacing: inherit; }
     .notice-title { flex: 1; min-width: 0; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .notice-date { flex: none; font-size: 13px; color: $sub; }
 }
+
+/* 날씨 그림: 이모지 스타일 이미지 — 크림 바탕 칸 */
+.weather .wx-box { width: 48px; height: 48px; border-radius: $radius; background: $honey-50; }
+.weather .wx-img { width: 36px; height: 36px; display: block; }
 </style>
