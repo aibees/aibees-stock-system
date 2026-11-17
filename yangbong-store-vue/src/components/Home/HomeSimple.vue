@@ -62,23 +62,34 @@
                         <b class="wx-desc">{{ weather.desc }}</b>
                     </span>
                 </div>
-                <div class="idx-cards">
-                    <article v-for="m in indexCards" :key="m.key" class="idx-card">
-                        <span class="ic-name">{{ m.label }}</span>
-                        <b class="ic-price">{{ m.priceText }}</b>
-                        <span class="ic-today" :class="m.todayCls">{{ m.todayArrow }} {{ m.todayAbs }}</span>
-                        <svg v-if="m.sparkPoints" class="ic-spark" :class="m.sparkCls" viewBox="0 0 64 24" preserveAspectRatio="none" aria-hidden="true">
+                <!-- 코스피·코스닥·원/달러: 카드 없이 같은 모양의 리스트 3줄(2026-11-17 심플 버전으로 되돌림) -->
+                <ul class="rows">
+                    <li v-for="m in indexCards" :key="m.key" class="row">
+                        <span class="r-main">
+                            <b class="r-name">{{ m.label }}</b>
+                            <small class="r-sub">
+                                <template v-for="(p, i) in m.periods" :key="p.label">{{ i ? ' · ' : '' }}{{ p.label }} <i :class="p.cls">{{ p.text }}</i></template>
+                            </small>
+                        </span>
+                        <svg v-if="m.sparkPoints" class="r-spark" :class="m.sparkCls" viewBox="0 0 64 24" preserveAspectRatio="none" aria-hidden="true">
                             <polyline :points="m.sparkPoints" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
                         </svg>
-                        <span class="ic-period">
-                            <template v-for="(p, i) in m.periods" :key="p.label">{{ i ? ' · ' : '' }}{{ p.label }} {{ p.text }}</template>
+                        <span class="r-val">
+                            <b>{{ m.priceText }}</b>
+                            <small :class="m.todayCls">{{ m.todayText }}</small>
                         </span>
-                    </article>
-                </div>
-                <div v-if="fxItem" class="fx-row">
-                    <span class="fx-label">원/달러</span>
-                    <span class="fx-val"><b>{{ fxItem.priceText }}</b><span class="badge" :class="fxItem.cls">{{ fxItem.chgText }}</span></span>
-                </div>
+                    </li>
+                    <li v-if="fxItem" class="row">
+                        <span class="r-main">
+                            <b class="r-name">원/달러</b>
+                            <small class="r-sub">환율</small>
+                        </span>
+                        <span class="r-val">
+                            <b>{{ fxItem.priceText }}</b>
+                            <small :class="fxItem.cls">{{ fxItem.chgText }}</small>
+                        </span>
+                    </li>
+                </ul>
             </section>
 
             <!-- ── 2. AI 분석 종목 TOP 3: 순위 리스트. 줄을 누르면 AI 분석, 아래 작은 글자 링크로 차트 ── -->
@@ -287,8 +298,6 @@ const indexCards = computed(() => marketData.value.filter(m => m.key !== 'usdkrw
         sparkPoints: sparkPoints(m.spark),
         sparkCls: clsOf(r20),
         todayText: r1 === null ? '' : `${signed(r1, 1)}%`,
-        todayArrow: r1 === null ? '' : (r1 > 0 ? '▲' : (r1 < 0 ? '▼' : '–')),
-        todayAbs: r1 === null ? '' : `${Math.abs(r1).toFixed(1)}%`,
         todayCls: clsOf(r1),
         periods: [
             { label: '5일', text: r5 === null ? '–' : `${signed(r5, 1)}%`, cls: clsOf(r5) },
@@ -769,29 +778,6 @@ button { font: inherit; letter-spacing: inherit; }
 }
 
 /* ── 2026-11-17 꿀빛 톤(한국투자 참고): 크림 카드 · 앰버 순위 · 등락 배지. 모서리는 $radius(12px) ── */
-.idx-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
-.idx-card {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    padding: 16px 16px 14px;
-    border-radius: $radius;
-    background: $honey-50;
-    .ic-name { font-size: 14px; color: $sub-ink; }
-    .ic-price { margin-top: 8px; font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
-    .ic-today { margin-top: 2px; font-size: 13px; font-weight: 600; }
-    .ic-spark { width: 100%; height: 22px; margin-top: 8px; }
-    .ic-period { margin-top: 8px; font-size: 12px; color: $sub; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-}
-.fx-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 52px;
-    margin-top: 4px;
-    .fx-label { font-size: 14px; color: $sub-ink; }
-    .fx-val { display: flex; align-items: center; gap: 8px; b { font-size: 16px; font-weight: 600; } }
-}
 .badge {
     display: inline-flex;
     align-items: center;
