@@ -109,7 +109,6 @@
                 <ol v-else class="rows">
                     <li v-for="(w, i) in visibleRows" :key="w.code" class="row rank-row">
                         <span class="r-rank">{{ i + 1 }}</span>
-                        <span class="r-logo" aria-hidden="true">{{ w.name.slice(0, 1) }}</span>
                         <span class="r-main">
                             <component :is="canOpen(AI_PATH) ? 'button' : 'b'" :type="canOpen(AI_PATH) ? 'button' : undefined"
                                 class="r-name" :class="{ link: canOpen(AI_PATH) }" @click="canOpen(AI_PATH) && goToStock(w.item)">{{ w.name }}</component>
@@ -791,20 +790,6 @@ button { font: inherit; letter-spacing: inherit; }
     background: $band;
     &.up   { color: $up;   background: $up-bg; }
     &.down { color: $down; background: $down-bg; }
-}
-.r-logo {
-    flex: none;
-    width: 40px;
-    height: 40px;
-    margin-right: 12px;
-    border-radius: 20px;
-    background: $honey-100;
-    color: $amber-700;
-    font-size: 15px;
-    font-weight: 700;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
 }
 .row { min-height: 68px; }
 .r-val { gap: 4px; align-items: flex-end; }
