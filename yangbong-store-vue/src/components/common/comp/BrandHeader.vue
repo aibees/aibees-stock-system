@@ -28,26 +28,27 @@ const goBack = () => router.push({ path: props.back });
 </script>
 
 <style scoped lang="scss">
+// 2026-11-17 화이트 톤 개편: 흰 바탕, 구분선 없이 큰 제목(스크롤해도 같은 흰 바탕이라 선이 필요 없다)
 .brand-header {
     position: sticky;
     top: env(safe-area-inset-top, 0px);
     z-index: 50;
-    background: #FFF6D2;
-    border-bottom: 1px solid #EFE2BC;
-    padding: 0 8px 0 8px;
+    background: #FFFFFF;
+    padding: 0 8px 0 12px;
     text-align: left;
+    font-family: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', sans-serif;
 
     @media (min-width: 640px) { position: static; }
 }
 
-.bh-row { display: flex; align-items: center; min-height: 52px; gap: 2px; }
+.bh-row { display: flex; align-items: center; min-height: 56px; gap: 2px; }
 
 .bh-back {
     width: 44px;
     height: 44px;
     border: 0;
     background: transparent;
-    color: #5C3118;
+    color: #191F28;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -58,9 +59,10 @@ const goBack = () => router.push({ path: props.back });
     flex: 1;
     margin: 0;
     padding-left: 8px;
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 700;
-    color: #3A200F;
+    letter-spacing: -0.6px;
+    color: #191F28;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

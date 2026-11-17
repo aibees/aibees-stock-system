@@ -60,7 +60,7 @@ const showLnb = computed(() => !isFocusPath(route.path));
   bottom: calc(var(--lnb-total) + 4px);
   margin: 0;
   font-size: 11px;
-  color: #7A6B5D;
+  color: #B0B8C1;
   pointer-events: none;
   z-index: 1100;
 }
@@ -95,7 +95,7 @@ body::before {
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  background: #FFF6D2;
+  background: #FFFFFF;
   z-index: 2000;
   pointer-events: none;
 }
@@ -115,7 +115,7 @@ body {
 
 body {
   height: 100%;
-  background-color: #f7f7f7;
+  background-color: #FFFFFF;
   margin: 0;
 
 }

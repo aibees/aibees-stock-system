@@ -99,70 +99,67 @@ const chapterState = (ch) => {
 <style scoped lang="scss">
 @use '@@/_home-tokens.scss' as *;
 
-// 레퍼런스(장 카드 + 2열 단계 칸) 배치를 양봉상회 색으로 옮긴 것.
-$tint:      #FBF3E4;   // 진행 카드·지금 칸 아이콘 바탕
-$pill:      #F6E8D2;
-$off-bg:    #F2F1EE;   // 잠긴 칸
-$off-ink:   #8F8A84;
-$off-dot:   #D6D3CE;
-
+// 2026-11-17 화이트 톤 개편: 홈과 같은 "흰 판 + 연회색 띠". 장 카드 테두리를 없애고 띠로 나눈다.
+//   단계 칸: 연회색 면 / 지금 차례 = 진한 테두리 / 마친 칸 = 진한 면 / 잠긴 칸 = 바탕 없이 연한 글자
 #training-home {
     min-height: 100vh;
-    background: $card;
+    background: $band;
     color: $ink;
     text-align: left;
     font-family: $font-body;
+    letter-spacing: -0.2px;
+    -webkit-font-smoothing: antialiased;
 }
 .tr-header {
-    background: $bar;
-    padding: 18px 16px 14px;
-    border-bottom: 1px solid $line;
+    background: $card;
+    padding: 16px $pad-x 18px;
     position: sticky;
     top: env(safe-area-inset-top, 0px);
     z-index: 10;
 
-    h1 { margin: 0; font-size: 1.2rem; font-weight: 800; color: $brown-ink; }
-    .tr-lead { margin: 4px 0 0; font-size: .84rem; color: $sub; }
+    h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.6px; color: $ink; }
+    .tr-lead { margin: 6px 0 0; font-size: 14px; color: $sub; }
 }
-.tr-main { max-width: 720px; margin: 0 auto; padding: 14px 16px 24px; box-sizing: border-box; }
+.tr-main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 0 24px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: $band-h;
+}
 
 .tr-card {
-    border: 1px solid $line;
-    border-radius: 16px;
     background: $card;
-    padding: 18px 16px;
-    & + .tr-card { margin-top: 12px; }
+    padding: 24px $pad-x;
 }
 
-/* ── 진행 카드 ── */
-.tr-progress { background: $tint; }
+/* ── 진행 ── */
+.tr-progress { padding-top: 8px; }
 .tr-progress-row { display: flex; align-items: baseline; justify-content: space-between; }
-.tr-progress-label { font-size: .98rem; font-weight: 700; color: $sub; }
+.tr-progress-label { font-size: 15px; color: $sub-ink; }
 .tr-progress-count {
-    font-size: 1rem; color: $sub-2; font-variant-numeric: tabular-nums;
-    b { font-size: 1.7rem; font-weight: 800; color: $ink; margin-right: 2px; }
+    font-size: 15px; color: $sub; font-variant-numeric: tabular-nums;
+    b { font-size: 28px; font-weight: 700; letter-spacing: -0.6px; color: $ink; margin-right: 2px; }
 }
 .tr-bar {
-    height: 8px; margin: 12px 0 10px; border-radius: 4px; background: $line-soft; overflow: hidden;
-    span { display: block; height: 100%; min-width: 8px; border-radius: 4px; background: $accent; transition: width .3s ease; }
+    height: 6px; margin: 12px 0 10px; border-radius: 3px; background: $band; overflow: hidden;
+    span { display: block; height: 100%; min-width: 6px; border-radius: 3px; background: $ink; transition: width .3s ease; }
 }
-.tr-progress-note { margin: 0; font-size: .84rem; color: $sub-2; }
+.tr-progress-note { margin: 0; font-size: 13px; color: $sub; }
 
-/* ── 장 카드 ── */
-.tr-ch-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-.tr-dot {
-    flex: none; width: 12px; height: 12px; border-radius: 50%; background: $off-dot; align-self: flex-end; margin-bottom: 6px;
-    &.on { background: $accent; }
-}
+/* ── 장 ── */
+.tr-ch-head { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 16px; }
+.tr-dot { display: none; }
 .tr-ch-text { flex: 1; min-width: 0; }
-.tr-ch-meta { margin: 0 0 2px; font-size: .8rem; color: $sub-2; font-variant-numeric: tabular-nums; }
-.tr-ch-head h2 { margin: 0; font-size: 1.15rem; font-weight: 800; color: $ink; word-break: keep-all; }
+.tr-ch-meta { margin: 0 0 4px; font-size: 13px; color: $sub; font-variant-numeric: tabular-nums; }
+.tr-ch-head h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: $ink; word-break: keep-all; }
 .tr-pill {
     flex: none; display: inline-flex; align-items: center; gap: 4px;
-    padding: 5px 11px; border-radius: 999px;
-    font-size: .82rem; font-weight: 700; font-variant-numeric: tabular-nums;
-    &.now, &.all { background: $pill; color: $accent; }
-    &.locked { background: $off-bg; color: $off-ink; font-weight: 600; }
+    font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
+    &.now, &.all { color: $ink; }
+    &.locked { color: $sub-2; font-weight: 500; }
 }
 
 /* ── 단계 칸: 2열 ── */
@@ -172,10 +169,10 @@ $off-dot:   #D6D3CE;
 }
 .tr-tile {
     width: 100%; height: 48px;
-    display: flex; align-items: center; gap: 9px;
-    padding: 0 10px; box-sizing: border-box;
-    border: 1px solid $line-2; border-radius: 10px;
-    background: $card; color: $ink;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 12px; box-sizing: border-box;
+    border: 0; border-radius: 12px;
+    background: $bg; color: $ink;
     font: inherit; text-align: left;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
@@ -183,31 +180,31 @@ $off-dot:   #D6D3CE;
     &:active:not(.locked) { transform: scale(.98); }
 
     &.done {
-        background: $accent; border-color: $accent; color: #fff;
-        .tr-ico { background: rgba(255, 255, 255, .22); color: #fff; }
-        .tr-tile-label { font-weight: 700; }
+        background: $ink; color: #fff;
+        .tr-ico { background: rgba(255, 255, 255, .18); color: #fff; }
     }
     &.next {
-        border: 2px solid $accent; padding: 0 9px;
-        .tr-tile-label { font-weight: 700; color: $brown-ink; }
+        background: $card; box-shadow: inset 0 0 0 1.5px $ink;
+        .tr-ico { background: $ink; color: #fff; }
+        .tr-tile-label { font-weight: 600; }
     }
     &.locked {
-        background: $off-bg; border-color: $off-bg; color: $off-ink; cursor: default;
-        .tr-ico { background: #fff; color: #A8A39C; }
+        background: transparent; box-shadow: inset 0 0 0 1px $line; color: $sub-2; cursor: default;
+        .tr-ico { background: transparent; color: $sub-2; }
     }
 }
 .tr-ico {
-    flex: none; width: 26px; height: 26px; border-radius: 50%;
+    flex: none; width: 22px; height: 22px; border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
-    background: $tint; color: $accent;
-    font-size: .8rem; font-weight: 800; font-variant-numeric: tabular-nums;
+    background: $band; color: $sub-ink;
+    font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 .tr-tile-label {
     flex: 1; min-width: 0;
-    font-size: .9rem; font-weight: 600;
+    font-size: 14px; font-weight: 500;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .tr-soon .tr-tile { padding-left: 14px; }
 
-.tr-note { margin: 18px 4px 0; font-size: .76rem; line-height: 1.5; color: $sub-2; }
+.tr-note { margin: 0; padding: 12px $pad-x 8px; font-size: 12px; line-height: 1.6; color: $sub-2; }
 </style>

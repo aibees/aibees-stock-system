@@ -142,14 +142,14 @@ const finish = () => {
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 6px 16px 8px 4px;
+    padding: 6px $pad-x 8px 4px;
     background: $bar;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid $line-soft;
     position: sticky;
     top: env(safe-area-inset-top, 0px);
     z-index: 10;
 
-    h1 { margin: 0; font-size: 1.02rem; line-height: 1.35; font-weight: 800; color: $brown-ink; word-break: keep-all; }
+    h1 { margin: 0; font-size: 17px; line-height: 1.35; font-weight: 700; letter-spacing: -0.4px; color: $ink; word-break: keep-all; }
 }
 .tl-head-text { min-width: 0; padding-top: 2px; }
 .tl-crumb { margin: 0 0 1px; font-size: .74rem; color: $sub-2; font-variant-numeric: tabular-nums; }
@@ -159,7 +159,7 @@ const finish = () => {
     display: inline-flex; align-items: center; justify-content: center;
     background: none; border: 0; color: $brown-ink; cursor: pointer;
 }
-.tl-main { max-width: 640px; margin: 0 auto; padding: 18px 16px 24px; }
+.tl-main { max-width: 640px; margin: 0 auto; padding: 20px $pad-x 24px; }
 .tl-msg, .tl-lead { margin: 0 0 18px; font-size: .95rem; line-height: 1.6; color: $sub; word-break: keep-all; }
 
 /* ── 본문 ── */
@@ -168,7 +168,7 @@ const finish = () => {
 .tl-h { margin: 26px 0 10px; font-size: 1.05rem; font-weight: 800; color: $brown-ink; }
 .tl-note {
     margin: 0 0 14px; padding: 10px 12px;
-    border-left: 3px solid $yellow; background: $bg;
+    border-radius: 10px; background: $bg;
     font-size: .9rem; line-height: 1.65; color: $sub;
 }
 .tl-terms {
@@ -221,9 +221,9 @@ const finish = () => {
     min-height: 52px;
     padding: 0 16px;
     border: 0;
-    border-radius: 14px;
+    border-radius: 12px;
     background: $yellow;
-    color: #3A200F;
+    color: #FFFFFF;
     font: inherit;
     font-size: 1rem;
     font-weight: 700;
@@ -232,7 +232,7 @@ const finish = () => {
     transition: transform .1s ease;
     &:active:not(:disabled) { transform: scale(.98); }
     &:disabled { background: $line-soft; color: $sub-2; cursor: default; }
-    &.ghost { background: $card; border: 1px solid $line-2; color: $brown-ink; }
+    &.ghost { background: $band; border: 0; color: $ink; }
 }
 .tl-msg + .tl-cta, .tl-cta + .tl-cta { margin-top: 10px; }
 </style>
