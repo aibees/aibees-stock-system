@@ -1,44 +1,40 @@
 <template>
     <div id="stock-buy-target">
-        <!-- 주식분석 탭의 첫 화면이라 뒤로 버튼이 없다(/stock 은 여기로 다시 온다).
-             날짜: 제목 오른쪽 ‹ 날짜(요일) › — 가운데를 눌러 달력으로 고르고, 양옆으로 하루씩(주말 건너뜀) 옮긴다 -->
-        <BrandHeader :title="title">
-            <div class="date-nav">
-                <button type="button" class="nav-btn" aria-label="이전 영업일" @click="stepSelectedDate(-1)">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
-                </button>
-                <div class="date-center">
-                    <button type="button" class="date-btn" aria-label="날짜 선택" @click="openDatePicker">{{ dateLabel }}</button>
-                    <input type="date" ref="dateInput" class="hidden-input" v-model="selectedDate"
-                        @change="handleDateChange" tabindex="-1" aria-hidden="true" />
-                </div>
-                <button type="button" class="nav-btn" aria-label="다음 영업일" :disabled="!canStepForward" @click="stepSelectedDate(1)">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
-                </button>
-            </div>
-        </BrandHeader>
+        <!-- 주식분석 탭의 첫 화면이라 뒤로 버튼이 없다(/stock 은 여기로 다시 온다). -->
+        <BrandHeader :title="title" />
 
         <div class="contents">
-            <!-- ── 내 설정: 한 줄. 왼쪽 성향 이름·바꾸기, 오른쪽 목록 범위(내 조건만 ↔ 전체) ── -->
-            <div class="persona-line">
-                <span class="pl-label">내 설정 <b>{{ personaType.name }}</b></span>
-                <button type="button" class="pl-link pl-change" @click="router.push('/stock/preset')">바꾸기</button>
-                <button type="button" class="pl-link pl-scope" @click="mineOnly = !mineOnly">{{ mineOnly ? '전체 보기' : '내 조건만 보기' }}</button>
+            <!-- ── 1줄: 추천 단계 칩(선택 = 꿀색) + 오른쪽 날짜 ‹ 11.17 (화) ›
+                 단계는 열람 가능한 단계 + 바로 위 한 단계(잠금)만 보인다. 그 위 단계는 존재 자체를 숨긴다 ── -->
+            <div class="top-bar">
+                <div class="stage-chips" role="tablist" aria-label="추천 단계">
+                    <button v-for="s in visibleStages" :key="s.code" type="button" role="tab" class="stage-chip"
+                        :class="{ on: s.code === stageCode, locked: s.locked }"
+                        :aria-selected="s.code === stageCode ? 'true' : 'false'" @click="stageCode = s.code">
+                        <svg v-if="s.locked" class="stage-lock" width="13" height="13" viewBox="0 0 16 16" fill="none"
+                            stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+                            <rect x="3" y="7" width="10" height="7" rx="2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+                        </svg>
+                        {{ s.name }}
+                        <span class="stage-count">{{ s.locked ? '' : (s.ready === false ? '준비 중' : stageCount(s.rank)) }}</span>
+                    </button>
+                </div>
+                <!-- 날짜: 가운데를 눌러 달력으로 고르고, 양옆으로 하루씩(주말 건너뜀) 옮긴다 -->
+                <div class="date-nav">
+                    <button type="button" class="nav-btn" aria-label="이전 영업일" @click="stepSelectedDate(-1)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+                    </button>
+                    <div class="date-center">
+                        <button type="button" class="date-btn" aria-label="날짜 선택" @click="openDatePicker">{{ dateLabel }}</button>
+                        <input type="date" ref="dateInput" class="hidden-input" v-model="selectedDate"
+                            @change="handleDateChange" tabindex="-1" aria-hidden="true" />
+                    </div>
+                    <button type="button" class="nav-btn" aria-label="다음 영업일" :disabled="!canStepForward" @click="stepSelectedDate(1)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+                    </button>
+                </div>
             </div>
-
-            <!-- ── 추천 단계: 밑줄 탭. 열람 가능한 단계 + 바로 위 한 단계(잠금)만 보인다. 그 위 단계는 존재 자체를 숨긴다 ── -->
-            <div class="stage-chips" role="tablist" aria-label="추천 단계">
-                <button v-for="s in visibleStages" :key="s.code" type="button" role="tab" class="stage-chip"
-                    :class="{ on: s.code === stageCode, locked: s.locked }"
-                    :aria-selected="s.code === stageCode ? 'true' : 'false'" @click="stageCode = s.code">
-                    <svg v-if="s.locked" class="stage-lock" width="13" height="13" viewBox="0 0 16 16" fill="none"
-                        stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
-                        <rect x="3" y="7" width="10" height="7" rx="2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
-                    </svg>
-                    {{ s.name }}
-                    <span class="stage-count">{{ s.locked ? '' : (s.ready === false ? '준비 중' : stageCount(s.rank)) }}</span>
-                </button>
-            </div>
+            <div class="band" aria-hidden="true"></div>
 
             <!-- 잠금 단계를 고른 경우: 내용 대신 안내만(개수·종목은 서버가 내려주지 않는다) -->
             <section v-if="activeStage.locked" class="stage-locked">
@@ -56,25 +52,34 @@
             </section>
 
             <template v-else>
-            <!-- ── 정렬 (홈과 동일: 기준 select + 방향 버튼) ── -->
-            <div v-if="!isLoading && resultData.length > 0" class="list-head">
-                <h2>추천 종목 <span class="count">{{ sortedData.length }}</span></h2>
-                <div class="list-tools">
-                    <button type="button" class="dir-btn" @click="toggleSortDir"
-                        :aria-label="`정렬 방향: ${sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel}`"
-                        :title="sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
-                            :style="{ transform: sortDir === 'desc' ? 'rotate(180deg)' : 'none' }" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg>
-                    </button>
-                </div>
+            <!-- ── 2줄: 목록 머리 + 정렬·범위 선택(누르면 기기 기본 선택 창이 뜬다) ── -->
+            <div class="list-head">
+                <h2>추천 종목<span v-if="!isLoading" class="count">{{ sortedData.length }}</span></h2>
+                <span class="basis">{{ priceLabel }} 기준</span>
             </div>
-            <!-- 정렬 기준: 가로로 넘기는 칩(방향은 위 ↑ 버튼) -->
-            <SortChips v-if="!isLoading && resultData.length > 0" v-model="sortKey" :options="SORT_OPTIONS" @change="onSortKeyChange" />
+            <div class="filters">
+                <label class="fbtn">
+                    <span class="sr-only">정렬 기준</span>
+                    <b>{{ currentSort.label }}</b>
+                    <select v-model="sortKey" @change="onSortKeyChange">
+                        <option v-for="o in SORT_OPTIONS" :key="o.key" :value="o.key">{{ o.label }}</option>
+                    </select>
+                </label>
+                <label class="fbtn">
+                    <span class="sr-only">목록 범위</span>
+                    {{ personaType.name }} · <b>{{ mineOnly ? '내 조건만' : '전체' }}</b>
+                    <select :value="mineOnly ? 'mine' : 'all'" @change="onScopeChange">
+                        <option value="mine">{{ personaType.name }} · 내 조건만</option>
+                        <option value="all">{{ personaType.name }} · 전체</option>
+                        <option value="preset">내 설정 바꾸기…</option>
+                    </select>
+                </label>
+            </div>
 
             <section class="buy-target reco">
                 <div v-if="!isLoading && sortedData.length" class="reco-list">
                     <div v-for="(r, idx) in rows" :key="r.item.stock_code ?? idx" class="reco-item">
-                        <!-- 윗줄: 순위 | 종목명·코드·시총 | 가격·등락. 아랫줄: 내 조건(점) + 충족한 지표만 태그. 줄 전체가 펼침 버튼 -->
+                        <!-- 윗줄: 순위 | 종목명·코드·시총 | 가격·등락 배지. 아래: 추천 이유 한 줄(크림 띠) + 내 조건 점. 전체가 펼침 버튼 -->
                         <button type="button" class="reco-row" :class="{ open: expandedCode === r.item.stock_code }"
                             :aria-expanded="expandedCode === r.item.stock_code ? 'true' : 'false'"
                             @click="toggleRow(r.item.stock_code)">
@@ -88,7 +93,13 @@
                             </span>
                             <span class="px">
                                 <span class="price">{{ formatNumber(r.item.close) }}</span>
-                                <span class="chg" :class="r.chg.cls">{{ r.chgPct }}</span>
+                                <span class="badge" :class="r.chg.cls">{{ r.chgPct }}</span>
+                            </span>
+
+                            <span v-if="expandedCode !== r.item.stock_code && r.reasons.top" class="why">
+                                <span class="why-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg></span>
+                                <span class="why-tx">{{ r.reasons.top.text }}</span>
+                                <span v-if="r.reasons.rest" class="why-more">+{{ r.reasons.rest }}</span>
                             </span>
                             <span class="r2">
                                 <span class="match" :aria-label="`내 조건 ${r.passText} 충족`">
@@ -96,11 +107,8 @@
                                     <span v-if="r.passTotal" class="dots" aria-hidden="true">
                                         <i v-for="n in r.passTotal" :key="n" :class="{ f: n <= r.passCount }"></i>
                                     </span>
-                                    {{ r.passText }}
+                                    <b>{{ r.passText }}</b>
                                 </span>
-                                <template v-if="expandedCode !== r.item.stock_code">
-                                    <span v-for="c in r.passedConds" :key="c" class="tag">{{ c }}</span>
-                                </template>
                                 <span class="more-hint" aria-hidden="true">
                                     {{ expandedCode === r.item.stock_code ? '접기' : '' }}
                                     <svg class="more-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -109,35 +117,40 @@
                             </span>
                         </button>
 
+                        <!-- 펼침: 이유(말) → 아직 아닌 것 → 숫자 → 버튼 -->
                         <div v-if="expandedCode === r.item.stock_code" class="reco-detail">
-                            <!-- 최근 5개 봉 + 지표 7개(충족 먼저, 미달은 연하게) -->
-                            <div class="rd-box">
-                                <div class="rd-cap">
-                                    <span>{{ priceLabel }} 기준 · 최근 {{ r.recentBars.length || 1 }}일</span>
-                                    <span>지표 {{ r.summary.total }}개 중 {{ r.summary.pass }}개 충족</span>
-                                </div>
-                                <div class="rd-candles">
-                                    <MiniCandles v-if="r.recentBars.length" class="candle" :bars="r.recentBars" />
-                                    <DayCandle v-else mini class="candle" :open="r.item.open" :high="r.item.high" :low="r.item.low"
-                                        :close="r.item.close" :close-label="priceLabel" />
-                                </div>
-                                <ul class="cs-list">
-                                    <li v-for="c in r.condsSorted" :key="c.key" class="cs-row" :class="{ off: !c.pass }">
-                                        <span class="cs-label">{{ COND_NAMES[c.key] ?? detailLabel(c.label) }}</span>
-                                        <span class="cs-value">{{ isStatusText(c.value) ? '' : c.value }}</span>
-                                        <span class="cs-state">{{ c.pass ? '충족' : '미달' }}</span>
+                            <template v-if="r.reasons.passed.length">
+                                <h4 class="rd-h">추천 이유 {{ r.reasons.passed.length }}가지</h4>
+                                <ul class="rs">
+                                    <li v-for="x in r.reasons.passed" :key="x.key">
+                                        <span class="rs-k" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg></span>
+                                        <span>{{ x.text }}<small>{{ x.detail }}</small></span>
                                     </li>
                                 </ul>
-                            </div>
-                            <!-- 수급·밸류 요약. 수급은 추천일 이하 최근 영업일, PER/PBR 은 추천일 배치 시점 -->
+                            </template>
+                            <template v-if="r.reasons.failed.length">
+                                <h4 class="rd-h">아직 아닌 것</h4>
+                                <ul class="rs off">
+                                    <li v-for="x in r.reasons.failed" :key="x.key">
+                                        <span class="rs-k" aria-hidden="true"></span>
+                                        <span>{{ x.text }} · {{ x.detail }}</span>
+                                    </li>
+                                </ul>
+                            </template>
+
+                            <!-- 숫자: PER·PBR·점수(프리미엄은 외국인·기관 순매수까지). 수급은 추천일 이하 최근 영업일, PER/PBR 은 추천일 배치 시점 -->
                             <div class="facts">
                                 <span v-for="f in r.facts" :key="f.name" class="fact">
                                     <span class="fact-name">{{ f.name }}</span>
                                     <span class="fact-value" :class="f.cls">{{ f.value }}</span>
                                 </span>
+                                <span v-if="hasValue(r.item.score)" class="fact">
+                                    <span class="fact-name">종합 점수</span>
+                                    <span class="fact-value">{{ numOrNull(r.item.score) }}</span>
+                                </span>
                             </div>
-                            <!-- 시가총액 · 수급: 추천일 이하 가장 최근 영업일 기준. 순매수=빨강 / 순매도=파랑 -->
-                            <div v-if="r.market" class="mk">
+                            <!-- 시가총액 · 수급(프리미엄 단계): 추천일 이하 가장 최근 영업일 기준. 순매수=빨강 / 순매도=파랑 -->
+                            <div v-if="r.market && activeStage.rank >= 2" class="mk">
                                 <div class="mk-head">
                                     <span class="mk-title">시가총액 · 수급</span>
                                     <span v-if="r.market.dateLabel" class="mk-date">{{ r.market.dateLabel }} 종가·순매수 기준</span>
@@ -155,12 +168,10 @@
                                     </li>
                                 </ul>
                             </div>
-                            <!-- 점수가 아직 없으면(장 마감 후 산출) 칸 자체를 숨긴다 -->
-                            <div v-if="hasValue(r.item.score)" class="score-line">종합 점수 <b>{{ numOrNull(r.item.score) }}</b> / 100</div>
 
                             <div class="rd-actions">
-                                <button type="button" class="btn-outline strong" @click="goToStockInfo(r.item.stock_code, r.item.stock_name)">AI 분석</button>
-                                <button type="button" class="btn-outline" @click="toggleChart(r.item.stock_code)">
+                                <button type="button" class="btn strong" @click="goToStockInfo(r.item.stock_code, r.item.stock_name)">AI 분석 보기</button>
+                                <button type="button" class="btn" @click="toggleChart(r.item.stock_code)">
                                     {{ expandedCharts.has(r.item.stock_code) ? '차트 접기' : '차트' }}
                                 </button>
                             </div>
@@ -206,6 +217,7 @@ import { addRecent } from '@scripts/recentStocks.js';
 import { usePersonaStore } from '@scripts/stores/persona-store.js';
 import { orderForType } from '@scripts/persona.js';
 import { evaluate } from '@scripts/indicators.js';
+import { recoReasons } from '@scripts/recoReasons.js';
 import { ONBOARDING_PATH } from '@scripts/authPaths.js';
 import {
     numOrNull, formatNumber, hasValue, changeInfo, conditionSummary,
@@ -343,6 +355,12 @@ const onSortKeyChange = () => {
     sortDir.value = SORT_OPTIONS.value.find(o => o.key === sortKey.value)?.dir ?? 'desc';
 };
 const toggleSortDir = () => { sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc'; };
+// 범위 선택: 내 조건만 / 전체 / 내 설정 바꾸기(설정 화면으로 이동 — 선택값은 그대로 둔다)
+const onScopeChange = (e) => {
+    const v = e.target.value;
+    if (v === 'preset') { e.target.value = mineOnly.value ? 'mine' : 'all'; router.push('/stock/preset'); return; }
+    mineOnly.value = v === 'mine';
+};
 
 // 카드 번호: 정렬 기준의 "기본 방향"일 때만 1위부터 매기고, 방향을 뒤집으면
 // 목록을 새로 매기는 게 아니라 같은 순위를 거꾸로 보여준다(마지막 번호부터 역순).
@@ -457,6 +475,7 @@ const rows = computed(() =>
             // 목록 줄에는 충족한 지표만 태그로, 펼치면 충족 먼저 → 미달 순서로 7개 전부
             passedConds: summary.rows.filter(c => c.pass).map(c => COND_NAMES[c.key] ?? c.head),
             condsSorted: [...summary.rows].sort((x, y) => Number(y.pass) - Number(x.pass)),
+            reasons: recoReasons(item),   // 추천 이유 문장(목록 줄 1개 + 펼침 전체)
             capShort: formatCapShort(item.market_cap), market: marketInfo(item),
             recentBars: (item.chart_data || []).slice(-RECENT_BARS),
             facts: [
@@ -494,7 +513,7 @@ const toggleChart = (code) => {
 </script>
 
 <style scoped lang="scss">
-// 2026-11-17 화이트 톤 개편 — 홈과 같은 토큰(흰 판, 연회색 구분, 색은 등락에만)
+// 2026-11-17 꿀빛 톤(한국투자 참고) — 홈과 같은 토큰. 조작 줄 2줄, 종목마다 추천 이유 한 줄(크림 띠).
 @use '@@/_home-tokens.scss' as *;
 
 #stock-buy-target {
@@ -508,135 +527,107 @@ const toggleChart = (code) => {
     -webkit-font-smoothing: antialiased;
 }
 button { font: inherit; letter-spacing: inherit; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-.contents {
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 0 0 24px;
-}
+.contents { max-width: 720px; margin: 0 auto; padding: 0 0 24px; }
 
-/* ── 날짜: 헤더 오른쪽 ‹ 11.17 (화) › ── */
-.date-nav { display: flex; align-items: center; gap: 0; margin-right: 4px; }
-.nav-btn {
-    flex: none;
-    width: 32px;
-    height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 0;
-    background: transparent;
-    color: $sub;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    &:disabled { color: $line; cursor: default; }
-}
-.date-center { position: relative; }
-.date-btn {
-    height: 44px;
-    padding: 0 2px;
-    border: 0;
-    background: transparent;
-    color: $ink;
-    font-size: 15px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-}
-.hidden-input {
-    position: absolute;
-    left: 50%;
-    bottom: 0;
-    width: 0;
-    height: 0;
-    opacity: 0;
-    pointer-events: none;
-}
-
-/* ── 내 설정 한 줄 ── */
-.persona-line {
-    margin: 2px 0 0;
-    padding: 0 $pad-x;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 36px;
-    font-size: 14px;
-    color: $sub;
-    white-space: nowrap;
-    .pl-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-    b { margin-left: 4px; color: $ink; font-weight: 600; }
-    .pl-link {
-        flex: none; min-height: 36px; padding: 0; border: 0; background: transparent;
-        color: $sub-ink; font-size: 14px; cursor: pointer;
-    }
-    .pl-change::after { content: ' ›'; color: $sub-2; }
-    .pl-scope { margin-left: auto; }
-}
-
-/* ── 추천 단계: 밑줄 탭(1단계 선택) ── */
-.stage-chips { display: flex; margin: 14px 0 0; border-bottom: 1px solid $line; }
+/* ── 1줄: 단계 칩 + 날짜 ── */
+.top-bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px 0 $pad-x; }
+.stage-chips { display: flex; gap: 6px; min-width: 0; }
 .stage-chip {
-    position: relative;
-    flex: 1;
-    min-height: 48px;
+    height: 36px;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
     gap: 6px;
-    padding: 0 8px;
+    padding: 0 14px;
     border: 0;
+    border-radius: 8px;
     background: transparent;
-    color: $sub-2;
-    font-size: 16px;
+    color: $sub;
+    font-size: 15px;
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    &.on {
-        color: $ink;
-        font-weight: 700;
-        &::after { content: ''; position: absolute; left: $pad-x; right: $pad-x; bottom: -1px; height: 2px; background: $ink; }
-    }
-    &:focus-visible { outline: 2px solid $ink; outline-offset: -2px; }
-    .stage-count { font-size: 14px; font-weight: 600; color: $sub; font-variant-numeric: tabular-nums; }
+    .stage-count { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    &.on { background: $honey-300; color: $honey-ink; font-weight: 700; .stage-count { color: $amber-700; } }
+    &:focus-visible { outline: 2px solid $ink; outline-offset: 2px; }
 }
-.stage-locked {
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-    margin: 20px $pad-x 0; padding: 32px 20px; border-radius: 16px; background: $bg; text-align: center; color: $ink;
-    svg { color: $sub; }
-    .stage-locked-title { margin: 4px 0 0; font-size: 16px; font-weight: 700; }
-    .stage-locked-desc { margin: 0; font-size: 14px; line-height: 1.5; color: $sub; text-wrap: pretty; }
-    .stage-locked-unlock { margin: 6px 0 0; padding: 6px 12px; border-radius: 999px; background: $card; font-size: 13px; font-weight: 600; color: $sub-ink; }
-}
-
-/* ── 목록 머리: 추천 종목 N + 정렬 방향 ── */
-.list-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 24px $pad-x 0;
-    h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.4px; }
-    .count { margin-left: 4px; color: $sub; }
-}
-.list-tools { display: flex; align-items: center; }
-.dir-btn {
-    width: 36px;
-    height: 36px;
-    border: 0;
-    border-radius: 18px;
-    background: transparent;
-    color: $sub;
-    cursor: pointer;
+.date-nav { margin-left: auto; display: flex; align-items: center; flex: none; }
+.nav-btn {
+    width: 28px;
+    height: 40px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    @media (hover: hover) { &:hover { background: $band; } }
+    border: 0;
+    background: transparent;
+    color: $sub;
+    cursor: pointer;
+    &:disabled { color: $line; cursor: default; }
 }
-// 정렬 칩은 공통 SortChips(선택된 것만 연회색 알약). 좌우 여백만 화면 기준으로 맞춘다.
-:deep(.sort-chips) { margin: 10px 0 4px; padding: 2px $pad-x; scroll-padding: 0 $pad-x; }
+.date-center { position: relative; }
+.date-btn {
+    height: 40px;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    color: $ink;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.hidden-input { position: absolute; left: 50%; bottom: 0; width: 0; height: 0; opacity: 0; pointer-events: none; }
+.band { height: $band-h; margin-top: 16px; background: $band; }
+
+.stage-locked {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    margin: 20px $pad-x 0; padding: 32px 20px; border-radius: $radius; background: $honey-50; text-align: center; color: $ink;
+    svg { color: $amber-700; }
+    .stage-locked-title { margin: 4px 0 0; font-size: 16px; font-weight: 700; }
+    .stage-locked-desc { margin: 0; font-size: 14px; line-height: 1.5; color: $sub-ink; text-wrap: pretty; }
+    .stage-locked-unlock { margin: 6px 0 0; padding: 6px 12px; border-radius: 8px; background: $card; font-size: 13px; font-weight: 600; color: $amber-700; }
+}
+
+/* ── 2줄: 목록 머리 + 정렬·범위 ── */
+.list-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 24px $pad-x 0;
+    h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    .count { margin-left: 4px; color: $amber-700; }
+    .basis { font-size: 13px; color: $sub; }
+}
+.filters { display: flex; gap: 6px; padding: 12px $pad-x 4px; }
+.fbtn {
+    position: relative;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px 0 12px;
+    border: 1px solid $line;
+    border-radius: 8px;
+    font-size: 14px;
+    color: $sub-ink;
+    white-space: nowrap;
+    cursor: pointer;
+    b { color: $ink; font-weight: 600; }
+    &::after {
+        content: '';
+        width: 6px;
+        height: 6px;
+        margin: 0 0 3px 6px;
+        border-right: 1.6px solid $sub;
+        border-bottom: 1.6px solid $sub;
+        transform: rotate(45deg);
+    }
+    // 실제 선택은 위에 투명하게 덮은 select(기기 기본 선택 창)
+    select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
+    &:focus-within { box-shadow: 0 0 0 2px $ink; }
+}
 
 /* ── 종목 목록 ── */
 .reco { padding: 0 $pad-x; }
@@ -647,9 +638,8 @@ button { font: inherit; letter-spacing: inherit; }
     width: 100%;
     display: grid;
     grid-template-columns: 26px minmax(0, 1fr) auto;
-    column-gap: 0;
     align-items: start;
-    padding: 18px 0;
+    padding: 18px 0 14px;
     border: 0;
     background: transparent;
     text-align: left;
@@ -657,13 +647,13 @@ button { font: inherit; letter-spacing: inherit; }
     color: $ink;
     -webkit-tap-highlight-color: transparent;
 
-    .rank { font-size: 16px; font-weight: 700; line-height: 1.4; color: $ink; }
-    .who { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding-right: 12px; }
+    .rank { font-size: 17px; font-weight: 700; line-height: 1.4; color: $amber-700; }
+    .who { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-right: 12px; }
     .name-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
     .name {
         font-size: 17px;
         font-weight: 600;
-        line-height: 1.35;
+        line-height: 1.4;
         letter-spacing: -0.4px;
         min-width: 0;
         overflow-wrap: anywhere;
@@ -674,104 +664,95 @@ button { font: inherit; letter-spacing: inherit; }
     }
     .sector { font-size: 12px; color: $sub; white-space: nowrap; flex-shrink: 0; }
     .code { font-size: 13px; color: $sub; }
+    .px { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .price { font-size: 17px; font-weight: 600; line-height: 1.4; }
 
-    .px { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
-    .price { font-size: 17px; font-weight: 600; line-height: 1.35; }
+    // 추천 이유 한 줄
+    .why {
+        grid-column: 2 / -1;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+        padding: 11px 12px;
+        border-radius: 10px;
+        background: $honey-50;
+    }
+    .why-tx { flex: 1; min-width: 0; font-size: 14px; color: $honey-ink; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .why-more { flex: none; font-size: 13px; font-weight: 600; color: $amber-700; }
 
-    // 아랫줄: 내 조건 점 + 충족 지표 태그 + 펼침 화살표
     .r2 {
         grid-column: 2 / -1;
         display: flex;
         align-items: center;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-top: 12px;
-    }
-    .match {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        margin-right: 4px;
-        font-size: 13px;
-        font-weight: 600;
-        color: $ink;
-        white-space: nowrap;
-    }
-    .dots { display: inline-flex; gap: 3px; }
-    .dots i { width: 6px; height: 6px; border-radius: 3px; background: $line; }
-    .dots i.f { background: $ink; }
-    .tag {
-        height: 24px;
-        padding: 0 8px;
-        border-radius: 6px;
-        background: $band;
+        margin-top: 10px;
         font-size: 12px;
-        color: $sub-ink;
-        display: inline-flex;
-        align-items: center;
-        white-space: nowrap;
-    }
-    .more-hint {
-        margin-left: auto;
-        display: inline-flex;
-        align-items: center;
-        gap: 2px;
-        font-size: 13px;
         color: $sub;
     }
+    .match { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; b { color: $ink; font-weight: 600; } }
+    .dots { display: inline-flex; gap: 3px; }
+    .dots i { width: 6px; height: 6px; border-radius: 3px; background: $line; }
+    .dots i.f { background: $amber-700; }
+    .more-hint { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: $sub; }
     .more-chev { color: $sub-2; transition: transform .15s ease; }
     &.open .more-chev { transform: rotate(180deg); }
 }
+.why-ic, .rs-k {
+    width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    background: $honey-300;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    svg { width: 10px; height: 10px; fill: none; stroke: $honey-ink; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+}
 
-.chg {
-    font-size: 14px;
+.badge {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: $radius-sm;
+    font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
-    &.up   { color: $up; }
-    &.down { color: $down; }
-    &.flat { color: $sub; }
+    color: $sub;
+    background: $band;
+    &.up   { color: $up;   background: $up-bg; }
+    &.down { color: $down; background: $down-bg; }
 }
 
-/* ── 펼친 상세 ── */
-.reco-detail {
-    margin-left: 26px;
-    padding: 0 0 20px;
+/* ── 펼친 상세: 이유 → 아직 아닌 것 → 숫자 → 버튼 ── */
+.reco-detail { margin-left: 26px; padding: 0 0 20px; display: flex; flex-direction: column; }
+.rd-h { margin: 4px 0 6px; font-size: 13px; font-weight: 600; color: $sub; }
+.rs + .rd-h { margin-top: 12px; }
+.rs { list-style: none; margin: 0; padding: 0; }
+.rs li {
     display: flex;
-    flex-direction: column;
-    gap: 14px;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 7px 0;
+    font-size: 15px;
+    line-height: 1.45;
+    .rs-k { flex: none; margin-top: 2px; }
+    small { display: block; margin-top: 1px; font-size: 12px; color: $sub; }
 }
-.rd-box { background: $bg; border-radius: 12px; padding: 14px 14px 6px; }
-.rd-cap { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: $sub; }
-.rd-candles { display: flex; justify-content: flex-end; padding: 10px 0 4px; }
-.cs-list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-}
-.cs-row {
+.rs.off li { padding: 5px 0; font-size: 14px; color: $sub; .rs-k { background: $band; } }
+
+.facts {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    column-gap: 6px;
-    min-height: 34px;
-    font-size: 14px;
-    .cs-label { color: $sub-ink; white-space: nowrap; }
-    .cs-value { justify-self: end; font-size: 12px; color: $sub; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-    .cs-state { font-size: 13px; font-weight: 600; color: $ink; white-space: nowrap; }
-    &.off { .cs-label, .cs-value { color: $sub-2; } .cs-state { color: $sub-2; font-weight: 500; } }
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 8px;
+    margin-top: 14px;
+    padding: 14px;
+    border-radius: $radius;
+    background: $band;
 }
-
-.score-line { font-size: 13px; color: $sub; b { color: $ink; font-weight: 600; } }
-
-// 수급·밸류 요약 — 4칸, 칸 사이 구분선 없이 여백으로
-.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .fact { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .fact-name { font-size: 12px; color: $sub; white-space: nowrap; }
 .fact-value {
-    max-width: 100%;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: $ink;
     white-space: nowrap;
@@ -781,45 +762,43 @@ button { font: inherit; letter-spacing: inherit; }
     &.down { color: $down; }
 }
 
-// 시가총액 · 수급 — 선 없는 줄 리스트
-.mk {
-    .mk-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 2px; }
-    .mk-title { font-size: 13px; font-weight: 600; color: $ink; }
-    .mk-date  { font-size: 12px; color: $sub-2; }
-}
+.mk { margin-top: 14px; }
+.mk-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.mk-title { font-size: 13px; font-weight: 600; color: $ink; }
+.mk-date  { font-size: 12px; color: $sub-2; }
 .mk-list { margin: 0; padding: 0; list-style: none; }
 .mk-row {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
     min-height: 34px;
-    align-items: center;
     font-size: 14px;
     .mk-label { color: $sub; white-space: nowrap; }
     .mk-value { font-weight: 600; color: $ink; text-align: right; white-space: nowrap; &.up { color: $up; } &.down { color: $down; } }
     .mk-qty { margin-left: 6px; font-size: 12px; font-weight: 400; color: $sub-2; }
 }
 
-.rd-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.btn-outline {
-    min-height: 44px;
-    border-radius: 10px;
+.rd-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.btn {
+    min-height: 46px;
     border: 0;
+    border-radius: $radius;
     background: $band;
     color: $ink;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    &.strong { background: $ink; color: #fff; }
+    &.strong { background: $honey-300; color: $honey-ink; }
 }
 
-.skeleton-row { height: 92px; border-top: 1px solid $line; background: $bg; animation: pulse 1.6s infinite ease-in-out; }
+.skeleton-row { height: 120px; border-top: 1px solid $line; background: $honey-50; animation: pulse 1.6s infinite ease-in-out; }
 .empty-box { text-align: center; padding: 56px 0; color: $sub; font-size: 14px; }
 
 /* ── 간이 차트 ── */
 .mini-chart {
     width: 100%;
+    margin-top: 14px;
     box-sizing: border-box;
     .mini-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
     .mini-legend { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -832,16 +811,7 @@ button { font: inherit; letter-spacing: inherit; }
         gap: 3px;
         &::before { content: ''; display: inline-block; width: 10px; height: 2px; background: var(--c); }
     }
-    .mini-chart-detail {
-        flex-shrink: 0;
-        min-height: 32px;
-        padding: 0 4px;
-        border: 0;
-        background: transparent;
-        color: $sub-ink;
-        font-size: 13px;
-        cursor: pointer;
-    }
+    .mini-chart-detail { flex-shrink: 0; min-height: 32px; padding: 0 4px; border: 0; background: transparent; color: $sub-ink; font-size: 13px; cursor: pointer; }
     .mini-chart-canvas { width: 100%; height: 220px; }
 }
 
