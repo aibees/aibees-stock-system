@@ -308,25 +308,11 @@ const saveMenu = async () => {
 </script>
 
 <style scoped lang="scss">
-$white:    #ffffff;
-$gray-50:  #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-300: #c4c4c4;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-700: #3d3d3d;
-$gray-900: #141414;
-$blue:     #141414;
-$navy:     #141414;
-$red:      #141414;
-$amber:    #141414;
-$green:    #141414;
 
 #route-setting {
     min-height: 100vh;
-    background: $gray-50;
-    color: $gray-900;
+    background: var(--sc-bg);
+    color: var(--sc-text);
     font-family: 'Pretendard', -apple-system, sans-serif;
 }
 
@@ -347,12 +333,12 @@ $green:    #141414;
         font-size: 1.4rem;
         font-weight: 700;
         margin: 0;
-        color: $gray-900;
+        color: var(--sc-text);
     }
 
     .sub-text {
         font-size: 0.82rem;
-        color: $gray-500;
+        color: var(--sc-text-sub);
         margin: 4px 0 0;
     }
 }
@@ -362,8 +348,8 @@ $green:    #141414;
     align-items: center;
     gap: 6px;
     padding: 8px 16px;
-    background: $navy;
-    color: $white;
+    background: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
     border: none;
     border-radius: 0;
     font-size: 0.84rem;
@@ -372,13 +358,13 @@ $green:    #141414;
     font-family: inherit;
     transition: background .15s;
 
-    &:hover { background: #000000; }
+    &:hover { background: var(--sc-strong-bg); }
 }
 
 /* ── Table ── */
 .table-section {
-    background: $white;
-    border: 1px solid $gray-200;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 0;
     overflow: hidden;
 }
@@ -389,8 +375,8 @@ $green:    #141414;
     font-size: 0.83rem;
 
     thead tr {
-        background: $gray-50;
-        border-bottom: 1px solid $gray-200;
+        background: var(--sc-bg);
+        border-bottom: 1px solid var(--sc-border);
     }
 
     th {
@@ -398,7 +384,7 @@ $green:    #141414;
         text-align: left;
         font-size: 0.72rem;
         font-weight: 700;
-        color: $gray-500;
+        color: var(--sc-text-sub);
         letter-spacing: .04em;
         text-transform: uppercase;
         white-space: nowrap;
@@ -406,14 +392,14 @@ $green:    #141414;
 
     td {
         padding: 10px 12px;
-        border-bottom: 1px solid $gray-100;
+        border-bottom: 1px solid var(--sc-border);
         vertical-align: middle;
-        color: $gray-700;
+        color: var(--sc-text);
     }
 
     tbody tr:last-child td { border-bottom: none; }
 
-    tbody tr:hover td { background: $gray-50; }
+    tbody tr:hover td { background: var(--sc-bg); }
 
     .row-disabled td { opacity: .45; }
 
@@ -436,36 +422,36 @@ $green:    #141414;
 .code-chip {
     font-size: 0.72rem;
     font-weight: 600;
-    background: $gray-100;
-    color: $gray-700;
+    background: var(--sc-surface-2);
+    color: var(--sc-text);
     padding: 2px 7px;
     border-radius: 0;
-    border: 1px solid $gray-200;
+    border: 1px solid var(--sc-border);
 }
 
 .parent-chip {
     font-size: 0.72rem;
-    background: #efefef;
-    color: $navy;
+    background: var(--sc-surface-2);
+    color: var(--sc-text);
     padding: 2px 7px;
     border-radius: 0;
-    border: 1px solid #c4c4c4;
+    border: 1px solid var(--sc-border-strong);
 }
 
 .root-label {
     font-size: 0.72rem;
-    color: $gray-400;
+    color: var(--sc-text-mute);
 }
 
 .path-text, .comp-text {
     font-family: 'SFMono-Regular', Consolas, monospace;
     font-size: 0.78rem;
-    color: $gray-700;
+    color: var(--sc-text);
 }
 
 .indent.child::before {
     content: '└ ';
-    color: $gray-400;
+    color: var(--sc-text-mute);
 }
 
 /* flag badge */
@@ -475,9 +461,9 @@ $green:    #141414;
     padding: 2px 8px;
     border-radius: 0;
 
-    &.on    { background: #141414; color: $green; border: 1px solid #141414; }
-    &.off   { background: $gray-100; color: $gray-400; border: 1px solid $gray-200; }
-    &.admin { background: #efefef; color: $amber; border: 1px solid #9a9a9a; }
+    &.on    { background: var(--sc-point); color: var(--sc-text); border: 1px solid var(--sc-point); }
+    &.off   { background: var(--sc-surface-2); color: var(--sc-text-mute); border: 1px solid var(--sc-border); }
+    &.admin { background: var(--sc-surface-2); color: var(--sc-text); border: 1px solid var(--sc-border-strong); }
 }
 
 /* toggle */
@@ -491,8 +477,8 @@ $green:    #141414;
     transition: background .2s;
     padding: 0;
 
-    &.active   { background: $green; }
-    &.inactive { background: $gray-200; }
+    &.active   { background: var(--sc-point); }
+    &.inactive { background: var(--sc-border); }
 
     &:disabled { opacity: .5; cursor: not-allowed; }
 
@@ -502,7 +488,7 @@ $green:    #141414;
         width: 14px;
         height: 14px;
         border-radius: 0;
-        background: $white;
+        background: var(--sc-surface);
         transition: left .2s;
     }
 
@@ -514,22 +500,22 @@ $green:    #141414;
     padding: 4px 10px;
     font-size: 0.75rem;
     font-weight: 600;
-    border: 1px solid $gray-200;
+    border: 1px solid var(--sc-border);
     border-radius: 0;
-    background: $white;
-    color: $gray-700;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     cursor: pointer;
     font-family: inherit;
     transition: border-color .12s, color .12s;
 
-    &:hover { border-color: $blue; color: $blue; }
+    &:hover { border-color: var(--sc-text); color: var(--sc-text); }
 }
 
 /* skeleton */
 .loader-rows { padding: 8px; }
 .skeleton-row {
     height: 42px;
-    background: $gray-100;
+    background: var(--sc-surface-2);
     border-radius: 0;
     margin-bottom: 6px;
     animation: pulse 1.6s infinite ease-in-out;
@@ -538,7 +524,7 @@ $green:    #141414;
 .empty-cell {
     text-align: center;
     padding: 60px 0;
-    color: $gray-400;
+    color: var(--sc-text-mute);
     font-size: 0.88rem;
 }
 
@@ -555,7 +541,7 @@ $green:    #141414;
 }
 
 .popup-panel {
-    background: $white;
+    background: var(--sc-surface);
     border-radius: 0;
     width: 100%;
     max-width: 560px;
@@ -570,27 +556,27 @@ $green:    #141414;
     justify-content: space-between;
     align-items: center;
     padding: 18px 20px 14px;
-    border-bottom: 1px solid $gray-100;
+    border-bottom: 1px solid var(--sc-border);
 
     h3 {
         margin: 0;
         font-size: 1rem;
         font-weight: 700;
-        color: $gray-900;
+        color: var(--sc-text);
     }
 
     .btn-close {
         border: none;
         background: none;
         cursor: pointer;
-        color: $gray-400;
+        color: var(--sc-text-mute);
         padding: 4px;
         border-radius: 0;
         display: flex;
         align-items: center;
         transition: color .12s;
 
-        &:hover { color: $gray-900; }
+        &:hover { color: var(--sc-text); }
     }
 }
 
@@ -615,27 +601,27 @@ $green:    #141414;
         label {
             font-size: 0.78rem;
             font-weight: 600;
-            color: $gray-700;
+            color: var(--sc-text);
         }
 
-        .req { color: $red; margin-left: 2px; }
+        .req { color: var(--sc-text); margin-left: 2px; }
 
         input[type="text"],
         input[type="number"],
         input:not([type="radio"]) {
             padding: 8px 10px;
-            border: 1px solid $gray-200;
+            border: 1px solid var(--sc-border);
             border-radius: 0;
             font-size: 0.84rem;
-            color: $gray-900;
+            color: var(--sc-text);
             font-family: inherit;
-            background: $white;
+            background: var(--sc-surface);
             outline: none;
             transition: border-color .15s;
 
-            &:focus  { border-color: $blue; }
-            &:disabled { background: $gray-50; color: $gray-400; }
-            &::placeholder { color: $gray-400; }
+            &:focus  { border-color: var(--sc-text); }
+            &:disabled { background: var(--sc-bg); color: var(--sc-text-mute); }
+            &::placeholder { color: var(--sc-text-mute); }
         }
 
         .radio-group {
@@ -650,10 +636,10 @@ $green:    #141414;
             gap: 5px;
             font-size: 0.84rem;
             font-weight: 500;
-            color: $gray-700;
+            color: var(--sc-text);
             cursor: pointer;
 
-            input[type="radio"] { cursor: pointer; accent-color: $navy; }
+            input[type="radio"] { cursor: pointer; accent-color: var(--sc-text); }
         }
     }
 }
@@ -663,36 +649,36 @@ $green:    #141414;
     justify-content: flex-end;
     gap: 8px;
     padding: 14px 20px 18px;
-    border-top: 1px solid $gray-100;
+    border-top: 1px solid var(--sc-border);
 
     .btn-cancel {
         padding: 8px 18px;
-        border: 1px solid $gray-200;
+        border: 1px solid var(--sc-border);
         border-radius: 0;
-        background: $white;
-        color: $gray-700;
+        background: var(--sc-surface);
+        color: var(--sc-text);
         font-size: 0.84rem;
         font-weight: 600;
         cursor: pointer;
         font-family: inherit;
         transition: border-color .12s;
 
-        &:hover { border-color: $gray-400; }
+        &:hover { border-color: var(--sc-border-strong); }
     }
 
     .btn-save {
         padding: 8px 20px;
         border: none;
         border-radius: 0;
-        background: $navy;
-        color: $white;
+        background: var(--sc-strong-bg);
+        color: var(--sc-strong-text);
         font-size: 0.84rem;
         font-weight: 700;
         cursor: pointer;
         font-family: inherit;
         transition: background .15s;
 
-        &:hover    { background: #000000; }
+        &:hover    { background: var(--sc-strong-bg); }
         &:disabled { opacity: .55; cursor: not-allowed; }
     }
 }

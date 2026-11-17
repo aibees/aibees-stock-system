@@ -102,11 +102,6 @@ const selectItem = async (data) => {
 
 <style lang="scss" scoped>
 /* 테마에 맞는 컬러 변수 (프로젝트에 글로벌 변수가 있다면 교체하세요) */
-$bg-card: #2b2b2b;
-$border-soft: #4d4d4d;
-$color-accent: #141414;
-$text-light: #ffffff;
-$text-dark: #000000;
 $hover-bg: rgba(0, 229, 255, 0.15);
 
 .auto-complete-container {
@@ -118,11 +113,11 @@ $hover-bg: rgba(0, 229, 255, 0.15);
         // width: 80%;
         display: flex;
         align-items: center;
-        background: $bg-card;
+        background: var(--sc-strong-bg);
         margin: auto;
         padding: 6px 6px 6px 18px;
         border-radius: 0;
-        border: 1px solid $border-soft;
+        border: 1px solid var(--sc-text-mute);
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 
         .search-icon {
@@ -131,8 +126,8 @@ $hover-bg: rgba(0, 229, 255, 0.15);
         }
 
         .label-badge {
-            background-color: #141414;
-            color: white;
+            background-color: var(--sc-strong-bg);
+            color: var(--sc-strong-text);
             padding: 4px 10px;
             border-radius: 0;
             font-size: 0.8rem;
@@ -144,7 +139,7 @@ $hover-bg: rgba(0, 229, 255, 0.15);
         input {
             background: transparent;
             border: none;
-            color: $text-light;
+            color: var(--sc-strong-text);
             font-size: 1rem;
             font-weight: 500;
 
@@ -152,7 +147,7 @@ $hover-bg: rgba(0, 229, 255, 0.15);
                 outline: none;
             }
             &::placeholder {
-                color: #888;
+                color: var(--sc-text-sub);
             }
         }
 
@@ -165,16 +160,16 @@ $hover-bg: rgba(0, 229, 255, 0.15);
         .code-input {
             width: 55px;
             text-align: center;
-            color: #aaa;
+            color: var(--sc-text-mute);
             font-size: 0.85rem;
             margin-right: 12px;
-            border-left: 1px solid $border-soft;
+            border-left: 1px solid var(--sc-text-mute);
             padding-left: 12px;
         }
 
         .search-btn {
-            background: $color-accent;
-            color: $text-dark;
+            background: var(--sc-strong-bg);
+            color: var(--sc-text);
             border: none;
             padding: 10px 20px;
             border-radius: 0;
@@ -195,8 +190,8 @@ $hover-bg: rgba(0, 229, 255, 0.15);
         top: calc(100% + 10px); // 검색창 바로 아래에 띄움
         left: 0;
         width: 100%;
-        background-color: $bg-card;
-        border: 1px solid $border-soft;
+        background-color: var(--sc-strong-bg);
+        border: 1px solid var(--sc-text-mute);
         border-radius: 0;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         z-index: 999;
@@ -220,13 +215,13 @@ $hover-bg: rgba(0, 229, 255, 0.15);
             .s_code {
                 width: 70px;
                 text-align: center;
-                color: #000;
+                color: var(--sc-text);
             }
 
             .s_name {
                 flex: 1;
                 text-align: left;
-                color: #000;
+                color: var(--sc-text);
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -235,17 +230,17 @@ $hover-bg: rgba(0, 229, 255, 0.15);
             .s_type {
                 width: 60px;
                 text-align: center;
-                color: #aaa;
+                color: var(--sc-text-mute);
             }
         }
 
         .suggestion-header {
             background-color: rgba(255, 255, 255, 0.05);
-            border-bottom: 1px solid $border-soft;
+            border-bottom: 1px solid var(--sc-text-mute);
             
             .item {
                 font-weight: 700;
-                color: #ccc;
+                color: var(--sc-strong-text);
             }
         }
 
@@ -258,7 +253,7 @@ $hover-bg: rgba(0, 229, 255, 0.15);
                 width: 6px;
             }
             &::-webkit-scrollbar-thumb {
-                background: #555;
+                background: var(--sc-text-sub);
                 border-radius: 0;
             }
 

@@ -57,8 +57,8 @@ onBeforeUnmount(() => {
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    background: #fff;
-    border-top: 1px solid #dcdcdc;
+    background: var(--sc-surface);
+    border-top: 1px solid var(--sc-border);
     z-index: 1001;
 }
 </style>

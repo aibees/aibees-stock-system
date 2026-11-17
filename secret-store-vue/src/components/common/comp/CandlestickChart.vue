@@ -10,6 +10,8 @@ import { CandlestickController, CandlestickElement } from 'chartjs-chart-financi
 import 'chartjs-adapter-luxon'
 import 'chartjs-plugin-zoom'
 Chart.register(...registerables, CandlestickController, CandlestickElement)
+import { setupChartJsTheme } from '@scripts/theme.js'
+setupChartJsTheme(Chart)
 
 const props = defineProps({
   chartData:    Object,

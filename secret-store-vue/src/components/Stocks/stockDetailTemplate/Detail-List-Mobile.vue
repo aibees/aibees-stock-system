@@ -56,7 +56,7 @@
         <div class="body-wrapper">
             <ul class="table-mobile body" v-for="(data, idx) in detail_list" :key="idx" :id=data.theme_code>
                 <li class="lines"
-                    :style="{ borderLeftColor: data.per_flow === 'UP' ? '#141414' : '#9a9a9a' }"
+                    :style="{ borderLeftColor: data.per_flow === 'UP' ? 'var(--sc-text)' : 'var(--sc-text-mute)' }"
                     >
                     <div class="list-item">
                         <div class="left">
@@ -67,7 +67,7 @@
                         </div>
                         <div class="center">
                                 <div class="item"
-                                    :style="{ color: data.per_flow === 'UP' ? '#ffffff' : (data.per_flow === 'DOWN' ? '#bfbfbf' : '') }"
+                                    :style="{ color: data.per_flow === 'UP' ? 'var(--sc-text)' : (data.per_flow === 'DOWN' ? 'var(--sc-text-mute)' : '') }"
                                     >
                                     <div>
                                         <img :src="data.per_flow === 'UP' ? '/src/img/upper_arrow.png' : (data.per_flow === 'DOWN' ? '/src/img/lower_arrow.png' : '')" />

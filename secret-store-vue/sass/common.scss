@@ -1,33 +1,33 @@
 
 button {
-    color: black;
+    color: var(--sc-text);
     padding: 3px 10px;
     border-radius: 7px;
 }
 
 button.primary {
-    background-color: #dcdcdc;
+    background-color: var(--sc-border);
 }
 
 input {
-    color: white;
+    color: var(--sc-strong-text);
     background-color: transparent;
     border: 0;
     font-size: 12px;
     padding: 3px 0px;
 }
 input:focus {
-    background-color: #4b4b4b;
+    background-color: var(--sc-strong-bg);
 }
 
 select {
     height: 100%;
-    color: white;
+    color: var(--sc-strong-text);
     background-color: transparent;
     text-align: center;
 
     option {
-        background-color: #4b4b4b;
+        background-color: var(--sc-strong-bg);
     }
 }
 

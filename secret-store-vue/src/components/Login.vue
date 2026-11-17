@@ -4,7 +4,7 @@
         <!-- 상단: 홈과 같은 크림 띠 + 물결 가장자리, 가운데 브랜드 -->
         <header class="lg-head">
             <img class="lg-logo" src="/favicon.svg" alt="" aria-hidden="true" />
-            <h1 class="lg-name">양봉상회</h1>
+            <h1 class="lg-name">비밀상회</h1>
             <div class="lg-edge" aria-hidden="true"></div>
         </header>
 
@@ -279,22 +279,13 @@ const naverlogin = async () => {
 </script>
 
 <style scoped lang="scss">
-// 양봉상회 디자인 토큰(Home.vue 와 같은 값)
-$bar:       #FFF6D2;
-$line:      #EFE2BC;
-$brown:     #7A4423;
-$brown-ink: #5C3118;
-$hero:      #74462A;
-$ink:       #2B1D14;
-$sub:       #6B5B4E;
-$cream:     #FFF8E1;
-$naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
+// 비밀상회 — 색은 테마 토큰(var(--sc-*), sass/theme.css)
 
 #login {
     min-height: 100vh;
     min-height: 100svh;
-    background: #fff;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     text-align: left;
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
 }
@@ -307,7 +298,8 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
     align-items: center;
     gap: 8px;
     padding: calc(env(safe-area-inset-top, 0px) + 48px) 20px 28px;
-    background: $bar;
+    background: var(--sc-surface);
+    border-bottom: 1px solid var(--sc-border);
 }
 .lg-logo { width: 64px; height: 64px; }
 .lg-name {
@@ -315,19 +307,11 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
     font-family: 'Do Hyeon', 'Pretendard', sans-serif;
     font-size: 34px;
     font-weight: 400;
-    color: $brown-ink;
+    color: var(--sc-text);
     letter-spacing: .5px;
 }
-// 홈 헤더와 같은 물결 가장자리
-.lg-edge {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -8px;
-    height: 8px;
-    background: radial-gradient(circle at 50% 0, #{$bar} 6.5px, transparent 7px) repeat-x;
-    background-size: 16px 8px;
-}
+// 양봉상회의 꿀 물결 가장자리는 비밀상회에서 쓰지 않는다(1px 구분선으로 대체)
+.lg-edge { display: none; }
 
 /* ── 본문 ── */
 .lg-main {
@@ -345,22 +329,22 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
     display: flex;
     flex-direction: column;
     gap: 6px;
-    label { font-size: 13px; font-weight: 600; color: $sub; }
+    label { font-size: 13px; font-weight: 600; color: var(--sc-text-sub); }
     input {
         width: 100%;
         min-height: 48px;
         padding: 0 12px;
         box-sizing: border-box;
-        border: 1px solid $line;
+        border: 1px solid var(--sc-border);
         border-radius: 10px;
-        background: #fff;
-        color: $ink;
+        background: var(--sc-surface);
+        color: var(--sc-text);
         font-size: 16px;   // iOS 확대 방지
         font-family: inherit;
-        &:focus { outline: none; border-color: $brown; }
+        &:focus { outline: none; border-color: var(--sc-point); }
     }
 }
-.lg-field-err { margin: 0; font-size: 12px; color: #C0392B; }
+.lg-field-err { margin: 0; font-size: 12px; color: var(--sc-up); }
 
 .lg-options { display: flex; gap: 18px; }
 .lg-check {
@@ -369,28 +353,28 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
     gap: 6px;
     min-height: 32px;
     font-size: 14px;
-    color: $sub;
+    color: var(--sc-text-sub);
     cursor: pointer;
-    input { width: 18px; height: 18px; margin: 0; accent-color: $hero; }
+    input { width: 18px; height: 18px; margin: 0; accent-color: var(--sc-point); }
 }
 
-.lg-error { margin: 0; font-size: 13px; color: #C0392B; }
+.lg-error { margin: 0; font-size: 13px; color: var(--sc-up); }
 
 .lg-or {
     display: flex;
     align-items: center;
     gap: 12px;
     font-size: 12px;
-    color: $sub;
-    &::before, &::after { content: ''; flex: 1; height: 1px; background: $line; }
+    color: var(--sc-text-sub);
+    &::before, &::after { content: ''; flex: 1; height: 1px; background: var(--sc-border); }
 }
 
 .lg-signup {
     margin: 4px 0 0;
     text-align: center;
     font-size: 14px;
-    color: $sub;
-    a { color: $brown; font-weight: 700; text-decoration: underline; }
+    color: var(--sc-text-sub);
+    a { color: var(--sc-point-ink); font-weight: 700; text-decoration: underline; }
 }
 
 /* ── 구글 버튼(GIS iframe) — 가운데 정렬, 높이는 다른 버튼과 비슷하게 ── */
@@ -409,18 +393,18 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
     &:disabled { opacity: .45; cursor: default; }
 }
-.btn-primary { border: 0; background: $hero; color: $cream; }
-.btn-ghost { border: 1px solid $line; background: #fff; color: $sub; }
+.btn-primary { border: 0; background: var(--sc-point); color: var(--sc-on-point); }
+.btn-ghost { border: 1px solid var(--sc-border); background: var(--sc-surface); color: var(--sc-text-sub); }
 .btn-naver {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
     border: 0;
-    background: $naver;
+    background: #03C75A;
     color: #fff;
     .naver-n { font-size: 18px; font-weight: 900; }
 }
@@ -434,15 +418,15 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
     align-items: center;
     justify-content: center;
     padding: 20px;
-    background: rgba(43, 29, 20, .45);
+    background: color-mix(in srgb, var(--sc-strong-bg) 45%, transparent);
 }
 .lg-modal {
     width: 100%;
     max-width: 380px;
     padding: 22px 20px 18px;
     border-radius: 14px;
-    background: #fff;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     text-align: left;
     display: flex;
     flex-direction: column;
@@ -450,7 +434,7 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
 }
 .lg-modal-title { margin: 0; font-size: 18px; font-weight: 700; }
-.lg-modal-desc { margin: 0; font-size: 14px; line-height: 1.5; color: $sub; }
+.lg-modal-desc { margin: 0; font-size: 14px; line-height: 1.5; color: var(--sc-text-sub); }
 .lg-modal-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;

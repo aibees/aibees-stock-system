@@ -4,5 +4,5 @@
   max-height: 90vh;
   margin: auto;
 
-  background-color: #212121;
+  background-color: var(--sc-strong-bg);
 }

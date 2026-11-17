@@ -6,6 +6,8 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { Chart, registerables } from 'chart.js'
 Chart.register(...registerables)
+import { setupChartJsTheme } from '@scripts/theme.js'
+setupChartJsTheme(Chart)
 
 const props = defineProps({
     points: { type: Array, default: () => [] }, // [{date, value}]

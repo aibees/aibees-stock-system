@@ -4,6 +4,33 @@
 
         <div class="contents">
 
+            <!-- ════════════ 화면 테마 ════════════
+                 이 기기에만 저장된다(Capacitor Preferences). 누르는 즉시 바뀌고 아래 저장 버튼과 무관하다.
+                 계정 정보를 못 불러와도 바꿀 수 있게 폼 바깥에 둔다. -->
+            <section class="setting-card theme-card" aria-labelledby="theme-head">
+                <header class="card-head">
+                    <h3 id="theme-head">화면 테마</h3>
+                </header>
+                <ul class="theme-list" role="radiogroup" aria-labelledby="theme-head">
+                    <li v-for="t in THEMES" :key="t.id">
+                        <button type="button" class="theme-row" role="radio"
+                            :aria-checked="theme === t.id ? 'true' : 'false'"
+                            :class="{ on: theme === t.id }" @click="pickTheme(t.id)">
+                            <span class="theme-swatch" aria-hidden="true">
+                                <i :style="{ background: t.swatch[0] }"></i>
+                                <i :style="{ background: t.swatch[1] }"></i>
+                                <i :style="{ background: t.swatch[2] }"></i>
+                            </span>
+                            <span class="theme-text">
+                                <span class="theme-name">{{ t.label }}<template v-if="t.id === DEFAULT_THEME"> (기본)</template></span>
+                                <span class="theme-desc">{{ t.desc }}</span>
+                            </span>
+                            <span class="theme-check" aria-hidden="true">{{ theme === t.id ? '✓' : '' }}</span>
+                        </button>
+                    </li>
+                </ul>
+            </section>
+
             <div v-if="isLoading" class="loader-rows">
                 <div v-for="n in 4" :key="n" class="skeleton-row"></div>
             </div>
@@ -124,6 +151,14 @@
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores';
 import { hasRole, WORKER_ROLE } from '@scripts/useAccess.js';
+import { THEMES, DEFAULT_THEME, getTheme, setTheme } from '@scripts/theme.js';
+
+/* ── 화면 테마(기기별) ── */
+const theme = ref(getTheme());
+const pickTheme = (id) => {
+    theme.value = id;
+    setTheme(id);
+};
 
 const title = ref('계정 설정');
 
@@ -252,11 +287,11 @@ const save = async () => {
 </script>
 
 <style scoped>
-/* 양봉상회 v2 — 계정 설정 */
+/* 비밀상회 — 계정 설정 */
 #user-option {
     min-height: 100vh;
-    background: #FFFBEA;
-    color: #2B1D14;
+    background: var(--sc-bg);
+    color: var(--sc-text);
     text-align: left;
 }
 
@@ -269,8 +304,8 @@ const save = async () => {
 
 /* ── 카드 ── */
 .setting-card {
-    background: #fff;
-    border: 1px solid #EFE2BC;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 16px;
     padding: 16px 14px 18px;
     margin-bottom: 14px;
@@ -281,36 +316,63 @@ const save = async () => {
     margin: 0;
     font-size: 13px;
     font-weight: 600;
-    color: #7A6B5D;
+    color: var(--sc-text-sub);
 }
 
-.special-card { border-style: dashed; border-color: #E3CF8F; background: #FFFDF5; }
+.special-card { border-style: dashed; border-color: var(--sc-border-strong); background: var(--sc-bg); }
+
+/* ── 화면 테마 ── 카드 안 목록 행. 선택은 포인트 테두리 + ✓ */
+.theme-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.theme-row {
+    width: 100%;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--sc-border);
+    border-radius: 12px;
+    background: var(--sc-surface);
+    color: var(--sc-text);
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+    transition: border-color .15s, background-color .15s;
+}
+.theme-row.on { border-color: var(--sc-point); background: var(--sc-point-bg); }
+.theme-row:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
+.theme-swatch { display: inline-flex; flex: 0 0 auto; border-radius: 8px; overflow: hidden; border: 1px solid var(--sc-border-strong); }
+.theme-swatch i { display: block; width: 14px; height: 32px; }
+.theme-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.theme-name { font-size: 15px; font-weight: 600; }
+.theme-desc { font-size: 12px; color: var(--sc-text-sub); }
+.theme-check { flex: 0 0 20px; text-align: center; font-size: 16px; font-weight: 700; color: var(--sc-point-ink); }
 
 /* ── 필드 ── */
 .field-grid { display: flex; flex-direction: column; gap: 14px; }
 .field-grid.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; }
 
 .form-field { display: flex; flex-direction: column; gap: 6px; }
-.form-field label { font-size: 13px; font-weight: 600; color: #2B1D14; }
+.form-field label { font-size: 13px; font-weight: 600; color: var(--sc-text); }
 
 .form-field input {
     width: 100%;
     box-sizing: border-box;
     height: 44px;
     padding: 0 12px;
-    border: 1px solid #EAD9A6;
+    border: 1px solid var(--sc-border-strong);
     border-radius: 12px;
     font-size: 15px;
-    color: #2B1D14;
-    background: #fff;
+    color: var(--sc-text);
+    background: var(--sc-surface);
     transition: border-color 0.15s, box-shadow 0.15s;
 }
 .form-field input:focus {
     outline: none;
-    border-color: #F6C445;
-    box-shadow: 0 0 0 3px rgba(246, 196, 69, 0.28);
+    border-color: var(--sc-point);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sc-point) 28%, transparent);
 }
-.form-field input::placeholder { color: #B8A890; }
+.form-field input::placeholder { color: var(--sc-text-mute); }
 
 /* ── 비밀 입력 + 표시 토글 ── */
 .secret-input { position: relative; display: flex; align-items: center; }
@@ -326,7 +388,7 @@ const save = async () => {
     place-items: center;
     border: 0;
     background: transparent;
-    color: #7A6B5D;
+    color: var(--sc-text-sub);
     cursor: pointer;
 }
 
@@ -343,16 +405,16 @@ const save = async () => {
     position: relative;
     cursor: pointer;
     transition: background 0.18s;
-    background: #DCCFA8;
+    background: var(--sc-border-strong);
 }
-.toggle-btn.active { background: #F6C445; }
+.toggle-btn.active { background: var(--sc-point); }
 .toggle-knob {
     position: absolute;
     top: 3px;
     left: 3px;
     width: 24px;
     height: 24px;
-    background: #fff;
+    background: var(--sc-surface);
     border-radius: 12px;
     transition: transform 0.18s;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
@@ -368,12 +430,12 @@ const save = async () => {
     gap: 10px;
     padding: 10px 16px;
     margin: 4px -16px 0;
-    background: rgba(255, 246, 210, 0.96);
+    background: color-mix(in srgb, var(--sc-surface-2) 96%, transparent);
     backdrop-filter: blur(6px);
-    border-top: 1px solid #EFE2BC;
+    border-top: 1px solid var(--sc-border);
 }
-.dirty-note { flex: 1; font-size: 13px; color: #7A4423; font-weight: 600; }
-.dirty-note.clean { color: #A89C88; font-weight: 500; }
+.dirty-note { flex: 1; font-size: 13px; color: var(--sc-point-ink); font-weight: 600; }
+.dirty-note.clean { color: var(--sc-text-mute); font-weight: 500; }
 
 .btn-reset,
 .btn-save {
@@ -385,17 +447,17 @@ const save = async () => {
     cursor: pointer;
     border: 1px solid transparent;
 }
-.btn-reset { background: #fff; border-color: #EAD9A6; color: #7A4423; }
+.btn-reset { background: var(--sc-surface); border-color: var(--sc-border-strong); color: var(--sc-point-ink); }
 .btn-reset:disabled { opacity: 0.5; cursor: default; }
-.btn-save { background: #F6C445; color: #3A200F; }
-.btn-save:disabled { background: #EFE5C4; color: #B8A890; cursor: default; }
+.btn-save { background: var(--sc-point); color: var(--sc-on-point); }
+.btn-save:disabled { background: var(--sc-border); color: var(--sc-text-mute); cursor: default; }
 
 /* ── 로딩 스켈레톤 ── */
 .loader-rows { display: flex; flex-direction: column; gap: 12px; }
 .skeleton-row {
     height: 96px;
     border-radius: 16px;
-    background: linear-gradient(90deg, #F6EDC9 25%, #FFFBEA 50%, #F6EDC9 75%);
+    background: linear-gradient(90deg, var(--sc-border) 25%, var(--sc-bg) 50%, var(--sc-border) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.2s infinite;
 }

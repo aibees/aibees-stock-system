@@ -1,20 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>양봉상회</title>
-  <!-- 벌집 육각형 > 꿀단지 > 오르는 양봉 3개 -->
-  <polygon points="32,2.5 57.5,17.25 57.5,46.75 32,61.5 6.5,46.75 6.5,17.25"
-           fill="#FFC107" stroke="#895129" stroke-width="3" stroke-linejoin="round"/>
-  <!-- 꿀단지: 목 + 몸통(크림) -->
-  <path d="M25.5 21 L25.5 24 C16 26.5 14.5 38 18.5 44.5 C20.5 48 25 50.5 32 50.5 C39 50.5 43.5 48 45.5 44.5 C49.5 38 48 26.5 38.5 24 L38.5 21 Z"
-        fill="#FFFDD0" stroke="#895129" stroke-width="2.6" stroke-linejoin="round"/>
-  <!-- 뚜껑 -->
-  <rect x="21.5" y="14.5" width="21" height="6.5" rx="3.2" fill="#895129"/>
-  <!-- 단지 안의 양봉 3개 -->
-  <g fill="#895129" stroke="#895129" stroke-linecap="round">
-    <line x1="24.5" y1="36" x2="24.5" y2="46" stroke-width="2.4"/>
-    <rect x="21.5" y="38.5" width="6" height="6" rx="1.2" stroke="none"/>
-    <line x1="32" y1="32" x2="32" y2="46" stroke-width="2.4"/>
-    <rect x="29" y="34" width="6" height="9.5" rx="1.2" stroke="none"/>
-    <line x1="39.5" y1="29" x2="39.5" y2="46" stroke-width="2.4"/>
-    <rect x="36.5" y="30.5" width="6" height="12.5" rx="1.2" stroke="none"/>
-  </g>
+  <title>비밀상회</title>
+  <!-- 비밀상회 로고 (회의록 2026-11-17 1-2)
+       - 양봉상회와 같은 벌집 육각형(Chagok Labs 집안 표식) — 면은 비우고 실버 외곽선만
+       - 안에는 내려진 셔터 한 줄
+       - 테마와 무관한 1종 고정(실버 #9AA0AB). 앱 아이콘·스플래시·OG 이미지는 brand/make_assets.py 가 이 모양으로 그린다. -->
+  <polygon points="32,3.5 56.7,17.75 56.7,46.25 32,60.5 7.3,46.25 7.3,17.75"
+           fill="none" stroke="#9AA0AB" stroke-width="3.4" stroke-linejoin="round"/>
+  <line x1="19" y1="38" x2="45" y2="38" stroke="#9AA0AB" stroke-width="3.6" stroke-linecap="round"/>
 </svg>

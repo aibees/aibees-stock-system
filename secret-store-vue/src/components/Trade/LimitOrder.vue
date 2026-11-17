@@ -322,24 +322,11 @@ const onCancelTier = async (tier) => {
 
 <style scoped lang="scss">
 // 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
-$white: #ffffff;
-$gray-50: #FFFBEA;
-$gray-100: #F3EAD2;
-$gray-200: #EFE2BC;
-$gray-300: #E3D3A8;
-$gray-400: #9A8C7E;
-$gray-500: #6B5B4E;
-$gray-700: #4A3628;
-$gray-900: #2B1D14;
-$blue: #1F5BD1;
-$navy: #74462A;
-$red: #C8282A;
-$green: #1F7A3E;
 
 #auto-trade-limit {
     min-height: 100vh;
-    background: $gray-50;
-    color: $gray-900;
+    background: var(--sc-bg);
+    color: var(--sc-text);
     font-family: 'Pretendard', -apple-system, sans-serif;
 
     * {
@@ -361,14 +348,14 @@ $green: #1F7A3E;
 .page-sub {
     margin: 0 0 14px;
     font-size: .82rem;
-    color: $gray-500;
+    color: var(--sc-text-sub);
     line-height: 1.5;
 }
 
 .card {
     border-radius: 12px;
-    background: $white;
-    border: 1px solid $gray-200;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     padding: 10px 14px;
 
     @media (max-width: 480px) {
@@ -378,12 +365,12 @@ $green: #1F7A3E;
 
 .empty-msg {
     text-align: center;
-    color: $gray-500;
+    color: var(--sc-text-sub);
     font-size: .84rem;
     padding: 16px 0;
 
     &.error {
-        color: $red;
+        color: var(--sc-up);
         line-height: 1.5;
     }
 }
@@ -395,7 +382,7 @@ $green: #1F7A3E;
 }
 
 .holding-row {
-    border-bottom: 1px solid $gray-100;
+    border-bottom: 1px solid var(--sc-border);
 
     &:last-child {
         border-bottom: 0;
@@ -411,7 +398,7 @@ $green: #1F7A3E;
     cursor: pointer;
 
     &:hover {
-        background: $gray-50;
+        background: var(--sc-bg);
     }
 }
 
@@ -425,7 +412,7 @@ $green: #1F7A3E;
     .code-chip {
         flex: 0 0 auto;
         font-family: monospace;
-        background: $gray-100;
+        background: var(--sc-surface-2);
         padding: 2px 6px;
         font-size: .72rem;
     }
@@ -446,15 +433,15 @@ $green: #1F7A3E;
     gap: 10px;
     flex: 0 0 auto;
     font-size: .8rem;
-    color: $gray-500;
+    color: var(--sc-text-sub);
     white-space: nowrap;
 
     .allocated {
-        color: $gray-700;
+        color: var(--sc-text);
         font-weight: 600;
 
         &.over {
-            color: $gray-900;
+            color: var(--sc-text);
             font-weight: 800;
         }
     }
@@ -462,7 +449,7 @@ $green: #1F7A3E;
 
 .chevron {
     flex: 0 0 auto;
-    color: $gray-400;
+    color: var(--sc-text-sub);
     transition: transform .15s;
 
     &.open {
@@ -477,7 +464,7 @@ $green: #1F7A3E;
 .base-line {
     margin: 0 0 10px;
     font-size: .8rem;
-    color: $gray-500;
+    color: var(--sc-text-sub);
 }
 
 // 지정가 %(매입가 대비). 한국 시장 관례: 상승 적색 / 하락 청색
@@ -486,9 +473,9 @@ $green: #1F7A3E;
     font-size: .76rem;
     white-space: nowrap;
 
-    &.up { color: $red; }
-    &.down { color: $blue; }
-    &.flat { color: $gray-500; }
+    &.up { color: var(--sc-up); }
+    &.down { color: var(--sc-down); }
+    &.flat { color: var(--sc-text-sub); }
 }
 
 .tier-list {
@@ -505,8 +492,8 @@ $green: #1F7A3E;
     gap: 6px 10px;
     padding: 8px 10px;
     font-size: .8rem;
-    background: $gray-50;
-    border: 1px solid $gray-100;
+    background: var(--sc-bg);
+    border: 1px solid var(--sc-border);
     margin-bottom: 6px;
 
     &.done {
@@ -526,8 +513,8 @@ $green: #1F7A3E;
         border-radius: 12px;
         border: 1px solid;
 
-        &.up { color: $red; border-color: $red; }
-        &.down { color: $blue; border-color: $blue; }
+        &.up { color: var(--sc-up); border-color: var(--sc-up); }
+        &.down { color: var(--sc-down); border-color: var(--sc-down); }
     }
 
     .tier-price {
@@ -535,35 +522,35 @@ $green: #1F7A3E;
     }
 
     .tier-ratio {
-        color: $gray-500;
+        color: var(--sc-text-sub);
     }
 
     .tier-state {
         font-size: .72rem;
         padding: 2px 8px;
-        background: $gray-200;
-        color: $gray-900;
+        background: var(--sc-border);
+        color: var(--sc-text);
 
         &.armed {
             border-radius: 12px;
-            background: $gray-100;
-            color: $gray-900;
-            border: 1px solid $gray-300;
+            background: var(--sc-surface-2);
+            color: var(--sc-text);
+            border: 1px solid var(--sc-border-strong);
         }
 
         &.done {
-            background: #74462A;
-            color: $white;
+            background: var(--sc-strong-bg);
+            color: var(--sc-strong-text);
         }
 
         &.cancelled {
-            background: $gray-50;
-            color: $gray-400;
+            background: var(--sc-bg);
+            color: var(--sc-text-sub);
         }
     }
 
     .tier-memo {
-        color: $gray-500;
+        color: var(--sc-text-sub);
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -572,7 +559,7 @@ $green: #1F7A3E;
     }
 
     .tier-fill {
-        color: $gray-500;
+        color: var(--sc-text-sub);
         font-size: .74rem;
         flex: 0 0 auto;
     }
@@ -582,9 +569,9 @@ $green: #1F7A3E;
     border-radius: 12px;
     margin-left: auto;
     flex: 0 0 auto;
-    border: 1px solid $gray-300;
+    border: 1px solid var(--sc-border-strong);
     background: transparent;
-    color: $gray-700;
+    color: var(--sc-text);
     padding: 4px 10px;
     font-size: .76rem;
     cursor: pointer;
@@ -600,8 +587,8 @@ $green: #1F7A3E;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-    background: $gray-50;
-    border: 1px dashed $gray-300;
+    background: var(--sc-bg);
+    border: 1px dashed var(--sc-border-strong);
     padding: 12px;
 
     @media (max-width: 480px) {
@@ -631,17 +618,17 @@ $green: #1F7A3E;
     label {
         font-size: .76rem;
         font-weight: 600;
-        color: $gray-500;
+        color: var(--sc-text-sub);
     }
 
     input {
         border-radius: 12px;
         width: 100%;
         height: 36px;
-        border: 1px solid $gray-200;
+        border: 1px solid var(--sc-border);
         padding: 0 10px;
         font-size: .84rem;
-        background: $white;
+        background: var(--sc-surface);
     }
 }
 
@@ -654,9 +641,9 @@ $green: #1F7A3E;
 .dir-btn {
     border-radius: 12px;
     height: 40px;
-    border: 1px solid $gray-300;
-    background: $white;
-    color: $gray-700;
+    border: 1px solid var(--sc-border-strong);
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-size: .84rem;
     font-weight: 700;
     cursor: pointer;
@@ -668,8 +655,8 @@ $green: #1F7A3E;
         opacity: .8;
     }
 
-    &.up.active { background: $red; border-color: $red; color: $white; }
-    &.down.active { background: $blue; border-color: $blue; color: $white; }
+    &.up.active { background: var(--sc-up); border-color: var(--sc-up); color: #ffffff; }
+    &.down.active { background: var(--sc-down); border-color: var(--sc-down); color: #ffffff; }
 }
 
 .input-with-hint {
@@ -691,13 +678,13 @@ $green: #1F7A3E;
     margin: 0;
     font-size: .8rem;
     font-weight: 600;
-    color: $gray-700;
+    color: var(--sc-text);
 }
 
 .form-warning {
     margin: 2px 0 0;
     font-size: .76rem;
-    color: $red;
+    color: var(--sc-up);
     line-height: 1.4;
 }
 
@@ -705,19 +692,19 @@ $green: #1F7A3E;
     border-radius: 12px;
     width: 44px;
     height: 24px;
-    border: 1px solid $gray-300;
+    border: 1px solid var(--sc-border-strong);
     position: relative;
     cursor: pointer;
     flex: 0 0 auto;
-    background: $white;
+    background: var(--sc-surface);
 
     &.active {
-        background: #74462A;
-        border-color: $gray-900;
+        background: var(--sc-point);
+        border-color: var(--sc-point);
     }
 
     &.inactive {
-        background: $white;
+        background: var(--sc-surface);
     }
 
     .toggle-knob {
@@ -726,13 +713,13 @@ $green: #1F7A3E;
         left: 2px;
         width: 18px;
         height: 18px;
-        background: $gray-300;
+        background: var(--sc-border-strong);
         transition: transform .18s, background .18s;
     }
 
     &.active .toggle-knob {
         transform: translateX(19px);
-        background: $white;
+        background: var(--sc-surface);
     }
 }
 
@@ -740,8 +727,8 @@ $green: #1F7A3E;
     grid-column: 1 / -1;
     height: 40px;
     border: 0;
-    background: $navy;
-    color: #fff;
+    background: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
     font-size: .84rem;
     font-weight: 700;
     cursor: pointer;

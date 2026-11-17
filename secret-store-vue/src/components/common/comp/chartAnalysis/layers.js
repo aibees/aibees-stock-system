@@ -3,11 +3,13 @@
 // draw(ctx, data): 시리즈·가격선·박스는 직접 그리고, 마커는 ctx.markers 에 모은다(시리즈당 마커 플러그인은 하나라).
 import { LineSeries, LineStyle, createSeriesMarkers } from 'lightweight-charts'
 import { ZonePrimitive } from './ZonePrimitive.js'
+import { themeColor, alpha } from '@scripts/theme.js'
 
 export const C = {
-    buy:   '#C8282A',   // 매수 쪽(앱 공통 상승색)
-    sell:  '#1F5BD1',   // 매도 쪽(앱 공통 하락색)
-    swing: '#B9A58C',
+    // 매수/매도 쪽은 테마 등락색을 그릴 때마다 읽는다(LwStockChart 가 테마 전환 시 다시 그림)
+    get buy()  { return themeColor('--sc-up', '#E24B4A') },
+    get sell() { return themeColor('--sc-down', '#378ADD') },
+    swing: '#9A8F80',
     struct:'#9A6B4F',
     fib:   '#8E6FB5',
     rsi:   '#8E7CC3',
@@ -73,8 +75,8 @@ const zone = (ctx, from, lo, hi, side, label) => {
     const color = side === 'buy' ? C.buy : C.sell
     ctx.candle.attachPrimitive(new ZonePrimitive({
         from, top: hi, bottom: lo,
-        fill: side === 'buy' ? 'rgba(200,40,42,0.07)' : 'rgba(31,91,209,0.07)',
-        stroke: side === 'buy' ? 'rgba(200,40,42,0.35)' : 'rgba(31,91,209,0.35)',
+        fill: alpha(color, 0.07),
+        stroke: alpha(color, 0.35),
         label, textColor: color,
     }))
 }

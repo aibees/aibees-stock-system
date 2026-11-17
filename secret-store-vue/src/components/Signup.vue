@@ -172,17 +172,11 @@ const submit = async () => {
 </script>
 
 <style scoped lang="scss">
-$hero:  #74462A;
-$brown: #7A4423;
-$ink:   #2B1D14;
-$sub:   #6B5B4E;
-$line:  #EFE2BC;
-$cream: #FFF8E1;
 
 #signup {
     min-height: 100vh;
-    background: #fff;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
 }
 
@@ -199,20 +193,20 @@ $cream: #FFF8E1;
     display: flex;
     flex-direction: column;
     gap: 6px;
-    label { font-size: 13px; font-weight: 600; color: $sub; }
+    label { font-size: 13px; font-weight: 600; color: var(--sc-text-sub); }
     input {
         width: 100%;
         min-height: 48px;
         padding: 0 12px;
         box-sizing: border-box;
-        border: 1px solid $line;
+        border: 1px solid var(--sc-border);
         border-radius: 10px;
-        background: #fff;
-        color: $ink;
+        background: var(--sc-surface);
+        color: var(--sc-text);
         font-size: 16px;   // iOS 확대 방지
         font-family: inherit;
-        &:focus { outline: none; border-color: $brown; }
-        &:disabled { background: #FAF6EA; }
+        &:focus { outline: none; border-color: var(--sc-point); }
+        &:disabled { background: var(--sc-surface-2); }
     }
 }
 
@@ -229,13 +223,13 @@ $cream: #FFF8E1;
     text-align: right;
     font-size: 14px;
     font-weight: 600;
-    color: $brown;
+    color: var(--sc-point-ink);
     font-variant-numeric: tabular-nums;
-    &.over { color: #C0392B; }
+    &.over { color: var(--sc-up); }
 }
 
-.su-err { margin: 0; font-size: 12px; color: #C0392B; }
-.su-error { margin: 0; font-size: 13px; color: #C0392B; }
+.su-err { margin: 0; font-size: 12px; color: var(--sc-up); }
+.su-error { margin: 0; font-size: 13px; color: var(--sc-up); }
 
 .su-actions { display: flex; flex-direction: column; gap: 8px; }
 
@@ -246,18 +240,18 @@ $cream: #FFF8E1;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
     &:disabled { opacity: .45; cursor: default; }
 }
 .btn-line {
     flex-shrink: 0;
     padding: 0 14px;
-    border: 1px solid $hero;
-    background: #fff;
-    color: $hero;
+    border: 1px solid var(--sc-point);
+    background: var(--sc-surface);
+    color: var(--sc-point-ink);
     font-size: 14px;
     white-space: nowrap;
 }
-.btn-primary { border: 0; background: $hero; color: $cream; }
-.btn-ghost { border: 1px solid $line; background: #fff; color: $sub; }
+.btn-primary { border: 0; background: var(--sc-strong-bg); color: var(--sc-strong-text); }
+.btn-ghost { border: 1px solid var(--sc-border); background: var(--sc-surface); color: var(--sc-text-sub); }
 </style>

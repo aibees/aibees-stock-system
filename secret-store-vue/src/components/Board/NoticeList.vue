@@ -72,20 +72,11 @@ onMounted(() => loadPage(0));
 
 <style scoped lang="scss">
 // 양봉상회 디자인 토큰
-$card:  #FFFFFF;
-$line:  #EFE2BC;
-$brown: #7A4423;
-$ink:   #2B1D14;
-$sub:   #6B5B4E;
-$sub-2: #7A6B5D;
-$up:    #C8282A;
-$down:  #1F5BD1;
-$amber: #A0662F;
 
 #notice-list {
     min-height: 100vh;
-    background: $card;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     text-align: left;
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
 }
@@ -99,10 +90,10 @@ $amber: #A0662F;
 .list-head {
     margin-bottom: 4px;
     h2 { margin: 0; font-size: 18px; font-weight: 700; }
-    .count { color: $amber; }
+    .count { color: var(--sc-point-ink); }
 }
 
-.notice-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid $line; }
+.notice-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--sc-border); }
 .notice-row {
     width: 100%;
     display: flex;
@@ -111,28 +102,28 @@ $amber: #A0662F;
     gap: 12px;
     padding: 12px 0;
     border: 0;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
     background: transparent;
-    color: $ink;
+    color: var(--sc-text);
     text-align: left;
     font: inherit;
     cursor: pointer;
 
     .title { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; line-height: 1.4; word-break: keep-all; }
     // 카테고리·날짜는 오른쪽
-    .meta { flex-shrink: 0; display: flex; gap: 8px; font-size: 12px; color: $sub; white-space: nowrap; }
+    .meta { flex-shrink: 0; display: flex; gap: 8px; font-size: 12px; color: var(--sc-text-sub); white-space: nowrap; }
     .date { font-variant-numeric: tabular-nums; }
 }
 
 // 카테고리: 글자색만
 .cat { font-weight: 600; }
-.cat-notice { color: $brown; }
-.cat-maint  { color: $up; }
-.cat-update { color: $down; }
-.cat-event  { color: $amber; }
-.cat-etc    { color: $sub-2; }
+.cat-notice { color: var(--sc-point-ink); }
+.cat-maint  { color: var(--sc-up); }
+.cat-update { color: var(--sc-down); }
+.cat-event  { color: var(--sc-point-ink); }
+.cat-etc    { color: var(--sc-text-sub); }
 
-.empty-box { text-align: center; padding: 56px 0; color: $sub; font-size: 14px; }
+.empty-box { text-align: center; padding: 56px 0; color: var(--sc-text-sub); font-size: 14px; }
 
 .more-btn {
     display: block;
@@ -141,11 +132,11 @@ $amber: #A0662F;
     padding: 12px 0;
     border: 0;
     background: transparent;
-    color: $brown;
+    color: var(--sc-point-ink);
     font: inherit;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    &:disabled { color: $sub-2; cursor: default; }
+    &:disabled { color: var(--sc-text-sub); cursor: default; }
 }
 </style>

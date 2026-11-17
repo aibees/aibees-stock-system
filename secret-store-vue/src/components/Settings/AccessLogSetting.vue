@@ -324,21 +324,11 @@ onMounted(() => { loaded.login = true; fetchLoginList(); });
 </script>
 
 <style scoped lang="scss">
-$white: #ffffff;
-$gray-50: #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-300: #c4c4c4;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-700: #3d3d3d;
-$gray-900: #141414;
-$navy: #141414;
 
 #access-log-setting {
     min-height: 100vh;
-    background: $gray-50;
-    color: $gray-900;
+    background: var(--sc-bg);
+    color: var(--sc-text);
     font-family: 'Pretendard', -apple-system, sans-serif;
 }
 
@@ -360,8 +350,8 @@ $navy: #141414;
     align-items: center;
     gap: 6px;
     padding: 8px 16px;
-    background: $navy;
-    color: $white;
+    background: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
     border: none;
     border-radius: 0;
     font-size: 0.84rem;
@@ -371,7 +361,7 @@ $navy: #141414;
     transition: background .15s;
 
     &:hover {
-        background: #000000;
+        background: var(--sc-strong-bg);
     }
 }
 
@@ -379,7 +369,7 @@ $navy: #141414;
 .tab-nav {
     display: flex;
     gap: 4px;
-    border-bottom: 1px solid $gray-200;
+    border-bottom: 1px solid var(--sc-border);
     margin-bottom: 16px;
 }
 
@@ -387,7 +377,7 @@ $navy: #141414;
     padding: 9px 18px;
     border: none;
     background: none;
-    color: $gray-500;
+    color: var(--sc-text-sub);
     font-size: 0.86rem;
     font-weight: 600;
     cursor: pointer;
@@ -397,12 +387,12 @@ $navy: #141414;
     transition: color .12s, border-color .12s;
 
     &:hover {
-        color: $gray-700;
+        color: var(--sc-text);
     }
 
     &.active {
-        color: $navy;
-        border-bottom-color: $navy;
+        color: var(--sc-text);
+        border-bottom-color: var(--sc-text);
     }
 }
 
@@ -414,8 +404,8 @@ $navy: #141414;
     gap: 18px;
     margin-bottom: 16px;
     padding: 14px 16px;
-    background: $white;
-    border: 1px solid $gray-200;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
 }
 
 .filter-group {
@@ -427,7 +417,7 @@ $navy: #141414;
 .filter-label {
     font-size: 0.76rem;
     font-weight: 700;
-    color: $gray-500;
+    color: var(--sc-text-sub);
     letter-spacing: .03em;
 }
 
@@ -439,10 +429,10 @@ $navy: #141414;
 
 .filter-chip {
     padding: 5px 13px;
-    border: 1px solid $gray-200;
+    border: 1px solid var(--sc-border);
     border-radius: 0;
-    background: $white;
-    color: $gray-700;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
@@ -450,29 +440,29 @@ $navy: #141414;
     transition: all .12s;
 
     &:hover {
-        border-color: $gray-900;
-        color: $gray-900;
+        border-color: var(--sc-text);
+        color: var(--sc-text);
     }
 
     &.active {
-        background: $navy;
-        border-color: $navy;
-        color: $white;
+        background: var(--sc-point);
+        border-color: var(--sc-point);
+        color: var(--sc-on-point);
     }
 }
 
 .filter-input {
     padding: 6px 10px;
-    border: 1px solid $gray-200;
+    border: 1px solid var(--sc-border);
     border-radius: 0;
     font-size: 0.8rem;
-    color: $gray-900;
+    color: var(--sc-text);
     font-family: inherit;
     outline: none;
     transition: border-color .15s;
 
     &:focus {
-        border-color: $gray-900;
+        border-color: var(--sc-text);
     }
 
     &.date {
@@ -481,14 +471,14 @@ $navy: #141414;
 }
 
 .tilde {
-    color: $gray-400;
+    color: var(--sc-text-mute);
 }
 
 .btn-apply {
     padding: 7px 18px;
     border: none;
-    background: $navy;
-    color: $white;
+    background: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
     border-radius: 0;
     font-size: 0.82rem;
     font-weight: 700;
@@ -497,14 +487,14 @@ $navy: #141414;
     transition: background .15s;
 
     &:hover {
-        background: #000000;
+        background: var(--sc-strong-bg);
     }
 }
 
 /* ── Table (Desktop) ── */
 .table-section {
-    background: $white;
-    border: 1px solid $gray-200;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 0;
     overflow: hidden;
     overflow-x: auto;
@@ -520,8 +510,8 @@ $navy: #141414;
     font-size: 0.83rem;
 
     thead tr {
-        background: $gray-50;
-        border-bottom: 1px solid $gray-200;
+        background: var(--sc-bg);
+        border-bottom: 1px solid var(--sc-border);
     }
 
     th {
@@ -529,7 +519,7 @@ $navy: #141414;
         text-align: left;
         font-size: 0.72rem;
         font-weight: 700;
-        color: $gray-500;
+        color: var(--sc-text-sub);
         letter-spacing: .04em;
         text-transform: uppercase;
         white-space: nowrap;
@@ -537,9 +527,9 @@ $navy: #141414;
 
     td {
         padding: 10px 12px;
-        border-bottom: 1px solid $gray-100;
+        border-bottom: 1px solid var(--sc-border);
         vertical-align: middle;
-        color: $gray-700;
+        color: var(--sc-text);
         white-space: nowrap;
     }
 
@@ -548,15 +538,15 @@ $navy: #141414;
     }
 
     tbody tr:hover td {
-        background: $gray-50;
+        background: var(--sc-bg);
     }
 }
 
-.col-time { width: 150px; color: $gray-500; font-size: 0.78rem; }
+.col-time { width: 150px; color: var(--sc-text-sub); font-size: 0.78rem; }
 .col-user { min-width: 160px; }
 .col-type { width: 110px; }
 .col-status { width: 100px; text-align: center; }
-.col-desc { min-width: 220px; white-space: normal !important; color: $gray-500; }
+.col-desc { min-width: 220px; white-space: normal !important; color: var(--sc-text-sub); }
 .col-ip { width: 130px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.78rem; }
 .col-code { width: 140px; }
 .col-path { min-width: 180px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.78rem; }
@@ -564,11 +554,11 @@ $navy: #141414;
 .code-chip {
     font-size: 0.72rem;
     font-weight: 600;
-    background: $gray-100;
-    color: $gray-700;
+    background: var(--sc-surface-2);
+    color: var(--sc-text);
     padding: 2px 7px;
     border-radius: 0;
-    border: 1px solid $gray-200;
+    border: 1px solid var(--sc-border);
 }
 
 /* status badge */
@@ -580,27 +570,27 @@ $navy: #141414;
     white-space: nowrap;
 
     &.success {
-        background: $white;
-        color: $gray-500;
-        border: 1px solid $gray-200;
+        background: var(--sc-surface);
+        color: var(--sc-text-sub);
+        border: 1px solid var(--sc-border);
     }
 
     &.fail {
-        background: $gray-900;
-        color: $white;
-        border: 1px solid $gray-900;
+        background: var(--sc-strong-bg);
+        color: var(--sc-strong-text);
+        border: 1px solid var(--sc-text);
     }
 
     &.running {
-        background: $gray-100;
-        color: $gray-900;
-        border: 1px solid $gray-400;
+        background: var(--sc-surface-2);
+        color: var(--sc-text);
+        border: 1px solid var(--sc-border-strong);
     }
 
     &.default {
-        background: $gray-100;
-        color: $gray-500;
-        border: 1px solid $gray-200;
+        background: var(--sc-surface-2);
+        color: var(--sc-text-sub);
+        border: 1px solid var(--sc-border);
     }
 }
 
@@ -611,7 +601,7 @@ $navy: #141414;
 
 .skeleton-row {
     height: 42px;
-    background: $gray-100;
+    background: var(--sc-surface-2);
     border-radius: 0;
     margin-bottom: 6px;
     animation: pulse 1.6s infinite ease-in-out;
@@ -620,7 +610,7 @@ $navy: #141414;
 .empty-cell {
     text-align: center;
     padding: 60px 0;
-    color: $gray-400;
+    color: var(--sc-text-mute);
     font-size: 0.88rem;
 }
 
@@ -643,8 +633,8 @@ $navy: #141414;
 }
 
 .log-li {
-    background: $white;
-    border: 1px solid $gray-200;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 0;
     padding: 14px;
 }
@@ -658,14 +648,14 @@ $navy: #141414;
 
 .li-time {
     font-size: 0.76rem;
-    color: $gray-500;
+    color: var(--sc-text-sub);
     font-variant-numeric: tabular-nums;
 }
 
 .li-name {
     font-size: 0.9rem;
     font-weight: 700;
-    color: $gray-900;
+    color: var(--sc-text);
     margin-bottom: 8px;
 }
 
@@ -675,12 +665,12 @@ $navy: #141414;
     align-items: flex-start;
     font-size: 0.8rem;
     margin-bottom: 4px;
-    color: $gray-700;
+    color: var(--sc-text);
 
     .li-label {
         flex-shrink: 0;
         width: 56px;
-        color: $gray-500;
+        color: var(--sc-text-sub);
         font-weight: 600;
     }
 }
@@ -696,10 +686,10 @@ $navy: #141414;
 
 .page-btn {
     padding: 6px 14px;
-    border: 1px solid $gray-200;
+    border: 1px solid var(--sc-border);
     border-radius: 0;
-    background: $white;
-    color: $gray-700;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-size: 0.8rem;
     font-weight: 600;
     cursor: pointer;
@@ -707,8 +697,8 @@ $navy: #141414;
     transition: border-color .12s, color .12s;
 
     &:hover:not(:disabled) {
-        border-color: $navy;
-        color: $navy;
+        border-color: var(--sc-text);
+        color: var(--sc-text);
     }
 
     &:disabled {
@@ -720,7 +710,7 @@ $navy: #141414;
 .page-info {
     font-size: 0.82rem;
     font-weight: 600;
-    color: $gray-700;
+    color: var(--sc-text);
     padding: 0 6px;
 }
 

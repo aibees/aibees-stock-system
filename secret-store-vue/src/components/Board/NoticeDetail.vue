@@ -70,20 +70,11 @@ watch(() => route.query.id, (id) => load(id), { immediate: true });
 
 <style scoped lang="scss">
 // 양봉상회 디자인 토큰
-$card:  #FFFFFF;
-$line:  #EFE2BC;
-$brown: #7A4423;
-$ink:   #2B1D14;
-$sub:   #6B5B4E;
-$sub-2: #7A6B5D;
-$up:    #C8282A;
-$down:  #1F5BD1;
-$amber: #A0662F;
 
 #notice-detail {
     min-height: 100vh;
-    background: $card;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     text-align: left;
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
 }
@@ -103,14 +94,14 @@ $amber: #A0662F;
         gap: 8px;
         margin-top: 6px;
         padding-bottom: 14px;
-        border-bottom: 1px solid $line;
+        border-bottom: 1px solid var(--sc-border);
         font-size: 12px;
-        color: $sub;
+        color: var(--sc-text-sub);
     }
     .date { font-variant-numeric: tabular-nums; }
     .body {
         padding: 16px 0 20px;
-        border-bottom: 1px solid $line;
+        border-bottom: 1px solid var(--sc-border);
         font-size: 15px;
         line-height: 1.7;
         white-space: pre-wrap;
@@ -119,28 +110,28 @@ $amber: #A0662F;
     // HTML 본문: 줄바꿈은 태그로만. v-html 내용은 scoped 밖이라 :deep 으로 꾸민다.
     .body.is-html {
         white-space: normal;
-        :deep(h3) { margin: 20px 0 8px; font-size: 16px; font-weight: 700; color: $brown; }
+        :deep(h3) { margin: 20px 0 8px; font-size: 16px; font-weight: 700; color: var(--sc-point-ink); }
         :deep(h4) { margin: 16px 0 6px; font-size: 15px; font-weight: 700; }
         :deep(h3:first-child), :deep(h4:first-child), :deep(p:first-child) { margin-top: 0; }
         :deep(p) { margin: 0 0 10px; }
         :deep(strong), :deep(b) { font-weight: 700; }
         :deep(ul), :deep(ol) { margin: 0 0 10px; padding-left: 20px; }
         :deep(li) { margin: 2px 0; }
-        :deep(blockquote) { margin: 0 0 10px; padding-left: 12px; border-left: 3px solid $line; color: $sub; }
-        :deep(hr) { border: 0; border-top: 1px solid $line; margin: 16px 0; }
-        :deep(a) { color: $down; text-decoration: underline; }
+        :deep(blockquote) { margin: 0 0 10px; padding-left: 12px; border-left: 3px solid var(--sc-border); color: var(--sc-text-sub); }
+        :deep(hr) { border: 0; border-top: 1px solid var(--sc-border); margin: 16px 0; }
+        :deep(a) { color: var(--sc-down); text-decoration: underline; }
     }
 }
 
 // 카테고리: 글자색만 (NoticeList 와 같음)
 .cat { font-weight: 600; }
-.cat-notice { color: $brown; }
-.cat-maint  { color: $up; }
-.cat-update { color: $down; }
-.cat-event  { color: $amber; }
-.cat-etc    { color: $sub-2; }
+.cat-notice { color: var(--sc-point-ink); }
+.cat-maint  { color: var(--sc-up); }
+.cat-update { color: var(--sc-down); }
+.cat-event  { color: var(--sc-point-ink); }
+.cat-etc    { color: var(--sc-text-sub); }
 
-.empty-box { text-align: center; padding: 56px 0; color: $sub; font-size: 14px; }
+.empty-box { text-align: center; padding: 56px 0; color: var(--sc-text-sub); font-size: 14px; }
 
 .list-btn {
     display: block;
@@ -148,7 +139,7 @@ $amber: #A0662F;
     padding: 10px 16px;
     border: 0;
     background: transparent;
-    color: $brown;
+    color: var(--sc-point-ink);
     font: inherit;
     font-size: 14px;
     font-weight: 600;

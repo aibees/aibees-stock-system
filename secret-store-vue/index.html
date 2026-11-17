@@ -4,18 +4,41 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="theme-color" content="#FFC107" />
+    <meta name="theme-color" content="#16181D" />
+    <meta name="description" content="비밀상회 — 자동매매 현황을 한눈에 보는 가족용 조회 앱" />
+
+    <!-- Open Graph / 링크 미리보기(카카오톡·슬랙·페이스북 등). 이미지·주소는 크롤러가 받아갈 수 있게 절대 경로.
+         %VITE_REDIRECT_URL% 는 빌드 시 .env.<mode> 값으로 바뀐다(운영 = https://secret-store.chagoklabs.com). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="비밀상회" />
+    <meta property="og:title" content="비밀상회" />
+    <meta property="og:description" content="자동매매 현황을 한눈에" />
+    <meta property="og:url" content="%VITE_REDIRECT_URL%/" />
+    <meta property="og:image" content="%VITE_REDIRECT_URL%/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="비밀상회 로고 — 실버 육각형과 내려진 셔터" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="비밀상회" />
+    <meta name="twitter:description" content="자동매매 현황을 한눈에" />
+    <meta name="twitter:image" content="%VITE_REDIRECT_URL%/og-image.png" />
+
+    <!-- 저장된 테마를 첫 페인트 전에 적용(src/scripts/theme.js 의 localStorage 사본). 없으면 dark-teal. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('sc-theme');
+          if (t === 'dark-teal' || t === 'light-violet' || t === 'light-rose') document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
     <script type="text/javascript" src="https://static.nid.naver.com/js/naverLogin_implicit-1.0.3.js" charset="utf-8"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap" />
-    <!-- adsense:start — 웹 운영 빌드에만 남는다. dev 서버·앱(BUILD_TARGET=app) 빌드에서는 vite.config.js 가 지운다
-         (앱 WebView 안 AdSense 는 정책 위반). id 는 AdSlot.vue 가 같은 스크립트를 두 번 넣지 않게 하는 표식. -->
-    <script async id="adsbygoogle-js" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5330672724286218"
-     crossorigin="anonymous"></script>
-    <!-- adsense:end -->
-    <title>양봉상회</title>
+    <title>비밀상회</title>
   </head>
   <body>
     <div id="app"></div>

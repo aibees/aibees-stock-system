@@ -157,24 +157,19 @@ PlanRows.props = ['plan']
 </script>
 
 <style scoped lang="scss">
-$line:   #EFE2BC;
-$line-2: #F4ECD6;
-$ink:    #2B1D14;
-$sub:    #6B5B4E;
-$sub-2:  #7A6B5D;
 
 .ca-summary {
     margin-top: 16px;
-    border-top: 1px solid $line;
+    border-top: 1px solid var(--sc-border);
     font-size: 13px;
     line-height: 1.45;
-    color: $ink;
+    color: var(--sc-text);
     font-variant-numeric: tabular-nums;
 }
 
 .ca-sec {
     padding: 16px 0 12px;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
 
     h3 {
         margin: 0 0 6px;
@@ -206,7 +201,7 @@ dl { margin: 0; }
     padding: 6px 0;
 
     dt {
-        color: $sub-2;
+        color: var(--sc-text-sub);
         min-width: 0;
     }
     .ca-val {
@@ -219,14 +214,14 @@ dl { margin: 0; }
             margin-left: 6px;
             font-size: 12px;
             font-weight: 400;
-            color: $sub-2;
+            color: var(--sc-text-sub);
         }
     }
     .ca-note {
         grid-column: 1 / -1;
         margin: 2px 0 0;
         font-size: 12px;
-        color: $sub-2;
+        color: var(--sc-text-sub);
     }
 }
 
@@ -237,7 +232,7 @@ dl { margin: 0; }
     column-gap: 20px;
     margin: 8px 0 0;
     padding: 8px 0 0;
-    border-top: 1px solid $line-2;
+    border-top: 1px solid var(--sc-border);
     list-style: none;
 
     li {
@@ -245,24 +240,24 @@ dl { margin: 0; }
         justify-content: space-between;
         padding: 3px 0;
         font-size: 12px;
-        color: $sub-2;
+        color: var(--sc-text-sub);
     }
-    b { font-weight: 600; color: $sub; }
+    b { font-weight: 600; color: var(--sc-text-sub); }
 }
 
 .ca-status {
     flex: none;
     font-size: 12px;
     font-weight: 500;
-    color: $sub;
-    &.is-live { color: #74462A; font-weight: 700; }
-    &.is-dead { color: #A99B8C; }
+    color: var(--sc-text-sub);
+    &.is-live { color: var(--sc-point-ink); font-weight: 700; }
+    &.is-dead { color: var(--sc-text-mute); }
 }
 
 .ca-pattern + .ca-pattern {
     margin-top: 10px;
     padding-top: 10px;
-    border-top: 1px solid $line-2;
+    border-top: 1px solid var(--sc-border);
 }
 .ca-pattern-head {
     margin: 0 0 2px;
@@ -285,8 +280,8 @@ dl { margin: 0; }
         align-items: center;
         gap: 12px;
         padding: 10px 0;
-        border-bottom: 1px solid $line-2;
-        color: $sub;
+        border-bottom: 1px solid var(--sc-border);
+        color: var(--sc-text-sub);
         cursor: pointer;
         &.on { color: #A8458A; .ca-wave-title { font-weight: 700; } }
     }
@@ -298,11 +293,11 @@ dl { margin: 0; }
         flex: 1;
     }
     .ca-wave-title { color: inherit; font-weight: 600; }
-    .ca-wave-meta { font-size: 12px; color: $sub-2; b { font-weight: 600; } }
+    .ca-wave-meta { font-size: 12px; color: var(--sc-text-sub); b { font-weight: 600; } }
     .ca-spark { width: 60px; height: 20px; flex: none; }
 }
 
 // Row(함수형) 안쪽에도 걸리도록 deep
-:deep(.up)   { color: #C8282A; }
-:deep(.down) { color: #1F5BD1; }
+:deep(.up)   { color: var(--sc-up); }
+:deep(.down) { color: var(--sc-down); }
 </style>

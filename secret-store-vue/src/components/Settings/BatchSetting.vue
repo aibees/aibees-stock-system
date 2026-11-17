@@ -449,36 +449,19 @@ const executeBatch = async () => {
 
 <style scoped lang="scss">
 // 양봉상회 토큰(홈·매수추천과 동일). 기존 변수명은 팝업 스타일이 쓰고 있어 값만 브랜드 톤으로 바꿔 둔다.
-$white:    #ffffff;
-$line:     #EFE2BC;
-$line-2:   #EAD9A6;
-$chip:     #F6EBC8;
-$hero:     #74462A;
-$brown:    #7A4423;
-$ink:      #2B1D14;
-$sub:      #6B5B4E;
-$sub-2:    #7A6B5D;
-$cream:    #FFF8E1;
-$ok:       #2E9E5B;
-$fail:     #C8282A;
-$run:      #E07A00;
 
-$gray-50:  #FFFDF5;
-$gray-100: #F3EAD2;
-$gray-200: $line-2;
-$gray-300: $line-2;
-$gray-400: #9A8C7E;
-$gray-500: $sub;
-$gray-700: #4A3628;
-$gray-900: $ink;
-$blue:     $brown;
-$navy:     $hero;
-$red:      $fail;
+$gray-200: #EAD9A6;
+$gray-300: #EAD9A6;
+$gray-500: #6B5B4E;
+$gray-900: #2B1D14;
+$blue:     #7A4423;
+$navy:     #74462A;
+$red:      #C8282A;
 
 #batch-setting {
     min-height: 100vh;
-    background: $white;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     text-align: left;
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
     font-variant-numeric: tabular-nums;
@@ -499,7 +482,7 @@ $red:      $fail;
     gap: 10px;
     margin-bottom: 8px;
 
-    .summary { margin: 0; font-size: 14px; color: $sub; b { color: $ink; font-size: 16px; } }
+    .summary { margin: 0; font-size: 14px; color: var(--sc-text-sub); b { color: var(--sc-text); font-size: 16px; } }
 }
 .head-actions { display: flex; gap: 8px; }
 
@@ -518,14 +501,14 @@ $red:      $fail;
     white-space: nowrap;
 }
 .btn-ghost {
-    border: 1px solid $line-2;
-    background: $white;
-    color: $brown;
-    &:disabled { color: $sub-2; cursor: default; }
+    border: 1px solid var(--sc-border-strong);
+    background: var(--sc-surface);
+    color: var(--sc-point-ink);
+    &:disabled { color: var(--sc-text-sub); cursor: default; }
 }
-.btn-primary { border: 0; background: $hero; color: $cream; }
+.btn-primary { border: 0; background: var(--sc-strong-bg); color: var(--sc-strong-text); }
 .btn-ghost:focus-visible,
-.btn-primary:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+.btn-primary:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
 
 .spinning { animation: spin 0.9s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -536,8 +519,8 @@ $red:      $fail;
     margin: 0 0 4px;
     font-size: 17px;
     font-weight: 700;
-    color: $ink;
-    .count { color: #A0662F; margin-left: 2px; }
+    color: var(--sc-text);
+    .count { color: var(--sc-point-ink); margin-left: 2px; }
 }
 
 /* ── 배치 목록: 카드 없이 구분선 ── */
@@ -545,7 +528,7 @@ $red:      $fail;
     margin: 0;
     padding: 0;
     list-style: none;
-    border-top: 1px solid $line;
+    border-top: 1px solid var(--sc-border);
 }
 
 .job {
@@ -553,7 +536,7 @@ $red:      $fail;
     flex-direction: column;
     gap: 6px;
     padding: 14px 0;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
 
     &.off .job-title,
     &.off .job-last,
@@ -567,8 +550,8 @@ $red:      $fail;
     gap: 12px;
 }
 .job-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.job-name { font-size: 16px; font-weight: 700; color: $ink; word-break: keep-all; }
-.job-when { font-size: 14px; font-weight: 600; color: $brown; }
+.job-name { font-size: 16px; font-weight: 700; color: var(--sc-text); word-break: keep-all; }
+.job-when { font-size: 14px; font-weight: 600; color: var(--sc-point-ink); }
 
 // 최근 실행: 점 + 글자
 .job-last {
@@ -578,20 +561,20 @@ $red:      $fail;
     gap: 2px 8px;
     font-size: 13px;
 
-    .dot { width: 8px; height: 8px; border-radius: 4px; background: $sub-2; flex-shrink: 0; }
-    .lr-state { font-weight: 700; color: $sub; }
-    .lr-meta { color: $sub; }
+    .dot { width: 8px; height: 8px; border-radius: 4px; background: var(--sc-text-sub); flex-shrink: 0; }
+    .lr-state { font-weight: 700; color: var(--sc-text-sub); }
+    .lr-meta { color: var(--sc-text-sub); }
 
-    &.ok   { .dot { background: $ok; }   .lr-state { color: #23784A; } }
-    &.fail { .dot { background: $fail; } .lr-state { color: $fail; } }
-    &.run  { .dot { background: $run; }  .lr-state { color: #B05F00; } }
-    &.none { .lr-state { font-weight: 500; color: $sub-2; } }
+    &.ok   { .dot { background: #2E9E5B; }   .lr-state { color: #23784A; } }
+    &.fail { .dot { background: var(--sc-up); } .lr-state { color: var(--sc-up); } }
+    &.run  { .dot { background: #E07A00; }  .lr-state { color: var(--sc-point-ink); } }
+    &.none { .lr-state { font-weight: 500; color: var(--sc-text-sub); } }
 }
 .job-desc {
     margin: 0;
     font-size: 13px;
     line-height: 1.5;
-    color: $sub;
+    color: var(--sc-text-sub);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -612,7 +595,7 @@ $red:      $fail;
     min-width: 0;
     font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
     font-size: 11.5px;
-    color: $sub-2;
+    color: var(--sc-text-sub);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -624,15 +607,15 @@ $red:      $fail;
     border: 0;
     border-radius: 8px;
     background: transparent;
-    color: $brown;
+    color: var(--sc-point-ink);
     font-size: 13px;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
 
-    &:hover { background: rgba(239, 226, 188, .4); }
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 0; }
-    &.danger { color: $fail; }
+    &:hover { background: color-mix(in srgb, var(--sc-border) 40%, transparent); }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 0; }
+    &.danger { color: var(--sc-up); }
 }
 
 /* ── 사용 스위치 ── */
@@ -646,10 +629,10 @@ $red:      $fail;
     cursor: pointer;
     transition: background .15s;
 
-    &.active   { background: $hero; }
-    &.inactive { background: $line-2; }
+    &.active   { background: var(--sc-point); }
+    &.inactive { background: var(--sc-border-strong); }
     &:disabled { opacity: .6; cursor: default; }
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
 
     .toggle-knob {
         position: absolute;
@@ -658,7 +641,7 @@ $red:      $fail;
         width: 20px;
         height: 20px;
         border-radius: 10px;
-        background: $white;
+        background: var(--sc-surface);
         box-shadow: 0 1px 2px rgba(74, 40, 20, .25);
         transition: transform .15s;
     }
@@ -666,20 +649,20 @@ $red:      $fail;
 }
 
 /* ── 로딩 / 빈 상태 ── */
-.loader-rows { display: flex; flex-direction: column; margin-top: 18px; border-top: 1px solid $line; }
+.loader-rows { display: flex; flex-direction: column; margin-top: 18px; border-top: 1px solid var(--sc-border); }
 .skeleton-row {
     height: 96px;
-    border-bottom: 1px solid $line;
-    background: rgba(239, 226, 188, .3);
+    border-bottom: 1px solid var(--sc-border);
+    background: color-mix(in srgb, var(--sc-border) 30%, transparent);
     animation: pulse 1.6s infinite ease-in-out;
 }
-.empty { padding: 48px 0; text-align: center; color: $sub; font-size: 14px; }
+.empty { padding: 48px 0; text-align: center; color: var(--sc-text-sub); font-size: 14px; }
 
 /* ── Popup ── */
 .popup-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(43, 29, 20, .45);
+    background: color-mix(in srgb, var(--sc-strong-bg) 45%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -694,7 +677,7 @@ $red:      $fail;
 }
 
 .popup-panel {
-    background: $white;
+    background: var(--sc-surface);
     border-radius: 16px;
     width: 100%;
     max-width: 560px;
@@ -721,7 +704,7 @@ $red:      $fail;
     justify-content: space-between;
     align-items: center;
     padding: 18px 20px 14px;
-    border-bottom: 1px solid $gray-100;
+    border-bottom: 1px solid var(--sc-border);
 
     h3 {
         margin: 0;
@@ -735,7 +718,7 @@ $red:      $fail;
         border: none;
         background: none;
         cursor: pointer;
-        color: $gray-400;
+        color: var(--sc-text-sub);
         padding: 4px;
         border-radius: 0;
         display: flex;
@@ -766,8 +749,8 @@ $red:      $fail;
         grid-column: 1 / -1;
         margin: -4px 0 0;
         font-size: 13px;
-        color: $sub;
-        b { color: $brown; margin-left: 4px; }
+        color: var(--sc-text-sub);
+        b { color: var(--sc-point-ink); margin-left: 4px; }
     }
 
     .form-field {
@@ -782,7 +765,7 @@ $red:      $fail;
         label {
             font-size: 0.78rem;
             font-weight: 600;
-            color: $gray-700;
+            color: var(--sc-text);
         }
 
         .req {
@@ -803,7 +786,7 @@ $red:      $fail;
             font-size: 16px;
             color: $gray-900;
             font-family: inherit;
-            background: $white;
+            background: var(--sc-surface);
             outline: none;
             transition: border-color .15s;
 
@@ -812,12 +795,12 @@ $red:      $fail;
             }
 
             &:disabled {
-                background: $gray-50;
-                color: $gray-400;
+                background: var(--sc-bg);
+                color: var(--sc-text-sub);
             }
 
             &::placeholder {
-                color: $gray-400;
+                color: var(--sc-text-sub);
             }
         }
 
@@ -833,7 +816,7 @@ $red:      $fail;
             gap: 5px;
             font-size: 0.84rem;
             font-weight: 500;
-            color: $gray-700;
+            color: var(--sc-text);
             cursor: pointer;
 
             input[type="radio"] {
@@ -855,7 +838,7 @@ $red:      $fail;
         font-size: 14px;
         font-family: 'SFMono-Regular', Consolas, monospace;
         color: $gray-900;
-        background: $gray-50;
+        background: var(--sc-bg);
         outline: none;
         resize: vertical;
         transition: border-color .15s;
@@ -877,15 +860,15 @@ $red:      $fail;
     justify-content: flex-end;
     gap: 8px;
     padding: 14px 20px 18px;
-    border-top: 1px solid $gray-100;
+    border-top: 1px solid var(--sc-border);
 
     .btn-cancel {
         min-height: 42px;
         padding: 0 18px;
         border: 1px solid $gray-200;
         border-radius: 10px;
-        background: $white;
-        color: $gray-700;
+        background: var(--sc-surface);
+        color: var(--sc-text);
         font-size: 0.84rem;
         font-weight: 600;
         cursor: pointer;
@@ -893,7 +876,7 @@ $red:      $fail;
         transition: border-color .12s;
 
         &:hover {
-            border-color: $gray-400;
+            border-color: var(--sc-text-mute);
         }
     }
 
@@ -903,7 +886,7 @@ $red:      $fail;
         border: none;
         border-radius: 10px;
         background: $navy;
-        color: $cream;
+        color: var(--sc-strong-text);
         font-size: 0.84rem;
         font-weight: 700;
         cursor: pointer;
@@ -911,7 +894,7 @@ $red:      $fail;
         transition: background .15s;
 
         &:hover {
-            background: $brown;
+            background: var(--sc-strong-bg);
         }
 
         &:disabled {

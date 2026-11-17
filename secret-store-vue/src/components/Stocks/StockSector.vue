@@ -248,21 +248,11 @@ onMounted(getSectors);
 
 <style scoped lang="scss">
 // 양봉상회 디자인 토큰 (매수추천과 동일)
-$card:  #FFFFFF;
-$line:  #EFE2BC;
-$line-soft: #F3EAD2;
-$brown: #7A4423;
-$ink:   #2B1D14;
-$sub:   #6B5B4E;
-$sub-2: #7A6B5D;
-$up:    #C8282A;
-$down:  #1F5BD1;
-$amber: #A0662F;
 
 #stock-sector {
     min-height: 100vh;
-    background: $card;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     text-align: left;
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
     font-variant-numeric: tabular-nums;
@@ -274,15 +264,15 @@ $amber: #A0662F;
     padding: 16px 16px 24px;
 }
 
-.up   { color: $up; }
-.down { color: $down; }
+.up   { color: var(--sc-up); }
+.down { color: var(--sc-down); }
 
 /* ── 시장 탭: 글자 + 밑줄 ── */
 .market-tabs {
     display: flex;
     align-items: flex-end;
     gap: 18px;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
     margin-bottom: 16px;
 }
 .market-tab {
@@ -293,16 +283,16 @@ $amber: #A0662F;
     font: inherit;
     font-size: 16px;
     font-weight: 600;
-    color: $sub-2;
+    color: var(--sc-text-sub);
     cursor: pointer;
     border-bottom: 2px solid transparent;
-    &.on { color: $ink; font-weight: 700; border-bottom-color: $brown; }
+    &.on { color: var(--sc-text); font-weight: 700; border-bottom-color: var(--sc-point); }
 }
 .basis {
     margin-left: auto;
     padding-bottom: 11px;
     font-size: 12px;
-    color: $sub-2;
+    color: var(--sc-text-sub);
 }
 
 .list-head {
@@ -311,7 +301,7 @@ $amber: #A0662F;
     justify-content: space-between;
     margin-bottom: 12px;
     h2 { margin: 0; font-size: 18px; font-weight: 700; }
-    .count { color: $amber; }
+    .count { color: var(--sc-point-ink); }
 }
 // 기간 전환 — 글자 버튼(선택 = 진한 글자 + 밑줄)
 .period { display: flex; gap: 12px; }
@@ -322,10 +312,10 @@ $amber: #A0662F;
     font: inherit;
     font-size: 13px;
     font-weight: 600;
-    color: $sub-2;
+    color: var(--sc-text-sub);
     cursor: pointer;
     border-bottom: 2px solid transparent;
-    &.on { color: $ink; font-weight: 700; border-bottom-color: $brown; }
+    &.on { color: var(--sc-text); font-weight: 700; border-bottom-color: var(--sc-point); }
 }
 
 /* ── 업종 목록: 카드 없이 구분선 ── */
@@ -348,16 +338,16 @@ $amber: #A0662F;
     font: inherit;
     font-size: 12px;
     font-weight: 600;
-    color: $sub;
+    color: var(--sc-text-sub);
     text-align: right;
     cursor: pointer;
     white-space: nowrap;
-    &.on { color: $brown; font-weight: 700; }
+    &.on { color: var(--sc-point-ink); font-weight: 700; }
     .dir { margin-left: 2px; }
 }
 
-.sector-list { border-top: 1px solid $line; }
-.sector-item { border-bottom: 1px solid $line; }
+.sector-list { border-top: 1px solid var(--sc-border); }
+.sector-item { border-bottom: 1px solid var(--sc-border); }
 
 .sector-row {
     width: 100%;
@@ -366,28 +356,28 @@ $amber: #A0662F;
     padding: 14px 0;
     text-align: left;
     cursor: pointer;
-    color: $ink;
+    color: var(--sc-text);
     font-family: inherit;
 
     .who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .name-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
     .name { font-size: 15px; font-weight: 700; letter-spacing: -.2px; overflow-wrap: anywhere; }
-    .parent { font-size: 11px; color: $sub-2; white-space: nowrap; }
+    .parent { font-size: 11px; color: var(--sc-text-sub); white-space: nowrap; }
     .chg { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
     .spark {
         flex-shrink: 0;
         overflow: visible;
-        polyline { fill: none; stroke: $sub; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
-        .spark-zero { stroke: $line; stroke-width: 1; }
-        &.up polyline { stroke: $up; }
-        &.down polyline { stroke: $down; }
+        polyline { fill: none; stroke: var(--sc-text-sub); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+        .spark-zero { stroke: var(--sc-strong-text); stroke-width: 1; }
+        &.up polyline { stroke: var(--sc-up); }
+        &.down polyline { stroke: var(--sc-down); }
     }
-    .sub { font-size: 11px; color: $sub-2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sub { font-size: 11px; color: var(--sc-text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .v { text-align: right; white-space: nowrap; font-weight: 600; }
     .chg { font-size: 15px; font-weight: 700; }
     .flow { font-size: 12px; }
-    .v:not(.up):not(.down):not(.chg), .chg > span:not(.up):not(.down) { color: $sub; }
+    .v:not(.up):not(.down):not(.chg), .chg > span:not(.up):not(.down) { color: var(--sc-text-sub); }
 }
 
 .sector-detail { padding: 0 0 16px; }
@@ -397,7 +387,7 @@ $amber: #A0662F;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     padding-bottom: 10px;
-    border-bottom: 1px solid $line-soft;
+    border-bottom: 1px solid var(--sc-border);
 }
 .fact {
     display: flex;
@@ -406,14 +396,14 @@ $amber: #A0662F;
     gap: 3px;
     min-width: 0;
     padding: 2px 0;
-    & + .fact { border-left: 1px solid $line-soft; }
+    & + .fact { border-left: 1px solid var(--sc-border); }
 }
-.fact-name { font-size: 11px; color: $sub-2; white-space: nowrap; }
+.fact-name { font-size: 11px; color: var(--sc-text-sub); white-space: nowrap; }
 .fact-value { font-size: 13px; font-weight: 600; white-space: nowrap; }
 
 /* ── 업종 내 종목 ── */
 .st-list { list-style: none; margin: 0; padding: 0; }
-.st-list li + li { border-top: 1px solid $line-soft; }
+.st-list li + li { border-top: 1px solid var(--sc-border); }
 .st-row {
     width: 100%;
     display: grid;
@@ -425,17 +415,17 @@ $amber: #A0662F;
     padding: 10px 0;
     text-align: left;
     cursor: pointer;
-    color: $ink;
+    color: var(--sc-text);
     font-family: inherit;
 
     .who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
     .name-line { display: flex; align-items: baseline; gap: 5px; min-width: 0; }   // 순위는 종목명 줄 안에
-    .rank { font-family: 'Do Hyeon', 'Pretendard', sans-serif; font-size: 15px; line-height: 1; color: $amber; flex-shrink: 0; }
+    .rank { font-family: 'Do Hyeon', 'Pretendard', sans-serif; font-size: 15px; line-height: 1; color: var(--sc-point-ink); flex-shrink: 0; }
     .name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-    .code { font-size: 11px; color: $sub-2; }
+    .code { font-size: 11px; color: var(--sc-text-sub); }
     .px { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
     .price { font-size: 14px; font-weight: 700; }
-    .chg-sm { font-size: 12px; font-weight: 600; color: $sub; &.up { color: $up; } &.down { color: $down; } }
+    .chg-sm { font-size: 12px; font-weight: 600; color: var(--sc-text-sub); &.up { color: var(--sc-up); } &.down { color: var(--sc-down); } }
 }
 
 .more {
@@ -443,12 +433,12 @@ $amber: #A0662F;
     margin-top: 4px;
     padding: 10px 0;
     border: 0;
-    border-top: 1px solid $line-soft;
+    border-top: 1px solid var(--sc-border);
     background: transparent;
     font: inherit;
     font-size: 13px;
     font-weight: 600;
-    color: $brown;
+    color: var(--sc-point-ink);
     cursor: pointer;
 }
 
@@ -456,6 +446,6 @@ $amber: #A0662F;
     padding: 40px 0;
     text-align: center;
     font-size: 13px;
-    color: $sub-2;
+    color: var(--sc-text-sub);
 }
 </style>

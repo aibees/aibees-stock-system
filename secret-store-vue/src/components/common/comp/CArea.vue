@@ -27,12 +27,12 @@
 <style lang="scss" scoped>
 .area-div {
 
-    background-color: #2c2c2c;
-    color: #fafafa;
+    background-color: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
     /* 밝고 부드러운 회색 계열 배경 */
     border-radius: 0;
     padding: 1rem 1.5rem;
-    // color: #333;
+    // color: var(--sc-text);
     /* 다크 그레이 */
 
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);

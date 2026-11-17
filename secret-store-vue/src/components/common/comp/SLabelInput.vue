@@ -71,15 +71,15 @@ const setWidth = () => {
         white-space: nowrap;
         padding-left: 4px;
         padding-right: 4px;
-        color: white;
-        background-color: #141414;
+        color: var(--sc-strong-text);
+        background-color: var(--sc-strong-bg);
         border-top-left-radius: 5px;
         border-bottom-left-radius: 5px;
         font-weight: 600;
     }
 
     input {
-        color: white;
+        color: var(--sc-strong-text);
         height:15px;
         font-size: 12px;
         padding: 3px 3px;

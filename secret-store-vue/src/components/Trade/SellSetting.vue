@@ -553,7 +553,7 @@ const save = async () => {
 <style scoped>
 #sell-param-setting {
     min-height: 100vh;
-    background: #FFFBEA;
+    background: var(--sc-bg);
 }
 
 .contents {
@@ -568,7 +568,7 @@ const save = async () => {
 .mode-tab-nav {
     display: flex;
     gap: 4px;
-    border-bottom: 1px solid #EFE2BC;
+    border-bottom: 1px solid var(--sc-border);
     margin: 0 0 16px;
     overflow-x: auto;
 }
@@ -581,7 +581,7 @@ const save = async () => {
     padding: 8px 14px;
     border: none;
     background: none;
-    color: #9A8C7E;
+    color: var(--sc-text-sub);
     cursor: pointer;
     font-family: inherit;
     white-space: nowrap;
@@ -601,11 +601,11 @@ const save = async () => {
     font-weight: 600;
 }
 
-.mode-tab-btn:hover { color: #4A3628; }
+.mode-tab-btn:hover { color: var(--sc-text); }
 
 .mode-tab-btn.active {
-    color: #2B1D14;
-    border-bottom-color: #2B1D14;
+    color: var(--sc-text);
+    border-bottom-color: var(--sc-text);
 }
 
 /* ── 준비중 영역 ── */
@@ -616,10 +616,10 @@ const save = async () => {
     justify-content: center;
     gap: 8px;
     min-height: 320px;
-    background: #fff;
-    border: 1px dashed #EFE2BC;
+    background: var(--sc-surface);
+    border: 1px dashed var(--sc-border);
     border-radius: 10px;
-    color: #9A8C7E;
+    color: var(--sc-text-sub);
 }
 
 .mode-empty .me-code {
@@ -628,15 +628,15 @@ const save = async () => {
     letter-spacing: .06em;
     padding: 3px 9px;
     border-radius: 10px;
-    background: #F3EAD2;
-    color: #6B5B4E;
+    background: var(--sc-surface-2);
+    color: var(--sc-text-sub);
 }
 
 .mode-empty h3 {
     margin: 0;
     font-size: 1rem;
     font-weight: 700;
-    color: #4A3628;
+    color: var(--sc-text);
 }
 
 .mode-empty p {
@@ -656,13 +656,13 @@ const save = async () => {
     margin: 0;
     font-size: 1.25rem;
     font-weight: 700;
-    color: #2B1D14;
+    color: var(--sc-text);
 }
 
 .head-desc .sub-text {
     margin: 6px 0 0;
     font-size: 0.85rem;
-    color: #6B5B4E;
+    color: var(--sc-text-sub);
     line-height: 1.4;
 }
 
@@ -672,10 +672,10 @@ const save = async () => {
     gap: 6px;
     height: 32px;
     padding: 0 12px;
-    border: 1px solid #EFE2BC;
+    border: 1px solid var(--sc-border);
     border-radius: 10px;
-    background: #fff;
-    color: #4A3628;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
@@ -683,8 +683,8 @@ const save = async () => {
 }
 
 .btn-refresh:hover:not(:disabled) {
-    border-color: #2B1D14;
-    color: #2B1D14;
+    border-color: var(--sc-text);
+    color: var(--sc-text);
 }
 
 /* ── 매도 판정 우선순위: 한 줄 ── */
@@ -692,8 +692,8 @@ const save = async () => {
     display: flex;
     align-items: center;
     gap: 10px;
-    background: #fff;
-    border: 1px solid #EFE2BC;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 14px;
     padding: 12px 14px;
     margin-bottom: 14px;
@@ -702,7 +702,7 @@ const save = async () => {
     flex-shrink: 0;
     font-size: 0.74rem;
     font-weight: 700;
-    color: #6B5B4E;
+    color: var(--sc-text-sub);
 }
 .pb-steps {
     flex: 1;
@@ -722,7 +722,7 @@ const save = async () => {
     white-space: nowrap;
     font-size: 0.82rem;
     font-weight: 700;
-    color: #2B1D14;
+    color: var(--sc-text);
 }
 .pb-step b {
     display: grid;
@@ -730,11 +730,11 @@ const save = async () => {
     width: 16px;
     height: 16px;
     border-radius: 8px;
-    background: #74462A;
-    color: #fff;
+    background: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
     font-size: 0.62rem;
 }
-.pb-sep { color: #9A8C7E; font-size: 0.9rem; }
+.pb-sep { color: var(--sc-text-sub); font-size: 0.9rem; }
 @media (max-width: 380px) {
     .priority-bar { padding: 10px; gap: 6px; }
     .pb-title { display: none; }
@@ -751,7 +751,7 @@ const save = async () => {
 .skeleton-row {
     height: 96px;
     border-radius: 10px;
-    background: linear-gradient(90deg, #F3EAD2 25%, #FFFBEA 37%, #F3EAD2 63%);
+    background: linear-gradient(90deg, var(--sc-surface-2) 25%, var(--sc-bg) 37%, var(--sc-surface-2) 63%);
     background-size: 400% 100%;
     animation: shimmer 1.2s ease-in-out infinite;
 }
@@ -763,8 +763,8 @@ const save = async () => {
 
 /* ── 카드 ── */
 .setting-card {
-    background: #fff;
-    border: 1px solid #F3EAD2;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 10px;
     padding: 18px 18px 20px;
     margin-bottom: 14px;
@@ -788,7 +788,7 @@ const save = async () => {
     margin: 0;
     font-size: 1rem;
     font-weight: 700;
-    color: #2B1D14;
+    color: var(--sc-text);
 }
 
 .prio-badge {
@@ -798,12 +798,12 @@ const save = async () => {
     height: 22px;
     padding: 0 6px;
     border-radius: 10px;
-    background: #74462A;
-    color: #fff;
+    background: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
     font-size: 0.72rem;
     font-weight: 700;
 }
-.prio-badge.exec { background: #74462A; }
+.prio-badge.exec { background: var(--sc-strong-bg); }
 
 /* ── 필드 ── */
 .field-list {
@@ -818,7 +818,7 @@ const save = async () => {
     flex-direction: column;
     gap: 8px;
     padding: 12px 0;
-    border-top: 1px solid #FFFBEA;
+    border-top: 1px solid var(--sc-border);
 }
 
 .field-row:first-child {
@@ -831,7 +831,7 @@ const save = async () => {
 }
 
 .field-row.pending {
-    background: #FFFBEA;
+    background: var(--sc-bg);
     border-radius: 10px;
     padding: 12px;
 }
@@ -846,12 +846,12 @@ const save = async () => {
 .fr-head label {
     font-size: 0.88rem;
     font-weight: 600;
-    color: #4A3628;
+    color: var(--sc-text);
 }
 
 .fr-unit {
     font-weight: 500;
-    color: #9A8C7E;
+    color: var(--sc-text-sub);
     font-size: 0.8rem;
 }
 
@@ -863,24 +863,24 @@ const save = async () => {
 
 .fr-def {
     font-size: 0.72rem;
-    color: #9A8C7E;
+    color: var(--sc-text-sub);
     white-space: nowrap;
 }
 
 .btn-null {
     height: 22px;
     padding: 0 8px;
-    border: 1px solid #EFE2BC;
+    border: 1px solid var(--sc-border);
     border-radius: 10px;
-    background: #fff;
-    color: #6B5B4E;
+    background: var(--sc-surface);
+    color: var(--sc-text-sub);
     font-size: 0.68rem;
     cursor: pointer;
 }
 
 .btn-null:hover:not(:disabled) {
-    border-color: #2B1D14;
-    color: #2B1D14;
+    border-color: var(--sc-text);
+    color: var(--sc-text);
 }
 
 /* slider */
@@ -896,7 +896,7 @@ const save = async () => {
     appearance: none;
     height: 4px;
     border-radius: 10px;
-    background: #F3EAD2;
+    background: var(--sc-surface-2);
     outline: none;
 }
 
@@ -906,8 +906,8 @@ const save = async () => {
     width: 18px;
     height: 18px;
     border-radius: 10px;
-    background: #74462A;
-    border: 2px solid #fff;
+    background: var(--sc-strong-bg);
+    border: 2px solid var(--sc-border);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
     cursor: pointer;
 }
@@ -916,12 +916,12 @@ const save = async () => {
     width: 16px;
     height: 16px;
     border-radius: 10px;
-    background: #74462A;
-    border: 2px solid #fff;
+    background: var(--sc-strong-bg);
+    border: 2px solid var(--sc-border);
     cursor: pointer;
 }
 
-.sl-range:disabled::-webkit-slider-thumb { background: #9A8C7E; }
+.sl-range:disabled::-webkit-slider-thumb { background: var(--sc-text-sub); }
 
 .sl-num {
     flex: 0 0 auto;
@@ -935,24 +935,24 @@ const save = async () => {
     height: 34px;
     box-sizing: border-box;
     padding: 0 8px;
-    border: 1px solid #EFE2BC;
+    border: 1px solid var(--sc-border);
     border-radius: 10px;
     font-size: 0.88rem;
     text-align: right;
-    color: #2B1D14;
-    background: #fff;
+    color: var(--sc-text);
+    background: var(--sc-surface);
 }
 
 .sl-num input:focus {
     outline: none;
-    border-color: #2B1D14;
+    border-color: var(--sc-text);
     box-shadow: 0 0 0 3px rgba(43, 29, 20, 0.12);
 }
 
 .sl-unit,
 .st-unit {
     font-size: 0.78rem;
-    color: #6B5B4E;
+    color: var(--sc-text-sub);
     min-width: 16px;
 }
 
@@ -967,17 +967,17 @@ const save = async () => {
 .st-btn {
     width: 34px;
     height: 34px;
-    border: 1px solid #EFE2BC;
+    border: 1px solid var(--sc-border);
     border-radius: 10px;
-    background: #fff;
-    color: #4A3628;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-size: 1rem;
     cursor: pointer;
 }
 
 .st-btn:hover:not(:disabled) {
-    border-color: #2B1D14;
-    color: #2B1D14;
+    border-color: var(--sc-text);
+    color: var(--sc-text);
 }
 
 .st-input {
@@ -985,16 +985,16 @@ const save = async () => {
     height: 34px;
     box-sizing: border-box;
     padding: 0 8px;
-    border: 1px solid #EFE2BC;
+    border: 1px solid var(--sc-border);
     border-radius: 10px;
     text-align: center;
     font-size: 0.88rem;
-    color: #2B1D14;
+    color: var(--sc-text);
 }
 
 .st-input:focus {
     outline: none;
-    border-color: #2B1D14;
+    border-color: var(--sc-text);
 }
 
 /* bool */
@@ -1006,7 +1006,7 @@ const save = async () => {
 
 .bool-text {
     font-size: 0.8rem;
-    color: #6B5B4E;
+    color: var(--sc-text-sub);
 }
 
 .toggle-btn {
@@ -1018,10 +1018,10 @@ const save = async () => {
     position: relative;
     cursor: pointer;
     transition: background 0.18s;
-    background: #E3D3A8;
+    background: var(--sc-border-strong);
 }
 
-.toggle-btn.active { background: #74462A; }
+.toggle-btn.active { background: var(--sc-point); }
 
 .toggle-knob {
     position: absolute;
@@ -1029,7 +1029,7 @@ const save = async () => {
     left: 3px;
     width: 20px;
     height: 20px;
-    background: #fff;
+    background: var(--sc-surface);
     border-radius: 10px;
     transition: transform 0.18s;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
@@ -1048,20 +1048,20 @@ const save = async () => {
     align-items: center;
     gap: 6px;
     padding: 7px 14px;
-    border: 1px solid #EFE2BC;
+    border: 1px solid var(--sc-border);
     border-radius: 10px;
     font-size: 0.82rem;
-    color: #4A3628;
+    color: var(--sc-text);
     cursor: pointer;
-    background: #fff;
+    background: var(--sc-surface);
 }
 
-.radio-chip input { accent-color: #2B1D14; }
+.radio-chip input { accent-color: var(--sc-text); }
 
 .radio-chip.on {
-    border-color: #2B1D14;
-    background: rgba(43, 29, 20, 0.06);
-    color: #2B1D14;
+    border-color: var(--sc-point);
+    background: color-mix(in srgb, var(--sc-strong-bg) 6%, transparent);
+    color: var(--sc-text);
     font-weight: 600;
 }
 
@@ -1069,17 +1069,17 @@ const save = async () => {
 
 .field-error {
     font-size: 0.74rem;
-    color: #2B1D14;
+    color: var(--sc-text);
     font-weight: 600;
 }
 
 /* ── E 실행·안전 ── */
 .exec-card {
-    border-color: #F3EAD2;
-    background: #FFFBEA;
+    border-color: var(--sc-border);
+    background: var(--sc-bg);
 }
 
-.exec-card .card-head h3 { color: #2B1D14; }
+.exec-card .card-head h3 { color: var(--sc-text); }
 
 .exec-list {
     display: flex;
@@ -1093,8 +1093,8 @@ const save = async () => {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    background: #fff;
-    border: 1px solid #F3EAD2;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 10px;
     padding: 11px 13px;
 }
@@ -1108,7 +1108,7 @@ const save = async () => {
 .ex-label {
     font-size: 0.85rem;
     font-weight: 600;
-    color: #4A3628;
+    color: var(--sc-text);
 }
 
 .ex-right {
@@ -1121,20 +1121,20 @@ const save = async () => {
 .ex-value {
     font-size: 1rem;
     font-weight: 700;
-    color: #2B1D14;
+    color: var(--sc-text);
 }
 
 .ex-value i {
     font-style: normal;
     font-size: 0.75rem;
     font-weight: 500;
-    color: #6B5B4E;
+    color: var(--sc-text-sub);
     margin-left: 2px;
 }
 
 .ex-key {
     font-size: 0.66rem;
-    color: #9A8C7E;
+    color: var(--sc-text-sub);
     font-family: ui-monospace, Menlo, monospace;
 }
 
@@ -1149,18 +1149,18 @@ const save = async () => {
     margin: 4px -14px 0;
     background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(6px);
-    border-top: 1px solid #F3EAD2;
+    border-top: 1px solid var(--sc-border);
 }
 
 .dirty-note {
     flex: 1 1 auto;
     font-size: 0.78rem;
-    color: #2B1D14;
+    color: var(--sc-text);
     font-weight: 600;
 }
 
 .dirty-note.clean {
-    color: #9A8C7E;
+    color: var(--sc-text-sub);
     font-weight: 500;
 }
 
@@ -1176,15 +1176,15 @@ const save = async () => {
 
 .btn-reset {
     border-radius: 12px;
-    border: 1px solid #EFE2BC;
-    background: #fff;
-    color: #6B5B4E;
+    border: 1px solid var(--sc-border);
+    background: var(--sc-surface);
+    color: var(--sc-text-sub);
 }
 
 .btn-save {
     border: 0;
-    background: #74462A;
-    color: #fff;
+    background: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
 }
 
 .btn-save:disabled,

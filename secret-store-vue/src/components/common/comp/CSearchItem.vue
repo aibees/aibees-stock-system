@@ -19,12 +19,12 @@
         padding: 0.4rem 0.6rem;
         border-radius: 0;
         font-size: 14px;
-        color: white;
+        color: var(--sc-strong-text);
         background-color: transparent;
         transition: border-color 0.2s;
 
         &:focus {
-            border-color: #141414;
+            border-color: var(--sc-text);
             outline: none;
             box-shadow: 0 0 5px rgba(56, 99, 17, 0.3);
         }

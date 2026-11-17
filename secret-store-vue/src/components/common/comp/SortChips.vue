@@ -58,8 +58,8 @@ onMounted(() => scrollToActive(false));
     padding: 0 16px;
     border: 0;
     border-radius: 999px;
-    background: #F6F1E4;
-    color: #6B5B4E;
+    background: var(--sc-surface-2);
+    color: var(--sc-text-sub);
     font-size: 15px;
     font-weight: 600;
     font-family: inherit;
@@ -67,7 +67,7 @@ onMounted(() => scrollToActive(false));
     cursor: pointer;
     transition: background .15s, color .15s;
 
-    &.on { background: #74462A; color: #FFF8E1; }
-    &:focus-visible { outline: 2px solid #7A4423; outline-offset: 2px; }
+    &.on { background: var(--sc-point); color: var(--sc-on-point); }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
 }
 </style>

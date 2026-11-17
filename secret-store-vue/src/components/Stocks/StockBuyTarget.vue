@@ -20,36 +20,6 @@
                 </div>
             </section>
 
-            <!-- ── 추천 단계: 열람 가능한 단계 + 바로 위 한 단계(잠금)만 보인다. 그 위 단계는 존재 자체를 숨긴다 ── -->
-            <div class="stage-chips" role="tablist" aria-label="추천 단계">
-                <button v-for="s in visibleStages" :key="s.code" type="button" role="tab" class="stage-chip"
-                    :class="{ on: s.code === stageCode, locked: s.locked }"
-                    :aria-selected="s.code === stageCode ? 'true' : 'false'" @click="stageCode = s.code">
-                    <svg v-if="s.locked" class="stage-lock" width="13" height="13" viewBox="0 0 16 16" fill="none"
-                        stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
-                        <rect x="3" y="7" width="10" height="7" rx="2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
-                    </svg>
-                    {{ s.name }}
-                    <span class="stage-count">{{ s.locked ? '비공개' : (s.ready === false ? '준비 중' : stageCount(s.rank)) }}</span>
-                </button>
-            </div>
-
-            <!-- 잠금 단계를 고른 경우: 내용 대신 안내만(개수·종목은 서버가 내려주지 않는다) -->
-            <section v-if="activeStage.locked" class="stage-locked">
-                <svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
-                    stroke-linecap="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></svg>
-                <p class="stage-locked-title">{{ activeStage.name }} 추천이 따로 있어요</p>
-                <p class="stage-locked-desc">{{ activeStage.desc }}</p>
-                <p v-if="activeStage.unlock" class="stage-locked-unlock">{{ activeStage.unlock }}</p>
-            </section>
-
-            <!-- 아직 알고리즘이 확정되지 않은 단계(실전): 빈 목록 대신 준비 중 안내 -->
-            <section v-else-if="activeStage.ready === false" class="stage-locked">
-                <p class="stage-locked-title">{{ activeStage.name }} 추천을 준비하고 있어요</p>
-                <p class="stage-locked-desc">{{ activeStage.desc }}</p>
-            </section>
-
-            <template v-else>
             <!-- ── 정렬 (홈과 동일: 기준 select + 방향 버튼) ── -->
             <div v-if="!isLoading && resultData.length > 0" class="list-head">
                 <h2>추천 종목 <span class="count">{{ sortedData.length }}</span></h2>
@@ -185,7 +155,6 @@
                     <p>분석된 데이터가 없습니다. 날짜를 변경해 보세요.</p>
                 </div>
             </section>
-            </template>
         </div>
     </div>
 </template>
@@ -324,44 +293,23 @@ const sortNum = (v) => {
     return Number.isNaN(n) ? null : n;
 };
 
-/* ══════════════ 추천 단계(기본 → 고급 → 실전) ══════════════
- * 단계 이름·설명은 임시 — 확정되면 STAGE_DEFS 만 바꾼다. desc 는 잠겼을 때도 보이므로 내부 용어를 쓰지 않는다.
- * 단계마다 알고리즘이 다른 별개의 목록이다. 서버(RecoLevel.py)가 행마다 reco_stages(속한 단계 번호, 사용자 단계까지)를 준다.
- *   기본 = 옛 기계식 / 고급 = 2파 돌파 + 모델 확률 + 외국인·기관 수급 / 실전 = 고급 종목의 30분봉 재검증(연구 중).
- * 서버는 사용자 권한 밖 종목·정보를 응답에서 지운다(화면 가림은 보안이 아니다).
+/* ══════════════ 추천 목록(단계 탭 없음) ══════════════
+ * 비밀상회는 기본/고급/실전 탭을 나누지 않고 '매수추천' 목록 하나만 보여준다(2026-11-17).
+ * 목록 = 사용자가 볼 수 있는 단계 중 가장 높은 단계(실전은 아직 준비 중이라 고급까지) — 홈(Home.vue)과 같은 규칙.
+ * 서버(RecoLevel.py)가 행마다 reco_stages 를 주고, 권한 밖 종목·정보는 응답에서 지운다.
  */
-const STAGE_DEFS = [
-    // 기본 = 옛 기계식 알고리즘(이평 정배열·MACD/OBV 기울기·거래량 급증 등)
-    { code: 'BASIC', rank: 1, name: '기본', desc: '이동평균·거래량 같은 규칙으로 1차로 고른 후보예요.' },
-    // 고급 = 현재 제공 알고리즘(2파 하락 추세선 돌파 + 모델 확률 + 외국인·기관 수급). 잠겼을 때도 보이는 문구라 내부 용어는 쓰지 않는다.
-    //   광고 시청·정기결제 연동 전이라 버튼은 아직 없다.
-    { code: 'ADVANCED', rank: 2, name: '고급', desc: '차트 패턴과 모델 분석, 수급 흐름까지 더해 고른 종목이에요.',
-      unlock: '광고를 보거나 정기결제를 하면 열려요.' },
-    // 실전 = 고급 종목을 30분봉으로 다시 검증해 순위를 재정비한 목록(다른 세션에서 연구 중 — ready:false).
-    //   private: 운영자가 직접 권한(WORKER_USER)을 준 사람만. 신청·결제 경로가 없으므로 권한이 없으면 칩 자체를 숨긴다.
-    { code: 'LIVE', rank: 3, name: '실전', desc: '고급 종목을 30분봉으로 한 번 더 검증한 최종 후보를 곧 보여드릴게요.', private: true, ready: false },
-];
-const visibleStages = computed(() =>
-    STAGE_DEFS
-        .filter(d => d.rank <= userLevel.value + 1)
-        .map(d => ({ ...d, locked: d.rank > userLevel.value }))
-        .filter(d => !(d.locked && d.private)));
-const stageCode = ref('BASIC');
-const activeStage = computed(() => visibleStages.value.find(s => s.code === stageCode.value) ?? visibleStages.value[0]);
-// 단계를 바꾸면 그 단계의 기본 정렬로 되돌린다(단계마다 쓸 수 있는 정렬 기준이 다르다)
-watch(stageCode, () => {
-    sortKey.value = activeStage.value.rank >= 2 ? 'composite_rank_no' : 'rank_no';
-    sortDir.value = 'asc';
-});
-// 단계 k 의 목록 = 서버가 reco_stages 에 k 를 담아 준 종목. 단계마다 알고리즘이 달라 서로 다른 목록이며
-// 두 알고리즘에 모두 걸린 종목은 양쪽에 나온다. reco_stages 가 없으면(구 응답) 기본 단계로 본다.
+const STAGE_RANK = computed(() => Math.min(userLevel.value, 2));
+const activeStage = computed(() => ({ rank: STAGE_RANK.value }));
 const stageItems = (rank) => resultData.value.filter(it => (it.reco_stages ?? [1]).includes(rank));
-const stageCount = (rank) => stageItems(rank).length;
+watch(STAGE_RANK, (r) => {
+    sortKey.value = r >= 2 ? 'composite_rank_no' : 'rank_no';
+    sortDir.value = 'asc';
+}, { immediate: true });
 
 const sortedData = computed(() => {
     const key = sortKey.value;
     const desc = sortDir.value === 'desc';
-    const base = activeStage.value.locked ? [] : stageItems(activeStage.value.rank);
+    const base = stageItems(activeStage.value.rank);
     return base.sort((a, b) => {
         const va = sortNum(a[key]);
         const vb = sortNum(b[key]);
@@ -443,26 +391,11 @@ const toggleChart = (code) => {
 
 <style scoped lang="scss">
 // 양봉상회 디자인 토큰 (홈과 동일)
-$bg:       #FFFBEA;
-$card:     #FFFFFF;
-$line:     #EFE2BC;
-$line-2:   #EAD9A6;
-$brown:    #7A4423;
-$ink:      #2B1D14;
-$sub:      #6B5B4E;
-$sub-2:    #7A6B5D;
-$up:       #C8282A;
-$down:     #1F5BD1;
-$amber:    #A0662F;
-$gray-700: #5C3118;
-$gray-300: #EAD9A6;
-$white:    #fff;
-$blue:     #7A4423;
 
 #stock-buy-target {
     min-height: 100vh;
-    background: $card;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     text-align: left;
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
     font-variant-numeric: tabular-nums;
@@ -476,26 +409,6 @@ $blue:     #7A4423;
 
 .head-desc { display: flex; margin-bottom: 12px; }
 
-/* ── 추천 단계 칩: 정렬 칩(SortChips)과 같은 pill 톤. 잠금은 빗금 + 자물쇠 ── */
-.stage-chips { display: flex; gap: 8px; margin: 0 0 14px; }
-.stage-chip {
-    flex: 1; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px;
-    border: 0; border-radius: 999px; background: #F6F1E4; color: #6B5B4E; font: inherit; font-size: 15px; font-weight: 700;
-    white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent;
-    transition-property: background-color, color, scale; transition-duration: .15s; transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
-    &:active { scale: 0.96; }
-    &.on { background: #74462A; color: #FFF8E1; }
-    &.locked { background: repeating-linear-gradient(135deg, #F6F1E4 0 6px, #EFE6CF 6px 12px); }
-    &.locked.on { background: #74462A; }
-    &:focus-visible { outline: 2px solid #7A4423; outline-offset: 2px; }
-    .stage-count { font-size: 12px; font-weight: 600; opacity: .75; font-variant-numeric: tabular-nums; }
-}
-.stage-locked {
-    display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 32px 20px; border-radius: 16px; background: #FAF6EA; text-align: center; color: #2B1D14;
-    .stage-locked-title { margin: 4px 0 0; font-size: 16px; font-weight: 800; }
-    .stage-locked-desc { margin: 0; font-size: 14px; line-height: 1.5; color: #6B5B4E; text-wrap: pretty; }
-    .stage-locked-unlock { margin: 6px 0 0; padding: 6px 12px; border-radius: 999px; background: #fff; font-size: 13px; font-weight: 700; color: #74462A; }
-}
 /* ── Head Actions ── */
 .head-actions {
     display: flex;
@@ -516,17 +429,17 @@ $blue:     #7A4423;
     padding: 0 14px;
     min-height: 44px;
     border-radius: 14px;
-    border: 1px solid $gray-300;
-    background: $white;
-    color: $gray-700;
+    border: 1px solid var(--sc-border-strong);
+    background: var(--sc-surface);
+    color: var(--sc-point-ink);
     font-size: 0.88rem;
     font-weight: 600;
     cursor: pointer;
     transition: border-color .15s;
 
-    &:hover { border-color: $blue; }
+    &:hover { border-color: var(--sc-point); }
 
-    .date-value { color: $blue; }
+    .date-value { color: var(--sc-point-ink); }
 
     .hidden-input {
         position: absolute;
@@ -544,7 +457,7 @@ $blue:     #7A4423;
     margin-bottom: 12px;
 
     h2 { margin: 0; font-size: 18px; font-weight: 700; }
-    .count { color: $amber; }
+    .count { color: var(--sc-point-ink); }
 }
 .list-tools { display: flex; align-items: center; gap: 4px; }
 .dir-btn {
@@ -552,8 +465,8 @@ $blue:     #7A4423;
     height: 40px;
     border: 0;
     border-radius: 20px;
-    background: #F6EBC8;
-    color: #5C3118;
+    background: var(--sc-border);
+    color: var(--sc-point-ink);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -562,11 +475,11 @@ $blue:     #7A4423;
 
 /* ── 컴팩트 리스트: 카드 없이 페이지 배경 위에 구분선으로만 나열 (홈과 동일) ── */
 .reco-list {
-    border-top: 1px solid $line;
+    border-top: 1px solid var(--sc-border);
     display: flex;
     flex-direction: column;
 }
-.reco-item { border-bottom: 1px solid $line; }
+.reco-item { border-bottom: 1px solid var(--sc-border); }
 
 /* 줄 칸 나눔: 윗줄 = 종목 | 현재가 | 작은 봉, 아랫줄 = 7개 조건(전체 폭). 머리글(.reco-cols)은 윗줄과 같은 값. */
 .reco {
@@ -589,7 +502,7 @@ $blue:     #7A4423;
     padding: 0 0 6px;
     font-size: 9px;
     font-weight: 600;
-    color: $sub;
+    color: var(--sc-text-sub);
     .c-px { text-align: right; }
     @media (min-width: 640px) { font-size: 12px; }
 }
@@ -601,10 +514,10 @@ $blue:     #7A4423;
     padding: 14px 0;
     text-align: left;
     cursor: pointer;
-    color: $ink;
+    color: var(--sc-text);
     font-family: inherit;
 
-    .rank { font-family: 'Do Hyeon', 'Pretendard', sans-serif; font-size: 17px; line-height: 1; color: #A0662F; flex-shrink: 0; }
+    .rank { font-family: 'Do Hyeon', 'Pretendard', sans-serif; font-size: 17px; line-height: 1; color: var(--sc-point-ink); flex-shrink: 0; }
     .who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
     .name-line { display: flex; align-items: baseline; gap: 5px; min-width: 0; }    // 순위는 종목명 줄 안에
     // 좁은 칸이라 자르지 않고 최대 두 줄로 감싼다(한글 종목명은 띄어쓰기가 없어 글자 단위로 넘긴다)
@@ -620,8 +533,8 @@ $blue:     #7A4423;
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
-    .code { font-size: 11px; color: $sub-2; }
-    .sector { font-size: 11px; color: $sub-2; white-space: nowrap; flex-shrink: 0; }   // 업종(지수업종 중분류)
+    .code { font-size: 11px; color: var(--sc-text-sub); }
+    .sector { font-size: 11px; color: var(--sc-text-sub); white-space: nowrap; flex-shrink: 0; }   // 업종(지수업종 중분류)
 
     // 7개 조건 — 윗줄 아래 전체 폭, 항상 7칸 1줄. 칸마다 이름 위 / 상태 아래, 칸 사이 옅은 세로선
     .conds {
@@ -639,13 +552,13 @@ $blue:     #7A4423;
         padding: 2px 0;
         line-height: 1.2;
         text-align: center;
-        & + .cond { border-left: 1px solid #F3EAD2; }                    // 칸 사이 옅은 구분선
+        & + .cond { border-left: 1px solid var(--sc-border); }                    // 칸 사이 옅은 구분선
     }
     .cond-name {
         max-width: 100%;
         font-size: 11px;
         letter-spacing: -.3px;
-        color: $sub-2;
+        color: var(--sc-text-sub);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -661,12 +574,12 @@ $blue:     #7A4423;
         margin-top: 8px;
         font-size: 12px;
         font-weight: 600;
-        color: $brown;
+        color: var(--sc-point-ink);
     }
     .more-chev { transition: transform .15s ease; }
     &.open .more-chev { transform: rotate(180deg); }
-    .cond-state { font-size: 13px; font-weight: 400; color: #A89A8A; }    // 미달: 회색 보통
-    .cond.on .cond-state { color: $up; font-weight: 700; }               // 충족: 빨강 볼드
+    .cond-state { font-size: 13px; font-weight: 400; color: var(--sc-text-mute); }    // 미달: 회색 보통
+    .cond.on .cond-state { color: var(--sc-up); font-weight: 700; }               // 충족: 빨강 볼드
 
     .px { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; min-width: 0; }
     .price { font-size: 15px; font-weight: 700; }
@@ -684,9 +597,9 @@ $blue:     #7A4423;
         .chg-full { display: inline; }
         .chg-short { display: none; }
     }
-    &.up   { color: $up; }
-    &.down { color: $down; }
-    &.flat { color: $sub; }
+    &.up   { color: var(--sc-up); }
+    &.down { color: var(--sc-down); }
+    &.flat { color: var(--sc-text-sub); }
 }
 
 .reco-detail {
@@ -696,14 +609,14 @@ $blue:     #7A4423;
     gap: 12px;
 }
 
-.score-line { font-size: 12px; color: $sub; b { color: $ink; } }
+.score-line { font-size: 12px; color: var(--sc-text-sub); b { color: var(--sc-text); } }
 
 // 수급·밸류 요약 — 펼침 영역 맨 위. 조건 줄과 같은 칸 모양(4칸), 아래쪽에 옅은 가로선
 .facts {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     padding-bottom: 10px;
-    border-bottom: 1px solid #F3EAD2;
+    border-bottom: 1px solid var(--sc-border);
 }
 .fact {
     display: flex;
@@ -713,20 +626,20 @@ $blue:     #7A4423;
     min-width: 0;
     padding: 2px 0;
     line-height: 1.2;
-    & + .fact { border-left: 1px solid #F3EAD2; }
+    & + .fact { border-left: 1px solid var(--sc-border); }
 }
 .fact-value {
     max-width: 100%;
     font-size: 13px;
     font-weight: 600;
-    color: $ink;
+    color: var(--sc-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    &.up   { color: $up; }      // 순매수
-    &.down { color: $down; }    // 순매도
+    &.up   { color: var(--sc-up); }      // 순매수
+    &.down { color: var(--sc-down); }    // 순매도
 }
-.facts .cond-name { font-size: 11px; letter-spacing: -.3px; color: $sub-2; white-space: nowrap; }
+.facts .cond-name { font-size: 11px; letter-spacing: -.3px; color: var(--sc-text-sub); white-space: nowrap; }
 
 // 시가총액 · 수급 — 조건 목록과 같은 줄 리스트(카드·칩 없음). 등락은 글자색으로만
 .mk {
@@ -737,83 +650,83 @@ $blue:     #7A4423;
         gap: 8px;
         padding-bottom: 6px;
     }
-    .mk-title { font-size: 13px; font-weight: 700; color: $ink; }
-    .mk-date  { font-size: 11px; color: $sub-2; }
+    .mk-title { font-size: 13px; font-weight: 700; color: var(--sc-text); }
+    .mk-date  { font-size: 11px; color: var(--sc-text-sub); }
 }
-.mk-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid $line; }
+.mk-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--sc-border); }
 .mk-row {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: 12px;
     padding: 9px 0;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
     font-size: 13px;
 
-    .mk-label { color: $sub; white-space: nowrap; }
+    .mk-label { color: var(--sc-text-sub); white-space: nowrap; }
     .mk-value {
         font-weight: 600;
-        color: $ink;
+        color: var(--sc-text);
         text-align: right;
         white-space: nowrap;
-        &.up   { color: $up; }
-        &.down { color: $down; }
+        &.up   { color: var(--sc-up); }
+        &.down { color: var(--sc-down); }
     }
-    .mk-qty { margin-left: 6px; font-size: 11px; font-weight: 400; color: $sub-2; }
+    .mk-qty { margin-left: 6px; font-size: 11px; font-weight: 400; color: var(--sc-text-sub); }
 }
 
 // 조건 목록 (홈과 같은 모양)
-.cs-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid $line; }
+.cs-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--sc-border); }
 .cs-row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: baseline;
     column-gap: 10px;
     padding: 9px 0;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
     font-size: 13px;
 
-    .cs-state { font-weight: 700; color: $up; white-space: nowrap; }      // 충족: 빨강 볼드
-    .cs-label { font-weight: 600; color: $ink; white-space: nowrap; }
+    .cs-state { font-weight: 700; color: var(--sc-up); white-space: nowrap; }      // 충족: 빨강 볼드
+    .cs-label { font-weight: 600; color: var(--sc-text); white-space: nowrap; }
     .cs-value {
         justify-self: end;
         text-align: right;
         font-size: 12px;
-        color: $ink;
+        color: var(--sc-text);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         max-width: 100%;
     }
-    &.off { .cs-label, .cs-value { color: $sub; font-weight: 400; } .cs-state { color: #A89A8A; font-weight: 400; } }
+    &.off { .cs-label, .cs-value { color: var(--sc-text-sub); font-weight: 400; } .cs-state { color: var(--sc-text-mute); font-weight: 400; } }
 }
 
 .rd-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .btn-outline {
     min-height: 44px;
     border-radius: 10px;
-    border: 1px solid #E3D3A8;
+    border: 1px solid var(--sc-border-strong);
     background: transparent;
-    color: #4A3628;
+    color: var(--sc-text);
     font-size: 14px;
     cursor: pointer;
     font-family: inherit;
 
-    &.strong { border: 1.5px solid $brown; color: $brown; font-weight: 600; }
+    &.strong { border: 1.5px solid var(--sc-point); color: var(--sc-point-ink); font-weight: 600; }
 }
 
 .more-btn {
     min-height: 52px;
     border: 0;
     background: transparent;
-    color: $brown;
+    color: var(--sc-point-ink);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
 }
 
-.skeleton-row { height: 72px; border-bottom: 1px solid $line; background: rgba(239, 226, 188, .35); animation: pulse 1.6s infinite ease-in-out; }
-.empty-box { text-align: center; padding: 56px 0; color: $sub; font-size: 14px; }
+.skeleton-row { height: 72px; border-bottom: 1px solid var(--sc-border); background: color-mix(in srgb, var(--sc-border) 35%, transparent); animation: pulse 1.6s infinite ease-in-out; }
+.empty-box { text-align: center; padding: 56px 0; color: var(--sc-text-sub); font-size: 14px; }
 
 /* ── 간이 차트 ── */
 .mini-chart {
@@ -825,7 +738,7 @@ $blue:     #7A4423;
     .leg-item {
         font-size: 11px;
         font-weight: 600;
-        color: $sub;
+        color: var(--sc-text-sub);
         display: flex;
         align-items: center;
         gap: 3px;
@@ -835,10 +748,10 @@ $blue:     #7A4423;
         flex-shrink: 0;
         min-height: 32px;
         padding: 0 10px;
-        border: 1px solid #E3D3A8;
+        border: 1px solid var(--sc-border-strong);
         border-radius: 8px;
-        background: $card;
-        color: $brown;
+        background: var(--sc-surface);
+        color: var(--sc-point-ink);
         font-size: 12px;
         font-weight: 600;
         cursor: pointer;

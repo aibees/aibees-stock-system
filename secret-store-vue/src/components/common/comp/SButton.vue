@@ -28,7 +28,7 @@
 <style lang="scss" scoped>
 .custom-button-div {
     min-width: 60px;
-    color: #fafafa;
+    color: var(--sc-strong-text);
     padding: 0.6rem 1rem;
     border: none;
     border-radius: 0;
@@ -38,18 +38,18 @@
 }
 
 .outline {
-    border: 2px solid #cbcbcb;
+    border: 2px solid var(--sc-border-strong);
 
     &:hover {
-        background-color: #4b4b4b;
+        background-color: var(--sc-strong-bg);
     }
 }
 
 .save {
-    background-color: #141414;
+    background-color: var(--sc-strong-bg);
 
     &:hover {
-        background-color: #000000;
+        background-color: var(--sc-strong-bg);
     }
 }
 

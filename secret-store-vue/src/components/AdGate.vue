@@ -117,8 +117,8 @@ onBeforeUnmount(() => clearInterval(timer));
     align-items: center;
     justify-content: center;
     padding: 24px 16px;
-    background: #f7f7f7;
-    color: #141414;
+    background: var(--sc-bg);
+    color: var(--sc-text);
 }
 .gate-card {
     display: flex;
@@ -128,22 +128,22 @@ onBeforeUnmount(() => clearInterval(timer));
     max-width: 360px;
     width: 100%;
     padding: 28px 20px;
-    background: #fff;
-    border: 1px solid #dcdcdc;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 12px;
     h2 { margin: 0; font-size: 17px; }
-    .sub { margin: 0; font-size: 12px; color: #737373; line-height: 1.5; }
-    .msg { margin: 0; font-size: 12px; color: #c0392b; text-align: center; }
+    .sub { margin: 0; font-size: 12px; color: var(--sc-text-sub); line-height: 1.5; }
+    .msg { margin: 0; font-size: 12px; color: var(--sc-up); text-align: center; }
 }
 .btn-go {
     width: 100%;
     padding: 12px;
     border: 0;
     border-radius: 8px;
-    background: #141414;
-    color: #fff;
+    background: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
     font-size: 14px;
     cursor: pointer;
-    &:disabled { background: #dcdcdc; color: #9a9a9a; cursor: default; }
+    &:disabled { background: var(--sc-border); color: var(--sc-text-mute); cursor: default; }
 }
 </style>

@@ -194,7 +194,7 @@
 
 .theme_select {
     width: 170px;
-    border: 1px solid rgb(102, 102, 102);
+    border: 1px solid var(--sc-text-mute);
 }
 
 #chart-theme-mobile {
@@ -203,7 +203,7 @@
         width: 95%;
         height: 57px;
         margin: 5px auto;
-        background-color: #353535;
+        background-color: var(--sc-strong-bg);
         margin-top : 100px;
 
         .search-item {
@@ -220,7 +220,7 @@
     .chart-div {
         width: 100%;
         overflow: scroll;
-        background-color: white;
+        background-color: var(--sc-surface);
 
         .chart-item {
             width: 200%;

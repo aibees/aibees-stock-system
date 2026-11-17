@@ -4,7 +4,7 @@ android {
     namespace = "com.aibeesworld.stocks"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.aibeesworld.stocks"
+        applicationId "com.aibeesworld.secretstore"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

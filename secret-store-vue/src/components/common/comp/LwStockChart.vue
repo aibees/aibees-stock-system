@@ -29,6 +29,7 @@
 // analysis(일봉 분석)는 chartAnalysis/layers.js 가 레이어별로 그린다 — layers 에 든 key 만 그린다.
 import { createChart, CandlestickSeries, LineSeries, HistogramSeries, CrosshairMode, LineStyle } from 'lightweight-charts'
 import { drawAnalysis } from './chartAnalysis/layers.js'
+import { chartPalette, alpha, useThemeChange } from '@scripts/theme.js'
 
 const props = defineProps({
     data:        { type: Object, required: true },
@@ -37,8 +38,7 @@ const props = defineProps({
     layerOptions:{ type: Object, default: () => ({}) }, // 레이어별 선택값(예: { elliott: 해석 index })
 })
 
-const UP   = '#C8282A'
-const DOWN = '#1F5BD1'
+// 등락색·바탕색은 테마 토큰에서 읽는다(render 때마다). 이평선·볼린저 색은 지표 고유색이라 테마와 무관.
 
 const maLines = [
     { key: 'ma5',   label: 'MA5',   color: '#f38980' },
@@ -95,25 +95,27 @@ const render = (keepRange = false) => {
     const d = props.data
     if (!d || !el.value) return
     buildRows(d)
+    const pal = chartPalette()
+    const UP = pal.up, DOWN = pal.down
 
     chart = createChart(el.value, {
         autoSize: true,
         layout: {
-            background: { color: '#FFFFFF' },
-            textColor: '#6B5B4E',
+            background: { color: pal.bg },
+            textColor: pal.textSub,
             fontFamily: "'Pretendard', -apple-system, 'Apple SD Gothic Neo', sans-serif",
         },
         grid: {
             vertLines: { visible: false },
-            horzLines: { color: '#F4ECD6' },
+            horzLines: { color: pal.grid },
         },
         crosshair: {
             mode: CrosshairMode.Normal,
-            vertLine: { color: '#B9A58C', labelBackgroundColor: '#74462A' },
-            horzLine: { color: '#B9A58C', labelBackgroundColor: '#74462A' },
+            vertLine: { color: pal.line, labelBackgroundColor: pal.strongBg },
+            horzLine: { color: pal.line, labelBackgroundColor: pal.strongBg },
         },
-        rightPriceScale: { borderColor: '#EFE2BC', scaleMargins: { top: 0.08, bottom: 0.22 } },
-        timeScale: { borderColor: '#EFE2BC', rightOffset: 4, minBarSpacing: 2 },
+        rightPriceScale: { borderColor: pal.grid, scaleMargins: { top: 0.08, bottom: 0.22 } },
+        timeScale: { borderColor: pal.grid, rightOffset: 4, minBarSpacing: 2 },
         localization: {
             locale: 'ko-KR',
             priceFormatter: (p) => Math.round(p).toLocaleString('ko-KR'),
@@ -135,7 +137,7 @@ const render = (keepRange = false) => {
     volSeries.setData((d.ohcl || []).map(c => ({
         time: c.x,
         value: byTime.get(c.x)?.v ?? 0,
-        color: c.c >= c.o ? 'rgba(200,40,42,0.28)' : 'rgba(31,91,209,0.28)',
+        color: c.c >= c.o ? alpha(UP, 0.28) : alpha(DOWN, 0.28),
     })))
 
     for (const b of bbLines) {
@@ -187,6 +189,8 @@ watch(() => props.data, () => nextTick(() => render()))
 // 값이 실제로 바뀔 때만 다시 그린다(새 종목을 받으면 data 쪽 watch 가 이미 그리므로 같은 레이어면 건너뜀)
 watch(() => JSON.stringify([props.layers, props.layerOptions]), () => nextTick(() => render(true)))
 onBeforeUnmount(() => { chart?.remove(); chart = null })
+// 테마 전환: 차트 옵션은 JS 값이라 CSS 변수를 못 따라온다 → 보던 위치 그대로 다시 그린다
+useThemeChange(() => nextTick(() => render(true)))
 </script>
 
 <style scoped lang="scss">
@@ -202,17 +206,17 @@ onBeforeUnmount(() => { chart?.remove(); chart = null })
     gap: 4px;
     padding-bottom: 8px;
     font-size: 13px;
-    color: #2B1D14;
+    color: var(--sc-text);
     font-variant-numeric: tabular-nums;
 
     em {
         font-style: normal;
-        color: #7A6B5D;
+        color: var(--sc-text-sub);
         margin-right: 4px;
     }
     b { font-weight: 700; }
-    .up   { color: #C8282A; }
-    .down { color: #1F5BD1; }
+    .up   { color: var(--sc-up); }
+    .down { color: var(--sc-down); }
 }
 
 .lw-ohlc, .lw-ma {
@@ -222,7 +226,7 @@ onBeforeUnmount(() => { chart?.remove(); chart = null })
     row-gap: 2px;
 }
 
-.lw-date { font-weight: 600; color: #6B5B4E; }
+.lw-date { font-weight: 600; color: var(--sc-text-sub); }
 
 .lw-ma .lw-rsi::before { background: #8E7CC3; }
 

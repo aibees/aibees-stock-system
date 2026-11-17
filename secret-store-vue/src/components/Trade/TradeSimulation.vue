@@ -219,6 +219,8 @@
 import { ref, reactive, computed, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import Chart from 'chart.js/auto';
+import { chartPalette, alpha, setupChartJsTheme, useThemeChange } from '@scripts/theme.js';
+setupChartJsTheme(Chart);
 import aibeesApi from '@scripts/aibeesApi.js';
 import mariaToast from '@scripts/mariaToast.js';
 
@@ -335,6 +337,7 @@ const drawChart = () => {
 
     const curve = result.value.equity_curve;
     const init = result.value.final.init_cash;
+    const pal = chartPalette();
 
     chart = new Chart(equityCanvas.value, {
         type: 'line',
@@ -343,12 +346,12 @@ const drawChart = () => {
             datasets: [{
                 label: '자산',
                 data: curve.map(p => p.cash),
-                borderColor: '#141414',
-                backgroundColor: 'rgba(25,113,194,.10)',
+                borderColor: pal.text,
+                backgroundColor: alpha(pal.point, 0.10),
                 fill: { target: { value: init } },
                 borderWidth: 2,
                 pointRadius: 3,
-                pointBackgroundColor: curve.map(p => (p.cash >= init ? '#141414' : '#9a9a9a')),
+                pointBackgroundColor: curve.map(p => (p.cash >= init ? pal.text : pal.flat)),
                 tension: 0.15,
             }],
         },
@@ -366,7 +369,7 @@ const drawChart = () => {
             scales: {
                 y: {
                     ticks: { callback: (v) => `${(v / 10000).toLocaleString()}만` },
-                    grid: { color: 'rgba(0,0,0,.06)' },
+                    grid: { color: pal.grid },
                 },
                 x: { ticks: { maxRotation: 60, minRotation: 0, font: { size: 10 } }, grid: { display: false } },
             },
@@ -375,6 +378,7 @@ const drawChart = () => {
 };
 
 onBeforeUnmount(() => { if (chart) chart.destroy(); });
+useThemeChange(() => nextTick(drawChart));
 onMounted(fetchConfig);
 
 /* ═══════════ 포맷 ═══════════ */
@@ -384,7 +388,7 @@ const pnlClass = (v) => (Number(v) > 0 ? 'up' : Number(v) < 0 ? 'down' : '');
 </script>
 
 <style scoped>
-#trade-simulation { min-height: 100vh; background: #FFFBEA; }
+#trade-simulation { min-height: 100vh; background: var(--sc-bg); }
 
 .contents {
     max-width: 980px;
@@ -394,12 +398,12 @@ const pnlClass = (v) => (Number(v) > 0 ? 'up' : Number(v) < 0 ? 'down' : '');
 }
 
 .head-desc { padding: 8px 4px 16px; }
-.head-desc h2 { margin: 0; text-align: start; font-size: 1.25rem; font-weight: 700; color: #2B1D14; }
-.head-desc .sub-text { margin: 6px 0 0; font-size: 0.85rem; color: #6B5B4E; line-height: 1.45; }
+.head-desc h2 { margin: 0; text-align: start; font-size: 1.25rem; font-weight: 700; color: var(--sc-text); }
+.head-desc .sub-text { margin: 6px 0 0; font-size: 0.85rem; color: var(--sc-text-sub); line-height: 1.45; }
 
 .card {
-    background: #fff;
-    border: 1px solid #F3EAD2;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 10px;
     padding: 16px;
     margin-bottom: 14px;
@@ -409,30 +413,30 @@ const pnlClass = (v) => (Number(v) > 0 ? 'up' : Number(v) < 0 ? 'down' : '');
     display: flex; align-items: center; justify-content: space-between;
     gap: 10px; margin-bottom: 12px;
 }
-.card-head h3 { margin: 0; font-size: 0.98rem; font-weight: 700; color: #2B1D14; }
+.card-head h3 { margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--sc-text); }
 .ch-right { display: flex; align-items: center; gap: 10px; }
-.hint-text { font-size: 0.72rem; color: #9A8C7E; }
+.hint-text { font-size: 0.72rem; color: var(--sc-text-sub); }
 
 .btn-link {
     border: none; background: none; padding: 0;
-    color: #2B1D14; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+    color: var(--sc-text); font-size: 0.75rem; font-weight: 600; cursor: pointer;
     text-decoration: underline;
 }
 
 .skeleton-box {
     height: 120px; border-radius: 10px;
-    background: linear-gradient(90deg, #F3EAD2 25%, #FFFBEA 37%, #F3EAD2 63%);
+    background: linear-gradient(90deg, var(--sc-surface-2) 25%, var(--sc-bg) 37%, var(--sc-surface-2) 63%);
     background-size: 400% 100%; animation: sk 1.2s ease infinite;
 }
 @keyframes sk { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 
 /* ── 설정 요약 ── */
-.cfg-group { padding: 12px 0; border-top: 1px solid #F3EAD2; }
+.cfg-group { padding: 12px 0; border-top: 1px solid var(--sc-border); }
 .cfg-group:first-of-type { border-top: none; padding-top: 4px; }
 
 .cfg-group-title {
     display: flex; align-items: center; gap: 9px; margin-bottom: 9px;
-    font-size: 0.78rem; font-weight: 700; color: #4A3628;
+    font-size: 0.78rem; font-weight: 700; color: var(--sc-text);
 }
 
 .order-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
@@ -440,25 +444,25 @@ const pnlClass = (v) => (Number(v) > 0 ? 'up' : Number(v) < 0 ? 'down' : '');
 .ord-chip {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 5px 11px; border-radius: 10px;
-    background: #F3EAD2; color: #74462A;
+    background: var(--sc-surface-2); color: var(--sc-point-ink);
     font-size: 0.78rem; font-weight: 600;
 }
 .ord-chip b {
     width: 16px; height: 16px; border-radius: 10px;
-    background: #74462A; color: #fff;
+    background: var(--sc-strong-bg); color: var(--sc-strong-text);
     font-size: 0.62rem; display: inline-flex; align-items: center; justify-content: center;
 }
 .ord-chip i { font-style: normal; opacity: .75; }
-.ord-arrow { color: #E3D3A8; font-size: 0.8rem; }
+.ord-arrow { color: var(--sc-text-mute); font-size: 0.8rem; }
 
 .badge-default {
     padding: 2px 8px; border-radius: 10px;
-    background: #F3EAD2; color: #6B5B4E;
+    background: var(--sc-surface-2); color: var(--sc-text-sub);
     font-size: 0.68rem; font-weight: 600;
 }
 .badge-default.sm { margin-left: 5px; font-size: 0.62rem; padding: 1px 6px; }
 
-.cfg-note { margin: 9px 0 0; font-size: 0.73rem; color: #6B5B4E; line-height: 1.5; }
+.cfg-note { margin: 9px 0 0; font-size: 0.73rem; color: var(--sc-text-sub); line-height: 1.5; }
 
 .cfg-grid {
     display: grid;
@@ -468,87 +472,87 @@ const pnlClass = (v) => (Number(v) > 0 ? 'up' : Number(v) < 0 ? 'down' : '');
 
 .cfg-item {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
-    padding: 8px 11px; border-radius: 10px; background: #FFFBEA;
+    padding: 8px 11px; border-radius: 10px; background: var(--sc-bg);
 }
 .cfg-item.off { opacity: .5; }
-.ci-label { font-size: 0.75rem; color: #6B5B4E; }
-.ci-value { font-size: 0.79rem; font-weight: 700; color: #2B1D14; white-space: nowrap; }
+.ci-label { font-size: 0.75rem; color: var(--sc-text-sub); }
+.ci-value { font-size: 0.79rem; font-weight: 700; color: var(--sc-text); white-space: nowrap; }
 
 /* ── 실행 조건 ── */
 .run-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
 
 .rf-field { display: flex; flex-direction: column; gap: 5px; }
-.rf-field > span { font-size: 0.72rem; font-weight: 600; color: #6B5B4E; }
+.rf-field > span { font-size: 0.72rem; font-weight: 600; color: var(--sc-text-sub); }
 .rf-field input {
     height: 34px; padding: 0 10px;
-    border: 1px solid #EFE2BC; border-radius: 10px;
-    font-size: 0.8rem; color: #2B1D14; box-sizing: border-box;
+    border: 1px solid var(--sc-border); border-radius: 10px;
+    font-size: 0.8rem; color: var(--sc-text); box-sizing: border-box;
 }
 .rf-field input[type="number"] { width: 130px; text-align: right; }
 
 .seg { display: flex; gap: 4px; }
 .seg button {
     height: 34px; padding: 0 12px;
-    border: 1px solid #EFE2BC; border-radius: 10px; background: #fff;
-    color: #6B5B4E; font-size: 0.76rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+    border: 1px solid var(--sc-border); border-radius: 10px; background: var(--sc-surface);
+    color: var(--sc-text-sub); font-size: 0.76rem; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
-.seg button.on { border-color: #74462A; background: #F3EAD2; color: #74462A; }
+.seg button.on { border-color: var(--sc-point); background: var(--sc-point-bg); color: var(--sc-point-ink); }
 
 .rf-check {
     display: flex; align-items: center; gap: 6px; height: 34px;
-    font-size: 0.76rem; color: #4A3628; cursor: pointer;
+    font-size: 0.76rem; color: var(--sc-text); cursor: pointer;
 }
 .rf-check.disabled { opacity: .4; cursor: not-allowed; }
 
 .btn-run {
     height: 34px; padding: 0 22px; margin-left: auto;
-    border: none; border-radius: 10px; background: #74462A; color: #fff;
+    border: none; border-radius: 10px; background: var(--sc-strong-bg); color: var(--sc-strong-text);
     font-size: 0.82rem; font-weight: 700; cursor: pointer; white-space: nowrap;
 }
-.btn-run:disabled { background: #E3D3A8; cursor: not-allowed; }
+.btn-run:disabled { background: var(--sc-border-strong); cursor: not-allowed; }
 
-.run-note { margin: 11px 0 0; font-size: 0.72rem; color: #6B5B4E; line-height: 1.5; }
-.run-error { margin: 8px 0 0; font-size: 0.75rem; color: #2B1D14; font-weight: 600; }
+.run-note { margin: 11px 0 0; font-size: 0.72rem; color: var(--sc-text-sub); line-height: 1.5; }
+.run-error { margin: 8px 0 0; font-size: 0.75rem; color: var(--sc-text); font-weight: 600; }
 
 /* ── 결과 요약 ── */
 .period-badge {
     padding: 3px 10px; border-radius: 10px;
-    background: #F3EAD2; color: #6B5B4E; font-size: 0.7rem; font-weight: 600;
+    background: var(--sc-surface-2); color: var(--sc-text-sub); font-size: 0.7rem; font-weight: 600;
 }
 
 .final-row {
     display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px;
-    padding: 14px 16px; border-radius: 10px; background: #FFFBEA; margin-bottom: 12px;
+    padding: 14px 16px; border-radius: 10px; background: var(--sc-bg); margin-bottom: 12px;
 }
-.final-row.up { background: #FFFBEA; }
-.final-row.down { background: #F3EAD2; }
-.fr-label { font-size: 0.75rem; color: #6B5B4E; font-weight: 600; }
-.fr-value { font-size: 1.32rem; font-weight: 800; color: #2B1D14; }
+.final-row.up { background: var(--sc-bg); }
+.final-row.down { background: var(--sc-surface-2); }
+.fr-label { font-size: 0.75rem; color: var(--sc-text-sub); font-weight: 600; }
+.fr-value { font-size: 1.32rem; font-weight: 800; color: var(--sc-text); }
 .fr-delta { font-size: 0.92rem; font-weight: 700; }
-.final-row.up .fr-delta { color: #2B1D14; }
-.final-row.down .fr-delta { color: #2B1D14; }
-.fr-init { margin-left: auto; font-size: 0.72rem; color: #9A8C7E; }
+.final-row.up .fr-delta { color: var(--sc-text); }
+.final-row.down .fr-delta { color: var(--sc-text); }
+.fr-init { margin-left: auto; font-size: 0.72rem; color: var(--sc-text-sub); }
 
 .stat-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 7px;
 }
 .stat {
     display: flex; flex-direction: column; gap: 3px;
-    padding: 9px 11px; border-radius: 10px; background: #FFFBEA;
+    padding: 9px 11px; border-radius: 10px; background: var(--sc-bg);
 }
-.stat span { font-size: 0.7rem; color: #6B5B4E; }
-.stat b { font-size: 0.92rem; color: #2B1D14; }
+.stat span { font-size: 0.7rem; color: var(--sc-text-sub); }
+.stat b { font-size: 0.92rem; color: var(--sc-text); }
 
 .exit-row {
     display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
-    margin-top: 12px; padding-top: 12px; border-top: 1px solid #F3EAD2;
+    margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--sc-border);
 }
-.er-label { font-size: 0.72rem; font-weight: 700; color: #6B5B4E; }
+.er-label { font-size: 0.72rem; font-weight: 700; color: var(--sc-text-sub); }
 .er-chip {
-    padding: 3px 10px; border-radius: 10px; background: #F3EAD2;
-    font-size: 0.73rem; color: #4A3628;
+    padding: 3px 10px; border-radius: 10px; background: var(--sc-surface-2);
+    font-size: 0.73rem; color: var(--sc-text);
 }
-.er-chip b { color: #2B1D14; }
+.er-chip b { color: var(--sc-text); }
 
 /* ── 차트 ── */
 .chart-box { height: 280px; position: relative; }
@@ -557,32 +561,32 @@ const pnlClass = (v) => (Number(v) > 0 ? 'up' : Number(v) < 0 ? 'down' : '');
 .table-wrap { overflow-x: auto; }
 .log-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; white-space: nowrap; }
 .log-table th {
-    padding: 8px; background: #FFFBEA; border-bottom: 1px solid #F3EAD2;
-    color: #6B5B4E; font-weight: 600; text-align: left;
+    padding: 8px; background: var(--sc-bg); border-bottom: 1px solid var(--sc-border);
+    color: var(--sc-text-sub); font-weight: 600; text-align: left;
 }
-.log-table td { padding: 9px 8px; border-bottom: 1px solid #F3EAD2; color: #2B1D14; }
-.log-table tr.win td { background: #FFFBEA; }
-.log-table tr.lose td { background: #FFFBEA; }
+.log-table td { padding: 9px 8px; border-bottom: 1px solid var(--sc-border); color: var(--sc-text); }
+.log-table tr.win td { background: var(--sc-bg); }
+.log-table tr.lose td { background: var(--sc-bg); }
 .log-table .tr { text-align: right; }
 .log-table .tc { text-align: center; }
 .log-table .num { font-variant-numeric: tabular-nums; }
 
-.name-cell b { display: block; font-weight: 600; color: #2B1D14; }
-.name-cell i { font-style: normal; font-size: 0.68rem; color: #9A8C7E; }
+.name-cell b { display: block; font-weight: 600; color: var(--sc-text); }
+.name-cell i { font-style: normal; font-size: 0.68rem; color: var(--sc-text-sub); }
 
 .reason {
     padding: 2px 8px; border-radius: 10px;
-    background: #F3EAD2; color: #4A3628; font-size: 0.7rem; font-weight: 600;
+    background: var(--sc-surface-2); color: var(--sc-text); font-size: 0.7rem; font-weight: 600;
 }
 
-.up { color: #2B1D14; }
-.down { color: #2B1D14; }
+.up { color: var(--sc-text); }
+.down { color: var(--sc-text); }
 
-.log-note { margin: 10px 0 0; font-size: 0.71rem; color: #6B5B4E; line-height: 1.5; }
-.log-note code { color: #2B1D14; }
+.log-note { margin: 10px 0 0; font-size: 0.71rem; color: var(--sc-text-sub); line-height: 1.5; }
+.log-note code { color: var(--sc-text); }
 
 .empty-card, .empty-inline {
-    text-align: center; color: #6B5B4E; font-size: 0.82rem; padding: 22px 0;
+    text-align: center; color: var(--sc-text-sub); font-size: 0.82rem; padding: 22px 0;
 }
 .empty-card p { margin: 0; line-height: 1.6; }
 

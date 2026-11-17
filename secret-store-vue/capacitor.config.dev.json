@@ -1,6 +1,6 @@
 {
-  "appId": "com.aibeesworld.stocks",
-  "appName": "양봉상회",
+  "appId": "com.aibeesworld.secretstore",
+  "appName": "비밀상회",
   "webDir": "dist",
   "server": {
     "url": "http://localhost:19010",
@@ -11,12 +11,16 @@
       "launchShowDuration": 1500,
       "launchAutoHide": true,
       "launchFadeOutDuration": 300,
-      "backgroundColor": "#FFFDD0",
+      "backgroundColor": "#0E0F12",
       "androidSplashResourceName": "splash",
       "androidScaleType": "CENTER_CROP",
       "showSpinner": false,
       "splashFullScreen": true,
       "splashImmersive": true
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#16181D"
     }
   }
 }

@@ -306,22 +306,11 @@ onMounted(() => {
  *   헤더/탭바 #FFF6D2 · 카드 #FFF · 테두리 #EFE2BC · 갈색 #74462A · 노랑 #F6C445
  *   상승 #C8282A / 하락 #1F5BD1
  * ════════════════════════════════════════════════════════════════ */
-$bg:      #FFFBEA;
-$bar:     #FFF6D2;
-$line:    #EFE2BC;
-$hero:    #74462A;
-$brown:   #7A4423;
-$ink:     #2B1D14;
-$sub:     #6B5B4E;
-$sub-2:   #7A6B5D;
-$yellow:  #F6C445;
-$up:      #C8282A;
-$down:    #1F5BD1;
 
 #trade-dashboard {
     min-height: 100vh;
-    background: #fff;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     text-align: left;
     font-family: 'Pretendard', -apple-system, sans-serif;
     font-variant-numeric: tabular-nums;
@@ -332,16 +321,16 @@ $down:    #1F5BD1;
     position: sticky;
     top: env(safe-area-inset-top, 0px);   // 상태바 영역은 App.vue 의 고정 덮개가 가린다
     z-index: 50;
-    background: $bar;
-    border-bottom: 1px solid $line;
+    background: var(--sc-surface-2);
+    border-bottom: 1px solid var(--sc-border);
     padding: 0 8px 0 16px;
 
     .dh-row { display: flex; align-items: center; justify-content: space-between; min-height: 52px; }
-    h1 { margin: 0; font-size: 20px; font-weight: 700; color: #3A200F; }
+    h1 { margin: 0; font-size: 20px; font-weight: 700; color: var(--sc-text); }
     .dh-right { display: flex; align-items: center; gap: 2px; }
-    .dh-time { font-size: 12px; color: $sub-2; }
+    .dh-time { font-size: 12px; color: var(--sc-text-sub); }
     .icon-btn {
-        width: 44px; height: 44px; border: 0; background: transparent; color: #5C3118;
+        width: 44px; height: 44px; border: 0; background: transparent; color: var(--sc-point-ink);
         display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
     }
 }
@@ -357,10 +346,10 @@ $down:    #1F5BD1;
 
 /* ── 자산현황 히어로 ── */
 .asset-hero {
-    background: $hero;
+    background: var(--sc-strong-bg);
     border-radius: 20px;
     padding: 18px;
-    color: #FFF8E1;
+    color: var(--sc-strong-text);
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -370,27 +359,27 @@ $down:    #1F5BD1;
     &.skeleton { animation: pulse 1.6s infinite ease-in-out; }
 
     .ah-top { display: flex; align-items: center; justify-content: space-between; }
-    .ah-label { font-size: 13px; color: #E8D5B8; }
+    .ah-label { font-size: 13px; color: var(--sc-strong-text); }
     .ah-link {
-        border: 0; background: transparent; color: #F3DCA8; font-size: 13px;
+        border: 0; background: transparent; color: var(--sc-strong-text); font-size: 13px;
         min-height: 36px; padding: 0 2px; cursor: pointer; font-family: inherit;
     }
     .ah-amount {
         font-size: 32px; font-weight: 700; letter-spacing: -.5px;
         .won { font-size: 18px; font-weight: 500; margin-left: 2px; }
     }
-    .ah-empty { margin: 0; font-size: 14px; color: #F5E6CC; }
+    .ah-empty { margin: 0; font-size: 14px; color: var(--sc-strong-text); }
 
     .ah-stats {
         margin: 8px 0 0;
         padding-top: 12px;
-        border-top: 1px solid rgba(255, 248, 225, .18);
+        border-top: 1px solid color-mix(in srgb, var(--sc-border) 18%, transparent);
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 8px;
 
-        dt { font-size: 12px; color: #E8D5B8; margin: 0 0 2px; }
-        dd { margin: 0; font-size: 14px; font-weight: 700; color: #FFF8E1; word-break: keep-all; }
+        dt { font-size: 12px; color: var(--sc-strong-text); margin: 0 0 2px; }
+        dd { margin: 0; font-size: 14px; font-weight: 700; color: var(--sc-strong-text); word-break: keep-all; }
     }
 }
 
@@ -399,7 +388,7 @@ $down:    #1F5BD1;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: 20px;
-    border-top: 1px solid $line;
+    border-top: 1px solid var(--sc-border);
 }
 .quick-tile {
     min-height: 48px;
@@ -410,19 +399,19 @@ $down:    #1F5BD1;
     gap: 8px;
     background: transparent;
     border: 0;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
     border-radius: 0;
     cursor: pointer;
     font-family: inherit;
-    color: $ink;
+    color: var(--sc-text);
     text-align: left;
 
     .qt-label { font-size: 14px; font-weight: 600; }
-    .qt-arrow { font-size: 18px; color: #A0662F; }
-    &:active { background: rgba(239, 226, 188, .3); }
-    &:focus-visible { outline: 2px solid $brown; outline-offset: -2px; }
+    .qt-arrow { font-size: 18px; color: var(--sc-point-ink); }
+    &:active { background: color-mix(in srgb, var(--sc-border) 30%, transparent); }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: -2px; }
 }
-.quick-empty { margin: 0; padding: 14px 0; text-align: center; font-size: 13px; color: $sub; }
+.quick-empty { margin: 0; padding: 14px 0; text-align: center; font-size: 13px; color: var(--sc-text-sub); }
 
 /* ── 요약 섹션: 카드 없이 위쪽 구분선 + 제목으로만 나눈다(홈 추천 목록과 같은 방식) ── */
 .card-grid {
@@ -433,7 +422,7 @@ $down:    #1F5BD1;
 
 // 섹션 경계: 흰 배경 위 두꺼운 크림 띠. 모바일은 본문 좌우 여백(16px)을 넘어 화면 끝까지 늘린다.
 .d-card {
-    border-top: 8px solid $bg;
+    border-top: 8px solid var(--sc-border);
     margin: 0 -16px;
     padding: 14px 16px 18px;
     display: flex;
@@ -449,13 +438,13 @@ $down:    #1F5BD1;
     justify-content: space-between;
     margin-bottom: 6px;
 
-    h3 { font-size: 17px; font-weight: 700; margin: 0; color: $ink; }
+    h3 { font-size: 17px; font-weight: 700; margin: 0; color: var(--sc-text); }
 }
 
 .d-link {
     border: 0;
     background: transparent;
-    color: $brown;
+    color: var(--sc-point-ink);
     font-size: 13px;
     font-weight: 600;
     min-height: 36px;
@@ -464,8 +453,8 @@ $down:    #1F5BD1;
     font-family: inherit;
 }
 
-.d-skel { height: 90px; border-radius: 12px; background: #F6EFD6; animation: pulse 1.6s infinite ease-in-out; }
-.d-empty { color: $sub; font-size: 13px; padding: 16px 0; }
+.d-skel { height: 90px; border-radius: 12px; background: var(--sc-surface-2); animation: pulse 1.6s infinite ease-in-out; }
+.d-empty { color: var(--sc-text-sub); font-size: 13px; padding: 16px 0; }
 
 .d-body { display: flex; flex-direction: column; gap: 10px; }
 
@@ -474,7 +463,7 @@ $down:    #1F5BD1;
     align-items: baseline;
     gap: 4px;
     .d-num { font-size: 26px; font-weight: 700; }
-    .d-unit { font-size: 13px; color: $sub; font-weight: 600; }
+    .d-unit { font-size: 13px; color: var(--sc-text-sub); font-weight: 600; }
 }
 
 .d-rows {
@@ -487,11 +476,11 @@ $down:    #1F5BD1;
     justify-content: space-between;
     align-items: center;
     min-height: 40px;
-    border-top: 1px solid $line;
+    border-top: 1px solid var(--sc-border);
     font-size: 14px;
 
     &:first-child { border-top: none; }
-    dt { color: $sub; margin: 0; }
+    dt { color: var(--sc-text-sub); margin: 0; }
     dd { margin: 0; font-weight: 700; }
 }
 
@@ -507,14 +496,14 @@ $down:    #1F5BD1;
         justify-content: space-between;
         align-items: center;
         min-height: 40px;
-        border-top: 1px solid $line;
+        border-top: 1px solid var(--sc-border);
         font-size: 14px;
         &:first-child { border-top: none; }
     }
     .d-list-name { font-weight: 600; }
-    .d-list-val { font-weight: 700; &.up { color: $up; } &.down { color: $down; } }
+    .d-list-val { font-weight: 700; &.up { color: var(--sc-up); } &.down { color: var(--sc-down); } }
 }
-.d-more { margin: 2px 0 0; font-size: 12px; color: $sub-2; }
+.d-more { margin: 2px 0 0; font-size: 12px; color: var(--sc-text-sub); }
 
 // 운용 상태: 점 + 글자(색만으로 구분하지 않는다)
 .d-status {
@@ -524,22 +513,22 @@ $down:    #1F5BD1;
     gap: 7px;
     padding: 5px 12px;
     border-radius: 999px;
-    background: #F1ECE2;
-    color: $sub;
+    background: var(--sc-surface-2);
+    color: var(--sc-text-sub);
     font-size: 13px;
     font-weight: 700;
 
-    .d-dot { width: 8px; height: 8px; border-radius: 4px; background: #9A8F84; }
-    &.on { background: $bar; color: #5C3118; border: 1px solid #EAD9A6; padding: 4px 11px;
+    .d-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--sc-border-strong); }
+    &.on { background: var(--sc-surface-2); color: var(--sc-point-ink); border: 1px solid var(--sc-border-strong); padding: 4px 11px;
         .d-dot { background: #2E9E5B; } }
 }
 
 .d-msg {
     margin: 4px 0 0;
     padding-top: 10px;
-    border-top: 1px solid $line;
+    border-top: 1px solid var(--sc-border);
     font-size: 12px;
-    color: $sub;
+    color: var(--sc-text-sub);
     line-height: 1.5;
 }
 

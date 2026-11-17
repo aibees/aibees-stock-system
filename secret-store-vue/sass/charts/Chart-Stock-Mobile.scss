@@ -17,12 +17,12 @@
         display: flex;
         justify-content: center;
         gap: 1rem;
-        background-color: #2c2c2c;
+        background-color: var(--sc-strong-bg);
         flex-wrap: wrap;
         /* 밝고 부드러운 회색 계열 배경 */
         border-radius: 10px;
         padding: 1rem 1.5rem;
-        color: #333;
+        color: var(--sc-text);
         /* 다크 그레이 */
 
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
@@ -41,7 +41,7 @@
                 padding: 0.4rem 0.6rem;
                 border-radius: 6px;
                 font-size: 14px;
-                color: white;
+                color: var(--sc-strong-text);
                 background-color: transparent;
                 transition: border-color 0.2s;
 
@@ -52,8 +52,8 @@
                 }
 
                 option {
-                    color: white;
-                    background-color: #333;
+                    color: var(--sc-strong-text);
+                    background-color: var(--sc-strong-bg);
                 }
             }
         }
@@ -135,15 +135,15 @@
     }
 
     .chart-div::-webkit-scrollbar-track {
-        background-color: #2c2c2c;
+        background-color: var(--sc-strong-bg);
     }
 
     .chart-div::-webkit-scrollbar-thumb {
-        color: #d8d8d8;
+        color: var(--sc-strong-text);
     }
 
     .header {
-        color: black;
+        color: var(--sc-text);
         font-weight: bold;
         border-radius: 3px 3px 3px 3px;
         margin-bottom: 0.5rem;
@@ -153,7 +153,7 @@
         height: 57vh;
         overflow: scroll;
         padding: 0.5rem 0.3rem 0.1rem;
-        background-color:#2c2c2c;
+        background-color:var(--sc-strong-bg);
         border-radius: 10px;
         padding-bottom: 10px;
     }

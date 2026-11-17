@@ -138,19 +138,11 @@ const NOTE = { StockBuyTarget: '종목', ChartStock: '차트' };
 
 <style scoped lang="scss">
 /* 양봉상회 전체 메뉴 v2 (목업 기준 토큰) */
-$bg:     #FFFBEA;
-$bar:    #FFF6D2;
-$line:   #EFE2BC;
-$line-2: #EAD9A6;
-$ink:    #2B1D14;
-$sub:    #7A6B5D;
-$brown:  #7A4423;
-$yellow: #F6C445;
 
 #menu-page {
     min-height: 100vh;
-    background: $bg;
-    color: $ink;
+    background: var(--sc-bg);
+    color: var(--sc-text);
     text-align: left;
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
 }
@@ -162,8 +154,8 @@ $yellow: #F6C445;
     position: sticky;
     top: env(safe-area-inset-top, 0px);   // 상태바 영역은 App.vue 의 고정 덮개가 가린다
     z-index: 50;
-    background: $bar;
-    border-bottom: 1px solid $line;
+    background: var(--sc-surface-2);
+    border-bottom: 1px solid var(--sc-border);
     padding: 12px 16px;
     display: flex;
     flex-direction: column;
@@ -177,8 +169,8 @@ $yellow: #F6C445;
     width: 44px;
     height: 44px;
     border-radius: 22px;
-    background: $yellow;
-    color: #3A200F;
+    background: var(--sc-point);
+    color: var(--sc-on-point);
     font-weight: 700;
     font-size: 17px;
     display: flex;
@@ -194,7 +186,7 @@ $yellow: #F6C445;
     padding: 0;
     min-height: 28px;
     font-size: 12px;
-    color: $sub;
+    color: var(--sc-text-sub);
     cursor: pointer;
     font-family: inherit;
 }
@@ -203,12 +195,12 @@ $yellow: #F6C445;
     display: flex;
     align-items: center;
     gap: 8px;
-    background: #fff;
-    border: 1px solid $line-2;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border-strong);
     border-radius: 14px;
     padding: 0 14px;
     min-height: 44px;
-    color: $sub;
+    color: var(--sc-text-sub);
 
     input {
         flex: 1;
@@ -218,7 +210,7 @@ $yellow: #F6C445;
         background: transparent;
         font-size: 15px;
         font-family: inherit;
-        color: $ink;
+        color: var(--sc-text);
         -webkit-appearance: none;
         appearance: none;
         &::-webkit-search-cancel-button { -webkit-appearance: none; }
@@ -240,12 +232,12 @@ $yellow: #F6C445;
     flex-direction: column;
     gap: 8px;
 
-    h2 { margin: 0 4px; font-size: 13px; font-weight: 600; color: $sub; }
+    h2 { margin: 0 4px; font-size: 13px; font-weight: 600; color: var(--sc-text-sub); }
 }
 
 .card {
-    background: #fff;
-    border: 1px solid $line;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 16px;
     overflow: hidden;
 }
@@ -258,34 +250,34 @@ $yellow: #F6C445;
     min-height: 54px;
     padding: 0 14px;
     border: 0;
-    border-bottom: 1px solid #F5EEDA;
-    background: #fff;
+    border-bottom: 1px solid var(--sc-border);
+    background: var(--sc-surface);
     text-align: left;
     cursor: pointer;
     font-family: inherit;
-    color: $ink;
+    color: var(--sc-text);
     -webkit-tap-highlight-color: transparent;
 
     &:last-child { border-bottom: 0; }
-    &:active { background: #FFFDF5; }
+    &:active { background: var(--sc-bg); }
 
     .icon-box {
         width: 32px;
         height: 32px;
         border-radius: 10px;
-        background: #FFF4CC;
-        color: $brown;
+        background: var(--sc-surface-2);
+        color: var(--sc-point-ink);
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
     }
     .label { flex: 1; min-width: 0; font-size: 15px; }
-    .note { font-size: 12px; color: #A0662F; }
-    .chev { color: #B8A890; flex-shrink: 0; }
+    .note { font-size: 12px; color: var(--sc-point-ink); }
+    .chev { color: var(--sc-text-mute); flex-shrink: 0; }
 }
 
-.empty { margin: 24px 0; text-align: center; font-size: 14px; color: $sub; }
+.empty { margin: 24px 0; text-align: center; font-size: 14px; color: var(--sc-text-sub); }
 
 .logout {
     align-self: center;
@@ -294,7 +286,7 @@ $yellow: #F6C445;
     min-height: 44px;
     padding: 0 16px;
     font-size: 14px;
-    color: $sub;
+    color: var(--sc-text-sub);
     cursor: pointer;
     font-family: inherit;
 }

@@ -80,17 +80,11 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
-$hero:  #74462A;
-$brown: #7A4423;
-$ink:   #2B1D14;
-$sub:   #6B5B4E;
-$line:  #EFE2BC;
-$cream: #FFF8E1;
 
 #naver-callback {
     min-height: 100vh;
-    background: #fff;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
 }
 
@@ -105,14 +99,14 @@ $cream: #FFF8E1;
     text-align: center;
 }
 .nc-title { margin: 0; font-size: 18px; font-weight: 700; }
-.nc-msg { margin: 0; font-size: 14px; line-height: 1.6; color: $sub; word-break: keep-all; }
+.nc-msg { margin: 0; font-size: 14px; line-height: 1.6; color: var(--sc-text-sub); word-break: keep-all; }
 
 .spinner {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    border: 3px solid $line;
-    border-top-color: $hero;
+    border: 3px solid var(--sc-border);
+    border-top-color: var(--sc-point);
     animation: spin .8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -124,12 +118,12 @@ $cream: #FFF8E1;
     padding: 0 22px;
     border: 0;
     border-radius: 10px;
-    background: $hero;
-    color: $cream;
+    background: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
     font-size: 15px;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
 }
 </style>

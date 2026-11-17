@@ -71,11 +71,6 @@ const close = () => emit('close');
 
 <style scoped lang="scss">
 // 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
-$gray-100: #F3EAD2;
-$gray-200: #EFE2BC;
-$gray-500: #6B5B4E;
-$gray-900: #2B1D14;
-$blue: #1F5BD1;
 
 .picker-overlay {
     position: fixed;
@@ -90,8 +85,8 @@ $blue: #1F5BD1;
 .picker-panel {
     border-radius: 12px;
     width: min(460px, 92vw);
-    background: #fff;
-    border: 1px solid $gray-200;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     overflow: hidden;
 }
 
@@ -100,13 +95,13 @@ $blue: #1F5BD1;
     justify-content: space-between;
     align-items: center;
     padding: 14px 16px;
-    border-bottom: 1px solid $gray-100;
+    border-bottom: 1px solid var(--sc-border);
 
     h3 {
         margin: 0;
         font-size: .98rem;
         font-weight: 700;
-        color: $gray-900;
+        color: var(--sc-text);
     }
 
     .btn-close {
@@ -114,7 +109,7 @@ $blue: #1F5BD1;
         background: none;
         font-size: 1rem;
         cursor: pointer;
-        color: $gray-500;
+        color: var(--sc-text-sub);
     }
 }
 
@@ -127,7 +122,7 @@ $blue: #1F5BD1;
         border-radius: 12px;
         flex: 1;
         height: 36px;
-        border: 1px solid $gray-200;
+        border: 1px solid var(--sc-border);
         padding: 0 10px;
         font-size: 16px;   // iOS 는 16px 미만 입력창에 포커스되면 화면을 확대한다
     }
@@ -136,8 +131,8 @@ $blue: #1F5BD1;
         height: 36px;
         padding: 0 16px;
         border: 0;
-        background: #74462A;
-        color: #fff;
+        background: var(--sc-strong-bg);
+        color: var(--sc-strong-text);
         font-size: .84rem;
         font-weight: 600;
         cursor: pointer;
@@ -160,12 +155,12 @@ $blue: #1F5BD1;
         font-size: .86rem;
 
         &:hover {
-            background: $gray-100;
+            background: var(--sc-surface-2);
         }
 
         &.empty {
             justify-content: center;
-            color: $gray-500;
+            color: var(--sc-text-sub);
             cursor: default;
             font-size: .82rem;
 
@@ -177,7 +172,7 @@ $blue: #1F5BD1;
 
     .code-chip {
         font-family: monospace;
-        background: $gray-100;
+        background: var(--sc-surface-2);
         padding: 2px 6px;
         font-size: .78rem;
     }
@@ -185,12 +180,12 @@ $blue: #1F5BD1;
     .name {
         flex: 1;
         font-weight: 600;
-        color: $gray-900;
+        color: var(--sc-text);
     }
 
     .type {
         font-size: .74rem;
-        color: $gray-500;
+        color: var(--sc-text-sub);
     }
 }
 

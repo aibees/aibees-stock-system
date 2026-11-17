@@ -80,37 +80,31 @@ onMounted(load);
 </script>
 
 <style scoped lang="scss">
-$gray-50: #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-900: #141414;
 
 #user-auth-setting {
     min-height: 100vh;
-    background: $gray-50;
-    color: $gray-900;
+    background: var(--sc-bg);
+    color: var(--sc-text);
     font-family: 'Pretendard', -apple-system, sans-serif;
 }
 .contents { max-width: 900px; margin: 0 auto; padding: 28px 16px 100px; }
 .head-desc h2 { margin: 0 0 6px; text-align: left; }
-.desc { color: $gray-500; font-size: 13px; margin: 0 0 16px; line-height: 1.5; text-align: left; }
-.loading, .empty { padding: 40px; text-align: center; color: $gray-400; }
+.desc { color: var(--sc-text-sub); font-size: 13px; margin: 0 0 16px; line-height: 1.5; text-align: left; }
+.loading, .empty { padding: 40px; text-align: center; color: var(--sc-text-mute); }
 
 .search { display: flex; gap: 8px; margin-bottom: 16px;
-    input { flex: 1; padding: 8px 10px; border: 1px solid $gray-200; border-radius: 6px; font-size: 14px; }
-    .btn { padding: 8px 16px; border: 0; border-radius: 6px; background: $gray-900; color: #fff; cursor: pointer; } }
+    input { flex: 1; padding: 8px 10px; border: 1px solid var(--sc-border); border-radius: 6px; font-size: 14px; }
+    .btn { padding: 8px 16px; border: 0; border-radius: 6px; background: var(--sc-strong-bg); color: var(--sc-strong-text); cursor: pointer; } }
 
-.user-list { list-style: none; margin: 0; padding: 0; background: #fff; border: 1px solid $gray-200; border-radius: 10px; }
+.user-list { list-style: none; margin: 0; padding: 0; background: var(--sc-surface); border: 1px solid var(--sc-border); border-radius: 10px; }
 .user-row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between;
-    padding: 12px 16px; border-top: 1px solid $gray-100; text-align: left;
+    padding: 12px 16px; border-top: 1px solid var(--sc-border); text-align: left;
     &:first-child { border-top: 0; } }
 .who { display: flex; flex-direction: column; gap: 2px;
     .name { font-weight: 600; font-size: 14px; }
-    .meta { font-size: 12px; color: $gray-400; } }
+    .meta { font-size: 12px; color: var(--sc-text-mute); } }
 .roles { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { padding: 5px 12px; border: 1px solid $gray-200; border-radius: 14px; background: #fff; color: $gray-500; font-size: 12px; cursor: pointer;
-    &.on { background: $gray-900; border-color: $gray-900; color: #fff; }
+.chip { padding: 5px 12px; border: 1px solid var(--sc-border); border-radius: 14px; background: var(--sc-surface); color: var(--sc-text-sub); font-size: 12px; cursor: pointer;
+    &.on { background: var(--sc-point); border-color: var(--sc-point); color: var(--sc-on-point); }
     &:disabled { opacity: .5; cursor: default; } }
 </style>

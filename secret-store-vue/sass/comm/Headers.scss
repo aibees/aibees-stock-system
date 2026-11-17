@@ -9,7 +9,7 @@
     // 저절로 맞춰지기 때문 — hex를 박아두면 나중에 페이지 배경이 바뀔 때
     // 헤더만 따로 겉돌 수 있음.
     background-color: transparent;
-    border-bottom: 2px solid $dc-gray-900;
+    border-bottom: 2px solid var(--sc-text);
     width: 100%;
     height: 50px;
     // box-sizing: content-box;
@@ -24,7 +24,7 @@
 
         .title {
             font-size: 0.92rem;
-            color: $dc-gray-900; // [수정] white → 어두운 배경 아니라서 흰 글씨는 안 보임
+            color: var(--sc-text); // [수정] white → 어두운 배경 아니라서 흰 글씨는 안 보임
             font-weight: bold;
             margin-left: 20px;
             // "AIbees" 의 대문자 I 가 일부 폰트에서 소문자 l 처럼 보여
@@ -41,7 +41,7 @@
             margin-right: 10px;
 
             .nav-item {
-                color: $dc-gray-900; // [수정] white → 다크
+                color: var(--sc-text); // [수정] white → 다크
                 font-weight: 600;
                 cursor: pointer;
                 font-size: 15px;
@@ -71,7 +71,7 @@
         .group,
         .users {
             cursor: pointer;
-            color: $dc-gray-900; // [추가] #app 전역 color(#f7f7f7, 거의 흰색)를 상속받아
+            color: var(--sc-text); // [추가] #app 전역 color(#f7f7f7, 거의 흰색)를 상속받아
                             // 밝은 배경에서 안 보이던 문제 — 명시적으로 다크 지정
 
             div {
@@ -89,7 +89,7 @@
                         display: inline-flex;
                         align-items: center;
                         gap: 6px;
-                        color: $dc-gray-900; // [수정] white → 다크
+                        color: var(--sc-text); // [수정] white → 다크
                         font-weight: 400;
                         background: transparent;
                         border: 0;
@@ -102,7 +102,7 @@
                         height: 0;
                         border-left: 5px solid transparent;
                         border-right: 5px solid transparent;
-                        border-top: 6px solid $dc-gray-900; // [수정] white → 다크
+                        border-top: 6px solid var(--sc-text); // [수정] white → 다크
                         transition: transform .18s ease;
         
                         &.open {
@@ -116,9 +116,9 @@
                         right: -15px;
                         top: calc(100% + 2px);
                         min-width: 100px;
-                        background: $dc-white;
-                        color: $dc-gray-900;
-                        border: 1px solid $dc-gray-200;
+                        background: var(--sc-surface);
+                        color: var(--sc-text);
+                        border: 1px solid var(--sc-border);
                         box-shadow: 0 10px 24px rgba(0, 0, 0, .12);
                         padding: 0;
                         z-index: 1000;
@@ -132,7 +132,7 @@
                             cursor: pointer;
         
                             &:hover {
-                                background: $dc-gray-50;
+                                background: var(--sc-bg);
                             }
                         }
 
@@ -148,10 +148,10 @@
                             .avatar {
                                 width: 36px;
                                 height: 36px;
-                                background: $dc-gray-100;
+                                background: var(--sc-surface-2);
                                 display: grid;
                                 place-items: center;
-                                color: $dc-gray-700;
+                                color: var(--sc-text);
         
                                 svg {
                                     display: block;
@@ -167,7 +167,7 @@
                                 .subtitle {
                                     margin-top: 2px;
                                     font-size: 12px;
-                                    color: $dc-gray-500;
+                                    color: var(--sc-text-sub);
                                 }
                             }
                         }
@@ -177,7 +177,7 @@
                         .divider {
                             height: 1px;
                             margin: 0;
-                            background: $dc-gray-100;
+                            background: var(--sc-surface-2);
                             pointer-events: none;
                             padding: 0;
                         }
@@ -187,7 +187,7 @@
                             display: flex;
                             align-items: center;
                             gap: 8px;
-                            color: $dc-gray-900;
+                            color: var(--sc-text);
 
                             .icon {
                                 opacity: .85;
@@ -197,7 +197,7 @@
                         /* 위험(로그아웃) */
 
                         .logout {
-                            color: $dc-gray-900;
+                            color: var(--sc-text);
                             font-weight: 700;
                             align-items: center;
                             gap: 8px;

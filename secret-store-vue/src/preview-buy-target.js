@@ -5,6 +5,7 @@ import { createPinia } from 'pinia';
 import { createRouter, createMemoryHistory, RouterView } from 'vue-router';
 import aibeesApi from './scripts/aibeesApi.js';
 import StockBuyTarget from './components/Stocks/StockBuyTarget.vue';
+import '@@/theme.css';
 
 const bars = (c) => Array.from({ length: 8 }, (_, i) => {
     const b = c * (0.9 + i * 0.012);

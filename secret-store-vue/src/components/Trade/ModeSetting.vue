@@ -183,24 +183,11 @@ const goManualBuy = () => router.push({ path: '/trade/manual-buy' });
 
 <style scoped lang="scss">
 // 양봉상회 토큰(홈·배치관리와 동일)
-$white:  #ffffff;
-$line:   #EFE2BC;
-$line-2: #EAD9A6;
-$chip:   #F6EBC8;
-$hero:   #74462A;
-$brown:  #7A4423;
-$ink:    #2B1D14;
-$sub:    #6B5B4E;
-$sub-2:  #7A6B5D;
-$cream:  #FFF8E1;
-$up:     #C8282A;
-$down:   #1F5FBF;
-$ok:     #2E9E5B;
 
 #auto-trade-mode {
     min-height: 100vh;
-    background: $white;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     text-align: left;
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
     font-variant-numeric: tabular-nums;
@@ -213,18 +200,18 @@ $ok:     #2E9E5B;
 }
 
 /* ── 섹션: 카드 없이 구분선 ── */
-.sec { padding: 18px 0; border-bottom: 1px solid $line; }
+.sec { padding: 18px 0; border-bottom: 1px solid var(--sc-border); }
 .sec-title {
     margin: 0 0 6px;
     font-size: 17px;
     font-weight: 700;
     white-space: nowrap;
-    .count { color: #A0662F; margin-left: 2px; }
+    .count { color: var(--sc-point-ink); margin-left: 2px; }
 }
 .rows { margin: 0; padding: 0; list-style: none; }
-.rows > li { border-bottom: 1px solid $line; &:last-child { border-bottom: 0; } }
-.empty-row { margin: 6px 0 0; font-size: 14px; color: $sub-2; }
-.empty { padding: 40px 0; text-align: center; color: $sub; }
+.rows > li { border-bottom: 1px solid var(--sc-border); &:last-child { border-bottom: 0; } }
+.empty-row { margin: 6px 0 0; font-size: 14px; color: var(--sc-text-sub); }
+.empty { padding: 40px 0; text-align: center; color: var(--sc-text-sub); }
 
 /* ── 현재 상태 ── */
 .now {
@@ -234,13 +221,13 @@ $ok:     #2E9E5B;
         align-items: center;
         gap: 8px;
         font-size: 15px;
-        color: $ok;
+        color: #2E9E5B;
         .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
     }
-    &.halted .now-line { color: $up; }
+    &.halted .now-line { color: var(--sc-up); }
     .now-mode { margin: 6px 0 2px; font-size: 22px; font-weight: 800; }
-    .now-sub { margin: 0; font-size: 13px; color: $sub-2; }
-    .now-msg { margin: 10px 0 0; font-size: 13px; color: $sub; line-height: 1.5; }
+    .now-sub { margin: 0; font-size: 13px; color: var(--sc-text-sub); }
+    .now-msg { margin: 10px 0 0; font-size: 13px; color: var(--sc-text-sub); line-height: 1.5; }
 }
 
 /* ── 보유 포지션 ── */
@@ -250,8 +237,8 @@ $ok:     #2E9E5B;
     align-items: baseline;
     gap: 6px;
     b { font-size: 16px; }
-    .code { font-size: 12px; color: $sub-2; }
-    .qty { margin-left: auto; font-size: 14px; color: $sub; }
+    .code { font-size: 12px; color: var(--sc-text-sub); }
+    .qty { margin-left: auto; font-size: 14px; color: var(--sc-text-sub); }
 }
 .pos-lines {
     display: flex;
@@ -259,10 +246,10 @@ $ok:     #2E9E5B;
     margin: 6px 0 0;
     font-size: 13px;
     div { display: flex; gap: 4px; }
-    dt { color: $sub-2; }
+    dt { color: var(--sc-text-sub); }
     dd { margin: 0; font-weight: 600; }
-    .up { color: $up; }
-    .down { color: $down; }
+    .up { color: var(--sc-up); }
+    .down { color: var(--sc-down); }
 }
 
 /* ── 모드 목록 ── */
@@ -278,11 +265,11 @@ $ok:     #2E9E5B;
         width: 20px;
         height: 20px;
         margin-top: 1px;
-        border: 2px solid $line-2;
+        border: 2px solid var(--sc-border-strong);
         border-radius: 50%;
         box-sizing: border-box;
     }
-    &.on .radio { border: 6px solid $hero; }
+    &.on .radio { border: 6px solid var(--sc-point); }
     &:focus-visible .mode-head b { text-decoration: underline; }
     &.off { cursor: default; .mode-body, .radio { opacity: .45; } }
 }
@@ -297,14 +284,14 @@ $ok:     #2E9E5B;
 .tag {
     padding: 2px 7px;
     border-radius: 6px;
-    background: $chip;
-    color: $sub;
+    background: var(--sc-border);
+    color: var(--sc-text-sub);
     font-size: 11px;
     font-weight: 700;
     white-space: nowrap;
-    &.cur { background: $hero; color: $cream; }
+    &.cur { background: var(--sc-strong-bg); color: var(--sc-strong-text); }
 }
-.mode-desc { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: $sub; :deep(b) { color: $ink; } }
+.mode-desc { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: var(--sc-text-sub); :deep(b) { color: var(--sc-text); } }
 
 /* ── 이력 ── */
 .log {
@@ -314,8 +301,8 @@ $ok:     #2E9E5B;
     gap: 2px 12px;
     padding: 10px 0;
     font-size: 14px;
-    .log-time { grid-row: span 2; color: $sub-2; font-size: 12px; white-space: nowrap; }
-    .log-reason { grid-column: 2; color: $sub; font-size: 12px; }
+    .log-time { grid-row: span 2; color: var(--sc-text-sub); font-size: 12px; white-space: nowrap; }
+    .log-reason { grid-column: 2; color: var(--sc-text-sub); font-size: 12px; }
 }
 
 .link-row {
@@ -324,9 +311,9 @@ $ok:     #2E9E5B;
     width: 100%;
     padding: 16px 0;
     border: 0;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
     background: none;
-    color: $brown;
+    color: var(--sc-point-ink);
     font: inherit;
     font-size: 15px;
     font-weight: 600;
@@ -341,15 +328,15 @@ $ok:     #2E9E5B;
     margin: 8px 0 4px;
     border: 0;
     border-radius: 12px;
-    background: $hero;
-    color: $cream;
+    background: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
     font: inherit;
     font-size: 16px;
     font-weight: 700;
     cursor: pointer;
-    &.danger { background: $up; color: $white; }
-    &:disabled { background: $chip; color: $sub-2; cursor: default; }
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+    &.danger { background: var(--sc-up); color: #ffffff; }
+    &:disabled { background: var(--sc-border); color: var(--sc-text-sub); cursor: default; }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
 }
 
 /* ── 스켈레톤 ── */
@@ -358,7 +345,7 @@ $ok:     #2E9E5B;
     height: 64px;
     margin-bottom: 10px;
     border-radius: 8px;
-    background: linear-gradient(90deg, #F6EFD9 25%, #FBF6E6 50%, #F6EFD9 75%);
+    background: linear-gradient(90deg, var(--sc-surface-2) 25%, var(--sc-surface-2) 50%, var(--sc-surface-2) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.2s infinite;
 }

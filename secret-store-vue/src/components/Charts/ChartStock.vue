@@ -236,21 +236,11 @@ const fetchChart = async () => {
 <style scoped lang="scss">
 // 양봉상회 디자인 토큰(홈·매수추천과 동일). 카드 없이 흰 배경 + 구분선.
 // 캔들(상승/하락)은 앱 공통 등락색, 이동평균선·볼린저밴드는 데이터 구분용 색이라 <script> 쪽에 그대로 둔다.
-$white:   #FFFFFF;
-$line:    #EFE2BC;
-$line-2:  #EAD9A6;
-$chip:    #F6EBC8;
-$hero:    #74462A;
-$brown:   #7A4423;
-$ink:     #2B1D14;
-$sub:     #6B5B4E;
-$sub-2:   #7A6B5D;
-$cream:   #FFF8E1;
 
 #chart-stocks {
     min-height: 100vh;
-    background: $white;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     text-align: left;
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
     font-variant-numeric: tabular-nums;
@@ -268,7 +258,7 @@ $cream:   #FFF8E1;
     flex-direction: column;
     gap: 10px;
     padding-bottom: 16px;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
 
     /* SAutoInput 오버라이드(공용 컴포넌트라 이 화면에서만 덮어쓴다) */
     :deep(.auto-complete-container) { margin: 0; width: 100%; }
@@ -278,14 +268,14 @@ $cream:   #FFF8E1;
         box-sizing: border-box;
         margin: 0 !important;
         min-height: 46px;
-        background: $white;
-        border: 1px solid $line-2;
+        background: var(--sc-surface);
+        border: 1px solid var(--sc-border-strong);
         border-radius: 12px;
         padding: 2px 14px;
         box-shadow: none;
         transition: border-color .15s;
 
-        &:focus-within { border-color: $brown; }
+        &:focus-within { border-color: var(--sc-point); }
     }
 
     // 돋보기 이모지·검정 '종목' 배지는 이 화면 톤과 맞지 않아 숨긴다(placeholder 가 같은 뜻을 전한다)
@@ -293,32 +283,32 @@ $cream:   #FFF8E1;
     :deep(.search-bar .label-badge) { display: none; }
 
     :deep(.search-bar input) {
-        color: $ink;
+        color: var(--sc-text);
         font-size: 16px;   // iOS 포커스 확대 방지
         text-align: left !important;
         background: transparent;
-        &::placeholder { color: $sub-2; }
+        &::placeholder { color: var(--sc-text-sub); }
     }
 
     :deep(.suggestion-div) {
-        background: $white;
-        border: 1px solid $line-2;
+        background: var(--sc-surface);
+        border: 1px solid var(--sc-border-strong);
         border-radius: 12px;
         box-shadow: 0 10px 24px rgba(74, 40, 20, .12);
     }
 
     :deep(.suggestion-header) {
-        background: $white;
-        border-bottom: 1px solid $line;
-        .item { color: $sub; font-size: 12px; font-weight: 700; }
+        background: var(--sc-surface);
+        border-bottom: 1px solid var(--sc-border);
+        .item { color: var(--sc-text-sub); font-size: 12px; font-weight: 700; }
     }
 
     :deep(.list-item) {
-        border-bottom: 1px solid $line;
-        .s_code { color: $sub-2; }
-        .s_name { color: $ink; }
-        .s_type { color: $sub-2; }
-        &:hover { background: rgba(239, 226, 188, .3); }
+        border-bottom: 1px solid var(--sc-border);
+        .s_code { color: var(--sc-text-sub); }
+        .s_name { color: var(--sc-text); }
+        .s_type { color: var(--sc-text-sub); }
+        &:hover { background: color-mix(in srgb, var(--sc-border) 30%, transparent); }
     }
 }
 
@@ -335,7 +325,7 @@ $cream:   #FFF8E1;
     display: flex;
     gap: 2px;
     padding: 3px;
-    background: $chip;
+    background: var(--sc-border);
     border-radius: 10px;
 }
 
@@ -346,15 +336,15 @@ $cream:   #FFF8E1;
     border: 0;
     border-radius: 8px;
     background: transparent;
-    color: $brown;
+    color: var(--sc-point-ink);
     font-size: 14px;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
     transition: background .12s, color .12s;
 
-    &.active { background: $hero; color: $cream; }
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 1px; }
+    &.active { background: var(--sc-point); color: var(--sc-on-point); }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 1px; }
 }
 
 .date-field {
@@ -367,7 +357,7 @@ $cream:   #FFF8E1;
     .date-label {
         font-size: 13px;
         font-weight: 600;
-        color: $sub;
+        color: var(--sc-text-sub);
         white-space: nowrap;
     }
 
@@ -375,16 +365,16 @@ $cream:   #FFF8E1;
         flex: 1;
         min-height: 42px;
         padding: 0 10px;
-        border: 1px solid $line-2;
+        border: 1px solid var(--sc-border-strong);
         border-radius: 10px;
         font-size: 16px;
         font-family: inherit;
-        color: $ink;
-        background: $white;
+        color: var(--sc-text);
+        background: var(--sc-surface);
         outline: none;
         transition: border-color .15s;
 
-        &:focus { border-color: $brown; }
+        &:focus { border-color: var(--sc-point); }
     }
 }
 
@@ -395,8 +385,8 @@ $cream:   #FFF8E1;
     gap: 6px;
     min-height: 42px;
     padding: 0 18px;
-    background: $hero;
-    color: $cream;
+    background: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
     border: none;
     border-radius: 10px;
     font-size: 15px;
@@ -407,7 +397,7 @@ $cream:   #FFF8E1;
     flex-shrink: 0;
 
     &:active { transform: scale(0.97); }
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
 }
 
 /* ── 차트: 카드 없이 제목 줄 + 차트 ── */
@@ -427,8 +417,8 @@ $cream:   #FFF8E1;
             align-items: baseline;
             gap: 8px;
 
-            .stock-name { font-size: 18px; font-weight: 700; color: $ink; }
-            .stock-code { font-size: 13px; color: $sub-2; }
+            .stock-name { font-size: 18px; font-weight: 700; color: var(--sc-text); }
+            .stock-code { font-size: 13px; color: var(--sc-text-sub); }
         }
     }
 
@@ -443,16 +433,16 @@ $cream:   #FFF8E1;
         font-size: 13px;
 
         > div { display: flex; gap: 6px; }
-        dt { color: $sub-2; }
-        dd { margin: 0; font-weight: 600; color: $ink; }
-        dd.up   { color: #C8282A; }
-        dd.down { color: #1F5BD1; }
+        dt { color: var(--sc-text-sub); }
+        dd { margin: 0; font-weight: 600; color: var(--sc-text); }
+        dd.up   { color: var(--sc-up); }
+        dd.down { color: var(--sc-down); }
 
         .summary-note {
             flex-basis: 100%;
             margin: 0;
             font-size: 12px;
-            color: $sub-2;
+            color: var(--sc-text-sub);
         }
     }
 
@@ -471,7 +461,7 @@ $cream:   #FFF8E1;
         padding: 0 4px;
         background: none;
         border: 0;
-        color: $ink;
+        color: var(--sc-text);
         font-size: 13px;
         font-weight: 600;
         cursor: pointer;
@@ -485,8 +475,8 @@ $cream:   #FFF8E1;
         margin: 0;
         padding: 6px 0;
         list-style: none;
-        background: $white;
-        border: 1px solid $line-2;
+        background: var(--sc-surface);
+        border: 1px solid var(--sc-border-strong);
         border-radius: 10px;
         box-shadow: 0 6px 20px rgba(43, 29, 20, .10);
 
@@ -495,19 +485,19 @@ $cream:   #FFF8E1;
             align-items: center;
             padding: 8px 14px;
             font-size: 13px;
-            color: $sub;
+            color: var(--sc-text-sub);
             cursor: pointer;
-            &.on { color: $ink; font-weight: 600; }
-            &:hover { background: $cream; }
+            &.on { color: var(--sc-text); font-weight: 600; }
+            &:hover { background: var(--sc-surface-2); }
         }
-        .check { width: 18px; color: $brown; }
+        .check { width: 18px; color: var(--sc-point-ink); }
     }
 }
 
 /* ── Loading ── */
 .chart-skeleton {
     height: 62vh;
-    background: rgba(239, 226, 188, .25);
+    background: color-mix(in srgb, var(--sc-border) 25%, transparent);
     border-radius: 12px;
     display: flex;
     flex-direction: column;
@@ -520,7 +510,7 @@ $cream:   #FFF8E1;
 .loading-bar {
     width: 220px;
     height: 3px;
-    background: $line;
+    background: var(--sc-border);
     border-radius: 2px;
     overflow: hidden;
 
@@ -529,12 +519,12 @@ $cream:   #FFF8E1;
         display: block;
         height: 100%;
         width: 40%;
-        background: $hero;
+        background: var(--sc-strong-bg);
         animation: slide 1.2s ease-in-out infinite;
     }
 }
 
-.loading-label { font-size: 13px; color: $sub-2; }
+.loading-label { font-size: 13px; color: var(--sc-text-sub); }
 
 @keyframes slide {
     0%   { transform: translateX(-100%); }
@@ -545,7 +535,7 @@ $cream:   #FFF8E1;
 .empty-box {
     text-align: center;
     padding: 72px 0;
-    color: $sub;
+    color: var(--sc-text-sub);
     font-size: 14px;
 }
 

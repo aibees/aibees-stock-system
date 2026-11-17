@@ -1,7 +1,5 @@
 <script setup>
 import Lnb from './common/Lnb.vue';
-import AdSideBanners from './common/AdSideBanners.vue';
-import AdBottomBanner from './common/AdBottomBanner.vue';
 import { isAuthPath } from '@scripts/authPaths.js';
 
 // 로그인·가입 화면에는 탭바(Lnb)를 그리지 않는다 — 로그인 전에는 갈 수 있는 메뉴가 없다.
@@ -14,8 +12,6 @@ const showLnb = computed(() => !isAuthPath(route.path));
        Lnb 가 렌더하는 탭바 자체는 position:fixed 라 이 여백 대상이 아니다. -->
   <div class="app-shell" :class="{ 'no-lnb': !showLnb }">
     <Lnb v-if="showLnb" />
-    <AdSideBanners />
-    <AdBottomBanner />
     <router-view />
   </div>
 </template>
@@ -29,12 +25,7 @@ const showLnb = computed(() => !isAuthPath(route.path));
    * 홈 인디케이터(safe-area-inset-bottom)를 더해야 기기별로 맞는다. */
   --lnb-height: 3.75rem;
   --lnb-total: calc(var(--lnb-height) + env(safe-area-inset-bottom, 0px));
-  /* 양봉상회 브랜드 팔레트(런타임 CSS 변수 — sass/__variables.scss 의 yb-* 변수와 같은 값) */
-  --yb-yellow: #FFC107;
-  --yb-honey: #F9E076;
-  --yb-cream: #FFFDD0;
-  --yb-brown: #895129;
-  --yb-ink: #4A2A12;
+  /* 테마 색(--sc-*)은 sass/theme.css 에서 <html data-theme> 기준으로 정의한다. */
   --ad-bottom-h: 0px;
   --ad-bottom-total: 0px;
 }
@@ -77,7 +68,7 @@ body::before {
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  background: #FFF6D2;
+  background: var(--sc-surface);
   z-index: 2000;
   pointer-events: none;
 }
@@ -97,7 +88,10 @@ body {
 
 body {
   height: 100%;
-  background-color: #f7f7f7;
+  background-color: var(--sc-bg);
+  color: var(--sc-text);
+  /* 테마 전환 때 면·글자색이 한 번에 바뀌도록 짧게 넘긴다(레이아웃 속성은 건드리지 않음) */
+  transition: background-color .2s ease, color .2s ease;
   margin: 0;
 
 }
@@ -107,7 +101,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
-  color: #f7f7f7;
+  color: var(--sc-text);
 
   /* 상하좌우 노치 및 홈 바 영역 자동 대응.
    * padding-bottom 은 여기서 주지 않는다 — 하단 탭바가 position:fixed 로 그

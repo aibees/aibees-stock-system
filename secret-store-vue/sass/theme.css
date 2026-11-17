@@ -1,0 +1,106 @@
+/* ──────────────────────────────────────────────────────────────────────────
+ * 비밀상회 테마 토큰 (회의록 2026-11-17 「비밀상회 디자인 분리」 2장 확정값)
+ *
+ *  - 테마 3종: dark-teal(기본) / light-violet / light-rose
+ *  - <html data-theme="..."> 속성 하나로 전환한다(리렌더 불필요). 속성이 없으면 dark-teal.
+ *  - 테마가 바꾸는 것은 배경·면·테두리·텍스트·포인트 5종(+ 그 파생값)뿐.
+ *  - 의미색(상승 빨강/하락 파랑)은 테마와 무관. 밝기만 다크/라이트로 나뉜다.
+ *  - 포인트색은 수익률 숫자에 쓰지 않는다 — 상태 표시·활성 탭·버튼 전용.
+ *
+ * 화면 코드는 색을 직접 쓰지 않고 var(--sc-*) 만 참조한다.
+ * 같은 값이 JS(차트) 쪽에 필요하면 src/scripts/theme.js 의 themeColor() 로 읽는다.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* ── dark-teal (기본) ── */
+:root,
+:root[data-theme="dark-teal"] {
+  color-scheme: dark;
+
+  --sc-bg:           #0E0F12;   /* 페이지 배경 */
+  --sc-surface:      #16181D;   /* 카드·시트 면 */
+  --sc-surface-2:    #1D2026;   /* 면 안의 보조 면(표 머리, 칩, 스켈레톤) */
+  --sc-border:       #2A2D34;
+  --sc-border-strong:#3A3E47;
+  --sc-text:         #E7E9EE;
+  --sc-text-sub:     #8B919C;
+  --sc-text-mute:    #646A75;
+
+  --sc-point:        #2DD4BF;
+  --sc-point-ink:    #5EEAD4;   /* 포인트색 글자(어두운 면 위) */
+  --sc-point-bg:     #10302D;   /* 포인트 연한 면(선택된 행·배지 배경) */
+  --sc-on-point:     #04201D;   /* 포인트 면 위 글자 */
+
+  --sc-strong-bg:    #23262D;   /* 강조 면(요약 배너·주 버튼 대체) */
+  --sc-strong-text:  #E7E9EE;
+
+  --sc-up:           #E24B4A;
+  --sc-down:         #378ADD;
+  --sc-up-bg:        #34191B;
+  --sc-down-bg:      #142338;
+
+  --sc-overlay:      rgba(0, 0, 0, .6);
+  --sc-shadow:       rgba(0, 0, 0, .45);
+
+  /* 로고 실버 — 아이콘·로고는 테마 무관 1종 */
+  --sc-silver:       #9AA0AB;
+}
+
+/* ── light-violet ── */
+:root[data-theme="light-violet"] {
+  color-scheme: light;
+
+  --sc-bg:           #FAFAFA;
+  --sc-surface:      #FFFFFF;
+  --sc-surface-2:    #F3F3F4;
+  --sc-border:       #DCDCDC;
+  --sc-border-strong:#C4C4C4;
+  --sc-text:         #141414;
+  --sc-text-sub:     #737373;
+  --sc-text-mute:    #9A9A9A;
+
+  --sc-point:        #6D5BD0;
+  --sc-point-ink:    #534AB7;
+  --sc-point-bg:     #EEEDFE;
+  --sc-on-point:     #FFFFFF;
+
+  --sc-strong-bg:    #141414;
+  --sc-strong-text:  #FFFFFF;
+
+  --sc-up:           #A32D2D;
+  --sc-down:         #185FA5;
+  --sc-up-bg:        #FCEBEB;
+  --sc-down-bg:      #E8F0FA;
+
+  --sc-overlay:      rgba(0, 0, 0, .45);
+  --sc-shadow:       rgba(0, 0, 0, .12);
+}
+
+/* ── light-rose ── 페이지 배경만 분홍, 카드 면은 순백(붉은 면에 붉은 숫자가 묻히지 않게) */
+:root[data-theme="light-rose"] {
+  color-scheme: light;
+
+  --sc-bg:           #FDF2F7;
+  --sc-surface:      #FFFFFF;
+  --sc-surface-2:    #FCF6F9;
+  --sc-border:       #F0D5E2;
+  --sc-border-strong:#E2B9CC;
+  --sc-text:         #4B1528;
+  --sc-text-sub:     #8A6373;
+  --sc-text-mute:    #B095A2;
+
+  --sc-point:        #D4537E;
+  --sc-point-ink:    #72243E;
+  --sc-point-bg:     #FBEAF0;
+  --sc-on-point:     #FFFFFF;
+
+  --sc-strong-bg:    #4B1528;
+  --sc-strong-text:  #FFFFFF;
+
+  --sc-up:           #A32D2D;
+  --sc-down:         #185FA5;
+  --sc-up-bg:        #FCEBEB;
+  --sc-down-bg:      #E8F0FA;
+
+  --sc-overlay:      rgba(40, 10, 20, .45);
+  --sc-shadow:       rgba(75, 21, 40, .12);
+}

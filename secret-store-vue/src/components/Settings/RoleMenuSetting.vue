@@ -339,23 +339,11 @@ onMounted(async () => {
 
 <style scoped lang="scss">
 // 양봉상회 토큰(홈·배치·라우팅 관리와 동일). 카드 없이 흰 배경 + 구분선.
-$white:   #ffffff;
-$bar:     #FFF6D2;
-$line:    #EFE2BC;
-$line-2:  #EAD9A6;
-$chip:    #F6EBC8;
-$hero:    #74462A;
-$brown:   #7A4423;
-$ink:     #2B1D14;
-$sub:     #6B5B4E;
-$sub-2:   #7A6B5D;
-$cream:   #FFF8E1;
-$red:     #C8282A;
 
 #role-menu-setting {
     min-height: 100vh;
-    background: $white;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     text-align: left;
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
     font-variant-numeric: tabular-nums;
@@ -366,15 +354,15 @@ $red:     #C8282A;
     margin: 0 auto;
     padding: 12px 16px calc(96px + env(safe-area-inset-bottom, 0px));
 }
-.loading { padding: 40px 0; text-align: center; color: $sub-2; font-size: 14px; }
+.loading { padding: 40px 0; text-align: center; color: var(--sc-text-sub); font-size: 14px; }
 
 /* ── 권한 탭 바: 화면 폭을 꽉 채운다(탭이 많으면 가로 스크롤) ── */
 .role-tabs {
     display: flex;
     width: 100%;
     overflow-x: auto;
-    background: $white;
-    border-bottom: 1px solid $line-2;
+    background: var(--sc-surface);
+    border-bottom: 1px solid var(--sc-border-strong);
     scrollbar-width: none;
     &::-webkit-scrollbar { display: none; }
 }
@@ -385,15 +373,15 @@ $red:     #C8282A;
     border: 0;
     border-bottom: 3px solid transparent;
     background: transparent;
-    color: $sub;
+    color: var(--sc-text-sub);
     font-size: 15px;
     font-family: inherit;
     white-space: nowrap;
     cursor: pointer;
 
-    em { font-style: normal; font-size: 12px; color: $sub-2; margin-left: 4px; }
-    &.on { color: $brown; font-weight: 700; border-bottom-color: #F6C445; em { color: $brown; } }
-    &:focus-visible { outline: 2px solid $brown; outline-offset: -2px; }
+    em { font-style: normal; font-size: 12px; color: var(--sc-text-sub); margin-left: 4px; }
+    &.on { color: var(--sc-point-ink); font-weight: 700; border-bottom-color: var(--sc-point); em { color: var(--sc-point-ink); } }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: -2px; }
 }
 
 /* ── 새 권한: 폭 전체 버튼 ── */
@@ -401,22 +389,22 @@ $red:     #C8282A;
     width: 100%;
     min-height: 46px;
     margin-top: 4px;
-    border: 1px dashed $line-2;
+    border: 1px dashed var(--sc-border-strong);
     border-radius: 10px;
-    background: $white;
-    color: $brown;
+    background: var(--sc-surface);
+    color: var(--sc-point-ink);
     font-size: 15px;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    &:active { background: rgba(239, 226, 188, .3); }
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+    &:active { background: color-mix(in srgb, var(--sc-border) 30%, transparent); }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
 }
 
 /* ── 섹션: 위쪽 구분선 + 제목 ── */
 .sec {
     padding: 16px 0 8px;
-    border-top: 1px solid $line;
+    border-top: 1px solid var(--sc-border);
     margin-top: 16px;
 
     &:first-child { border-top: 0; margin-top: 4px; padding-top: 8px; }
@@ -426,8 +414,8 @@ $red:     #C8282A;
     margin: 0 0 8px;
     font-size: 17px;
     font-weight: 700;
-    color: $ink;
-    .count { color: #A0662F; margin-left: 2px; font-size: 15px; }
+    color: var(--sc-text);
+    .count { color: var(--sc-point-ink); margin-left: 2px; font-size: 15px; }
 }
 .sec-head .sec-title { margin: 0; }
 
@@ -438,18 +426,18 @@ input:not([type="checkbox"]) {
     box-sizing: border-box;
     min-height: 42px;
     padding: 0 12px;
-    border: 1px solid $line-2;
+    border: 1px solid var(--sc-border-strong);
     border-radius: 10px;
-    background: $white;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-size: 16px;   // iOS 포커스 확대 방지
     font-family: inherit;
     outline: none;
-    &:focus { border-color: $brown; }
-    &::placeholder { color: #9A8C7E; }
+    &:focus { border-color: var(--sc-point); }
+    &::placeholder { color: var(--sc-text-sub); }
 }
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;
-    label { font-size: 13px; font-weight: 600; color: #4A3628; } }
+    label { font-size: 13px; font-weight: 600; color: var(--sc-text); } }
 .inline { display: flex; gap: 8px; align-items: center; input { flex: 1; } }
 .row-actions { display: flex; gap: 8px; button { flex: 1; } }
 
@@ -466,22 +454,22 @@ input:not([type="checkbox"]) {
     white-space: nowrap;
     &.sm { min-height: 36px; padding: 0 14px; font-size: 14px; }
     &:disabled { opacity: .45; cursor: default; }
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
 }
-.btn-primary { border: 0; background: $hero; color: $cream; }
-.btn-ghost { border: 1px solid $line-2; background: $white; color: $brown; }
+.btn-primary { border: 0; background: var(--sc-strong-bg); color: var(--sc-strong-text); }
+.btn-ghost { border: 1px solid var(--sc-border-strong); background: var(--sc-surface); color: var(--sc-point-ink); }
 .act {
     min-height: 32px;
     padding: 0 8px;
     border: 0;
     border-radius: 8px;
     background: transparent;
-    color: $brown;
+    color: var(--sc-point-ink);
     font-size: 14px;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    &.danger { color: $red; }
+    &.danger { color: var(--sc-up); }
     &:disabled { opacity: .45; }
 }
 .link-btn {
@@ -489,7 +477,7 @@ input:not([type="checkbox"]) {
     min-height: 32px;
     border: 0;
     background: none;
-    color: $brown;
+    color: var(--sc-point-ink);
     font-size: 13px;
     font-weight: 600;
     font-family: inherit;
@@ -503,10 +491,10 @@ input:not([type="checkbox"]) {
     align-items: center;
     gap: 12px;
     min-height: 44px;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
     &:last-child { border-bottom: 0; }
 
-    dt { flex: 0 0 64px; font-size: 14px; color: $sub; }
+    dt { flex: 0 0 64px; font-size: 14px; color: var(--sc-text-sub); }
     dd { flex: 1; min-width: 0; margin: 0; font-size: 15px; }
     dd.inline { padding: 6px 0; }
     .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 14px; }
@@ -519,21 +507,21 @@ input:not([type="checkbox"]) {
     align-items: center;
     gap: 6px;
     padding-bottom: 4px;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
 }
-.group-title { font-size: 15px; font-weight: 700; color: $ink; }
+.group-title { font-size: 15px; font-weight: 700; color: var(--sc-text); }
 .menu-list { margin: 0; padding: 0; list-style: none; }
 .menu-row {
     display: flex;
     align-items: center;
     gap: 10px;
     min-height: 44px;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
     font-size: 15px;
     cursor: pointer;
 
-    input[type="checkbox"] { width: 18px; height: 18px; margin: 0; accent-color: $hero; flex-shrink: 0; }
-    &.disabled { color: $sub-2; cursor: default; }
+    input[type="checkbox"] { width: 18px; height: 18px; margin: 0; accent-color: var(--sc-point); flex-shrink: 0; }
+    &.disabled { color: var(--sc-text-sub); cursor: default; }
 }
 .menu-name { min-width: 0; }
 
@@ -543,9 +531,9 @@ input:not([type="checkbox"]) {
     font-size: 11px;
     font-weight: 700;
     white-space: nowrap;
-    &.pub  { background: #E6F3EA; color: #23784A; }
-    &.com  { background: $chip; color: $brown; }
-    &.mute { background: #F1ECE2; color: $sub; }
+    &.pub  { background: var(--sc-surface-2); color: #23784A; }
+    &.com  { background: var(--sc-border); color: var(--sc-point-ink); }
+    &.mute { background: var(--sc-surface-2); color: var(--sc-text-sub); }
 }
 
 /* ── 기능 ── */
@@ -556,10 +544,10 @@ input:not([type="checkbox"]) {
     gap: 2px;
     padding: 2px 4px 2px 10px;
     border-radius: 999px;
-    background: $chip;
-    color: $brown;
+    background: var(--sc-border);
+    color: var(--sc-point-ink);
     font-size: 13px;
     font-weight: 600;
-    .x { min-width: 28px; min-height: 28px; border: 0; background: none; cursor: pointer; color: $brown; font-size: 16px; line-height: 1; }
+    .x { min-width: 28px; min-height: 28px; border: 0; background: none; cursor: pointer; color: var(--sc-point-ink); font-size: 16px; line-height: 1; }
 }
 </style>

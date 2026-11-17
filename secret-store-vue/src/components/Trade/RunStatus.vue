@@ -169,25 +169,11 @@ const rateClass = computed(() => {
 
 <style scoped lang="scss">
 // 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
-$white: #ffffff;
-$gray-50: #FFFBEA;
-$gray-100: #F3EAD2;
-$gray-200: #EFE2BC;
-$gray-300: #E3D3A8;
-$gray-400: #9A8C7E;
-$gray-500: #6B5B4E;
-$gray-700: #4A3628;
-$gray-900: #2B1D14;
-$blue: #1F5BD1;
-$navy: #74462A;
-$red: #C8282A;
-$amber: #B7791F;
-$green: #1F7A3E;
 
 #auto-trade-status {
     min-height: 100vh;
-    background: $gray-50;
-    color: $gray-900;
+    background: var(--sc-bg);
+    color: var(--sc-text);
     font-family: 'Pretendard', -apple-system, sans-serif;
 }
 
@@ -200,10 +186,10 @@ $green: #1F7A3E;
 .load-error {
     margin: 0 0 16px;
     padding: 12px 14px;
-    background: $white;
-    border: 1px solid $gray-200;
-    border-left: 3px solid $red;
-    color: $gray-700;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
+    border-left: 3px solid var(--sc-up);
+    color: var(--sc-text);
     font-size: .86rem;
     line-height: 1.5;
 }
@@ -221,8 +207,8 @@ $green: #1F7A3E;
 
 .sum-item {
     border-radius: 12px;
-    background: $white;
-    border: 1px solid $gray-100;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     padding: 14px;
     display: flex;
     flex-direction: column;
@@ -230,7 +216,7 @@ $green: #1F7A3E;
 
     .sum-label {
         font-size: .74rem;
-        color: $gray-500;
+        color: var(--sc-text-sub);
     }
 
     .sum-value {
@@ -243,23 +229,23 @@ $green: #1F7A3E;
         }
 
         &.st-holding {
-            color: $green;
+            color: #1F7A3E;
         }
 
         &.st-armed {
-            color: $blue;
+            color: var(--sc-down);
         }
 
         &.st-switch_pending {
-            color: $amber;
+            color: var(--sc-point-ink);
         }
     }
 }
 
 .card {
     border-radius: 12px;
-    background: $white;
-    border: 1px solid $gray-100;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     padding: 18px;
     margin-bottom: 14px;
 
@@ -272,7 +258,7 @@ $green: #1F7A3E;
 
 .empty {
     font-size: .82rem;
-    color: $gray-400;
+    color: var(--sc-text-sub);
     text-align: center;
     padding: 18px 0;
 }
@@ -291,7 +277,7 @@ $green: #1F7A3E;
 
     .code-chip {
         font-family: monospace;
-        background: $gray-100;
+        background: var(--sc-surface-2);
         padding: 2px 7px;
         font-size: .76rem;
     }
@@ -302,11 +288,11 @@ $green: #1F7A3E;
         font-weight: 800;
 
         &.up {
-            color: $red;
+            color: var(--sc-up);
         }
 
         &.down {
-            color: $blue;
+            color: var(--sc-down);
         }
     }
 
@@ -324,8 +310,8 @@ $green: #1F7A3E;
 
         li {
             border-radius: 12px;
-            background: $gray-50;
-            border: 1px solid $gray-100;
+            background: var(--sc-bg);
+            border: 1px solid var(--sc-border);
             padding: 10px;
             display: flex;
             flex-direction: column;
@@ -333,7 +319,7 @@ $green: #1F7A3E;
 
             span {
                 font-size: .72rem;
-                color: $gray-500;
+                color: var(--sc-text-sub);
             }
 
             b {
@@ -345,19 +331,19 @@ $green: #1F7A3E;
     .pos-note {
         margin: 12px 0 0;
         font-size: .78rem;
-        color: $gray-500;
+        color: var(--sc-text-sub);
     }
 }
 
 /* ── [MOCK] 시뮬레이터 ── */
 .mock-card {
-    border-color: $gray-300;
-    background: $gray-50;
+    border-color: var(--sc-border-strong);
+    background: var(--sc-bg);
 
     .mock-desc {
         margin: 0 0 12px;
         font-size: .78rem;
-        color: $gray-500;
+        color: var(--sc-text-sub);
         line-height: 1.5;
     }
 
@@ -371,8 +357,8 @@ $green: #1F7A3E;
         height: 36px;
         padding: 0 16px;
         border: 0;
-        background: $amber;
-        color: #fff;
+        background: var(--sc-strong-bg);
+        color: var(--sc-strong-text);
         font-size: .8rem;
         font-weight: 700;
         cursor: pointer;
@@ -380,8 +366,8 @@ $green: #1F7A3E;
         &.ghost {
             border-radius: 12px;
             background: transparent;
-            border: 1px solid $amber;
-            color: $amber;
+            border: 1px solid var(--sc-point);
+            color: var(--sc-point-ink);
         }
 
         &:disabled {
@@ -395,9 +381,9 @@ $green: #1F7A3E;
     border-radius: 12px;
     margin: 0;
     font-size: .84rem;
-    color: $gray-900;
-    background: $gray-50;
-    border: 1px solid $gray-100;
+    color: var(--sc-text);
+    background: var(--sc-bg);
+    border: 1px solid var(--sc-border);
     padding: 12px;
     line-height: 1.5;
 }
@@ -411,7 +397,7 @@ $green: #1F7A3E;
         display: flex;
         gap: 12px;
         padding: 10px 0;
-        border-bottom: 1px dashed $gray-100;
+        border-bottom: 1px dashed var(--sc-border);
 
         &:last-child {
             border-bottom: 0;
@@ -421,24 +407,24 @@ $green: #1F7A3E;
     .tl-dot {
         width: 9px;
         height: 9px;
-        background: $gray-200;
+        background: var(--sc-border);
         margin-top: 6px;
         flex: 0 0 auto;
 
         &.act-commit {
-            background: $green;
+            background: #1F7A3E;
         }
 
         &.act-reserved {
-            background: $amber;
+            background: var(--sc-strong-bg);
         }
 
         &.act-apply_now {
-            background: $blue;
+            background: var(--sc-down);
         }
 
         &.act-stop {
-            background: $red;
+            background: var(--sc-up);
         }
     }
 
@@ -455,17 +441,17 @@ $green: #1F7A3E;
 
     .tl-time {
         font-size: .74rem;
-        color: $gray-400;
+        color: var(--sc-text-sub);
     }
 
     .tl-desc {
         margin: 3px 0 0;
         font-size: .78rem;
-        color: $gray-500;
+        color: var(--sc-text-sub);
 
         .actor {
             margin-left: 6px;
-            color: $gray-400;
+            color: var(--sc-text-sub);
         }
     }
 }

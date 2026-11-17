@@ -145,50 +145,43 @@ onMounted(load);
 </script>
 
 <style scoped lang="scss">
-$gray-50: #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-900: #141414;
-$red: #d93025;
 
 #master-info-setting {
     min-height: 100vh;
-    background: $gray-50;
-    color: $gray-900;
+    background: var(--sc-bg);
+    color: var(--sc-text);
     font-family: 'Pretendard', -apple-system, sans-serif;
 }
 .contents { max-width: 900px; margin: 0 auto; padding: 28px 16px 100px; }
 .head-desc h2 { margin: 0 0 6px; text-align: left; }
-.desc { color: $gray-500; font-size: 13px; margin: 0 0 16px; line-height: 1.5; text-align: left; }
-.loading, .empty { padding: 40px; text-align: center; color: $gray-400; }
+.desc { color: var(--sc-text-sub); font-size: 13px; margin: 0 0 16px; line-height: 1.5; text-align: left; }
+.loading, .empty { padding: 40px; text-align: center; color: var(--sc-text-mute); }
 
 .toolbar { display: flex; gap: 8px; margin-bottom: 16px;
-    input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid $gray-200; border-radius: 6px; font-size: 14px; } }
-.btn { padding: 8px 16px; border: 0; border-radius: 6px; background: $gray-900; color: #fff; cursor: pointer; font-size: 14px;
+    input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--sc-border); border-radius: 6px; font-size: 14px; } }
+.btn { padding: 8px 16px; border: 0; border-radius: 6px; background: var(--sc-strong-bg); color: var(--sc-strong-text); cursor: pointer; font-size: 14px;
     &:disabled { opacity: .5; cursor: default; } }
-.btn-text { padding: 6px 8px; border: 0; background: none; color: $gray-500; font-size: 13px; cursor: pointer; flex-shrink: 0;
-    &.danger { color: $red; }
+.btn-text { padding: 6px 8px; border: 0; background: none; color: var(--sc-text-sub); font-size: 13px; cursor: pointer; flex-shrink: 0;
+    &.danger { color: var(--sc-up); }
     &:disabled { opacity: .5; cursor: default; } }
 
 .edit-form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; padding: 16px;
-    background: #fff; border: 1px solid $gray-200; border-radius: 10px; text-align: left;
-    label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: $gray-500; }
-    input, textarea { padding: 8px 10px; border: 1px solid $gray-200; border-radius: 6px; font-size: 14px; color: $gray-900;
+    background: var(--sc-surface); border: 1px solid var(--sc-border); border-radius: 10px; text-align: left;
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--sc-text-sub); }
+    input, textarea { padding: 8px 10px; border: 1px solid var(--sc-border); border-radius: 6px; font-size: 14px; color: var(--sc-text);
         font-family: inherit; word-break: break-all;
-        &:disabled { background: $gray-50; color: $gray-500; } }
+        &:disabled { background: var(--sc-bg); color: var(--sc-text-sub); } }
     textarea { resize: vertical; font-family: ui-monospace, Menlo, monospace; font-size: 13px; } }
 .form-actions { display: flex; align-items: center; gap: 8px; .spacer { flex: 1; } }
 
-.key-list { list-style: none; margin: 0; padding: 0; background: #fff; border: 1px solid $gray-200; border-radius: 10px; }
-.key-row { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid $gray-100;
+.key-list { list-style: none; margin: 0; padding: 0; background: var(--sc-surface); border: 1px solid var(--sc-border); border-radius: 10px; }
+.key-row { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--sc-border);
     &:first-child { border-top: 0; }
-    &.selected { background: $gray-50; } }
+    &.selected { background: var(--sc-bg); } }
 .row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 0; border: 0;
     background: none; text-align: left; cursor: pointer; color: inherit;
     .name { font-weight: 600; font-size: 14px; }
-    .meta { font-size: 12px; color: $gray-400; }
-    .expired { color: $red; margin-left: 4px; }
-    .value { font-size: 12px; color: $gray-500; font-family: ui-monospace, Menlo, monospace; word-break: break-all; } }
+    .meta { font-size: 12px; color: var(--sc-text-mute); }
+    .expired { color: var(--sc-up); margin-left: 4px; }
+    .value { font-size: 12px; color: var(--sc-text-sub); font-family: ui-monospace, Menlo, monospace; word-break: break-all; } }
 </style>

@@ -279,17 +279,11 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped lang="scss">
-$line:  #EFE2BC;
-$ink:   #2B1D14;
-$sub:   #6B5B4E;
-$yellow:#F6C445;
-$up:    #C8282A;
-$down:  #1F5BD1;
 
 #manual-buy {
     min-height: 100vh;
-    background: #fff;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     text-align: left;
     font-variant-numeric: tabular-nums;
 }
@@ -300,7 +294,7 @@ $down:  #1F5BD1;
     padding: 8px 16px 40px;
 }
 
-.row-label { flex-shrink: 0; width: 76px; font-size: 14px; color: $sub; }
+.row-label { flex-shrink: 0; width: 76px; font-size: 14px; color: var(--sc-text-sub); }
 
 .stock-row {
     display: flex;
@@ -309,7 +303,7 @@ $down:  #1F5BD1;
     min-height: 56px;
     padding: 0;
     border: 0;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
     background: transparent;
     color: inherit;
     font: inherit;
@@ -317,23 +311,23 @@ $down:  #1F5BD1;
     cursor: pointer;
 
     .stock-value { flex: 1; min-width: 0; font-size: 15px; font-weight: 700;
-        em { margin-left: 4px; font-style: normal; font-size: 12px; font-weight: 400; color: $sub; } }
-    .stock-empty { flex: 1; font-size: 15px; color: $sub; }
-    .chevron { font-size: 20px; color: $sub; }
+        em { margin-left: 4px; font-style: normal; font-size: 12px; font-weight: 400; color: var(--sc-text-sub); } }
+    .stock-empty { flex: 1; font-size: 15px; color: var(--sc-text-sub); }
+    .chevron { font-size: 20px; color: var(--sc-text-sub); }
 }
 
 .field {
     display: flex;
     align-items: center;
     min-height: 56px;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
 }
 
 .segment {
     flex: 1;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    background: #F3E8C6;
+    background: var(--sc-border);
     border-radius: 12px;
     padding: 3px;
 
@@ -342,11 +336,11 @@ $down:  #1F5BD1;
         border: 0;
         border-radius: 9px;
         background: transparent;
-        color: $sub;
+        color: var(--sc-text-sub);
         font: inherit;
         font-size: 14px;
         cursor: pointer;
-        &.on { background: #fff; color: $ink; font-weight: 700; }
+        &.on { background: var(--sc-surface); color: var(--sc-text); font-weight: 700; }
     }
 }
 
@@ -365,7 +359,7 @@ $down:  #1F5BD1;
         border: 0;
         outline: none;
         background: transparent;
-        color: $ink;
+        color: var(--sc-text);
         font: inherit;
         font-weight: 700;
         text-align: right;
@@ -377,31 +371,31 @@ $down:  #1F5BD1;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
     padding: 10px 0;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
 }
 .pct-btn {
     min-height: 44px;
     padding: 0;
-    border: 1px solid $line;
+    border: 1px solid var(--sc-border);
     border-radius: 10px;
-    background: #fff;
-    color: $sub;
+    background: var(--sc-surface);
+    color: var(--sc-text-sub);
     font: inherit;
     font-size: 14px;
     cursor: pointer;
-    &.on { border-color: #7A4423; background: #FFF6D2; color: #7A4423; font-weight: 700; }
+    &.on { border-color: var(--sc-point); background: var(--sc-point-bg); color: var(--sc-point-ink); font-weight: 700; }
 }
 
-.field-error { margin: 6px 0 0; font-size: 13px; color: $up; }
+.field-error { margin: 6px 0 0; font-size: 13px; color: var(--sc-up); }
 
 .summary {
     margin: 12px 0 0;
     div { display: flex; justify-content: space-between; padding: 4px 0; font-size: 14px; }
-    dt { color: $sub; }
-    dd { margin: 0; font-weight: 700; &.over { color: $up; } }
+    dt { color: var(--sc-text-sub); }
+    dd { margin: 0; font-weight: 700; &.over { color: var(--sc-up); } }
 }
 
-.note { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: $sub; }
+.note { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: var(--sc-text-sub); }
 
 .btn-buy {
     width: 100%;
@@ -409,8 +403,8 @@ $down:  #1F5BD1;
     margin-top: 16px;
     border: 0;
     border-radius: 12px;
-    background: $yellow;
-    color: #3A200F;
+    background: var(--sc-point);
+    color: var(--sc-on-point);
     font: inherit;
     font-size: 15px;
     font-weight: 700;
@@ -420,34 +414,34 @@ $down:  #1F5BD1;
 
 .orders {
     margin-top: 32px;
-    h2 { margin: 0; padding-bottom: 8px; font-size: 16px; font-weight: 700; border-bottom: 1px solid $line; }
+    h2 { margin: 0; padding-bottom: 8px; font-size: 16px; font-weight: 700; border-bottom: 1px solid var(--sc-border); }
     ul { list-style: none; margin: 0; padding: 0; }
 }
 
-.empty { padding: 32px 0; text-align: center; font-size: 14px; color: $sub; &.error { color: $up; } }
+.empty { padding: 32px 0; text-align: center; font-size: 14px; color: var(--sc-text-sub); &.error { color: var(--sc-up); } }
 
-.order { padding: 12px 0; border-bottom: 1px solid $line; }
+.order { padding: 12px 0; border-bottom: 1px solid var(--sc-border); }
 .order-top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
 .order-name { min-width: 0; font-size: 15px; font-weight: 700; }
 .order-state {
     flex-shrink: 0;
     font-size: 13px;
     font-weight: 700;
-    &.done { color: $up; }
-    &.active { color: $down; }
-    &.bad { color: $up; }
-    &.muted { color: $sub; font-weight: 500; }
+    &.done { color: var(--sc-up); }
+    &.active { color: var(--sc-down); }
+    &.bad { color: var(--sc-up); }
+    &.muted { color: var(--sc-text-sub); font-weight: 500; }
 }
-.order-meta { margin-top: 4px; font-size: 13px; color: $sub; }
-.order-reason { margin-top: 4px; font-size: 13px; line-height: 1.5; color: $ink; }
+.order-meta { margin-top: 4px; font-size: 13px; color: var(--sc-text-sub); }
+.order-reason { margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--sc-text); }
 .btn-cancel {
     min-height: 36px;
     margin-top: 8px;
     padding: 0 12px;
-    border: 1px solid $line;
+    border: 1px solid var(--sc-border);
     border-radius: 8px;
-    background: #fff;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font: inherit;
     font-size: 13px;
     cursor: pointer;

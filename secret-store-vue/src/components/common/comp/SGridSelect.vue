@@ -57,17 +57,17 @@
 
     select {
         flex: 7;
-        color: white;
+        color: var(--sc-strong-text);
         height:100%;
         padding: 3px 10px;
         background-color: transparent;
-        border: 1px solid #cbcbcba1;
+        border: 1px solid var(--sc-border-strong);
         border-radius: 0;
         box-sizing: border-box;
         
         option {
-            color: white;
-            background-color: #333;
+            color: var(--sc-strong-text);
+            background-color: var(--sc-strong-bg);
         }
     }
 }

@@ -38,7 +38,7 @@ export class ZonePrimitive {
                 ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
             }
             if (label && h >= 12) {
-                ctx.fillStyle = textColor || stroke || '#6B5B4E'
+                ctx.fillStyle = textColor || stroke || '#8B919C'
                 ctx.font = "11px 'Pretendard', -apple-system, sans-serif"
                 ctx.textBaseline = 'middle'
                 // 왼쪽 끝은 봉·마커와 겹치기 쉬워 오른쪽 끝(가격축 옆)에 쓴다

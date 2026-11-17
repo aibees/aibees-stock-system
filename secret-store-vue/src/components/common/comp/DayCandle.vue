@@ -3,8 +3,8 @@
     <svg v-if="mini" class="day-candle-mini" :viewBox="`0 0 ${MW} ${MH}`" role="img"
         :aria-label="ok ? `시가 ${fmt(open)} 고가 ${fmt(high)} 저가 ${fmt(low)} ${closeLabel} ${fmt(close)}` : '봉 정보 없음'">
         <template v-if="ok">
-            <line :x1="MW / 2" :x2="MW / 2" :y1="yOfMini(high)" :y2="yOfMini(low)" :stroke="color" stroke-width="1.5" stroke-linecap="round" />
-            <rect x="1" :y="miniBodyTop" :width="MW - 2" :height="miniBodyH" rx="1.5" :fill="color" />
+            <line :x1="MW / 2" :x2="MW / 2" :y1="yOfMini(high)" :y2="yOfMini(low)" :style="{ stroke: color }" stroke-width="1.5" stroke-linecap="round" />
+            <rect x="1" :y="miniBodyTop" :width="MW - 2" :height="miniBodyH" rx="1.5" :style="{ fill: color }" />
         </template>
     </svg>
 
@@ -12,12 +12,12 @@
         <svg v-if="ok" :viewBox="`0 0 ${W} ${H}`" role="img"
             :aria-label="`시가 ${fmt(open)} 고가 ${fmt(high)} 저가 ${fmt(low)} ${closeLabel} ${fmt(close)}`">
             <!-- 꼬리(고가~저가) + 몸통(시가~종가) -->
-            <line :x1="CX" :x2="CX" :y1="yOf(high)" :y2="yOf(low)" :stroke="color" stroke-width="2" stroke-linecap="round" />
-            <rect :x="CX - 14" :y="bodyTop" width="28" :height="bodyH" rx="3" :fill="color" />
+            <line :x1="CX" :x2="CX" :y1="yOf(high)" :y2="yOf(low)" :style="{ stroke: color }" stroke-width="2" stroke-linecap="round" />
+            <rect :x="CX - 14" :y="bodyTop" width="28" :height="bodyH" rx="3" :style="{ fill: color }" />
 
             <!-- 기준선 + 라벨: 가격 위치에 맞추되 라벨끼리 겹치면 위아래로 벌린다 -->
             <g v-for="l in labels" :key="l.key">
-                <line :x1="CX + 18" :x2="LX - 6" :y1="l.y" :y2="l.ty - 4" stroke="#E3D3A8" stroke-width="1" />
+                <line :x1="CX + 18" :x2="LX - 6" :y1="l.y" :y2="l.ty - 4" style="stroke: var(--sc-border-strong)" stroke-width="1" />
                 <text :x="LX" :y="l.ty" class="lab">{{ l.name }}</text>
                 <text :x="W" :y="l.ty" class="val" :class="l.cls" text-anchor="end">{{ fmt(l.v) }}</text>
             </g>
@@ -56,7 +56,7 @@ const ok = computed(() => [open, high, low, close].every(r => r.value !== null))
 
 const fmt = (v) => Number(v).toLocaleString();
 const up = computed(() => close.value >= open.value);
-const color = computed(() => (close.value === open.value ? '#8A7A68' : up.value ? '#C8282A' : '#1F5BD1'));
+const color = computed(() => (close.value === open.value ? 'var(--sc-text-mute)' : up.value ? 'var(--sc-up)' : 'var(--sc-down)'));
 
 // 값 → y (고가가 위). 고가=저가면 가운데.
 const yOf = (v) => {
@@ -102,27 +102,27 @@ const labels = computed(() => {
 
 <style scoped lang="scss">
 .day-candle {
-    background: #fff;
-    border: 1px solid #EFE2BC;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 10px;
     padding: 10px 14px 8px;
     font-variant-numeric: tabular-nums;
 }
 .day-candle svg { display: block; width: 100%; height: auto; max-height: 150px; }
 .day-candle-mini { display: block; width: 10px; height: 40px; }
-.lab { font-size: 11px; fill: #6B5B4E; font-weight: 600; }
-.val { font-size: 13px; fill: #2B1D14; font-weight: 600; }
-.val.up { fill: #C8282A; }
-.val.down { fill: #1F5BD1; }
+.lab { font-size: 11px; fill: var(--sc-text-sub); font-weight: 600; }
+.val { font-size: 13px; fill: var(--sc-text); font-weight: 600; }
+.val.up { fill: var(--sc-up); }
+.val.down { fill: var(--sc-down); }
 .val.strong { font-weight: 700; }
 .vol {
     margin: 6px 0 0;
     padding-top: 8px;
-    border-top: 1px solid #F3EAD2;
+    border-top: 1px solid var(--sc-border);
     font-size: 12px;
-    color: #6B5B4E;
+    color: var(--sc-text-sub);
     display: flex;
     justify-content: space-between;
-    b { font-size: 13px; color: #2B1D14; }
+    b { font-size: 13px; color: var(--sc-text); }
 }
 </style>

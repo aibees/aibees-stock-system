@@ -330,22 +330,11 @@ const saveMenu = async () => {
 
 <style scoped lang="scss">
 // 양봉상회 토큰(홈·배치 관리와 동일). 카드 없이 흰 배경 + 구분선.
-$white:   #ffffff;
-$line:    #EFE2BC;
-$line-2:  #EAD9A6;
-$chip:    #F6EBC8;
-$hero:    #74462A;
-$brown:   #7A4423;
-$ink:     #2B1D14;
-$sub:     #6B5B4E;
-$sub-2:   #7A6B5D;
-$cream:   #FFF8E1;
-$red:     #C8282A;
 
 #route-setting {
     min-height: 100vh;
-    background: $white;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     text-align: left;
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
     font-variant-numeric: tabular-nums;
@@ -364,21 +353,21 @@ $red:     #C8282A;
     justify-content: space-between;
     gap: 10px;
     margin-bottom: 4px;
-    .summary { margin: 0; font-size: 14px; color: $sub; b { color: $ink; font-size: 16px; } }
+    .summary { margin: 0; font-size: 14px; color: var(--sc-text-sub); b { color: var(--sc-text); font-size: 16px; } }
 }
 .btn-primary {
     min-height: 40px;
     padding: 0 14px;
     border: 0;
     border-radius: 10px;
-    background: $hero;
-    color: $cream;
+    background: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
     font-size: 14px;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
     white-space: nowrap;
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
 }
 
 /* ── 그룹(최상위 메뉴) ── */
@@ -389,19 +378,19 @@ $red:     #C8282A;
     justify-content: space-between;
     gap: 12px;
     padding-bottom: 8px;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
 
     &.off .gh-title { opacity: .55; }
 }
 .gh-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .gh-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
-.gh-line h2 { margin: 0; font-size: 17px; font-weight: 700; color: $ink; }
+.gh-line h2 { margin: 0; font-size: 17px; font-weight: 700; color: var(--sc-text); }
 .gh-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 
 .route-path {
     font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
     font-size: 12.5px;
-    color: $brown;
+    color: var(--sc-point-ink);
     overflow-wrap: anywhere;
 }
 
@@ -412,21 +401,21 @@ $red:     #C8282A;
     flex-direction: column;
     gap: 4px;
     padding: 12px 0;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
 
     &.off .m-title,
     &.off .m-route { opacity: .55; }
 }
 .m-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .m-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
-.m-name { font-size: 15px; font-weight: 600; color: $ink; }
+.m-name { font-size: 15px; font-weight: 600; color: var(--sc-text); }
 .m-route { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
 .m-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .m-tech {
     min-width: 0;
     font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
     font-size: 11.5px;
-    color: $sub-2;
+    color: var(--sc-text-sub);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -439,10 +428,10 @@ $red:     #C8282A;
     font-size: 11px;
     font-weight: 700;
     white-space: nowrap;
-    &.pub  { background: #E6F3EA; color: #23784A; }
-    &.com  { background: $chip; color: $brown; }
-    &.adm  { background: #F3E3D6; color: #8A3F14; }
-    &.mute { background: #F1ECE2; color: $sub; }
+    &.pub  { background: var(--sc-surface-2); color: #23784A; }
+    &.com  { background: var(--sc-border); color: var(--sc-point-ink); }
+    &.adm  { background: var(--sc-surface-2); color: var(--sc-point-ink); }
+    &.mute { background: var(--sc-surface-2); color: var(--sc-text-sub); }
 }
 
 .act {
@@ -451,14 +440,14 @@ $red:     #C8282A;
     border: 0;
     border-radius: 8px;
     background: transparent;
-    color: $brown;
+    color: var(--sc-point-ink);
     font-size: 13px;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
     flex-shrink: 0;
-    &:hover { background: rgba(239, 226, 188, .4); }
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 0; }
+    &:hover { background: color-mix(in srgb, var(--sc-border) 40%, transparent); }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 0; }
 }
 
 /* ── 활성 스위치 ── */
@@ -472,10 +461,10 @@ $red:     #C8282A;
     cursor: pointer;
     transition: background .15s;
 
-    &.active   { background: $hero; }
-    &.inactive { background: $line-2; }
+    &.active   { background: var(--sc-point); }
+    &.inactive { background: var(--sc-border-strong); }
     &:disabled { opacity: .6; cursor: default; }
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
 
     .toggle-knob {
         position: absolute;
@@ -484,7 +473,7 @@ $red:     #C8282A;
         width: 20px;
         height: 20px;
         border-radius: 10px;
-        background: $white;
+        background: var(--sc-surface);
         box-shadow: 0 1px 2px rgba(74, 40, 20, .25);
         transition: transform .15s;
     }
@@ -492,15 +481,15 @@ $red:     #C8282A;
 }
 
 /* ── 로딩 / 빈 상태 ── */
-.loader-rows { display: flex; flex-direction: column; margin-top: 18px; border-top: 1px solid $line; }
-.skeleton-row { height: 76px; border-bottom: 1px solid $line; background: rgba(239, 226, 188, .3); animation: pulse 1.6s infinite ease-in-out; }
-.empty { padding: 48px 0; text-align: center; color: $sub; font-size: 14px; }
+.loader-rows { display: flex; flex-direction: column; margin-top: 18px; border-top: 1px solid var(--sc-border); }
+.skeleton-row { height: 76px; border-bottom: 1px solid var(--sc-border); background: color-mix(in srgb, var(--sc-border) 30%, transparent); animation: pulse 1.6s infinite ease-in-out; }
+.empty { padding: 48px 0; text-align: center; color: var(--sc-text-sub); font-size: 14px; }
 
 /* ── 추가/수정 팝업: 모바일은 바텀시트 ── */
 .popup-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(43, 29, 20, .45);
+    background: color-mix(in srgb, var(--sc-strong-bg) 45%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -511,7 +500,7 @@ $red:     #C8282A;
 }
 
 .popup-panel {
-    background: $white;
+    background: var(--sc-surface);
     border-radius: 16px;
     width: 100%;
     max-width: 560px;
@@ -534,19 +523,19 @@ $red:     #C8282A;
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px 12px;
-    border-bottom: 1px solid $line;
+    border-bottom: 1px solid var(--sc-border);
 
-    h3 { margin: 0; font-size: 17px; font-weight: 700; color: $ink; }
+    h3 { margin: 0; font-size: 17px; font-weight: 700; color: var(--sc-text); }
 
     .btn-close {
         border: none;
         background: none;
         cursor: pointer;
-        color: $sub-2;
+        color: var(--sc-text-sub);
         padding: 6px;
         display: flex;
         align-items: center;
-        &:hover { color: $ink; }
+        &:hover { color: var(--sc-text); }
     }
 }
 
@@ -573,8 +562,8 @@ $red:     #C8282A;
 
         &.full { grid-column: 1 / -1; }
 
-        label { font-size: 13px; font-weight: 600; color: #4A3628; }
-        .req { color: $red; margin-left: 2px; }
+        label { font-size: 13px; font-weight: 600; color: var(--sc-text); }
+        .req { color: var(--sc-up); margin-left: 2px; }
 
         input:not([type="radio"]) {
             width: 100%;
@@ -582,18 +571,18 @@ $red:     #C8282A;
             box-sizing: border-box;
             min-height: 42px;
             padding: 0 12px;
-            border: 1px solid $line-2;
+            border: 1px solid var(--sc-border-strong);
             border-radius: 10px;
             font-size: 16px;   // iOS 포커스 확대 방지
-            color: $ink;
+            color: var(--sc-text);
             font-family: inherit;
-            background: $white;
+            background: var(--sc-surface);
             outline: none;
             transition: border-color .15s;
 
-            &:focus { border-color: $brown; }
-            &:disabled { background: #FFFDF5; color: $sub-2; }
-            &::placeholder { color: #9A8C7E; }
+            &:focus { border-color: var(--sc-point); }
+            &:disabled { background: var(--sc-bg); color: var(--sc-text-sub); }
+            &::placeholder { color: var(--sc-text-sub); }
         }
 
         .radio-group { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 6px 0 2px; }
@@ -605,10 +594,10 @@ $red:     #C8282A;
             min-height: 32px;
             font-size: 14px;
             font-weight: 500;
-            color: #4A3628;
+            color: var(--sc-text);
             cursor: pointer;
 
-            input[type="radio"] { cursor: pointer; accent-color: $hero; }
+            input[type="radio"] { cursor: pointer; accent-color: var(--sc-point); }
         }
     }
 }
@@ -618,7 +607,7 @@ $red:     #C8282A;
     justify-content: flex-end;
     gap: 8px;
     padding: 12px 20px 16px;
-    border-top: 1px solid $line;
+    border-top: 1px solid var(--sc-border);
 
     .btn-cancel,
     .btn-save {
@@ -630,13 +619,13 @@ $red:     #C8282A;
         font-family: inherit;
         cursor: pointer;
     }
-    .btn-cancel { border: 1px solid $line-2; background: $white; color: #4A3628; }
+    .btn-cancel { border: 1px solid var(--sc-border-strong); background: var(--sc-surface); color: var(--sc-text); }
     .btn-save {
         border: none;
-        background: $hero;
-        color: $cream;
+        background: var(--sc-strong-bg);
+        color: var(--sc-strong-text);
         font-weight: 700;
-        &:hover { background: $brown; }
+        &:hover { background: var(--sc-strong-bg); }
         &:disabled { opacity: .55; cursor: not-allowed; }
     }
 }

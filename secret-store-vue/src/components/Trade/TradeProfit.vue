@@ -343,25 +343,11 @@ const pnlClass = (v) => {
 
 <style scoped lang="scss">
 // 무채색 팔레트(MyWallet / trade 대시보드와 통일).
-$white: #ffffff;
-$gray-50: #FFFBEA;
-$gray-100: #F3EAD2;
-$gray-200: #EFE2BC;
-$gray-300: #E3D3A8;
-$gray-400: #9A8C7E;
-$gray-500: #6B5B4E;
-$gray-700: #4A3628;
-$gray-900: #2B1D14;
-$blue: #1F5BD1;
-$accent: #7A4423;
-$navy: #74462A;
-$red: #C8282A;
-$green: #1F7A3E;
 
 #trade-profit {
     min-height: 100vh;
-    background: $gray-50;
-    color: $gray-900;
+    background: var(--sc-bg);
+    color: var(--sc-text);
     font-family: 'Pretendard', -apple-system, sans-serif;
 }
 
@@ -379,27 +365,27 @@ $green: #1F7A3E;
     margin-bottom: 20px;
 
     h2 { font-size: 1.4rem; font-weight: 700; margin: 0; }
-    .sub-text { font-size: 0.82rem; color: $gray-500; margin: 6px 0 0; line-height: 1.5; text-align: left; }
+    .sub-text { font-size: 0.82rem; color: var(--sc-text-sub); margin: 6px 0 0; line-height: 1.5; text-align: left; }
 
     @media (max-width: 600px) { flex-direction: column; align-items: flex-start; gap: 12px; }
 }
 
 .btn-refresh {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 8px 16px; background: $navy; color: $white; border: none;
+    padding: 8px 16px; background: var(--sc-strong-bg); color: var(--sc-strong-text); border: none;
     font-size: 0.84rem; font-weight: 600; cursor: pointer;
     font-family: inherit; transition: background .15s;
-    &:hover:not(:disabled) { background: #74462A; }
-    &:disabled { background: $gray-400; cursor: default; }
+    &:hover:not(:disabled) { background: var(--sc-strong-bg); }
+    &:disabled { background: var(--sc-text-sub); cursor: default; }
 }
 
 /* 조회 조건 */
 .card {
     border-radius: 12px;
-    background: $white; border: 1px solid $gray-200;
+    background: var(--sc-surface); border: 1px solid var(--sc-border);
     padding: 16px; margin-bottom: 16px;
 }
-.empty-card p { margin: 0; color: $gray-500; font-size: 0.86rem; }
+.empty-card p { margin: 0; color: var(--sc-text-sub); font-size: 0.86rem; }
 
 .query-card { display: flex; flex-direction: column; gap: 12px; }
 // 데스크톱에서는 조회 영역이 화면 전체로 늘어나지 않게 폭을 제한한다
@@ -411,12 +397,12 @@ $green: #1F7A3E;
 .date-row { display: flex; align-items: flex-end; gap: 6px; }
 .df {
     flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px;
-    span { font-size: 0.74rem; font-weight: 700; color: $gray-500; letter-spacing: .03em; }
+    span { font-size: 0.74rem; font-weight: 700; color: var(--sc-text-sub); letter-spacing: .03em; }
     input {
         width: 100%; min-width: 0; box-sizing: border-box; border-radius: 12px;
-        padding: 8px 6px; border: 1px solid $gray-300; background: $white;
-        font-size: 0.84rem; font-family: inherit; color: $gray-900;
-        &:focus { outline: none; border-color: $gray-900; }
+        padding: 8px 6px; border: 1px solid var(--sc-border-strong); background: var(--sc-surface);
+        font-size: 0.84rem; font-family: inherit; color: var(--sc-text);
+        &:focus { outline: none; border-color: var(--sc-text); }
     }
 }
 // App.vue 의 모바일 전역 규칙(#app input → 16px, iOS 확대 방지)은 한 줄에 날짜 2개 + 버튼을 넣기엔 너무 커서
@@ -443,69 +429,69 @@ $green: #1F7A3E;
 }
 .seg {
     border-radius: 12px;
-    display: inline-flex; border: 1px solid $gray-300; overflow: hidden;
+    display: inline-flex; border: 1px solid var(--sc-border-strong); overflow: hidden;
     button {
-        padding: 7px 12px; background: $white; border: none; cursor: pointer;
-        font-size: 0.8rem; font-weight: 600; color: $gray-500; font-family: inherit;
-        border-right: 1px solid $gray-200;
+        padding: 7px 12px; background: var(--sc-surface); border: none; cursor: pointer;
+        font-size: 0.8rem; font-weight: 600; color: var(--sc-text-sub); font-family: inherit;
+        border-right: 1px solid var(--sc-border);
         &:last-child { border-right: none; }
-        &.on { background: #74462A; color: $white; }
+        &.on { background: var(--sc-point); color: var(--sc-on-point); }
     }
 }
 .btn-run {
-    flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 12px; background: $navy; color: $white; border: none;
+    flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 12px; background: var(--sc-strong-bg); color: var(--sc-strong-text); border: none;
     font-size: 0.84rem; font-weight: 700; cursor: pointer; font-family: inherit;
-    &:hover:not(:disabled) { background: #74462A; }
-    &:disabled { background: $gray-400; cursor: default; }
+    &:hover:not(:disabled) { background: var(--sc-strong-bg); }
+    &:disabled { background: var(--sc-text-sub); cursor: default; }
 }
 .warn-note {
     border-radius: 12px;
-    background: $gray-100; border: 1px solid $gray-300;
-    padding: 10px 14px; margin: 0 0 16px; font-size: 0.8rem; color: $gray-700;
+    background: var(--sc-surface-2); border: 1px solid var(--sc-border-strong);
+    padding: 10px 14px; margin: 0 0 16px; font-size: 0.8rem; color: var(--sc-text);
 }
 
 /* Table */
 .table-section {
     border-radius: 12px;
-    background: $white; border: 1px solid $gray-200; overflow-x: auto;
+    background: var(--sc-surface); border: 1px solid var(--sc-border); overflow-x: auto;
     @media (max-width: 860px) { display: none; }
 }
 .grid-table {
     width: 100%; border-collapse: collapse; font-size: 0.84rem;
 
-    thead tr { border-bottom: 1px solid $gray-200; background: $gray-50; }
+    thead tr { border-bottom: 1px solid var(--sc-border); background: var(--sc-bg); }
     th {
-        padding: 10px 12px; font-size: 0.72rem; font-weight: 700; color: $gray-500;
+        padding: 10px 12px; font-size: 0.72rem; font-weight: 700; color: var(--sc-text-sub);
         letter-spacing: .03em; white-space: nowrap;
     }
-    td { padding: 10px 12px; border-bottom: 1px solid $gray-100; color: $gray-700; white-space: nowrap; }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--sc-border); color: var(--sc-text); white-space: nowrap; }
     tbody tr:last-child td { border-bottom: none; }
-    tbody tr:hover td { background: $gray-50; }
+    tbody tr:hover td { background: var(--sc-bg); }
 
     .tl { text-align: left; }
     .tr { text-align: right; }
     .tc { text-align: center; }
     .num { font-variant-numeric: tabular-nums; }
 
-    .up { color: $red; }
-    .down { color: $blue; }
+    .up { color: var(--sc-up); }
+    .down { color: var(--sc-down); }
 
-    tfoot .sub-row td { background: $gray-50; border-top: 1px solid $gray-100; color: $gray-700; font-weight: 600; }
+    tfoot .sub-row td { background: var(--sc-bg); border-top: 1px solid var(--sc-border); color: var(--sc-text); font-weight: 600; }
     tfoot .total-row td {
-        background: $gray-50; font-weight: 700; color: #74462A;
-        border-top: 2px solid $gray-200;
+        background: var(--sc-bg); font-weight: 700; color: var(--sc-point-ink);
+        border-top: 2px solid var(--sc-border);
     }
 }
 
 .stk { display: flex; align-items: center; gap: 8px; }
-.stk-name { color: $gray-900; font-weight: 600; }
+.stk-name { color: var(--sc-text); font-weight: 600; }
 // 종목코드: 뱃지가 아니라 종목명 옆에 작게
-.stk-code { font-size: 0.72rem; color: $gray-400; font-variant-numeric: tabular-nums; }
+.stk-code { font-size: 0.72rem; color: var(--sc-text-sub); font-variant-numeric: tabular-nums; }
 // 매수/매도 뱃지(글자로도 구분된다)
 .action-badge {
     font-size: 0.7rem; font-weight: 700; padding: 2px 8px; white-space: nowrap; border-radius: 12px;
-    &.sell { background: #E8F0FE; color: $blue; border: 1px solid #C9DAFB; }
-    &.buy  { background: #FDECEC; color: $red;  border: 1px solid #F6CFCF; }
+    &.sell { background: var(--sc-down-bg); color: var(--sc-down); border: 1px solid var(--sc-down-bg); }
+    &.buy  { background: var(--sc-up-bg); color: var(--sc-up);  border: 1px solid var(--sc-up-bg); }
 }
 // 손익 금액·%: 굵게, 글자는 살짝 작게
 .pnl { font-weight: 700; font-size: 0.92em; }
@@ -513,36 +499,36 @@ $green: #1F7A3E;
 /* skeleton */
 .loader-rows { padding: 8px; }
 .skeleton-row {
-    height: 42px; background: $gray-100;
+    height: 42px; background: var(--sc-surface-2);
     margin-bottom: 6px; animation: pulse 1.6s infinite ease-in-out;
 }
-.empty-cell { text-align: center; padding: 60px 0; color: $gray-400; font-size: 0.88rem; }
+.empty-cell { text-align: center; padding: 60px 0; color: var(--sc-text-sub); font-size: 0.88rem; }
 
 /* Mobile list */
 .mobile-list { display: none; @media (max-width: 860px) { display: block; } }
 .m-summary {
     border-radius: 12px;
-    background: $white; border: 1px solid $gray-200; padding: 4px 14px;
+    background: var(--sc-surface); border: 1px solid var(--sc-border); padding: 4px 14px;
     margin-bottom: 10px; font-size: 0.84rem;
-    .ms-row { display: flex; align-items: center; justify-content: space-between; min-height: 38px; border-top: 1px solid $gray-100; }
+    .ms-row { display: flex; align-items: center; justify-content: space-between; min-height: 38px; border-top: 1px solid var(--sc-border); }
     .ms-row:first-child { border-top: none; }
-    .ms-label { color: $gray-700; font-weight: 600; }
-    .ms-row.total { border-top: 1.5px solid $gray-300; .ms-label { color: $gray-900; font-weight: 700; } }
+    .ms-label { color: var(--sc-text); font-weight: 600; }
+    .ms-row.total { border-top: 1.5px solid var(--sc-border-strong); .ms-label { color: var(--sc-text); font-weight: 700; } }
 }
-.cnt { font-style: normal; font-weight: 500; font-size: 0.74rem; color: $gray-400; margin-left: 4px; }
+.cnt { font-style: normal; font-weight: 500; font-size: 0.74rem; color: var(--sc-text-sub); margin-left: 4px; }
 .m-ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.m-li { background: $white; border: 1px solid $gray-200; padding: 14px; border-radius: 12px; }
+.m-li { background: var(--sc-surface); border: 1px solid var(--sc-border); padding: 14px; border-radius: 12px; }
 .li-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .li-name {
     display: flex; align-items: center; gap: 8px;
-    font-size: 0.95rem; font-weight: 700; color: $gray-900; margin-bottom: 8px;
+    font-size: 0.95rem; font-weight: 700; color: var(--sc-text); margin-bottom: 8px;
 }
 .li-row {
-    display: flex; gap: 8px; font-size: 0.8rem; margin-bottom: 4px; color: $gray-700;
-    .li-label { flex-shrink: 0; width: 84px; color: $gray-500; font-weight: 600; }
+    display: flex; gap: 8px; font-size: 0.8rem; margin-bottom: 4px; color: var(--sc-text);
+    .li-label { flex-shrink: 0; width: 84px; color: var(--sc-text-sub); font-weight: 600; }
 }
-.up { color: $red; }
-.down { color: $blue; }
+.up { color: var(--sc-up); }
+.down { color: var(--sc-down); }
 
 @keyframes pulse { 0%, 100% { opacity: .5; } 50% { opacity: .9; } }
 

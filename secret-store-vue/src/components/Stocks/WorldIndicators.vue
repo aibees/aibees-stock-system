@@ -119,23 +119,11 @@ const rateClass = (rate) => {
 <style scoped lang="scss">
 @use '@@/common.scss' as *;
 
-$white:   #ffffff;
-$gray-50: #fafafa;
-$gray-100:#efefef;
-$gray-200:#dcdcdc;
-$gray-300:#c4c4c4;
-$gray-400:#9a9a9a;
-$gray-500:#737373;
-$gray-700:#3d3d3d;
-$gray-900:#141414;
-$blue:    #141414;
-$navy:    #141414;
-$red:     #141414;
 
 #world-indicators {
     min-height: 100vh;
-    background: $gray-50;
-    color: $gray-900;
+    background: var(--sc-bg);
+    color: var(--sc-text);
     font-family: 'Pretendard', -apple-system, sans-serif;
 }
 
@@ -161,7 +149,7 @@ $red:     #141414;
         font-size: 1.4rem;
         font-weight: 700;
         margin: 0;
-        color: $gray-900;
+        color: var(--sc-text);
     }
 
     @media (max-width: 600px) {
@@ -183,9 +171,9 @@ $red:     #141414;
 
 .btn-world-refresh {
     padding: 8px 16px;
-    border: 1px solid $gray-200;
-    background: $white;
-    color: $gray-700;
+    border: 1px solid var(--sc-border);
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-size: 0.86rem;
     font-weight: 700;
     cursor: pointer;
@@ -193,8 +181,8 @@ $red:     #141414;
     white-space: nowrap;
     transition: border-color .15s, color .15s;
 
-    &:hover { border-color: $blue; color: $blue; }
-    &:disabled { color: $gray-400; cursor: not-allowed; }
+    &:hover { border-color: var(--sc-text); color: var(--sc-text); }
+    &:disabled { color: var(--sc-text-mute); cursor: not-allowed; }
 }
 
 .indicator-shortcuts {
@@ -206,16 +194,16 @@ $red:     #141414;
 
 .shortcut-chip {
     padding: 6px 14px;
-    border: 1px solid $gray-200;
-    background: $white;
-    color: $gray-700;
+    border: 1px solid var(--sc-border);
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-size: 0.8rem;
     font-weight: 600;
     text-decoration: none;
     white-space: nowrap;
     transition: border-color .15s, color .15s;
 
-    &:hover { border-color: $blue; color: $blue; }
+    &:hover { border-color: var(--sc-text); color: var(--sc-text); }
 }
 
 .indicator-group {
@@ -227,10 +215,10 @@ $red:     #141414;
 .indicator-group-title {
     font-size: 1rem;
     font-weight: 700;
-    color: $gray-900;
+    color: var(--sc-text);
     margin: 0 0 12px;
     padding-bottom: 8px;
-    border-bottom: 1px solid $gray-200;
+    border-bottom: 1px solid var(--sc-border);
 }
 
 .indicator-grid {
@@ -240,12 +228,12 @@ $red:     #141414;
 }
 
 .indicator-card {
-    background: $white;
-    border: 1px solid $gray-200;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     padding: 14px;
     transition: border-color .15s;
 
-    &:hover { border-color: $gray-900; }
+    &:hover { border-color: var(--sc-text); }
 }
 
 .indicator-head {
@@ -259,25 +247,25 @@ $red:     #141414;
         font-size: 0.9rem;
         font-weight: 700;
         margin: 0;
-        color: $gray-900;
+        color: var(--sc-text);
     }
 }
 
 .indicator-value {
     font-size: 1.05rem;
     font-weight: 800;
-    color: $gray-900;
+    color: var(--sc-text);
     white-space: nowrap;
 
-    &.rate-up { color: $red; }
-    &.rate-down { color: $navy; }
+    &.rate-up { color: var(--sc-text); }
+    &.rate-down { color: var(--sc-text); }
 }
 
 .indicator-change {
     margin-left: 4px;
     font-size: 0.7rem;
     font-weight: 600;
-    color: $gray-500;
+    color: var(--sc-text-sub);
 }
 
 .indicator-chart {
@@ -288,15 +276,15 @@ $red:     #141414;
 .indicator-summary {
     margin: 0;
     font-size: 0.76rem;
-    color: $gray-500;
+    color: var(--sc-text-sub);
     line-height: 1.4;
     text-align: left;
 
     .summary-change {
         font-weight: 700;
 
-        &.rate-up { color: #d92b2b; }
-        &.rate-down { color: #2b62d9; }
+        &.rate-up { color: var(--sc-up); }
+        &.rate-down { color: var(--sc-down); }
     }
 }
 
@@ -309,7 +297,7 @@ $red:     #141414;
 
 .skeleton-card {
     height: 310px;
-    background: $gray-100;
+    background: var(--sc-surface-2);
     animation: pulse 1.6s infinite ease-in-out;
 }
 
@@ -317,7 +305,7 @@ $red:     #141414;
 .empty-box {
     text-align: center;
     padding: 80px 0;
-    color: $gray-500;
+    color: var(--sc-text-sub);
     font-size: 0.9rem;
 }
 

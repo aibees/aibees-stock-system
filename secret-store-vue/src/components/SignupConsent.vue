@@ -105,17 +105,11 @@ const submit = async () => {
 </script>
 
 <style scoped lang="scss">
-$hero:  #74462A;
-$brown: #7A4423;
-$ink:   #2B1D14;
-$sub:   #6B5B4E;
-$line:  #EFE2BC;
-$cream: #FFF8E1;
 
 #signup-consent {
     min-height: 100vh;
-    background: #fff;
-    color: $ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
 }
 
@@ -131,24 +125,24 @@ $cream: #FFF8E1;
 
 .sc-section { display: flex; flex-direction: column; gap: 10px; }
 .sc-title { margin: 0; font-size: 20px; font-weight: 700; }
-.sc-msg { margin: 0; font-size: 14px; line-height: 1.6; color: $sub; word-break: keep-all; }
+.sc-msg { margin: 0; font-size: 14px; line-height: 1.6; color: var(--sc-text-sub); word-break: keep-all; }
 
 .sc-profile {
     margin: 0;
-    border-top: 1px solid $line;
+    border-top: 1px solid var(--sc-border);
     > div {
         display: flex;
         gap: 12px;
         padding: 10px 0;
-        border-bottom: 1px solid $line;
+        border-bottom: 1px solid var(--sc-border);
         font-size: 14px;
         line-height: 1.55;
     }
-    dt { flex: 0 0 96px; color: $sub; }
+    dt { flex: 0 0 96px; color: var(--sc-text-sub); }
     dd { margin: 0; flex: 1; min-width: 0; white-space: pre-line; word-break: keep-all; overflow-wrap: anywhere; }
 }
 
-.sc-error { margin: 0; font-size: 13px; color: #C0392B; }
+.sc-error { margin: 0; font-size: 13px; color: var(--sc-up); }
 
 .sc-actions { display: flex; flex-direction: column; gap: 8px; }
 
@@ -160,9 +154,9 @@ $cream: #FFF8E1;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--sc-point); outline-offset: 2px; }
     &:disabled { opacity: .45; cursor: default; }
 }
-.btn-primary { border: 0; background: $hero; color: $cream; }
-.btn-ghost { border: 1px solid $line; background: #fff; color: $sub; }
+.btn-primary { border: 0; background: var(--sc-strong-bg); color: var(--sc-strong-text); }
+.btn-ghost { border: 1px solid var(--sc-border); background: var(--sc-surface); color: var(--sc-text-sub); }
 </style>

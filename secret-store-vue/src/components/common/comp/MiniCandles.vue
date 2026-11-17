@@ -3,8 +3,8 @@
     <svg class="mini-candles" :viewBox="`0 0 ${width} ${H}`" :style="{ width: `${width}px` }" role="img"
         :aria-label="ariaLabel">
         <g v-for="(b, i) in shapes" :key="i">
-            <line :x1="b.cx" :x2="b.cx" :y1="b.yHigh" :y2="b.yLow" :stroke="b.color" stroke-width="1.2" stroke-linecap="round" />
-            <rect :x="b.cx - BW / 2" :y="b.bodyTop" :width="BW" :height="b.bodyH" rx="1" :fill="b.color" />
+            <line :x1="b.cx" :x2="b.cx" :y1="b.yHigh" :y2="b.yLow" :style="{ stroke: b.color }" stroke-width="1.2" stroke-linecap="round" />
+            <rect :x="b.cx - BW / 2" :y="b.bodyTop" :width="BW" :height="b.bodyH" rx="1" :style="{ fill: b.color }" />
         </g>
     </svg>
 </template>
@@ -47,7 +47,7 @@ const shapes = computed(() => {
             yLow: y(b.l),
             bodyTop: top,
             bodyH: Math.max(1.2, Math.abs(y(b.o) - y(b.c))),
-            color: b.c === b.o ? '#8A7A68' : b.c > b.o ? '#C8282A' : '#1F5BD1',
+            color: b.c === b.o ? 'var(--sc-text-mute)' : b.c > b.o ? 'var(--sc-up)' : 'var(--sc-down)',
         };
     });
 });

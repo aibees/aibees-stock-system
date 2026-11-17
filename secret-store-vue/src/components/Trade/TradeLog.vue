@@ -400,26 +400,11 @@ const formatDateTime = (v) => v ? String(v).replace('T', ' ').replace(/\.\d+Z?$/
 
 <style scoped lang="scss">
 // 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
-$white: #ffffff;
-$gray-50: #FFFBEA;
-$gray-100: #F3EAD2;
-$gray-200: #EFE2BC;
-$gray-300: #E3D3A8;
-$gray-400: #9A8C7E;
-$gray-500: #6B5B4E;
-$gray-700: #4A3628;
-$gray-900: #2B1D14;
-$blue: #1F5BD1;
-$accent: #7A4423;
-$navy: #74462A;
-$red: #C8282A;
-$amber: #B7791F;
-$green: #1F7A3E;
 
 #trade-log {
     min-height: 100vh;
-    background: $gray-50;
-    color: $gray-900;
+    background: var(--sc-bg);
+    color: var(--sc-text);
     font-family: 'Pretendard', -apple-system, sans-serif;
 }
 
@@ -429,25 +414,25 @@ $green: #1F7A3E;
 .head-desc {
     display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px;
     h2 { font-size: 1.4rem; font-weight: 700; margin: 0; }
-    .sub-text { font-size: 0.82rem; color: $gray-500; margin: 4px 0 0; }
+    .sub-text { font-size: 0.82rem; color: var(--sc-text-sub); margin: 4px 0 0; }
     @media (max-width: 600px) { flex-direction: column; align-items: flex-start; gap: 12px; }
 }
 
 .btn-refresh {
     display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
-    background: $navy; color: $white; border: none;
+    background: var(--sc-strong-bg); color: var(--sc-strong-text); border: none;
     font-size: 0.84rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s;
-    &:hover { background: #74462A; }
+    &:hover { background: var(--sc-strong-bg); }
 }
 
 /* Tabs */
-.tab-nav { display: flex; gap: 4px; border-bottom: 1px solid $gray-200; margin-bottom: 16px; }
+.tab-nav { display: flex; gap: 4px; border-bottom: 1px solid var(--sc-border); margin-bottom: 16px; }
 .tab-btn {
-    padding: 9px 18px; border: none; background: none; color: $gray-500;
+    padding: 9px 18px; border: none; background: none; color: var(--sc-text-sub);
     font-size: 0.86rem; font-weight: 600; cursor: pointer; font-family: inherit;
     border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .12s, border-color .12s;
-    &:hover { color: $gray-700; }
-    &.active { color: $navy; border-bottom-color: $navy; }
+    &:hover { color: var(--sc-text); }
+    &.active { color: var(--sc-point-ink); border-bottom-color: var(--sc-point); }
 }
 
 /* Filter bar */
@@ -455,10 +440,10 @@ $green: #1F7A3E;
     border-radius: 12px;
     display: flex; flex-wrap: wrap; align-items: center; gap: 18px;
     margin-bottom: 16px; padding: 14px 16px;
-    background: $white; border: 1px solid $gray-200;
+    background: var(--sc-surface); border: 1px solid var(--sc-border);
 }
 .filter-group { display: flex; align-items: center; gap: 10px; }
-.filter-label { flex-shrink: 0; font-size: 0.76rem; font-weight: 700; color: $gray-500; letter-spacing: .03em; }
+.filter-label { flex-shrink: 0; font-size: 0.76rem; font-weight: 700; color: var(--sc-text-sub); letter-spacing: .03em; }
 // 터치 기기는 입력창이 16px 이라(App.vue) 날짜 두 칸이 카드 밖으로 나간다 → 위아래로 쌓는다
 @media (max-width: 640px) {
     .filter-group.period { width: 100%; flex-wrap: wrap; }
@@ -469,103 +454,103 @@ $green: #1F7A3E;
 .chip-group { display: flex; gap: 6px; }
 .filter-chip {
     border-radius: 12px;
-    padding: 5px 13px; border: 1px solid $gray-200; background: $white;
-    color: $gray-700; font-size: 0.78rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .12s;
-    &:hover { border-color: $accent; color: $accent; }
-    &.active { background: $navy; border-color: $navy; color: $white; }
+    padding: 5px 13px; border: 1px solid var(--sc-border); background: var(--sc-surface);
+    color: var(--sc-text); font-size: 0.78rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .12s;
+    &:hover { border-color: var(--sc-point); color: var(--sc-point-ink); }
+    &.active { background: var(--sc-point); border-color: var(--sc-point); color: var(--sc-on-point); }
 }
 .filter-input {
     border-radius: 12px;
-    padding: 6px 10px; border: 1px solid $gray-200;
-    font-size: 0.8rem; color: $gray-900; font-family: inherit; outline: none; transition: border-color .15s;
-    &:focus { border-color: $accent; }
+    padding: 6px 10px; border: 1px solid var(--sc-border);
+    font-size: 0.8rem; color: var(--sc-text); font-family: inherit; outline: none; transition: border-color .15s;
+    &:focus { border-color: var(--sc-point); }
     &.date { padding: 5px 8px; }
 }
-.tilde { color: $gray-400; }
+.tilde { color: var(--sc-text-sub); }
 .btn-apply {
-    padding: 7px 18px; border: none; background: $navy; color: $white;
+    padding: 7px 18px; border: none; background: var(--sc-strong-bg); color: var(--sc-strong-text);
     font-size: 0.82rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: background .15s;
-    &:hover { background: #74462A; }
+    &:hover { background: var(--sc-strong-bg); }
 }
 
 /* Table */
 .table-section {
     border-radius: 12px;
-    background: $white; border: 1px solid $gray-200;
+    background: var(--sc-surface); border: 1px solid var(--sc-border);
     overflow: hidden; overflow-x: auto;
     @media (max-width: 860px) { display: none; }
 }
 .grid-table {
     width: 100%; border-collapse: collapse; font-size: 0.83rem;
-    thead tr { background: $gray-50; border-bottom: 1px solid $gray-200; }
-    th { padding: 10px 12px; font-size: 0.72rem; font-weight: 700; color: $gray-500; letter-spacing: .03em; white-space: nowrap; }
-    td { padding: 10px 12px; border-bottom: 1px solid $gray-100; color: $gray-700; white-space: nowrap; }
+    thead tr { background: var(--sc-bg); border-bottom: 1px solid var(--sc-border); }
+    th { padding: 10px 12px; font-size: 0.72rem; font-weight: 700; color: var(--sc-text-sub); letter-spacing: .03em; white-space: nowrap; }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--sc-border); color: var(--sc-text); white-space: nowrap; }
     tbody tr:last-child td { border-bottom: none; }
-    tbody tr:hover td { background: $gray-50; }
+    tbody tr:hover td { background: var(--sc-bg); }
     .tl { text-align: left; } .tr { text-align: right; } .tc { text-align: center; }
     .num { font-variant-numeric: tabular-nums; }
-    .time { color: $gray-500; font-size: 0.78rem; }
-    .up { color: $red; font-weight: 600; } .down { color: $blue; font-weight: 600; }
+    .time { color: var(--sc-text-sub); font-size: 0.78rem; }
+    .up { color: var(--sc-up); font-weight: 600; } .down { color: var(--sc-down); font-weight: 600; }
     .msg { white-space: normal; word-break: break-all; min-width: 260px; }
-    .reason { white-space: normal; word-break: break-all; min-width: 160px; color: $gray-500; }
+    .reason { white-space: normal; word-break: break-all; min-width: 160px; color: var(--sc-text-sub); }
 }
 .stk { display: flex; align-items: center; gap: 8px; }
-.stk-name { color: $gray-900; }
+.stk-name { color: var(--sc-text); }
 
 .code-chip {
     border-radius: 12px;
-    font-size: 0.72rem; font-weight: 600; background: $gray-100; color: $gray-700;
-    padding: 2px 7px; border: 1px solid $gray-200;
+    font-size: 0.72rem; font-weight: 600; background: var(--sc-surface-2); color: var(--sc-text);
+    padding: 2px 7px; border: 1px solid var(--sc-border);
     font-family: 'SFMono-Regular', Consolas, monospace;
 }
 
 .action-badge, .source-badge, .status-badge {
     font-size: 0.7rem; font-weight: 700; padding: 2px 9px; white-space: nowrap;
-    &.buy { background: #74462A; color: $white; border: 1px solid #74462A; border-radius: 12px; }
-    &.sell { background: $white; color: #74462A; border: 1px solid $gray-300; border-radius: 12px; }
-    &.holding { background: $gray-100; color: #74462A; border: 1px solid $gray-300; border-radius: 12px; }
-    &.sold { background: $gray-100; color: $gray-700; border: 1px solid $gray-200; border-radius: 12px; }
-    &.default { background: $gray-100; color: $gray-500; border: 1px solid $gray-200; border-radius: 12px; }
+    &.buy { background: var(--sc-strong-bg); color: var(--sc-strong-text); border: 1px solid var(--sc-point); border-radius: 12px; }
+    &.sell { background: var(--sc-surface); color: var(--sc-point-ink); border: 1px solid var(--sc-border-strong); border-radius: 12px; }
+    &.holding { background: var(--sc-surface-2); color: var(--sc-point-ink); border: 1px solid var(--sc-border-strong); border-radius: 12px; }
+    &.sold { background: var(--sc-surface-2); color: var(--sc-text); border: 1px solid var(--sc-border); border-radius: 12px; }
+    &.default { background: var(--sc-surface-2); color: var(--sc-text-sub); border: 1px solid var(--sc-border); border-radius: 12px; }
 }
 /* 심각도를 색상 대신 명도 단계로 구분: info < warn < error */
 .level-badge {
     font-size: 0.7rem; font-weight: 700; padding: 2px 8px; white-space: nowrap;
-    &.info { background: $white; color: $gray-500; border: 1px solid $gray-200; border-radius: 12px; }
-    &.warn { background: $gray-100; color: #74462A; border: 1px solid $gray-400; border-radius: 12px; }
-    &.error { background: #74462A; color: $white; border: 1px solid #74462A; border-radius: 12px; }
-    &.default { background: $gray-100; color: $gray-500; border: 1px solid $gray-200; border-radius: 12px; }
+    &.info { background: var(--sc-surface); color: var(--sc-text-sub); border: 1px solid var(--sc-border); border-radius: 12px; }
+    &.warn { background: var(--sc-surface-2); color: var(--sc-point-ink); border: 1px solid var(--sc-text-mute); border-radius: 12px; }
+    &.error { background: var(--sc-strong-bg); color: var(--sc-strong-text); border: 1px solid var(--sc-point); border-radius: 12px; }
+    &.default { background: var(--sc-surface-2); color: var(--sc-text-sub); border: 1px solid var(--sc-border); border-radius: 12px; }
 }
 
 /* skeleton / empty */
 .loader-rows { padding: 8px; }
-.skeleton-row { height: 42px; background: $gray-100; margin-bottom: 6px; animation: pulse 1.6s infinite ease-in-out; }
-.empty-cell { text-align: center; padding: 60px 0; color: $gray-400; font-size: 0.88rem; }
+.skeleton-row { height: 42px; background: var(--sc-surface-2); margin-bottom: 6px; animation: pulse 1.6s infinite ease-in-out; }
+.empty-cell { text-align: center; padding: 60px 0; color: var(--sc-text-sub); font-size: 0.88rem; }
 
 /* Mobile */
 .mobile-list { display: none; @media (max-width: 860px) { display: block; } }
 .m-ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.m-li { background: $white; border: 1px solid $gray-200; padding: 14px; border-radius: 12px; }
+.m-li { background: var(--sc-surface); border: 1px solid var(--sc-border); padding: 14px; border-radius: 12px; }
 .li-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .li-badges { display: flex; gap: 6px; }
-.li-name { font-size: 0.95rem; font-weight: 700; color: $gray-900; margin-bottom: 8px; }
-.li-msg { font-size: 0.86rem; color: $gray-900; line-height: 1.5; word-break: break-all; margin-bottom: 8px; }
+.li-name { font-size: 0.95rem; font-weight: 700; color: var(--sc-text); margin-bottom: 8px; }
+.li-msg { font-size: 0.86rem; color: var(--sc-text); line-height: 1.5; word-break: break-all; margin-bottom: 8px; }
 .li-row {
-    display: flex; gap: 8px; font-size: 0.8rem; margin-bottom: 4px; color: $gray-700;
-    .li-label { flex-shrink: 0; width: 68px; color: $gray-500; font-weight: 600; }
+    display: flex; gap: 8px; font-size: 0.8rem; margin-bottom: 4px; color: var(--sc-text);
+    .li-label { flex-shrink: 0; width: 68px; color: var(--sc-text-sub); font-weight: 600; }
 }
-.li-time { font-size: 0.76rem; color: $gray-500; font-variant-numeric: tabular-nums; }
-.num.up { color: $red; } .num.down { color: $blue; }
+.li-time { font-size: 0.76rem; color: var(--sc-text-sub); font-variant-numeric: tabular-nums; }
+.num.up { color: var(--sc-up); } .num.down { color: var(--sc-down); }
 
 /* Pagination (렌더 함수 컴포넌트가 생성) */
 .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 18px; }
 :deep(.page-btn) {
     border-radius: 12px;
-    padding: 6px 14px; border: 1px solid $gray-200; background: $white; color: $gray-700;
+    padding: 6px 14px; border: 1px solid var(--sc-border); background: var(--sc-surface); color: var(--sc-text);
     font-size: 0.8rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: border-color .12s, color .12s;
-    &:hover:not(:disabled) { border-color: $accent; color: $accent; }
+    &:hover:not(:disabled) { border-color: var(--sc-point); color: var(--sc-point-ink); }
     &:disabled { opacity: .45; cursor: not-allowed; }
 }
-:deep(.page-info) { font-size: 0.82rem; font-weight: 600; color: $gray-700; padding: 0 6px; }
+:deep(.page-info) { font-size: 0.82rem; font-weight: 600; color: var(--sc-text); padding: 0 6px; }
 
 @keyframes pulse { 0%, 100% { opacity: .5; } 50% { opacity: .9; } }
 

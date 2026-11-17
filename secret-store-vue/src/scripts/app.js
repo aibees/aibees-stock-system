@@ -1,5 +1,10 @@
 import { createApp } from 'vue'
 import App from '@/components/App.vue'
+// 테마 토큰(--sc-*). 컴포넌트 스타일보다 먼저 들어가야 하므로 맨 위에서 읽는다.
+import '@@/theme.css'
+import { initTheme } from './theme.js'
+// 저장된 테마를 마운트 전에 <html data-theme> 에 반영 — 첫 화면이 기본 테마로 번쩍이지 않게.
+initTheme();
 const app = createApp(App)
 
 // ===== 레이어 팝업 드래그 디렉티브 =====
@@ -52,21 +57,12 @@ setRouterToApp().then(router => {
     app.mount('#app');
 
     // ===== 푸시 알림(FCM) 등록 — 네이티브(iOS/Android) 앱에서만 동작 =====
-    const pushReady = import('./usePushNotifications').then(({ initPushNotifications }) => {
+    import('./usePushNotifications').then(({ initPushNotifications }) => {
         return initPushNotifications();
     });
     // ====================================================================
 
-    // ===== AdMob 배너 — 네이티브 앱에서만 동작. 푸시 초기화 "다음에" 시작한다 =====
-    //   첫 실행에는 푸시 권한 팝업과 iOS 추적(ATT) 팝업이 모두 뜨는데, 시스템 팝업이 이미 떠 있는
-    //   상태에서 ATT 를 요청하면 조용히 무시될 수 있다. 푸시는 사용자가 권한에 응답할 때까지
-    //   기다리므로 그 뒤에 광고를 시작하면 두 팝업이 순서대로 뜬다.
-    //   푸시가 멈춰도 광고가 영원히 막히지 않게 20초 상한을 둔다. 푸시 실패는 광고와 무관하다.
-    Promise.race([
-        pushReady.catch(() => {}),
-        new Promise((resolve) => setTimeout(resolve, 20000)),
-    ]).then(() => import('./useAdMob')).then(({ initAdMob }) => initAdMob());
-    // ====================================================================
+    // AdMob 은 시작하지 않는다 — 비밀상회는 광고 없는 내부 앱(2026-11-17).
 })
 // ===========================
 

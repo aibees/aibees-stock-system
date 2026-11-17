@@ -80,11 +80,6 @@ const toggle = (key) => { open.value = open.value === key ? null : key; };
 </script>
 
 <style scoped lang="scss">
-$hero:  #74462A;
-$brown: #7A4423;
-$ink:   #2B1D14;
-$sub:   #6B5B4E;
-$line:  #EFE2BC;
 
 .consent { display: flex; flex-direction: column; }
 
@@ -97,12 +92,12 @@ $line:  #EFE2BC;
     box-sizing: border-box;
     font-size: 15px;
     line-height: 1.45;
-    color: $ink;
+    color: var(--sc-text);
     cursor: pointer;
-    input { width: 20px; height: 20px; margin: 0; accent-color: $hero; flex-shrink: 0; }
-    b { color: $brown; font-weight: 700; }
+    input { width: 20px; height: 20px; margin: 0; accent-color: var(--sc-point); flex-shrink: 0; }
+    b { color: var(--sc-point-ink); font-weight: 700; }
 }
-.cc-all { font-weight: 700; border-bottom: 1px solid $line; }
+.cc-all { font-weight: 700; border-bottom: 1px solid var(--sc-border); }
 
 .cc-list { margin: 0; padding: 0; list-style: none; }
 .cc-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -113,7 +108,7 @@ $line:  #EFE2BC;
     padding: 0 4px;
     border: 0;
     background: none;
-    color: $sub;
+    color: var(--sc-text-sub);
     font-size: 13px;
     font-family: inherit;
     text-decoration: underline;
@@ -125,11 +120,11 @@ $line:  #EFE2BC;
     overflow-y: auto;
     margin: 0 0 8px 30px;
     padding: 10px 0 10px 12px;
-    border-left: 2px solid $line;
+    border-left: 2px solid var(--sc-border);
     font-size: 13px;
     line-height: 1.6;
-    color: $sub;
-    h4 { margin: 0 0 4px; font-size: 13px; color: $ink; }
+    color: var(--sc-text-sub);
+    h4 { margin: 0 0 4px; font-size: 13px; color: var(--sc-text); }
     p { margin: 0 0 6px; word-break: keep-all; }
     .cc-doc-sec + .cc-doc-sec { margin-top: 10px; }
 }
@@ -137,7 +132,7 @@ $line:  #EFE2BC;
 .cc-summary {
     margin: 0 0 12px;
     > div { display: flex; gap: 10px; padding: 4px 0; }
-    dt { flex: 0 0 84px; color: $ink; font-weight: 600; }
+    dt { flex: 0 0 84px; color: var(--sc-text); font-weight: 600; }
     dd { margin: 0; flex: 1; min-width: 0; white-space: pre-line; word-break: keep-all; }
 }
 </style>

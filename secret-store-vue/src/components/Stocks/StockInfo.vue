@@ -572,25 +572,12 @@ const formatRate = (v) => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
 
 <style scoped lang="scss">
 /* ── 색상 변수: 양봉상회 토큰(홈·매수추천과 동일). 변수명은 유지하고 값만 브랜드 톤으로 ── */
-$white:    #ffffff;
-$gray-50:  #FFFDF5;
-$gray-100: #F3EAD2;
-$gray-200: #EFE2BC;
-$gray-300: #EAD9A6;
-$gray-400: #9A8C7E;
-$gray-500: #6B5B4E;
-$gray-700: #4A3628;
-$gray-900: #2B1D14;
-$blue:     #7A4423;
-$navy:     #7A4423;
-$red:      #C8282A;
-$amber:    #A0662F;
 
 /* ── 기본 레이아웃 ── */
 #stock-analysis {
     min-height: 100vh;
-    background: $white;
-    color: $gray-900;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-family: 'Pretendard', -apple-system, sans-serif;
 }
 
@@ -610,17 +597,17 @@ $amber:    #A0662F;
     .chart-btn {
         align-self: flex-end;
         padding: 5px 12px;
-        border: 1px solid $gray-200;
+        border: 1px solid var(--sc-border);
         border-radius: 0;
-        background: $white;
-        color: $gray-700;
+        background: var(--sc-surface);
+        color: var(--sc-text);
         font-size: 0.72rem;
         font-weight: 600;
         font-family: inherit;
         cursor: pointer;
         transition: border-color .12s, color .12s, background .12s;
 
-        &:hover { border-color: $blue; color: $blue; background: $gray-50; }
+        &:hover { border-color: var(--sc-point); color: var(--sc-point-ink); background: var(--sc-point-bg); }
     }
 
     /* ① 컨테이너 자체 여백 제거 */
@@ -634,16 +621,16 @@ $amber:    #A0662F;
         width: 100% !important;   /* SAutoInput의 width:90% 덮어쓰기 */
         box-sizing: border-box;
         margin: 0 !important;
-        background: $white;
-        border: 1.5px solid $gray-200;
+        background: var(--sc-surface);
+        border: 1.5px solid var(--sc-border);
         border-radius: 0;
         padding: 6px 6px 6px 14px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
         transition: border-color 0.15s;
 
         &:focus-within {
-            border-color: $blue;
-            box-shadow: 0 2px 12px rgba(25, 113, 194, 0.12);
+            border-color: var(--sc-point);
+            box-shadow: 0 2px 12px color-mix(in srgb, var(--sc-down) 12%, transparent);
         }
     }
 
@@ -653,15 +640,15 @@ $amber:    #A0662F;
     }
 
     :deep(.search-bar input) {
-        color: $gray-900;
+        color: var(--sc-text);
         font-size: 0.95rem;
 
-        &::placeholder { color: $gray-400; }
+        &::placeholder { color: var(--sc-text-sub); }
     }
 
     :deep(.search-bar .search-btn) {
-        background: $navy;
-        color: $white;
+        background: var(--sc-strong-bg);
+        color: var(--sc-strong-text);
         border-radius: 0;
         padding: 9px 18px;
         font-size: 0.88rem;
@@ -669,35 +656,35 @@ $amber:    #A0662F;
         font-family: inherit;
         white-space: nowrap;
 
-        &:hover  { background: $blue; }
+        &:hover  { background: var(--sc-strong-bg); }
         &:active { transform: scale(0.97); }
     }
 
     /* 자동완성 드롭다운 */
     :deep(.suggestion-div) {
-        background: $white;
-        border: 1px solid $gray-200;
+        background: var(--sc-surface);
+        border: 1px solid var(--sc-border);
         border-radius: 0;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
     }
 
     :deep(.suggestion-header) {
-        background: $gray-50;
-        border-bottom: 1px solid $gray-100;
+        background: var(--sc-bg);
+        border-bottom: 1px solid var(--sc-border);
 
         .item {
-            color: $gray-500;
+            color: var(--sc-text-sub);
             font-size: 0.75rem;
             font-weight: 700;
         }
     }
 
     :deep(.list-item) {
-        .s_code { color: $gray-400; }
-        .s_name { color: $gray-900; }
-        .s_type { color: $gray-400; }
+        .s_code { color: var(--sc-text-sub); }
+        .s_name { color: var(--sc-text); }
+        .s_type { color: var(--sc-text-sub); }
 
-        &:hover { background: $gray-50; }
+        &:hover { background: var(--sc-bg); }
     }
 }
 
@@ -724,7 +711,7 @@ $amber:    #A0662F;
         text-align: start;
         font-size: 17px;
         font-weight: 700;
-        color: $gray-900;
+        color: var(--sc-text);
         flex: 1 0 auto;
         white-space: nowrap;
     }
@@ -732,9 +719,9 @@ $amber:    #A0662F;
     .section-badge {
         font-size: 0.68rem;
         font-weight: 700;
-        color: $navy;
-        background: #efefef;
-        border: 1px solid #c4c4c4;
+        color: var(--sc-point-ink);
+        background: var(--sc-surface-2);
+        border: 1px solid var(--sc-border-strong);
         padding: 2px 8px;
         border-radius: 0;
     }
@@ -742,24 +729,24 @@ $amber:    #A0662F;
     .token-info {
         font-size: 12px;
         font-weight: 500;
-        color: $gray-400;
+        color: var(--sc-text-sub);
         white-space: nowrap;
         font-variant-numeric: tabular-nums;
     }
 
     .section-unit {
         font-size: 0.72rem;
-        color: $gray-400;
+        color: var(--sc-text-sub);
     }
 
     .ai-refresh-btn {
         flex-shrink: 0;
         min-height: 32px;
         padding: 0 10px;
-        border: 1px solid $gray-300;
+        border: 1px solid var(--sc-border-strong);
         border-radius: 8px;
-        background: $white;
-        color: $blue;
+        background: var(--sc-surface);
+        color: var(--sc-point-ink);
         font-family: inherit;
         font-size: 12px;
         font-weight: 600;
@@ -767,15 +754,15 @@ $amber:    #A0662F;
         white-space: nowrap;
         transition: border-color .15s, color .15s;
 
-        &:hover:not(:disabled) { border-color: $blue; color: $blue; }
-        &:disabled { color: $gray-400; cursor: not-allowed; }
+        &:hover:not(:disabled) { border-color: var(--sc-point); color: var(--sc-point-ink); }
+        &:disabled { color: var(--sc-text-sub); cursor: not-allowed; }
     }
 }
 
 /* ── ① AI 분석 결과 섹션 ── */
 .ai-result-section {
-    background: $white;
-    border: 1px solid $gray-200;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 0;
     padding: 18px 16px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -808,7 +795,7 @@ $amber:    #A0662F;
         flex: 1;
         padding: 24px 0;
         font-size: 0.85rem;
-        color: $gray-400;
+        color: var(--sc-text-sub);
     }
 
     /* ── marked 렌더링 영역 ── */
@@ -817,28 +804,28 @@ $amber:    #A0662F;
         text-align: start;
         font-size: 0.9rem;
         line-height: 1.8;
-        color: $gray-700;
+        color: var(--sc-text);
         word-break: keep-all;
 
         :deep(h1), :deep(h2) {
         font-size: 0.95rem;
             font-weight: 700;
-            color: $navy;
+            color: var(--sc-point-ink);
             margin: 18px 0 6px;
             padding-bottom: 5px;
-            border-bottom: 1px solid $gray-100;
+            border-bottom: 1px solid var(--sc-border);
         }
 
         :deep(h3) {
             font-size: 0.88rem;
             font-weight: 700;
-            color: $gray-900;
+            color: var(--sc-text);
             margin: 14px 0 4px;
         }
 
         :deep(p) {
             margin: 6px 0;
-        color: $gray-700;
+        color: var(--sc-text);
         }
 
         :deep(ul), :deep(ol) {
@@ -848,27 +835,27 @@ $amber:    #A0662F;
             li {
                 font-size: 0.88rem;
                 line-height: 1.7;
-                color: $gray-700;
+                color: var(--sc-text);
             }
         }
 
         :deep(strong) {
             font-weight: 700;
-            color: $gray-900;
+            color: var(--sc-text);
         }
 
         :deep(code) {
-            background: $gray-50;
-            border: 1px solid $gray-100;
+            background: var(--sc-bg);
+            border: 1px solid var(--sc-border);
             border-radius: 0;
             padding: 1px 5px;
             font-size: 0.82rem;
-            color: $navy;
+            color: var(--sc-point-ink);
         }
 
         :deep(pre) {
-            background: $gray-50;
-            border: 1px solid $gray-100;
+            background: var(--sc-bg);
+            border: 1px solid var(--sc-border);
             border-radius: 0;
             padding: 12px 14px;
             overflow-x: auto;
@@ -881,11 +868,11 @@ $amber:    #A0662F;
         }
 
         :deep(blockquote) {
-            border-left: 3px solid $blue;
+            border-left: 3px solid var(--sc-point);
             margin: 8px 0;
             padding: 4px 12px;
-            color: $gray-500;
-            background: $gray-50;
+            color: var(--sc-text-sub);
+            background: var(--sc-bg);
             border-radius: 0;
         }
 
@@ -896,24 +883,24 @@ $amber:    #A0662F;
             margin: 10px 0;
 
             th {
-                background: $gray-50;
-                color: $gray-500;
+                background: var(--sc-bg);
+                color: var(--sc-text-sub);
                 font-weight: 700;
                 padding: 7px 8px;
-                border: 1px solid $gray-100;
+                border: 1px solid var(--sc-border);
                 text-align: center;
             }
 
             td {
                 padding: 7px 8px;
-                border: 1px solid $gray-100;
-                color: $gray-700;
+                border: 1px solid var(--sc-border);
+                color: var(--sc-text);
                 text-align: right;
 
                 &:first-child { text-align: left; }
             }
 
-            tr:nth-child(even) td { background: $gray-50; }
+            tr:nth-child(even) td { background: var(--sc-bg); }
         }
 
         /* 첫 번째 h2 상단 여백 제거 */
@@ -936,7 +923,7 @@ $amber:    #A0662F;
             span {
                 width: 8px;
                 height: 8px;
-                background: $blue;
+                background: var(--sc-strong-bg);
                 border-radius: 4px;
                 animation: bounce 1.2s infinite ease-in-out;
 
@@ -947,37 +934,37 @@ $amber:    #A0662F;
 
         .loading-label {
             font-size: 0.85rem;
-            color: $gray-500;
+            color: var(--sc-text-sub);
         }
     }
 }
 
 /* ── ② 분기 실적 ── */
 .quarterly-section {
-    background: $white;
-    border: 1px solid $gray-200;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 0;
     padding: 18px 16px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .quarterly-table {
-    border: 1px solid $gray-100;
+    border: 1px solid var(--sc-border);
     border-radius: 0;
     overflow: hidden;
 
     .qt-row {
         display: grid;
         grid-template-columns: 5.5rem repeat(4, 1fr);
-        border-bottom: 1px solid $gray-100;
+        border-bottom: 1px solid var(--sc-border);
 
         &.qt-head {
-            background: $gray-50;
+            background: var(--sc-bg);
 
             .qt-cell {
                 font-size: 0.72rem;
                 font-weight: 700;
-                color: $gray-500;
+                color: var(--sc-text-sub);
             }
         }
 
@@ -990,16 +977,16 @@ $amber:    #A0662F;
         padding: 9px 4px;
         text-align: center;
         font-size: 0.8rem;
-        color: $gray-700;
+        color: var(--sc-text);
 
         &.label-col {
             text-align: left;
             padding-left: 10px;
             font-size: 0.78rem;
             font-weight: 600;
-            color: $gray-500;
-            background: $gray-50;
-            border-right: 1px solid $gray-100;
+            color: var(--sc-text-sub);
+            background: var(--sc-bg);
+            border-right: 1px solid var(--sc-border);
         }
 
         &.num {
@@ -1008,14 +995,14 @@ $amber:    #A0662F;
         }
     }
 
-    .val-up   { color: $red; }
-    .val-down { color: $navy; }
+    .val-up   { color: var(--sc-up); }
+    .val-down { color: var(--sc-point-ink); }
 }
 
 /* ── ③ 추천 성과 ── */
 .rec-section {
-    background: $white;
-    border: 1px solid $gray-200;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 0;
     padding: 18px 16px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -1023,7 +1010,7 @@ $amber:    #A0662F;
 
 .rec-date-badge {
     font-size: 12px;
-    color: $gray-500;
+    color: var(--sc-text-sub);
 }
 
 // 세 값은 박스 없이 세로 구분선으로만 나눈다
@@ -1039,27 +1026,27 @@ $amber:    #A0662F;
     gap: 6px;
     padding: 6px 8px;
     text-align: center;
-    border-left: 1px solid $gray-200;
+    border-left: 1px solid var(--sc-border);
 
     &:first-child { border-left: 0; }
 
     .rec-label {
         font-size: 0.68rem;
         font-weight: 600;
-        color: $gray-500;
+        color: var(--sc-text-sub);
         line-height: 1.3;
     }
 
     .rec-price {
         font-size: 1rem;
         font-weight: 800;
-        color: $gray-900;
+        color: var(--sc-text);
         line-height: 1.2;
 
         em {
             font-size: 0.7rem;
             font-weight: 500;
-            color: $gray-500;
+            color: var(--sc-text-sub);
             font-style: normal;
             margin-left: 1px;
         }
@@ -1070,9 +1057,9 @@ $amber:    #A0662F;
     font-size: 13px;
     font-weight: 700;
 
-    &.neutral  { color: $gray-500; }
-    &.rate-up  { color: #C8282A; }
-    &.rate-down{ color: #1F5BD1; }
+    &.neutral  { color: var(--sc-text-sub); }
+    &.rate-up  { color: var(--sc-up); }
+    &.rate-down{ color: var(--sc-down); }
 }
 
 /* ── 전환 애니메이션 ── */
@@ -1097,36 +1084,25 @@ $amber:    #A0662F;
 /* ════════════════════════════════════════════════════════════════
  * 양봉상회 상세 화면 테마 (홈과 같은 토큰). 아래 규칙이 위의 기본 규칙을 덮어쓴다.
  * ════════════════════════════════════════════════════════════════ */
-$yb-bg:     #FFFBEA;
-$yb-bar:    #FFF6D2;
-$yb-line:   #EFE2BC;
-$yb-line-2: #EAD9A6;
-$yb-brown:  #7A4423;
-$yb-brown-d:#4A2814;
-$yb-yellow: #FFC20E;
-$yb-ink:    #2B1D14;
-$yb-sub:    #6B5B4E;
-$yb-up:     #D12B2B;
-$yb-down:   #1F5BD1;
 
 #stock-analysis :deep(.search-btn) {
-    background: $yb-yellow;
-    color: #3A200F;
+    background: var(--sc-point);
+    color: var(--sc-on-point);
     font-weight: 700;
     border-radius: 8px;
 }
 #stock-analysis :deep(.search-bar) {
     border-radius: 14px;
-    border-color: $yb-line-2;
-    background: #fff;
+    border-color: var(--sc-border-strong);
+    background: var(--sc-surface);
     box-shadow: none;
 }
 #stock-analysis :deep(.search-bar .search-icon) { display: none; }   // 돋보기 이모지는 다른 화면과 맞춰 숨긴다
 #stock-analysis :deep(.search-bar input) { font-size: 16px; }         // iOS 포커스 확대 방지
 
 #stock-analysis {
-    background: #fff;
-    color: $yb-ink;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-variant-numeric: tabular-nums;
     text-align: left;
 }
@@ -1137,13 +1113,13 @@ $yb-down:   #1F5BD1;
 .rec-section {
     background: transparent;
     border: 0;
-    border-top: 1px solid $yb-line;
+    border-top: 1px solid var(--sc-border);
     border-radius: 0;
     box-shadow: none;
     padding: 16px 0 4px;
     margin: 0;
 }
-.section-header .section-title { color: $yb-ink; }
+.section-header .section-title { color: var(--sc-text); }
 .ai-refresh-btn { border-radius: 8px; }
 
 .body-box { display: flex; flex-direction: column; gap: 12px; }
@@ -1158,15 +1134,15 @@ $yb-down:   #1F5BD1;
 
     .sh-who { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
     .sh-name { font-size: 22px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .sh-code { font-size: 13px; color: #7A6B5D; }
+    .sh-code { font-size: 13px; color: var(--sc-text-sub); }
     .sh-px { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
     .sh-price { font-size: 22px; font-weight: 700; }
     .sh-chg {
         font-size: 13px;
         font-weight: 600;
-        &.up { color: $yb-up; }
-        &.down { color: $yb-down; }
-        &.flat { color: $yb-sub; }
+        &.up { color: var(--sc-up); }
+        &.down { color: var(--sc-down); }
+        &.flat { color: var(--sc-text-sub); }
     }
     .sh-status {
         grid-column: 1 / -1;
@@ -1174,8 +1150,8 @@ $yb-down:   #1F5BD1;
         align-items: center;
         gap: 6px;
         font-size: 12px;
-        color: $yb-sub;
-        .dot { width: 7px; height: 7px; border-radius: 4px; background: #9A8F84; }
+        color: var(--sc-text-sub);
+        .dot { width: 7px; height: 7px; border-radius: 4px; background: var(--sc-border-strong); }
         &.live .dot { background: #E07A00; }
     }
 }
@@ -1186,7 +1162,7 @@ $yb-down:   #1F5BD1;
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
-    border-bottom: 1px solid $yb-line-2;
+    border-bottom: 1px solid var(--sc-border-strong);
     margin-top: 4px;
 
     .tab-btn {
@@ -1194,32 +1170,32 @@ $yb-down:   #1F5BD1;
         border: 0;
         border-bottom: 3px solid transparent;
         background: transparent;
-        color: $yb-sub;
+        color: var(--sc-text-sub);
         font-size: 15px;
         font-family: inherit;
         cursor: pointer;
         em { font-style: normal; font-size: 13px; margin-left: 4px; }
 
         &.on {
-            color: $yb-brown;
+            color: var(--sc-point-ink);
             font-weight: 700;
-            border-bottom-color: $yb-yellow;
+            border-bottom-color: var(--sc-point);
         }
     }
 }
 .tab-panel { display: flex; flex-direction: column; gap: 12px; }
 // 분석내용 탭: 재무 / 조건 두 묶음 — 카드 없이 소제목 + 구분선으로 나눈다
 .an-section { display: flex; flex-direction: column; gap: 10px; }
-.an-section + .an-section { margin-top: 8px; padding-top: 16px; border-top: 1px solid #EFE2BC; }
-.an-title { margin: 0; font-size: 15px; font-weight: 700; color: #2B1D14; }
+.an-section + .an-section { margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--sc-border); }
+.an-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--sc-text); }
 .an-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.an-basis { font-size: 11px; color: #7A6B5D; white-space: nowrap; }
+.an-basis { font-size: 11px; color: var(--sc-text-sub); white-space: nowrap; }
 // 탭 밑줄 바로 아래라 첫 섹션의 위쪽 구분선은 겹쳐 보인다 — 빼고 간격만 둔다
 .tab-panel > section:first-child { border-top: 0; padding-top: 6px; }
 
-.muted { margin: 0; font-size: 13px; color: $yb-sub; line-height: 1.5; }
+.muted { margin: 0; font-size: 13px; color: var(--sc-text-sub); line-height: 1.5; }
 .card-empty { padding: 28px 0; text-align: center; }
-.link-btn { margin-left: 6px; padding: 0; border: 0; background: none; color: #7A4423; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.link-btn { margin-left: 6px; padding: 0; border: 0; background: none; color: var(--sc-point-ink); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 
 /* ── 봉 모양: DayCandle 의 자체 테두리 박스는 이 화면에서만 걷어낸다(카드 최소화) ── */
 // 루트 요소에는 부모 scope 속성이 붙으므로 :deep 없이 잡힌다. 섹션 클래스를 앞에 둬 DayCandle 자체 규칙보다 우선.
@@ -1228,8 +1204,8 @@ $yb-down:   #1F5BD1;
 /* ── 충족한 신호: 체크 + 이름 + 한 줄 설명 ── */
 .sig-count {
     font-size: 14px;
-    color: $yb-sub;
-    b { font-size: 20px; font-weight: 700; color: $yb-brown; margin-right: 1px; }
+    color: var(--sc-text-sub);
+    b { font-size: 20px; font-weight: 700; color: var(--sc-point-ink); margin-right: 1px; }
 }
 .sig-list {
     margin: 0;
@@ -1241,26 +1217,26 @@ $yb-down:   #1F5BD1;
         grid-template-columns: 24px minmax(0, 1fr);
         gap: 10px;
         padding: 10px 0;
-        border-top: 1px solid $yb-line;
+        border-top: 1px solid var(--sc-border);
         &:first-child { border-top: 0; padding-top: 2px; }
     }
     .sig-mark {
         width: 22px; height: 22px; margin-top: 1px; border-radius: 11px;
         display: inline-flex; align-items: center; justify-content: center;
-        background: $yb-yellow; color: $yb-brown-d; font-size: 12px; font-weight: 700;
+        background: var(--sc-point); color: var(--sc-on-point); font-size: 12px; font-weight: 700;
     }
-    .sig-name { font-size: 15px; font-weight: 700; color: $yb-ink; }
-    .sig-desc { margin-top: 2px; font-size: 13px; line-height: 1.5; color: $yb-sub; }
+    .sig-name { font-size: 15px; font-weight: 700; color: var(--sc-text); }
+    .sig-desc { margin-top: 2px; font-size: 13px; line-height: 1.5; color: var(--sc-text-sub); }
 }
 
 /* ── 분석내용 탭 · 재무: 판별조건(.cond-list)과 같은 체크 목록. 한 줄에 "지표명 | 값 + 판정", 그 아래 작은 설명 ── */
 .fin-list li { padding: 10px 0; align-items: start; }
 .fin-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .fin-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 24px; }
-.fin-label { font-size: 14px; font-weight: 700; color: $yb-ink; }
+.fin-label { font-size: 14px; font-weight: 700; color: var(--sc-text); }
 .fin-right { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .fin-value { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.fin-desc { font-size: 11px; line-height: 1.4; color: $yb-sub; }
+.fin-desc { font-size: 11px; line-height: 1.4; color: var(--sc-text-sub); }
 // 판정은 색만이 아니라 글자("적합/높음/…")로도 구분한다
 .verdict {
     flex-shrink: 0;
@@ -1268,11 +1244,11 @@ $yb-down:   #1F5BD1;
     border-radius: 999px;
     font-size: 12px;
     font-weight: 700;
-    &.ok { background: $yb-bar; color: #5C3118; border: 1px solid $yb-line-2; }
-    &.ng { background: #FDECEC; color: #A32020; }
-    &.na { background: #F1ECE2; color: $yb-sub; }
+    &.ok { background: var(--sc-surface-2); color: var(--sc-point-ink); border: 1px solid var(--sc-border-strong); }
+    &.ng { background: var(--sc-up-bg); color: var(--sc-up); }
+    &.na { background: var(--sc-surface-2); color: var(--sc-text-sub); }
 }
-.basis-note { margin: 0; font-size: 12px; line-height: 1.5; color: #7A6B5D; }
+.basis-note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--sc-text-sub); }
 
 /* ── 분석내용 탭 · 조건: 체크리스트 ── */
 .cond-head {
@@ -1286,21 +1262,21 @@ $yb-down:   #1F5BD1;
     margin: 0;
     padding: 0;
     list-style: none;
-    border-top: 1px solid $yb-line;
+    border-top: 1px solid var(--sc-border);
 
-    li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 14px 0; border-bottom: 1px solid $yb-line; }
+    li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--sc-border); }
     .mark {
         width: 24px; height: 24px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
-        background: #F1ECE2; color: $yb-sub; font-weight: 700; font-size: 13px;
+        background: var(--sc-surface-2); color: var(--sc-text-sub); font-weight: 700; font-size: 13px;
     }
-    li.ok .mark { background: $yb-yellow; color: $yb-brown-d; }
+    li.ok .mark { background: var(--sc-point); color: var(--sc-on-point); }
     .cond-name { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-    .cond-state { font-size: 12px; font-weight: 700; color: $yb-sub; }
-    li.ok .cond-state { color: $yb-brown; }
-    .cond-desc { margin-top: 3px; font-size: 12px; line-height: 1.5; color: $yb-sub; }
+    .cond-state { font-size: 12px; font-weight: 700; color: var(--sc-text-sub); }
+    li.ok .cond-state { color: var(--sc-point-ink); }
+    .cond-desc { margin-top: 3px; font-size: 12px; line-height: 1.5; color: var(--sc-text-sub); }
 }
 
-.disclaimer { margin: 4px 0 0; font-size: 11px; line-height: 1.5; color: #7A6B5D; text-align: center; }
+.disclaimer { margin: 4px 0 0; font-size: 11px; line-height: 1.5; color: var(--sc-text-sub); text-align: center; }
 
 /* ── 하단 고정 버튼 (모바일에서는 하단 탭바 위) ── */
 .action-bar {
@@ -1312,8 +1288,8 @@ $yb-down:   #1F5BD1;
     display: flex;
     gap: 8px;
     padding: 10px 16px;
-    background: $yb-bar;
-    border-top: 1px solid $yb-line-2;
+    background: var(--sc-surface-2);
+    border-top: 1px solid var(--sc-border-strong);
 
     .act {
         flex: 1;
@@ -1323,7 +1299,7 @@ $yb-down:   #1F5BD1;
         font-weight: 700;
         font-family: inherit;
         cursor: pointer;
-        &.primary { border: 0; background: $yb-yellow; color: #3A200F; }
+        &.primary { border: 0; background: var(--sc-point); color: var(--sc-on-point); }
     }
 
     // 데스크톱: 하단 탭바가 없으므로 화면 맨 아래, 내용 폭에 맞춘다

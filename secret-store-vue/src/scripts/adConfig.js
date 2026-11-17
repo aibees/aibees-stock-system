@@ -6,9 +6,9 @@
  */
 
 // 광고 전체 스위치. false 면 사이드/모바일 배너와 진입 게이트가 모두 꺼진다.
-// ※ 광고 계정을 연동하기 전에는 배너가 자리표시 박스("AD")로 보이므로, 운영에 올릴 때
-//   실제 광고가 준비되지 않았다면 false 로 두는 편이 낫다.
-export const AD_ENABLED = true;
+// 비밀상회는 가족용 내부 앱이라 광고가 없다(2026-11-17). 화면에서 광고 컴포넌트도 뺐고,
+// 이 값은 남은 참조(라우터 게이트·useAds)가 켜지지 않게 막는 마지막 안전장치다.
+export const AD_ENABLED = false;
 
 // 광고 제공자. 빌드 모드별 .env 의 VITE_AD_PROVIDER 로 고른다(없으면 'placeholder' = 자리표시 박스만).
 //   'placeholder' | 'gpt-test' | 'adsense' | 'adfit'

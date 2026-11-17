@@ -165,25 +165,11 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
-$white: #ffffff;
-$gray-50: #fafafa;
-$gray-100: #efefef;
-$gray-200: #dcdcdc;
-$gray-300: #c4c4c4;
-$gray-400: #9a9a9a;
-$gray-500: #737373;
-$gray-700: #3d3d3d;
-$gray-900: #141414;
-$blue: #141414;
-$navy: #141414;
-$red: #141414;
-$amber: #141414;
-$green: #141414;
 
 #batch-log-setting {
     min-height: 100vh;
-    background: $gray-50;
-    color: $gray-900;
+    background: var(--sc-bg);
+    color: var(--sc-text);
     font-family: 'Pretendard', -apple-system, sans-serif;
 }
 
@@ -204,12 +190,12 @@ $green: #141414;
         font-size: 1.4rem;
         font-weight: 700;
         margin: 0;
-        color: $gray-900;
+        color: var(--sc-text);
     }
 
     .sub-text {
         font-size: 0.82rem;
-        color: $gray-500;
+        color: var(--sc-text-sub);
         margin: 4px 0 0;
     }
 }
@@ -219,8 +205,8 @@ $green: #141414;
     align-items: center;
     gap: 6px;
     padding: 8px 16px;
-    background: $navy;
-    color: $white;
+    background: var(--sc-strong-bg);
+    color: var(--sc-strong-text);
     border: none;
     border-radius: 0;
     font-size: 0.84rem;
@@ -230,14 +216,14 @@ $green: #141414;
     transition: background .15s;
 
     &:hover {
-        background: #000000;
+        background: var(--sc-strong-bg);
     }
 }
 
 /* ── Table (Desktop) ── */
 .table-section {
-    background: $white;
-    border: 1px solid $gray-200;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 0;
     overflow: hidden;
     overflow-x: auto;
@@ -253,8 +239,8 @@ $green: #141414;
     font-size: 0.83rem;
 
     thead tr {
-        background: $gray-50;
-        border-bottom: 1px solid $gray-200;
+        background: var(--sc-bg);
+        border-bottom: 1px solid var(--sc-border);
     }
 
     th {
@@ -262,7 +248,7 @@ $green: #141414;
         text-align: left;
         font-size: 0.72rem;
         font-weight: 700;
-        color: $gray-500;
+        color: var(--sc-text-sub);
         letter-spacing: .04em;
         text-transform: uppercase;
         white-space: nowrap;
@@ -270,9 +256,9 @@ $green: #141414;
 
     td {
         padding: 10px 12px;
-        border-bottom: 1px solid $gray-100;
+        border-bottom: 1px solid var(--sc-border);
         vertical-align: middle;
-        color: $gray-700;
+        color: var(--sc-text);
         white-space: nowrap;
     }
 
@@ -281,7 +267,7 @@ $green: #141414;
     }
 
     tbody tr:hover td {
-        background: $gray-50;
+        background: var(--sc-bg);
     }
 }
 
@@ -317,17 +303,17 @@ $green: #141414;
 .code-chip {
     font-size: 0.72rem;
     font-weight: 600;
-    background: $gray-100;
-    color: $gray-700;
+    background: var(--sc-surface-2);
+    color: var(--sc-text);
     padding: 2px 7px;
     border-radius: 0;
-    border: 1px solid $gray-200;
+    border: 1px solid var(--sc-border);
 }
 
 .comp-text {
     font-family: 'SFMono-Regular', Consolas, monospace;
     font-size: 0.78rem;
-    color: $gray-700;
+    color: var(--sc-text);
 }
 
 /* status badge */
@@ -339,27 +325,27 @@ $green: #141414;
     white-space: nowrap;
 
     &.success {
-        background: $white;
-        color: $gray-500;
-        border: 1px solid $gray-200;
+        background: var(--sc-surface);
+        color: var(--sc-text-sub);
+        border: 1px solid var(--sc-border);
     }
 
     &.fail {
-        background: $gray-900;
-        color: $white;
-        border: 1px solid $gray-900;
+        background: var(--sc-strong-bg);
+        color: var(--sc-strong-text);
+        border: 1px solid var(--sc-text);
     }
 
     &.running {
-        background: $gray-100;
-        color: $gray-900;
-        border: 1px solid $gray-400;
+        background: var(--sc-surface-2);
+        color: var(--sc-text);
+        border: 1px solid var(--sc-border-strong);
     }
 
     &.default {
-        background: $gray-100;
-        color: $gray-500;
-        border: 1px solid $gray-200;
+        background: var(--sc-surface-2);
+        color: var(--sc-text-sub);
+        border: 1px solid var(--sc-border);
     }
 }
 
@@ -370,7 +356,7 @@ $green: #141414;
 
 .skeleton-row {
     height: 42px;
-    background: $gray-100;
+    background: var(--sc-surface-2);
     border-radius: 0;
     margin-bottom: 6px;
     animation: pulse 1.6s infinite ease-in-out;
@@ -379,7 +365,7 @@ $green: #141414;
 .empty-cell {
     text-align: center;
     padding: 60px 0;
-    color: $gray-400;
+    color: var(--sc-text-mute);
     font-size: 0.88rem;
 }
 
@@ -402,8 +388,8 @@ $green: #141414;
 }
 
 .log-li {
-    background: $white;
-    border: 1px solid $gray-200;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     border-radius: 0;
     padding: 14px;
 }
@@ -418,7 +404,7 @@ $green: #141414;
 .li-name {
     font-size: 0.95rem;
     font-weight: 700;
-    color: $gray-900;
+    color: var(--sc-text);
     margin-bottom: 8px;
     font-family: 'SFMono-Regular', Consolas, monospace;
 }
@@ -429,12 +415,12 @@ $green: #141414;
     align-items: flex-start;
     font-size: 0.8rem;
     margin-bottom: 4px;
-    color: $gray-700;
+    color: var(--sc-text);
 
     .li-label {
         flex-shrink: 0;
         width: 56px;
-        color: $gray-500;
+        color: var(--sc-text-sub);
         font-weight: 600;
     }
 }
@@ -450,10 +436,10 @@ $green: #141414;
 
 .page-btn {
     padding: 6px 14px;
-    border: 1px solid $gray-200;
+    border: 1px solid var(--sc-border);
     border-radius: 0;
-    background: $white;
-    color: $gray-700;
+    background: var(--sc-surface);
+    color: var(--sc-text);
     font-size: 0.8rem;
     font-weight: 600;
     cursor: pointer;
@@ -461,8 +447,8 @@ $green: #141414;
     transition: border-color .12s, color .12s;
 
     &:hover:not(:disabled) {
-        border-color: $blue;
-        color: $blue;
+        border-color: var(--sc-text);
+        color: var(--sc-text);
     }
 
     &:disabled {
@@ -474,7 +460,7 @@ $green: #141414;
 .page-info {
     font-size: 0.82rem;
     font-weight: 600;
-    color: $gray-700;
+    color: var(--sc-text);
     padding: 0 6px;
 }
 

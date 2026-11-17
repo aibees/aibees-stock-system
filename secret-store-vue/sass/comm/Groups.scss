@@ -11,12 +11,12 @@
 .tab-bar-wrapper {
     display: flex;
     align-items: center;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--sc-border);
     position: relative;
     overflow: hidden;
     padding-top: 5px;
     margin-bottom: 1rem;
-    background-color: #000; // 탭 영역 배경
+    background-color: var(--sc-strong-bg); // 탭 영역 배경
 
 
     /* 좌/우 페이드(스크롤 힌트) */
@@ -32,12 +32,12 @@
 
     &::before {
         left: 0;
-        background: linear-gradient(to right, rgba(10, 10, 10, .8), rgba(10, 10, 10, 0));
+        background: linear-gradient(to right, color-mix(in srgb, var(--sc-strong-bg) 80%, transparent), color-mix(in srgb, var(--sc-strong-bg) 0%, transparent));
     }
 
     &::after {
         right: 60px;
-        background: linear-gradient(to left, rgba(10, 10, 10, .8), rgba(10, 10, 10, 0));
+        background: linear-gradient(to left, color-mix(in srgb, var(--sc-strong-bg) 80%, transparent), color-mix(in srgb, var(--sc-strong-bg) 0%, transparent));
     }
 
     /* 편집 버튼 자리 확보 */
@@ -65,7 +65,7 @@
     padding: 8px 14px;
     font-weight: 600;
     font-size: 0.95rem;
-    color: #d6d6d6;
+    color: var(--sc-strong-text);
     cursor: pointer;
     scroll-snap-align: start;
     border-radius: 0;
@@ -73,13 +73,13 @@
 
     &:hover {
         background: rgba(255, 255, 255, 0.05);
-        color: #fff;
+        color: var(--sc-strong-text);
     }
 
     &.active {
         background: none;
         /* 회색 배경 완전 제거 */
-        color: #fff;
+        color: var(--sc-strong-text);
     }
 }
 
@@ -91,7 +91,7 @@
     /* 조금 얇게 */
     border-radius: 0;
     /* 둥근 밑줄 제거 */
-    background: #ffffff;
+    background: var(--sc-surface);
     transition: left .22s ease, width .22s ease;
     box-shadow: none;
     /* 그림자 제거로 깔끔하게 */
@@ -108,7 +108,7 @@
 
 .edit-button {
     background: transparent;
-    color: #ececec;
+    color: var(--sc-strong-text);
     border: none;
     font-size: 0.9rem;
     padding: 8px 12px;
@@ -137,15 +137,15 @@
     border: 1px solid rgba(255, 255, 255, .08);
     border-radius: 0;
     overflow: hidden;
-    background: #131313;
+    background: var(--sc-strong-bg);
 }
 
 .group-bar-header {
-    background-color: #151515;
+    background-color: var(--sc-strong-bg);
     padding: 12px 16px;
     font-weight: 700;
     font-size: 1.05rem;
-    color: #ececec;
+    color: var(--sc-strong-text);
     cursor: pointer;
     display: flex;
     justify-content: space-between;
@@ -155,7 +155,7 @@
 
 .stock-list {
     padding: 10px;
-    background: #0f0f0f;
+    background: var(--sc-strong-bg);
     margin: 0;
     list-style: none;
     text-align: left;
@@ -166,7 +166,7 @@
 
 .stock-item {
     padding: 10px 12px;
-    color: #dcdcdc;
+    color: var(--sc-strong-text);
     font-size: 0.95rem;
     border: 1px solid rgba(255, 255, 255, .06);
     border-radius: 0;
@@ -182,7 +182,7 @@
 /* 비어있을 때 */
 .group-empty {
     text-align: center;
-    color: #9a9a9a;
+    color: var(--sc-text-mute);
     font-size: 1rem;
     margin: 2rem 0 0;
 }
@@ -190,8 +190,8 @@
 .add-button {
         margin-top: 1rem;
         padding: 10px 16px;
-        background-color: #3d3d3d;
-        color: #fff;
+        background-color: var(--sc-strong-bg);
+        color: var(--sc-strong-text);
         font-weight: 700;
         font-size: 0.95rem;
         border: none;
@@ -237,7 +237,7 @@
 .toggle-icon {
     font-size: .9rem;
     user-select: none;
-    color: #8a8a8a;
+    color: var(--sc-text-sub);
 }
 
 /* 반응형 */

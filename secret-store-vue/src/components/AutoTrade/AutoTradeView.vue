@@ -35,18 +35,10 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 // 무채색 팔레트(/trade 대시보드와 통일). 변수명은 유지, 값만 회색조로 교체.
-$white: #ffffff;
-$gray-50: #fafafa;
-$gray-100: #efefef;
-$gray-300: #c4c4c4;
-$gray-500: #737373;
-$gray-900: #141414;
-$navy: #141414;
-$amber: #141414;
 
 #auto-trade-view {
     min-height: 100vh;
-    background: $gray-50;
+    background: var(--sc-bg);
 }
 
 .at-tabs {
@@ -61,15 +53,15 @@ $amber: #141414;
         padding: 9px 16px;
         font-size: .83rem;
         font-weight: 600;
-        color: $gray-500;
+        color: var(--sc-text-sub);
         text-decoration: none;
-        background: $white;
-        border: 1px solid $gray-100;
+        background: var(--sc-surface);
+        border: 1px solid var(--sc-border);
 
         &.on {
-            background: $navy;
-            border-color: $navy;
-            color: #fff;
+            background: var(--sc-point);
+            border-color: var(--sc-point);
+            color: var(--sc-on-point);
         }
     }
 
@@ -77,9 +69,9 @@ $amber: #141414;
         margin-left: auto;
         font-size: .7rem;
         font-weight: 700;
-        color: $gray-900;
-        background: $gray-100;
-        border: 1px solid $gray-300;
+        color: var(--sc-text);
+        background: var(--sc-surface-2);
+        border: 1px solid var(--sc-border-strong);
         padding: 4px 10px;
     }
 

@@ -3,9 +3,9 @@
     <nav id="comm-lnb-web">
         <div class="lnb-web-inner">
             <div class="lnb-brand" @click="goPath('/home')">
-                <!-- 브랜드 마크: public/favicon.svg (벌집 > 꿀단지 > 양봉 3개) -->
+                <!-- 브랜드 마크: public/favicon.svg (실버 외곽선 육각형 + 내려진 셔터) -->
                 <img class="lnb-logo" src="/favicon.svg" alt="" aria-hidden="true" />
-                <span>양봉상회</span>
+                <span>비밀상회</span>
             </div>
 
             <ul class="lnb-menu">
@@ -36,7 +36,7 @@
     <nav id="comm-lnb" aria-label="주요 메뉴">
         <a v-for="t in visibleTabs" :key="t.key" class="tab" :class="{ active: isTabActive(t) }"
             :href="t.path" :aria-current="isTabActive(t) ? 'page' : undefined" @click.prevent="goPath(t.path)">
-            <svg v-if="t.key === 'home'" width="24" height="24" viewBox="0 0 24 24" :fill="isTabActive(t) ? '#F6C445' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>
+            <svg v-if="t.key === 'home'" width="24" height="24" viewBox="0 0 24 24" :style="{ fill: isTabActive(t) ? 'var(--sc-point-bg)' : 'none' }" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>
             <!-- 분석: 돋보기 안에 작은 막대그래프(차트 탭의 꺾은선과 구분) -->
             <svg v-else-if="t.key === 'stocks'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7"></circle><path d="M21 21l-5.5-5.5"></path><path d="M7.5 13v-2M10.5 13V8M13.5 13v-3" stroke-width="1.8"></path></svg>
             <!-- 매수추천: 과녁(매수 타겟) -->
@@ -154,8 +154,8 @@ onMounted(() => {
     position: sticky;
     top: 0;
     z-index: 900;
-    background: $yb-brown;
-    border-bottom: 3px solid $yb-yellow;
+    background: var(--sc-surface);
+    border-bottom: 1px solid var(--sc-border);
 
     @include mobile {
         display: block;
@@ -176,7 +176,7 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 8px;
-    color: $yb-cream;
+    color: var(--sc-text);
     font-weight: 800;
     font-size: 1rem;
     letter-spacing: .02em;
@@ -216,7 +216,7 @@ onMounted(() => {
         gap: 6px;
         height: 100%;
         padding: 0 14px;
-        color: rgba($yb-cream, .78);
+        color: var(--sc-text-sub);
         font-size: 0.86rem;
         font-weight: 600;
         white-space: nowrap;
@@ -226,8 +226,8 @@ onMounted(() => {
 
     &:hover .lnb-item-label,
     &.active .lnb-item-label {
-        color: $yb-cream;
-        border-bottom-color: $yb-yellow;
+        color: var(--sc-text);
+        border-bottom-color: var(--sc-point);
     }
 
     .caret {
@@ -251,8 +251,8 @@ onMounted(() => {
     top: 100%;
     left: 0;
     min-width: 180px;
-    background: $dc-white;
-    border: 1px solid $dc-gray-200;
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
     box-shadow: 0 10px 24px rgba(0, 0, 0, .12);
     list-style: none;
     margin: 0;
@@ -263,18 +263,18 @@ onMounted(() => {
         padding: 9px 12px;
         font-size: 0.82rem;
         font-weight: 500;
-        color: $dc-gray-900;
+        color: var(--sc-text);
         cursor: pointer;
         white-space: nowrap;
         transition: background .12s, color .12s;
 
         &:hover {
-            background: $yb-cream;
+            background: var(--sc-surface-2);
         }
 
         &.active {
-            background: $yb-yellow;
-            color: $yb-ink;
+            background: var(--sc-point-bg);
+            color: var(--sc-point-ink);
             font-weight: 700;
         }
     }
@@ -297,7 +297,7 @@ onMounted(() => {
     white-space: nowrap;
 
     .lnb-user {
-        color: rgba($dc-white, .78);
+        color: var(--sc-text-sub);
         font-size: 0.8rem;
         font-weight: 600;
     }
@@ -317,8 +317,8 @@ onMounted(() => {
      * 아이콘/라벨은 항상 --lnb-height 안에 있게 한다(App.vue 의 --lnb-total 과 같은 출처). */
     height: var(--lnb-total);
     box-sizing: border-box;
-    background-color: #FFF6D2;
-    border-top: 1px solid #EFE2BC;
+    background-color: var(--sc-surface);
+    border-top: 1px solid var(--sc-border);
     padding: 6px 4px env(safe-area-inset-bottom, 0px);
     display: grid;
     grid-auto-flow: column;
@@ -337,13 +337,13 @@ onMounted(() => {
         justify-content: center;
         gap: 3px;
         min-height: 48px;
-        color: #7A6B5D;          // 비활성도 대비 4.5:1 이상 유지
+        color: var(--sc-text-sub);          // 비활성도 대비 4.5:1 이상 유지
         font-size: 11px;
         text-decoration: none;
         -webkit-tap-highlight-color: transparent;
 
         &.active {
-            color: #5C3118;
+            color: var(--sc-point-ink);
             font-weight: 700;
         }
     }

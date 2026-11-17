@@ -5,7 +5,7 @@
             <div class="chart-head">
                 <span class="chart-title">{{ days.length }}일 누적 등락률</span>
                 <span class="legend">
-                    <span class="lg"><i class="sw line" :style="{ background: C_SECTOR }"></i>{{ sectorName }}</span>
+                    <span class="lg"><i class="sw line" style="background: var(--sc-text)"></i>{{ sectorName }}</span>
                     <span class="lg"><i class="sw dash"></i>{{ marketLabel }} 전체</span>
                 </span>
             </div>
@@ -37,6 +37,7 @@
 import { Chart, registerables } from 'chart.js';
 import { formatNetAmt, shortYmd } from '@scripts/marketFormat.js';
 Chart.register(...registerables);
+import { themeColor, useThemeChange } from '@scripts/theme.js';
 
 const props = defineProps({
     sectorName: { type: String, default: '' },
@@ -46,13 +47,19 @@ const props = defineProps({
     marketTrend: { type: Array, default: () => [] },
 });
 
-const C_SECTOR = '#7A4423';   // 단일 주 시리즈 — 브랜드 잉크
-const C_MARKET = '#A89A8A';   // 비교 기준선(점선, 중립 회색)
+// 주 시리즈·기준선·축은 테마 토큰(render 때마다 다시 읽음), 외국인·기관은 시리즈 고유색이라 고정.
+// 템플릿 범례는 같은 토큰을 var() 로 직접 쓴다.
+let C_SECTOR, C_MARKET, C_GRID, C_ZERO, C_TICK, C_POINT_BORDER;
 const C_FRGN = '#C2621B';
 const C_ORGN = '#6B5BB5';
-const C_GRID = '#F3EAD2';
-const C_ZERO = '#D9C9A3';
-const C_TICK = '#7A6B5D';
+const readColors = () => {
+    C_SECTOR = themeColor('--sc-text');          // 단일 주 시리즈
+    C_MARKET = themeColor('--sc-text-mute');     // 비교 기준선(점선, 중립 회색)
+    C_GRID = themeColor('--sc-surface-2');
+    C_ZERO = themeColor('--sc-border-strong');
+    C_TICK = themeColor('--sc-text-sub');
+    C_POINT_BORDER = themeColor('--sc-surface');
+};
 
 // 순매수 막대: 두께 BAR_PX, 외국인·기관 사이 BAR_GAP_PX. 좁은 화면에선 칸에 맞춰 줄어든다.
 const BAR_PX = 24;
@@ -81,13 +88,14 @@ const yScale = (fmt) => ({
     grid: { color: (c) => (c.tick.value === 0 ? C_ZERO : C_GRID), drawBorder: false },
     ticks: { color: C_TICK, font: { size: 10 }, maxTicksLimit: 4, callback: fmt },
 });
-const xScale = { grid: { display: false, drawBorder: false }, ticks: { color: C_TICK, font: { size: 10 } } };
+const xScale = () => ({ grid: { display: false, drawBorder: false }, ticks: { color: C_TICK, font: { size: 10 } } });
 const tooltipBase = { displayColors: true, boxWidth: 8, boxHeight: 8, padding: 8, titleFont: { size: 11 }, bodyFont: { size: 11 } };
 
 const render = () => {
     lineChart?.destroy();
     barChart?.destroy();
     if (!lineRef.value || !barRef.value || !props.trend.length) return;
+    readColors();
 
     // ── ① 누적 등락률 ── 기준일 0% 에서 시작
     const labels = [props.baseYmd, ...days.value].map(d => (d ? shortYmd(d) : ''));
@@ -98,7 +106,7 @@ const render = () => {
             labels,
             datasets: [
                 { label: props.sectorName, data: series(props.trend), borderColor: C_SECTOR, backgroundColor: C_SECTOR,
-                  borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBorderColor: '#fff', pointBorderWidth: 2, tension: 0 },
+                  borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBorderColor: C_POINT_BORDER, pointBorderWidth: 2, tension: 0 },
                 { label: `${marketLabel.value} 전체`, data: series(props.marketTrend), borderColor: C_MARKET, backgroundColor: C_MARKET,
                   borderWidth: 2, borderDash: [4, 4], pointRadius: 0, pointHoverRadius: 5, tension: 0 },
             ],
@@ -107,7 +115,7 @@ const render = () => {
             responsive: true, maintainAspectRatio: false, animation: false,
             interaction: { mode: 'index', intersect: false },
             layout: { padding: { right: 8 } },
-            scales: { x: xScale, y: yScale(v => `${v}%`) },
+            scales: { x: xScale(), y: yScale(v => `${v}%`) },
             plugins: {
                 legend: { display: false },
                 tooltip: { ...tooltipBase, callbacks: { label: (i) => ` ${i.dataset.label} ${pct(i.raw)}` } },
@@ -132,7 +140,7 @@ const render = () => {
             interaction: { mode: 'index', intersect: false },
             datasets: { bar: { categoryPercentage: CAT_PCT_MAX, barPercentage: 0.96 } },   // 실제 값은 fitBars 가 너비에 맞춰 정한다
             onResize: () => setTimeout(fitBars, 0),   // 리사이즈 직후 Chart.js 가 레이아웃을 다시 잡은 다음에 맞춘다
-            scales: { x: xScale, y: yScale(v => (Math.abs(v) >= 10000 ? `${(v / 10000).toLocaleString()}조` : `${v.toLocaleString()}억`)) },
+            scales: { x: xScale(), y: yScale(v => (Math.abs(v) >= 10000 ? `${(v / 10000).toLocaleString()}조` : `${v.toLocaleString()}억`)) },
             plugins: {
                 legend: { display: false },
                 tooltip: { ...tooltipBase, callbacks: { label: (i) => ` ${i.dataset.label} ${formatNetAmt(i.dataset.raw[i.dataIndex])}` } },
@@ -170,10 +178,11 @@ const fitBars = () => {
 onMounted(render);
 watch(() => [props.trend, props.marketTrend], render, { deep: true });
 onBeforeUnmount(() => { lineChart?.destroy(); barChart?.destroy(); });
+useThemeChange(() => nextTick(render));
 </script>
 
 <style scoped lang="scss">
-.sector-trend { display: flex; flex-direction: column; gap: 16px; padding: 12px 0 14px; border-bottom: 1px solid #F3EAD2; }
+.sector-trend { display: flex; flex-direction: column; gap: 16px; padding: 12px 0 14px; border-bottom: 1px solid var(--sc-border); }
 .chart-head {
     display: flex;
     align-items: baseline;
@@ -181,12 +190,12 @@ onBeforeUnmount(() => { lineChart?.destroy(); barChart?.destroy(); });
     gap: 8px;
     margin-bottom: 6px;
 }
-.chart-title { font-size: 12px; font-weight: 700; color: #2B1D14; }
-.legend { display: flex; gap: 10px; font-size: 11px; color: #6B5B4E; white-space: nowrap; }
+.chart-title { font-size: 12px; font-weight: 700; color: var(--sc-text); }
+.legend { display: flex; gap: 10px; font-size: 11px; color: var(--sc-text-sub); white-space: nowrap; }
 .lg { display: inline-flex; align-items: center; gap: 4px; }
 .sw { display: inline-block; flex-shrink: 0; }
 .sw.line { width: 12px; height: 2px; }
-.sw.dash { width: 12px; height: 0; border-top: 2px dashed #A89A8A; }
+.sw.dash { width: 12px; height: 0; border-top: 2px dashed var(--sc-border-strong); }
 .sw.box { width: 8px; height: 8px; border-radius: 2px; }
 .canvas-wrap { position: relative; height: 140px; }
 </style>
