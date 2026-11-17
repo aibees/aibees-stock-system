@@ -120,7 +120,7 @@ body {
 }
 #app {
   height: 100%;
-  font-family: "맑은 고딕", "Malgun Gothics", sans-serif;
+  font-family: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
@@ -134,6 +134,10 @@ body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
+
+/* 입력 요소(select·input·textarea·button)는 브라우저 기본 글꼴(Arial 등)을 따로 쓰므로
+ * 앱 글꼴(Pretendard)을 물려받게 한다 — 2026-11-17 글꼴 통일 */
+#app button, #app input, #app select, #app textarea, #app optgroup { font-family: inherit; }
 
 /* ── iOS 입력 포커스 시 자동 확대 방지 ─────────────────────────────────────
  * iOS Safari/WKWebView 는 폰트가 16px 미만인 입력요소에 포커스가 가면 화면을

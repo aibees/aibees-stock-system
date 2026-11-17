@@ -7,6 +7,12 @@ import draggable from './directives/draggable.js'
 app.directive('draggable', draggable)
 // =======================================
 
+// ===== 차트 글꼴 =====
+// Chart.js 는 캔버스에 직접 그려 CSS 글꼴을 따르지 않는다 → 기본 글꼴을 앱과 같은 Pretendard 로(2026-11-17 글꼴 통일).
+import { Chart } from 'chart.js';
+Chart.defaults.font.family = "'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif";
+// =====================
+
 // ===== global axios =====
 import axios from 'axios';
 

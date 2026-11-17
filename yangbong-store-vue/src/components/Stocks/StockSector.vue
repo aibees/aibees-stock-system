@@ -430,7 +430,7 @@ $amber: #A0662F;
 
     .who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
     .name-line { display: flex; align-items: baseline; gap: 5px; min-width: 0; }   // 순위는 종목명 줄 안에
-    .rank { font-family: 'Do Hyeon', 'Pretendard', sans-serif; font-size: 15px; line-height: 1; color: $amber; flex-shrink: 0; }
+    .rank { font-family: 'Pretendard', sans-serif; font-weight: 700; font-size: 15px; line-height: 1; color: $amber; flex-shrink: 0; }
     .name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
     .code { font-size: 11px; color: $sub-2; }
     .px { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }

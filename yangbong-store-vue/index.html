@@ -7,11 +7,9 @@
     <meta name="theme-color" content="#FFFFFF" />
     <script type="text/javascript" src="https://static.nid.naver.com/js/naverLogin_implicit-1.0.3.js" charset="utf-8"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap" />
-    <!-- 본문 글꼴 Pretendard(_home-tokens.scss 의 $font-body). 2026-11-17 화이트 톤 개편부터 실제로 불러온다 -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <!-- 글꼴은 Pretendard 하나(2026-11-17 통일). 외부 CDN 없이 public/fonts/pretendard 에 직접 둔다 — 앱 WebView·느린 망에서도 같은 글꼴.
+         예전 로고용 Do Hyeon(Google Fonts)은 더 이상 쓰지 않는다. -->
+    <link rel="stylesheet" href="/fonts/pretendard/pretendard.css" />
     <!-- adsense:start — 웹 운영 빌드에만 남는다. dev 서버·앱(BUILD_TARGET=app) 빌드에서는 vite.config.js 가 지운다
          (앱 WebView 안 AdSense 는 정책 위반). id 는 AdSlot.vue 가 같은 스크립트를 두 번 넣지 않게 하는 표식. -->
     <script async id="adsbygoogle-js" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5330672724286218"
