@@ -74,7 +74,11 @@ const trainingGroup = {
     children: chapters().map(ch => ({
         menu_code: `Training_${ch.slug}`, menu_path: ch.slug, display_flag: 'Y',
         menu_name: ch.name, menu_title: ch.name,
-    })),
+    })).concat({
+        // 트레이닝 화면의 용어 사전 탭(/training/glossary)
+        menu_code: 'TrainingGlossary', menu_path: 'glossary', display_flag: 'Y',
+        menu_name: '주식 용어 사전', menu_title: '주식 용어 사전',
+    }),
 };
 // 내 설정(preset)은 주식분석 그룹의 정적 화면 — 서버 메뉴에 그 그룹이 있으면 그 끝에 붙이고, 없으면 혼자 한 그룹으로 둔다.
 const presetItem = { menu_code: 'StockPreset', menu_path: 'preset', display_flag: 'Y', menu_name: '내 설정', menu_title: '내 설정' };
@@ -140,9 +144,11 @@ const ICON = {
     key:     'M8 15a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 11h10M17 11v3M20 11v2',
     route:   'M6 3v12M18 9v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
     grid:    'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+    book:    'M5 4.5A2.5 2.5 0 0 1 7.5 2H19v17H7.5A2.5 2.5 0 0 0 5 21.5zM5 19.5v-15M9 7h6M9 11h6',
     dot:     'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
 };
 const ICON_BY_CODE = {
+    TrainingGlossary: 'book',
     StockBuyTarget: 'star', StockPreset: 'sliders', StockInfo: 'list', StockSector: 'grid', ChartStock: 'chart', ChartTheme: 'chart', StockThemeDetail: 'list',
     WorldIndicators: 'globe',
     BatchSetting: 'history', BatchLogSetting: 'doc', RouteList: 'route',
