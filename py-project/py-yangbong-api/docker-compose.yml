@@ -29,7 +29,7 @@
 #   받는 요청이 없으므로 포트·고정 IP 가 없다. 한 개만 띄운다(scale 금지 — KIS 토큰을 나눠 쓰지 않게).
 #   DB 연결: API 최대 12 + 워커 최대 3 = 양봉 계정 한도 15.
 
-name: yangbong
+name: yangbong-api
 
 x-anthropic-key: &anthropic-key
     ../py-secret-api/app/config/keys/anthropic.env:/workdir/secrets/anthropic.env:ro
