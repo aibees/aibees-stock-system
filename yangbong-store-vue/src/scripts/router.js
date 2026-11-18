@@ -64,7 +64,7 @@ const routes = [
         component: StockPreset
     },
     {
-        // 트레이닝 커리큘럼(장 → 단계, 순서대로 잠금). 비로그인 접근 가능(authPaths.GUEST_PREFIXES). 정적 라우트.
+        // 트레이닝 커리큘럼(장 → 단계, 모든 단계 열림). 비로그인 접근 가능(authPaths.GUEST_PREFIXES). 정적 라우트.
         path: "/training",
         name: "training",
         component: TrainingHome

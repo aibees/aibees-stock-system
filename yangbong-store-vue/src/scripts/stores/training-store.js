@@ -2,9 +2,8 @@
  * 트레이닝 진행 기록: 마친 단계의 key 목록. 가입 없이도 쓰므로 이 기기(localStorage 'yb-training')에 둔다.
  * 계정으로 옮기는 동기화는 아직 없다(필요하면 성향처럼 yangbong 스키마에 테이블을 두고 updatedAt 으로 맞춘다).
  *
- * 순서대로 잠금(2026-11-15 결정): 첫 단계이거나, 이미 마쳤거나, 바로 앞 단계를 마친 단계만 열린다.
- * "앞 단계 전부"가 아니라 "바로 앞 단계"로 보는 이유: 나중에 단계를 사이에 끼워 넣어도
- * 이미 마친 뒤쪽 단계가 다시 잠기지 않게 하려는 것(마친 단계는 언제든 다시 열 수 있다).
+ * 순서대로 잠금은 2026-11-18 에 폐지했다(2026-11-15 에는 앞 단계를 마쳐야 다음이 열렸다).
+ * 지금은 어느 단계든 바로 볼 수 있고, '마침' 기록과 '지금 차례'(안 마친 첫 단계) 표시만 남는다.
  *
  * 저장소 접근은 사생활 보호 모드 등에서 실패할 수 있어 모두 try/catch — 실패해도 이번 실행 동안은 동작한다.
  */
@@ -39,11 +38,8 @@ export const useTrainingStore = defineStore('training', () => {
     const doneSet = computed(() => new Set(done.value));
     const isDone = (key) => doneSet.value.has(key);
 
-    const isOpen = (key) => {
-        const i = stages.findIndex(s => s.key === key);
-        if (i < 0) return false;
-        return i === 0 || isDone(key) || isDone(stages[i - 1].key);
-    };
+    // 모든 단계가 처음부터 열려 있다(2026-11-18, 순서대로 잠금 폐지). 없는 단계만 닫힌 것으로 본다.
+    const isOpen = (key) => stages.some(s => s.key === key);
 
     /** 지금 할 차례: 아직 안 마쳤고 열려 있는 첫 단계. 다 마쳤으면 null. */
     const nextStage = computed(() => stages.find(s => !isDone(s.key) && isOpen(s.key)) ?? null);
@@ -52,7 +48,7 @@ export const useTrainingStore = defineStore('training', () => {
     const doneCount = computed(() => stages.filter(s => isDone(s.key)).length);
     const total = stages.length;
 
-    /** 단계를 마친다. 잠긴 단계·본문 없는 단계는 마칠 수 없다. */
+    /** 단계를 마친다. 본문 없는 단계는 마칠 수 없다. */
     const complete = (key) => {
         const s = stages.find(x => x.key === key);
         if (!s || !s.lesson || !isOpen(key) || isDone(key)) return false;

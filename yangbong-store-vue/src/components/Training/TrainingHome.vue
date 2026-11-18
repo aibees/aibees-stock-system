@@ -29,7 +29,7 @@
 
             <!-- 장: 펼친 장은 단계 리스트, 접힌 장은 한 줄(누르면 펼침). 기본은 지금 차례인 장만 펼친다 -->
             <section v-for="ch in chapterList" :id="`ch-${ch.slug}`" :key="ch.slug" class="tr-card tr-chapter"
-                :class="{ folded: !isExpanded(ch), locked: chapterState(ch).cls === 'locked' }">
+                :class="{ folded: !isExpanded(ch) }">
                 <button type="button" class="tr-ch-head" :aria-expanded="isExpanded(ch) ? 'true' : 'false'"
                     :aria-controls="`ch-list-${ch.slug}`" @click="toggleChapter(ch)">
                     <span class="tr-ch-text">
@@ -38,16 +38,15 @@
                     </span>
                     <span class="tr-ch-state" :class="chapterState(ch).cls">
                         {{ chapterState(ch).text }}
-                        <svg v-if="chapterState(ch).cls === 'locked'" class="tr-lock" viewBox="0 0 24 24" aria-hidden="true"><path :d="LOCK_PATH"></path></svg>
                         <svg class="tr-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
                     </span>
                 </button>
 
                 <ol v-if="isExpanded(ch)" :id="`ch-list-${ch.slug}`" class="tr-list">
                     <li v-for="s in ch.stages" :key="s.key">
-                        <component :is="store.isOpen(s.key) ? 'button' : 'div'" :type="store.isOpen(s.key) ? 'button' : undefined"
-                            class="tr-row" :class="rowCls(s)" :aria-label="`${s.no}단계 ${s.title}, ${rowState(s).label}`"
-                            @click="store.isOpen(s.key) && openStage(s)">
+                        <button type="button" class="tr-row" :class="rowCls(s)"
+                            :aria-label="`${s.no}단계 ${s.title}${rowState(s).label ? `, ${rowState(s).label}` : ''}`"
+                            @click="openStage(s)">
                             <span class="tr-no" aria-hidden="true">
                                 <svg v-if="store.isDone(s.key)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg>
                                 <template v-else>{{ s.indexInChapter }}</template>
@@ -56,11 +55,8 @@
                                 <b>{{ shortOf(s) }}</b>
                                 <small v-if="s.sub">{{ s.sub }}</small>
                             </span>
-                            <span class="tr-state" aria-hidden="true">
-                                <svg v-if="rowState(s).lock" class="tr-lock" viewBox="0 0 24 24"><path :d="LOCK_PATH"></path></svg>
-                                <template v-else>{{ rowState(s).label }}</template>
-                            </span>
-                        </component>
+                            <span class="tr-state" aria-hidden="true">{{ rowState(s).label }}</span>
+                        </button>
                     </li>
                 </ol>
             </section>
@@ -89,8 +85,6 @@ import { useTrainingStore } from '@scripts/stores/training-store.js';
 const router = useRouter();
 const route = useRoute();
 const store = useTrainingStore();
-
-const LOCK_PATH = 'M7 10V7a5 5 0 0 1 10 0v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1zm2 0h6V7a3 3 0 0 0-6 0v3z';
 
 const chapterList = chapters();
 const soon = soonItems();
@@ -122,25 +116,22 @@ watch(() => route.params.chapter, (slug) => {
     if (slug && !expanded.value.has(String(slug))) expanded.value = new Set([...expanded.value, String(slug)]);
 });
 
-// 장 오른쪽 표시: 마친 수 / 다 마침 / 잠김(단계 수 + 자물쇠).
+// 장 오른쪽 표시: 마친 수 / 다 마침.
 const chapterState = (ch) => {
     const n = ch.stages.filter(s => store.isDone(s.key)).length;
     if (n === ch.stages.length) return { text: '✓ 마침', cls: 'all' };
-    if (!store.isOpen(ch.stages[0].key)) return { text: `${ch.stages.length}단계`, cls: 'locked' };
     return { text: `${n}/${ch.stages.length}`, cls: 'now' };
 };
 
-// 단계 줄 상태: 마침 / 지금 / 열림(앞 단계를 마쳐서 다시 볼 수 있음) / 잠김
+// 단계 줄 상태: 마침 / 지금(안 마친 첫 단계) / 그 밖에는 표시 없음
 const rowState = (s) => {
     if (store.isDone(s.key)) return { label: '마침' };
     if (isNext(s)) return { label: '지금 ›' };
-    if (store.isOpen(s.key)) return { label: '열림' };
-    return { label: '잠김', lock: true };
+    return { label: '' };
 };
 const rowCls = (s) => ({
     done: store.isDone(s.key),
     now: isNext(s),
-    locked: !store.isOpen(s.key),
 });
 </script>
 

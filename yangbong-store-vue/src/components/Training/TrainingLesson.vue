@@ -17,13 +17,6 @@
                 <button type="button" class="tl-cta ghost" @click="router.push(TRAINING_PATH)">목차로 돌아가기</button>
             </template>
 
-            <!-- 잠긴 단계(주소로 바로 들어온 경우) -->
-            <template v-else-if="!store.isOpen(stage.key)">
-                <p class="tl-msg">앞 단계를 먼저 마쳐 주세요. 앞 단계를 마치면 이 단계가 열립니다.</p>
-                <button v-if="next" type="button" class="tl-cta" @click="go(next)">{{ next.no }}. {{ next.short || next.title }} 하러 가기</button>
-                <button type="button" class="tl-cta ghost" @click="goChapter">목차로 돌아가기</button>
-            </template>
-
             <!-- 본문 준비 중 -->
             <template v-else-if="!stage.lesson">
                 <p class="tl-msg">이 단계는 내용을 준비하고 있어요. 준비되면 여기서 이어서 할 수 있습니다.</p>
@@ -32,7 +25,7 @@
 
             <!-- 장 끝 확인 문제 -->
             <template v-else-if="stage.isQuiz">
-                <p class="tl-lead">이 장에서 익힌 것을 확인합니다. 모두 맞히면 다음 장이 열립니다.</p>
+                <p class="tl-lead">이 장에서 익힌 것을 확인합니다. 모두 맞히면 이 장을 마칩니다.</p>
                 <ol class="tq-list">
                     <li v-for="(item, qi) in stage.lesson.quiz" :key="qi" class="tq">
                         <p class="tq-q"><span class="tq-no">Q{{ qi + 1 }}.</span> {{ item.q }}</p>
@@ -71,7 +64,7 @@
             </article>
 
             <!-- 하단: 마치기 / 다음 단계 -->
-            <div v-if="stage && store.isOpen(stage.key) && stage.lesson" class="tl-foot">
+            <div v-if="stage && stage.lesson" class="tl-foot">
                 <template v-if="!store.isDone(stage.key)">
                     <p v-if="stage.isQuiz" class="tl-count">{{ stage.lesson.quiz.length }}문제 중 {{ rightCount }}문제 맞힘</p>
                     <button type="button" class="tl-cta" :disabled="stage.isQuiz && !allRight" @click="finish">
@@ -101,7 +94,6 @@ const store = useTrainingStore();
 const stage = computed(() => findStage(String(route.params.chapter ?? ''), String(route.params.stage ?? '')));
 const chapter = computed(() => (stage.value ? findChapter(stage.value.chapterSlug) : null));
 const following = computed(() => followingStage(stage.value));
-const next = computed(() => store.nextStage);
 const hasExampleChart = computed(() =>
     (stage.value?.lesson?.body ?? []).some(b => ['volume', 'ma', 'sr'].includes(b.figure)));
 
