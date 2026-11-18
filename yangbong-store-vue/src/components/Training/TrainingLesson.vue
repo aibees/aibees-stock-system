@@ -61,6 +61,7 @@
                     <dl v-else-if="b.terms" class="tl-terms">
                         <div v-for="([term, desc], ti) in b.terms" :key="ti"><dt>{{ term }}</dt><dd>{{ desc }}</dd></div>
                     </dl>
+                    <TrainingPlay v-else-if="b.play" :name="b.play" />
                     <figure v-else-if="b.figure" class="tl-figure">
                         <TrainingFigure :name="b.figure" />
                         <figcaption v-if="b.caption">{{ b.caption }}</figcaption>
@@ -89,6 +90,7 @@
 
 <script setup>
 import TrainingFigure from './TrainingFigure.vue';
+import TrainingPlay from './TrainingPlay.vue';
 import { findChapter, findStage, followingStage, chapterPath, stagePath, TRAINING_PATH } from '@scripts/training.js';
 import { useTrainingStore } from '@scripts/stores/training-store.js';
 
