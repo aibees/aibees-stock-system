@@ -10,7 +10,7 @@
             </div>
             <div class="buttons-div">
                 <button @click="getThemeList">
-                    <font-awesome-icons :icon="['fa-solid', 'fa-magnifying-glass']" />
+                    <SearchIcon />
                 </button>
             </div>
         </div>

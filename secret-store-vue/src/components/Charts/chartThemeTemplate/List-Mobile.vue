@@ -54,7 +54,7 @@
         </div>
         <div class="buttons-div">
             <button @click="getChartThemeData">
-                <font-awesome-icons :icon="['fa-solid', 'fa-magnifying-glass']" />
+                <SearchIcon />
             </button>
         </div>
         <div class="chart-div">

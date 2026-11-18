@@ -29,10 +29,10 @@
         </div>
         <div class="buttons-div">
             <button @click="getStockChartData">
-                <font-awesome-icons :icon="['fa-solid', 'fa-magnifying-glass']" />
+                <SearchIcon />
             </button>
             <button @click="getStockChartData">
-                <font-awesome-icons :icon="['fa-solid', 'fa-magnifying-glass']" />
+                <SearchIcon />
             </button>
         </div>
     </div>
