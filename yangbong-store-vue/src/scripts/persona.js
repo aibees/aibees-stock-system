@@ -115,14 +115,14 @@ export const CUSTOM_KEY = 'custom';
  *   쾌청     : avg ≥ +1.5%   많이 오름
  *   따뜻     : avg ≥ 0       조금 오름(보합 포함)
  *   흐림     : avg < 0       조금 내림
- * 오늘 등락률은 rate_1d, 없으면 spark(최근 종가들)의 마지막 두 값으로 구한다. 둘 다 없으면 null(줄을 그리지 않는다).
+ * 오늘 등락률은 서버의 rate(전일 종가 대비 %), 없으면 spark(최근 종가들)의 마지막 두 값으로 구한다. 둘 다 없으면 null(줄을 그리지 않는다).
  * 임계값은 초안 — 바꾸려면 아래 상수만 고친다.
  */
 export const WEATHER_BIG_UP = 2;
 export const WEATHER_STORM = -5;
 
-const dailyRate = (m) => {
-    const r = numOrNull(m?.rate_1d);
+export const dailyRate = (m) => {
+    const r = numOrNull(m?.rate);
     if (r !== null) {
         return r;
     }

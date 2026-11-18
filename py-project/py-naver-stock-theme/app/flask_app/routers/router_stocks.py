@@ -1,3 +1,4 @@
+import json
 import logging
 import traceback, pprint
 from flask import Blueprint, request, g
@@ -11,8 +12,9 @@ from app.services.stocks import RecoLevel
 from app.domains.dao.masterCodesDao import MasterCodesDao
 from stock_shared.reco_algo import algo_stage_map, MASTER_CODES_KEY
 from app.flask_app.utils.apiResponse import ApiResponse
-from app.utils.service import KisDisabledError
+from app.utils.service import KisDisabledError, IS_YANGBONG
 from app.services.stocks.StockService import StockService
+from app.services.stocks.HomePickService import home_picks
 from app.services.stocks.RecoPerformanceService import RecoPerformanceService
 from app.services.stocks.FinanceService import FinanceService
 from app.services.stocks.SectorService import SectorService, MARKETS
@@ -55,35 +57,70 @@ def select_master_stock_search():
         return ApiResponse.error(str(e)[:255])
     
 
+def _buy_target_for_request(ymd=None, lite=False):
+    """매수추천 목록을 **요청한 사용자의 열람 단계에 맞춰** 가공해 돌려준다(/buy-target · /buy-target/home 공용)."""
+    user_id = g.current_user_id
+    auth_ids = roleMenuDaoImpl.select_user_auth_ids(g.db, user_id) if user_id is not None else []
+    features = roleMenuDaoImpl.select_features_for_user(g.db, auth_ids)
+    level = RecoLevel.user_level(auth_ids, features)
+
+    results = stockServiceImpl.get_buy_target_stock_list(g.db, {Literal.YMD: ymd}, lite=lite)
+    # 알고리즘→단계 대응은 공통코드(stock/setting/reco_algo). 못 읽으면 기본 대응(BASIC 1·PREMIUM 2·PRIVATE 3).
+    try:
+        algo_stage = algo_stage_map(MasterCodesDao().select_master_code(g.db, MASTER_CODES_KEY))
+    except Exception as e:
+        logging.warning(f"[buy-target] reco_algo 공통코드 조회 실패 → 기본 대응: {e}")
+        algo_stage = None
+    return RecoLevel.apply_levels(results, level, algo_stage)
+
+
 @stocks_bp.route('/buy-target')
 @optional_auth
 def select_buy_target_stock():
     """매수추천 목록. 비로그인도 열리지만 **열람 단계에 맞춰** 응답을 가공한다(RecoLevel).
     기본(비로그인 포함)은 고급 정보(shape_proba·종합순위·수급)를 뺀 목록, 고급은 RECO_ADVANCED 기능,
-    실전은 WORKER_USER 권한자에게만 단계가 열린다."""
-    search_params = {
-        Literal.YMD: request.args.get(Literal.YMD),
-    }
-
+    실전은 WORKER_USER 권한자에게만 단계가 열린다.
+    ?lite=1 이면 chart_data 에서 이동평균을 뺀다(미니 차트를 그리지 않는 화면용)."""
+    lite = request.args.get("lite") in ("1", "true", "Y")
     try:
-        user_id = g.current_user_id
-        auth_ids = roleMenuDaoImpl.select_user_auth_ids(g.db, user_id) if user_id is not None else []
-        features = roleMenuDaoImpl.select_features_for_user(g.db, auth_ids)
-        level = RecoLevel.user_level(auth_ids, features)
-
-        results = stockServiceImpl.get_buy_target_stock_list(g.db, search_params)
-        # 알고리즘→단계 대응은 공통코드(stock/setting/reco_algo). 못 읽으면 기본 대응(BASIC 1·PREMIUM 2·PRIVATE 3).
-        try:
-            algo_stage = algo_stage_map(MasterCodesDao().select_master_code(g.db, MASTER_CODES_KEY))
-        except Exception as e:
-            logging.warning(f"[buy-target] reco_algo 공통코드 조회 실패 → 기본 대응: {e}")
-            algo_stage = None
-        results = RecoLevel.apply_levels(results, level, algo_stage)
-        return ApiResponse.success(results)
+        return ApiResponse.success(_buy_target_for_request(request.args.get(Literal.YMD), lite=lite))
     except Exception as e:
         logging.error(str(e))
         traceback.print_exc()
         return ApiResponse.error(str(e)[:255])
+
+
+# STOCKS ROUTE :: 홈 'AI 분석 종목' — 서버가 내 설정으로 판정·정렬해 몇 줄만 준다(2026-11-18)
+#   GET /buy-target/home?settings=<JSON>&limit=3&watch=005930,000660
+#     settings : 화면의 보조지표 설정(persona 의 currentType.settings). 없거나 깨졌으면 기본 설정.
+#     limit    : 1~10, 기본 3
+#     watch    : 관심 종목 코드(쉼표, 최대 50개). 오늘 후보에 있는 것만 watch_items 로 돌려준다.
+#   응답: {ymd, candidate_count, matched_count, items:[{stock_code, stock_name, ymd, close, rate_pct, reason, reason_rest}],
+#          watch_items:[후보 행 + match]}
+#   판정 로직의 정본은 화면 JS(indicators.js 등) — HomePickService 머리말 참고.
+# ===============================================================================
+@stocks_bp.route('/buy-target/home')
+@optional_auth
+def select_buy_target_home():
+    raw = request.args.get("settings")
+    settings = None
+    if raw:
+        try:
+            settings = json.loads(raw)
+        except ValueError:
+            logging.warning("[buy-target/home] settings JSON 을 읽지 못해 기본 설정을 쓴다")
+    try:
+        limit = min(10, max(1, int(request.args.get("limit", 3))))
+    except ValueError:
+        limit = 3
+    watch = [c.strip() for c in (request.args.get("watch") or "").split(",") if c.strip().isalnum()][:50]
+    try:
+        items = _buy_target_for_request(lite=True)
+        return ApiResponse.success(home_picks(items, settings, limit, watch))
+    except Exception as e:
+        logging.error(str(e))
+        traceback.print_exc()
+        return ApiResponse.error("추천 종목을 불러오지 못했습니다.")
 
 
 # STOCKS ROUTE :: 월간 추천 성과 (홈) — 종목당 첫 추천 기준, 추천일 종가 → 5거래일 내 최고가
@@ -221,6 +258,17 @@ def select_sector_detail(market, sector_cd):
 def select_stock_finance(stock_code):
     if not (len(stock_code) == 6 and stock_code.isalnum()):
         return ApiResponse.error("종목코드 형식이 아닙니다.")
+    if IS_YANGBONG:
+        # 양봉상회는 API 서버가 KIS 를 부르지 않는다. AI 워커가 채운 캐시(stock_finance_snapshot)를 읽고,
+        # 없거나 10분 지났으면 finance 작업을 넣는다. data 는 예전 모양(없으면 null), 상태는 최상위에.
+        from app.flask_app.routers.router_ai_job import aiJobServiceImpl
+        try:
+            res = aiJobServiceImpl.finance(g.db, stock_code)
+            return ApiResponse.success(res["data"], extra={
+                "fetched_at": res["fetched_at"], "stale": res["stale"], "finance_job": res["job"]})
+        except Exception as e:  # noqa: BLE001
+            logging.error(f"[stocks/finance] {stock_code}: {e}")
+            return ApiResponse.error("재무 지표를 불러오지 못했습니다.")
     try:
         return ApiResponse.success(financeServiceImpl.get_fundamentals(stock_code))
     except KisDisabledError as e:

@@ -1,3 +1,4 @@
+import os
 import pprint
 from datetime import datetime, timedelta
 
@@ -10,7 +11,7 @@ from pykis.api.stock.quote import KisQuoteResponse
 
 from app.utils.constants.Literal import Literal
 from stock_shared.kis.client import create_pykis
-from stock_shared.kis.credentials import load_creds_from_db, load_creds_from_file
+from stock_shared.kis.credentials import KisCredentialError, load_creds_from_db, load_creds_from_file
 from stock_shared.kis.finance import build_fundamentals, fetch_annual_ratios, pick_settled_annual, to_db_strings
 
 # 실투자 KIS 인증정보를 조회할 기본 user_detail.user_id.
@@ -61,6 +62,17 @@ class KisEngine:
                 virtual_app_key=keys.get("vir_app_key"),
                 virtual_sec_key=keys.get("vir_sec_key"),
             )
+        elif os.environ.get("KIS_CREDS_FILE"):
+            # 실투자 키를 파일에서(양봉 AI 워커, 2026-11-18). 양봉 DB(user_detail)에는 KIS 키가 없다.
+            #   JSON {id, account, app_key, sec_key}. 이 환경변수는 워커 컨테이너에만 둔다(API 서버는 KIS 를 안 쓴다).
+            keys = load_creds_from_file(os.environ["KIS_CREDS_FILE"])
+            missing = [k for k in ("id", "account", "app_key", "sec_key") if not keys.get(k)]
+            if missing:
+                raise KisCredentialError(f"KIS_CREDS_FILE 에 {', '.join(missing)} 가 없습니다.")
+            self.id = keys["id"]
+            self.account = keys["account"]
+            self.kis = create_pykis(id=self.id, account=self.account,
+                                    app_key=keys["app_key"], sec_key=keys["sec_key"])
         else:
             # 실투자: DB(user_detail) 에서 이 인스턴스 계정의 인증정보 조회
             # strict=True + 파일 폴백 없음 — 키가 없는 유저가 다른 계좌를 보게 되는 경로가

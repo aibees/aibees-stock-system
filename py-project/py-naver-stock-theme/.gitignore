@@ -12,3 +12,6 @@ __pycache__/
 
 # 양봉상회 API 시크릿 — .env.yangbong.example 만 커밋한다
 .env.yangbong
+
+# 양봉 AI 워커 시크릿(KIS 키 파일, docker-compose.yangbong.yml 이 마운트)
+secrets/

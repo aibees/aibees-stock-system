@@ -95,9 +95,9 @@
                 <div v-if="isLoading" class="w-skeleton" aria-busy="true" aria-label="불러오는 중">
                     <i v-for="n in 3" :key="n"></i>
                 </div>
-                <div v-else-if="!ordered.length" class="w-empty">
+                <div v-else-if="!visibleRows.length" class="w-empty">
                     <p>오늘은 AI 기준에 충족된 종목이 없습니다.</p>
-                    <button v-if="items.length" type="button" class="text-link" @click="router.push('/stock/preset')">설정 조정하기</button>
+                    <button v-if="candidateCount" type="button" class="text-link" @click="router.push('/stock/preset')">설정 조정하기</button>
                 </div>
                 <ol v-else class="rows">
                     <li v-for="(w, i) in visibleRows" :key="w.code" class="w-li">
@@ -199,7 +199,7 @@
  * 양봉상회 홈(2026-11-15 개편 1차). 순서: 시황 → AI 분석 종목(≤3) → 지난달 성과 → 공지.
  * 데이터는 기존 홈과 같은 API(전부 비로그인 허용)를 쓴다. 알고리즘·계산은 그대로다.
  *   - AI 분석 종목: 종목 이름·등락과 AI 분석·차트 확인 버튼만(근거·살 만한 가격·내 조건 충족은 2026-11-15 뺌).
- *   - 내 설정(보조지표 수치)으로 서버 후보를 다시 걸러 설정한 순서로 보여 준다(indicators.evaluate / persona.orderForType).
+ *   - 내 설정(보조지표 수치)으로 거르고 설정한 순서로 정렬하는 일은 서버가 한다(/stocks/buy-target/home, 2026-11-18).
  */
 import AdSlot from '../common/AdSlot.vue';
 import aibeesApi from '@scripts/aibeesApi.js';
@@ -211,9 +211,7 @@ import { isNativeAdsEnabled } from '@scripts/useAdMob.js';
 import { INTRO_PATH, isGuestPath } from '@scripts/authPaths.js';
 import { NOTICE_LIST_PATH, NOTICE_DETAIL_PATH, noticeDateText } from '@scripts/notice.js';
 import { numOrNull, formatNumber, changeInfo } from '@scripts/stockSignals.js';
-import { orderForType, marketWeather } from '@scripts/persona.js';
-import { evaluate, passRuleText } from '@scripts/indicators.js';
-import { recoReasons } from '@scripts/recoReasons.js';
+import { marketWeather, dailyRate } from '@scripts/persona.js';
 import { judgeStockNews, itemFromChart } from '@scripts/stockNews.js';
 import { useWatchlistStore } from '@scripts/stores/watchlist-store.js';
 import { enablePushNotifications } from '@scripts/usePushNotifications.js';
@@ -293,7 +291,7 @@ const INDEX_LABEL = { kospi: '코스피', kosdaq: '코스닥' };
 const indexCards = computed(() => marketData.value.filter(m => m.key !== 'usdkrw').map(m => {
     const r5 = numOrNull(m.rate_5d);
     const r20 = numOrNull(m.rate_20d);
-    const r1 = numOrNull(m.rate_1d);
+    const r1 = dailyRate(m);   // 서버 필드는 rate(전일 대비 %). 없으면 spark 마지막 두 값으로 계산
     return {
         key: m.key,
         label: INDEX_LABEL[m.key] ?? m.label ?? m.code,
@@ -328,62 +326,71 @@ const weather = computed(() => marketWeather(marketData.value));
  *   2026-11-15 '시장이 주목하는 회사'(근거·살 만한 가격·내 조건 충족)에서 되돌림: 종목 이름·등락과 AI 분석·차트 확인 버튼만. */
 const HOME_COUNT = 3;
 const AI_PATH = '/stock/info';
-const CHART_PATH = '/stock/chart';
 const BUY_TARGET_PATH = '/stock/buy-target';
 // 비로그인 공개 경로(authPaths.GUEST_PATHS)거나 서버가 이 사용자에게 허용한 메뉴면 버튼을 보인다.
 const canOpen = (path) => isGuestPath(path) || userSession.access.paths.includes(path);
 
-const items = ref([]);
+const type = computed(() => persona.currentType);
+
+/* 서버가 내 설정으로 판정·정렬해 최대 HOME_COUNT 줄만 준다(/stocks/buy-target/home, 2026-11-18).
+ * 예전에는 /stocks/buy-target 전체(종목당 120일 봉)를 받아 여기서 indicators.evaluate·persona.orderForType·recoReasons 로
+ * 다시 계산했다. 판정 로직의 정본은 여전히 그 JS 이고, 서버(HomePickService)는 같은 결과를 내도록 옮긴 것이다. */
+const EMPTY_PICK = { ymd: null, candidate_count: 0, matched_count: 0, items: [], watch_items: [] };
+const pick = ref(EMPTY_PICK);
 const isLoading = ref(true);
-const showAll = ref(false);
+const watchlist = useWatchlistStore();
+const watchCodes = computed(() => watchlist.items.map(w => w.code).join());
+let pickSeq = 0;   // 설정을 빠르게 바꿀 때 늦게 온 옛 응답이 덮어쓰지 않게
 const loadItems = async () => {
+    const seq = ++pickSeq;
     isLoading.value = true;
     try {
-        const { data } = await aibeesApi.get('/api/v1/stocks/buy-target');
-        items.value = Array.isArray(data?.data) ? data.data : [];
+        const { data } = await aibeesApi.get('/api/v1/stocks/buy-target/home', {
+            // watch: 관심 종목 중 오늘 후보에 있는 것은 서버가 봉·내 조건 판정(match)을 같이 준다
+            params: { settings: JSON.stringify(type.value.settings), limit: HOME_COUNT, watch: watchCodes.value || undefined },
+        });
+        if (seq !== pickSeq) return;
+        const d = data?.data;
+        pick.value = d && Array.isArray(d.items) ? { ...EMPTY_PICK, ...d } : EMPTY_PICK;
     } catch (e) {
+        if (seq !== pickSeq) return;
         console.error('[home] 주목 종목 조회 실패', e);
-        items.value = [];
+        pick.value = EMPTY_PICK;
     } finally {
-        isLoading.value = false;
+        if (seq === pickSeq) isLoading.value = false;
     }
 };
 
-const type = computed(() => persona.currentType);
-// 서버가 준 후보를 내 설정의 보조지표로 다시 판정해 걸러 낸 뒤, 설정의 순서로 정렬한다.
-const passRule = computed(() => passRuleText(type.value.settings));
-const ordered = computed(() => {
-    const judged = items.value.map(item => ({ item, ev: evaluate(item, type.value.settings) })).filter(x => x.ev.match);
-    return orderForType(judged.map(x => x.item), type.value).map(item => ({
+const candidateCount = computed(() => pick.value.candidate_count || 0);
+const visibleRows = computed(() => pick.value.items.map(item => {
+    const pct = numOrNull(item.rate_pct);
+    return {
         item,
         code: item.stock_code,
         name: item.stock_name,
-        chg: changeInfo(item),
-        reasons: recoReasons(item),   // 가장 주요한 추천 이유 1개를 띠로
-    })).map(w => ({
-        ...w,
-        pctText: w.chg.pct === null ? '–' : `${signed(w.chg.pct, 2)}%`,
-        absText: w.chg.abs === null || !w.chg.dir ? '' : `${w.chg.dir > 0 ? '▲' : '▼'}${w.chg.abs.toLocaleString()}`,
-    }));
-});
-const visibleRows = computed(() => (showAll.value ? ordered.value : ordered.value.slice(0, HOME_COUNT)));
-const restCount = computed(() => Math.max(0, ordered.value.length - HOME_COUNT));
+        chg: { cls: clsOf(pct) },
+        pctText: pct === null ? '–' : `${signed(pct, 2)}%`,
+        reasons: { top: item.reason ? { text: item.reason } : null, rest: item.reason_rest || 0 },   // 가장 주요한 추천 이유 1개를 띠로
+    };
+}));
 const basisText = computed(() => {
-    const ymd = items.value[0]?.ymd;
+    const ymd = pick.value.ymd;
     return ymd ? `${mdText(String(ymd).replaceAll('-', ''))} 종가 기준` : '';
 });
-watch(() => type.value, () => { showAll.value = false; });
+// 설정(유형)이나 관심 종목이 바뀌면 서버에 다시 묻는다.
+watch(() => [JSON.stringify(type.value.settings), watchCodes.value], () => loadItems());
 
 /* ── 내 관심 종목 ── */
-const watchlist = useWatchlistStore();
 const canAskPush = Capacitor.isNativePlatform();
 const turnOnAlerts = async () => watchlist.setAlerts(await enablePushNotifications());
+// 오늘 분석 목록에 있는 관심 종목: 서버가 준 후보 행(봉 포함) + match. code → 항목
+const listedWatch = computed(() => new Map((pick.value.watch_items || []).map(x => [x.stock_code, x])));
 // 오늘 분석 목록에서 빠진 관심 종목은 일봉을 따로 받아 같은 기준으로 판단한다. code → 항목(실패 시 null)
 const watchCharts = ref({});
-watch(() => [isLoading.value, watchlist.items.map(w => w.code).join()], () => {
+watch(() => [isLoading.value, watchCodes.value], () => {
     if (isLoading.value) return;
     watchlist.items
-        .filter(w => !items.value.some(x => x.stock_code === w.code) && !(w.code in watchCharts.value))
+        .filter(w => !listedWatch.value.has(w.code) && !(w.code in watchCharts.value))
         .forEach(async (w) => {
             watchCharts.value = { ...watchCharts.value, [w.code]: undefined };
             let item = null;
@@ -398,7 +405,7 @@ watch(() => [isLoading.value, watchlist.items.map(w => w.code).join()], () => {
 }, { immediate: true });
 
 const watchRows = computed(() => watchlist.items.map((w) => {
-    const listed = items.value.find(x => x.stock_code === w.code);
+    const listed = listedWatch.value.get(w.code);
     const item = listed ?? watchCharts.value[w.code];
     if (!item) {
         const failed = !isLoading.value && watchCharts.value[w.code] === null;
@@ -409,8 +416,8 @@ const watchRows = computed(() => watchlist.items.map((w) => {
     return {
         code: w.code, name: w.name, price: formatNumber(item.close), cls: chg.cls,
         pct: chg.pct === null ? '' : `${signed(chg.pct, 2)}%`,
-        // 내 조건 판정은 지표 값이 있는 분석 목록 종목만 한다
-        news: judgeStockNews(item, listed ? evaluate(item, type.value.settings) : null),
+        // 내 조건 판정은 분석 목록 종목만 한다(서버가 내 설정으로 판정한 match)
+        news: judgeStockNews(item, listed ? { match: !!listed.match } : null),
     };
 }));
 
@@ -418,7 +425,6 @@ const goToStock = (item) => router.push({
     path: AI_PATH,
     query: { stock_code: item.stock_code, stock_name: item.stock_name, ymd: String(item.ymd ?? '').replaceAll('-', '') },
 });
-const goToChart = (item) => router.push({ path: CHART_PATH, query: { code: item.stock_code } });
 
 /* ── 3. 지난달 성과 ── (서버가 표시일 종가 → 5거래일 내 최고가를 계산, 6시간 캐시) */
 const perf = ref(null);

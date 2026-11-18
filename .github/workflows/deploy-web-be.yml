@@ -1,0 +1,103 @@
+# 웹 BE(py-naver-stock-theme, 이미지 py-stock-web) 배포 — 홈 서버
+#   main 에 py-naver-stock-theme/ 또는 shared/ 가 바뀌어 push 되면 자동 배포, 수동 실행도 가능.
+#
+#   이미지 하나(py-stock-web)를 쓰는 컨테이너가 여럿이다:
+#     stock-web-flask-app     (docker-compose.yml)          — 항상 교체
+#     yangbong-web-flask-app  (docker-compose.yangbong.yml) — 서버에 이미 떠 있을 때만 교체
+#     yangbong-ai-worker      (docker-compose.yangbong.yml) — 서버에 이미 떠 있을 때만 교체
+#   아직 안 띄운 컨테이너를 배포가 새로 띄우지 않게 한다(sql 적용·nginx 전환 같은 수동 단계가 먼저라서).
+#
+#   옛 build_docker.sh 와 달리 컨테이너를 먼저 내리지 않는다.
+#   새 이미지 빌드가 성공한 뒤에만 교체하므로 빌드가 깨지면 기존 서버가 그대로 남는다.
+#   설정 방법: .github/DEPLOY.md
+name: 배포 · 웹 BE
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "py-project/py-naver-stock-theme/**"
+      - "py-project/shared/**"
+      - "py-project/.dockerignore"
+      - "!py-project/**/bt_*"
+      - "!py-project/**/*.md"
+      - "!py-project/py-naver-stock-theme/docker-compose.mcp.yml"
+      - "!py-project/py-naver-stock-theme/Dockerfile.mcp"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web-be
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, home]
+    timeout-minutes: 30
+    env:
+      ROOT: ${{ vars.HOME_DEPLOY_ROOT }}
+    steps:
+      - name: 배포 경로 확인
+        run: |
+          if [ -z "$ROOT" ] || [ ! -d "$ROOT/py-project/py-naver-stock-theme" ]; then
+            echo "::error::저장소 변수 HOME_DEPLOY_ROOT 가 비었거나 경로에 py-project/py-naver-stock-theme 가 없습니다 ($ROOT)"
+            exit 1
+          fi
+
+      - name: git pull
+        run: |
+          cd "$ROOT"
+          git pull --ff-only origin main
+          echo "커밋: $(git log -1 --format='%h %s')"
+
+      - name: 이미지 빌드 (py-stock-web)
+        run: |
+          cd "$ROOT/py-project"
+          docker compose -f py-naver-stock-theme/docker-compose.yml build app
+
+      - name: 컨테이너 교체
+        run: |
+          set -euo pipefail
+          cd "$ROOT/py-project"
+
+          # 컨테이너가 떠 있으면 그 compose 프로젝트 이름을 그대로 쓴다.
+          # (두 compose 파일이 같은 폴더·같은 서비스명 app 이라 이름을 추측하면 엉뚱한 컨테이너를 교체할 수 있다)
+          project_of() { docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$1" 2>/dev/null || true; }
+
+          # recreate <compose 파일> <서비스> <컨테이너 이름> <없을 때: start|skip>
+          recreate() {
+            local file="$1" svc="$2" name="$3" when_missing="$4" proj
+            proj="$(project_of "$name")"
+            if [ -z "$proj" ] && [ "$when_missing" = skip ]; then
+              echo "· $name: 서버에 없음 → 건너뜀"
+              return
+            fi
+            local pargs=()
+            [ -n "$proj" ] && pargs=(-p "$proj")
+            echo "· $name 교체 (project=${proj:-기본})"
+            docker compose "${pargs[@]}" -f "$file" up -d --no-build --no-deps "$svc"
+            echo "$name" >> "$RUNNER_TEMP/recreated.txt"
+          }
+
+          : > "$RUNNER_TEMP/recreated.txt"
+          recreate py-naver-stock-theme/docker-compose.yml          app       stock-web-flask-app    start
+          recreate py-naver-stock-theme/docker-compose.yangbong.yml app       yangbong-web-flask-app skip
+          recreate py-naver-stock-theme/docker-compose.yangbong.yml ai-worker yangbong-ai-worker     skip
+
+      - name: 헬스체크
+        run: |
+          set -uo pipefail
+          sleep 15
+          fail=0
+          while read -r name; do
+            [ -z "$name" ] && continue
+            status="$(docker ps -a --filter "name=^/${name}$" --format '{{.Status}}')"
+            echo "· $name: $status"
+            case "$status" in
+              Up*) ;;
+              *) fail=1; docker logs --tail 50 "$name" 2>&1 || true ;;
+            esac
+          done < "$RUNNER_TEMP/recreated.txt"
+          rm -f "$RUNNER_TEMP/recreated.txt"
+          docker image prune -f >/dev/null 2>&1 || true
+          [ "$fail" = 0 ] || { echo "::error::기동 실패한 컨테이너가 있습니다"; exit 1; }
+          echo "### 웹 BE 배포 완료 — $(git -C "$ROOT" log -1 --format='%h %s')" >> "$GITHUB_STEP_SUMMARY"

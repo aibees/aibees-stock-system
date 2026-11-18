@@ -129,6 +129,63 @@ class StockAiContentService:
             logger.info(f"[ai-news] {stock_code} 새로 만들지 않음: {e}")
             return cached
 
+    # ── 비동기 작업(양봉상회, AiJobService·AI 워커)이 쓰는 조각 ────────────
+    #   요청 시점 검사(check_refresh_allowed·check_quota)와 실제 생성(generate_now)을 나눈다.
+    #   비밀상회의 동기 경로(refresh_*·get_or_refresh_news)는 위 메서드를 그대로 쓴다.
+    def check_refresh_allowed(self, session, stock_code: str, section: str, is_admin: bool, force: bool):
+        """버튼 갱신을 지금 받아도 되는지. 안 되면 AnnouncementMonthRequiredError·RefreshCooldownError."""
+        cached = self._dao.select_by_stock_section(session, stock_code, section)
+        if section == "overview" and cached and datetime.now().month not in ANNOUNCEMENT_MONTHS:
+            raise AnnouncementMonthRequiredError()
+        self._check_cooldown(cached, is_admin, force)
+        return cached
+
+    @staticmethod
+    def news_is_stale(cached: dict | None) -> bool:
+        return not cached or (datetime.now() - cached["updated_at"]) >= NEWS_TTL
+
+    def check_quota(self, session, user_id: int | None, is_admin: bool):
+        """하루 한도 검사만(기록은 남기지 않는다). user_id 가 None 이면(자동 작업) 서버 전체 한도만 본다."""
+        if is_admin:
+            return
+        now = datetime.now()
+        today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        limits = self._limits(session)
+        if user_id is not None and \
+                self._genLogDao.count_since(session, today, user_id=user_id) >= limits['GEN_PER_USER_DAY']:
+            raise GenerationQuotaError(
+                f"오늘 AI 분석을 새로 만들 수 있는 횟수({limits['GEN_PER_USER_DAY']}번)를 다 썼어요. 내일 다시 시도해 주세요.")
+        if self._genLogDao.count_since(session, today) >= limits['GEN_TOTAL_DAY']:
+            raise GenerationQuotaError("오늘은 AI 분석 요청이 많아 새로 만들 수 없어요. 내일 다시 시도해 주세요.")
+
+    def record_generation(self, session, stock_code: str, section: str, user_id: int | None) -> int:
+        """생성 기록 1행(한도 차감). 커밋은 호출자. 자동 작업은 user_id 0 으로 남긴다."""
+        return self._genLogDao.insert(session, user_id or 0, stock_code, section, datetime.now())
+
+    def refund_generation(self, session, log_id: int | None):
+        """생성이 실패했으면 차감한 기록을 지운다. 커밋은 호출자."""
+        if log_id is not None:
+            self._genLogDao.delete(session, log_id)
+
+    def generate_now(self, session, stock_code: str, section: str, kis: KisEngine | None = None) -> dict:
+        """AI 를 불러 만들고 저장한다(한도 검사·기록 없음 — 호출자 몫). news 는 kis 가 필요하다."""
+        if section == "overview":
+            messages = build_overview_messages(stock_code)
+        elif section == "theme":
+            messages = build_theme_messages(stock_code)
+        elif section == "news":
+            if kis is None:
+                raise ValueError("news 생성에는 KIS 엔진이 필요합니다.")
+            stock = self._masterStockDao.select_master_stock_by_id(session, {"stock_code": stock_code})
+            stock_name = stock["stock_name"] if stock else None
+            messages = build_news_messages(stock_code, kis.get_news_title(stock_code, stock_name=stock_name))
+        else:
+            raise ValueError(f"알 수 없는 섹션: {section}")
+        # AI 호출(수십 초) 동안 DB 연결을 쥐지 않게 읽기 트랜잭션을 끝낸다(양봉 계정 연결 수 한도 15).
+        session.commit()
+        result = self._anthropic.chat(messages=messages, system=STOCK_ANALYSIS_SYSTEM, use_web_search=True)
+        return self._save(session, stock_code, section, result)
+
     # ── 내부 ──────────────────────────────────────────────────
     def _limits(self, session) -> dict:
         limits = dict(_DEFAULT_LIMITS)

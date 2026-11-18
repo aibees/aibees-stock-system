@@ -57,13 +57,17 @@ class StockService:
                 logging.warning(f"[rec-record] KIS 키 없음 → DB 일봉 사용: {e}")
         return dailyBarSource.bars_between(session, stock_code, date_from, date_to)
 
-    def get_buy_target_stock_list(self, session, ymd):
+    def get_buy_target_stock_list(self, session, ymd, lite: bool = False):
         """매수추천 목록. 두 테이블을 종목당 한 줄로 합치고 행마다 algos(걸린 알고리즘)를 붙인다.
 
           · trade_buy_target_stock : 2파 종합순위(PREMIUM). 워커가 읽는 테이블.
                                      rank_no 가 남아 있는 옛 행(기본 알고리즘이 같은 테이블에 저장되던 시절)은 BASIC 도 겸한다.
           · trade_buy_target_basic : 옛 기계식 알고리즘(BASIC).
         단계 판정·권한별 가공은 RecoLevel.apply_levels 가 한다.
+
+        chart_data 는 응답용으로 줄인다(compact_bars, 2026-11-18). 봉 개수(120)는 그대로다 —
+        화면이 120일선·MACD(EMA)를 이 봉으로 다시 계산하므로 봉을 자르면 추천 판정이 달라진다.
+        lite=True(홈)면 이동평균(ma20·ma60·ma120)도 뺀다. 홈은 미니 차트를 그리지 않는다.
         """
         # ymd 미지정이면 두 테이블 중 더 최근 영업일을 쓴다(한쪽만 비는 날에도 다른 쪽이 나오게).
         if not ymd.get(Literal.YMD):
@@ -81,7 +85,7 @@ class StockService:
         resolved_ymd = results[0]["ymd"]
         chart_map = self.buyTargetChartDaoImpl.select_by_ymd(session, resolved_ymd)
         for item in results:
-            item["chart_data"] = chart_map.get(item["stock_code"], [])
+            item["chart_data"] = self.compact_bars(chart_map.get(item["stock_code"], []), with_ma=not lite)
 
         # 시가총액·투자자 수급 — 추천일 이하 가장 최근 영업일 기준(20:00 추천 → 다음 날 07:10 그날 수급 적재).
         # 부가 정보라 실패해도 추천 목록은 그대로 내려준다.
@@ -100,6 +104,36 @@ class StockService:
         for item in results:
             item["sector_name"] = sector_map.get(item.get("stock_code"))
         return results
+
+    _MA_KEYS = ("ma20", "ma60", "ma120")
+
+    @classmethod
+    def compact_bars(cls, bars: list, with_ma: bool = True) -> list:
+        """매수추천 chart_data 를 응답용으로 줄인다. 값의 의미는 바꾸지 않는다.
+          · date   'YYYY-MM-DD 00:00:00' → 'YYYY-MM-DD' (화면은 모두 앞 10자리만 쓴다)
+          · 가격    정수면 정수로(2335.0 → 2335), 아니면 소수 2자리
+          · volume 정수로
+          · ma*    소수 2자리(미니 차트 선 그리기용). with_ma=False 면 뺀다
+        그 밖의 키는 그대로 둔다."""
+        out = []
+        for b in bars or []:
+            if not isinstance(b, dict):
+                continue
+            row = {}
+            for k, v in b.items():
+                if k in cls._MA_KEYS:
+                    if with_ma:
+                        row[k] = round(v, 2) if isinstance(v, float) else v
+                elif k == "date":
+                    row[k] = str(v)[:10] if v is not None else v
+                elif k == "volume":
+                    row[k] = int(v) if isinstance(v, (int, float)) else v
+                elif k in ("open", "high", "low", "close") and isinstance(v, float):
+                    row[k] = int(v) if v.is_integer() else round(v, 2)
+                else:
+                    row[k] = v
+            out.append(row)
+        return out
 
     def attach_market_info(self, session, items: list, max_ymd: str = None) -> None:
         """

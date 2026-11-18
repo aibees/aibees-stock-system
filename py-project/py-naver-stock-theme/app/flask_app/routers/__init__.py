@@ -32,9 +32,19 @@ _SECRET_ONLY_BLUEPRINTS = [
 ]
 
 
+# 양봉상회에만 있는 블루프린트 — sql/yangbong/008 의 표(작업 큐·알림함·푸시 토큰)를 쓴다.
+#   AI 분석 비동기화(meetings/설계_2026-11-18_AI분석-비동기화.md). 비밀상회 DB(stock)에는 이 표가 없다.
+_YANGBONG_ONLY_BLUEPRINTS = [
+    ("app.flask_app.routers.router_ai_job",       "ai_job_bp",       "/api/v1/anthropic/stock-analysis"),
+    ("app.flask_app.routers.router_notification", "notification_bp", "/api/v1/notifications"),
+    ("app.flask_app.routers.router_notification", "notify_bp",       "/api/v1/notify"),
+]
+
+
 def _blueprints():
     import importlib
-    entries = _PUBLIC_BLUEPRINTS if IS_YANGBONG else _PUBLIC_BLUEPRINTS + _SECRET_ONLY_BLUEPRINTS
+    entries = _PUBLIC_BLUEPRINTS + _YANGBONG_ONLY_BLUEPRINTS if IS_YANGBONG \
+        else _PUBLIC_BLUEPRINTS + _SECRET_ONLY_BLUEPRINTS
     for module_path, attr, prefix in entries:
         yield getattr(importlib.import_module(module_path), attr), prefix
 

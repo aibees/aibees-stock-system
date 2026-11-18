@@ -10,6 +10,7 @@ from app.services.anthropic.stockAiContentService import (
     GenerationQuotaError,
 )
 from stock_shared.dao.masterStockDao import MasterStockDao
+from app.utils.service import IS_YANGBONG
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,12 @@ stockAiContentServiceImpl = StockAiContentService()
 masterStockDaoImpl = MasterStockDao()
 
 ADMIN_USER_ID = 1
+
+# 양봉상회(2026-11-18): AI 생성은 요청을 쌓고 AI 워커가 처리한다(router_ai_job·AiJobService).
+#   옛 POST /stock-analysis/<overview|theme> 는 작업 접수(202)로 바뀌고, GET news 는 저장된 것 + 2시간 지났으면 작업을 넣는다.
+#   비밀상회는 지금처럼 요청 안에서 바로 만든다.
+if IS_YANGBONG:
+    from app.flask_app.routers.router_ai_job import aiJobServiceImpl, request_job
 
 # AI 를 새로 부르는(비용이 드는) 엔드포인트의 공통 규칙 (2026-11-15):
 #   - 로그인 필요. /chat·/stream 은 화면에서 쓰지 않으므로 관리자(user_id=1)만.
@@ -149,6 +156,9 @@ def refresh_overview():
     if (bad := _unknown_stock(stock_code)):
         return bad
 
+    if IS_YANGBONG:
+        return request_job("overview", stock_code)
+
     body = request.get_json(silent=True) or {}
     is_admin = (g.current_user_id == ADMIN_USER_ID)
     force = is_admin and bool(body.get("force"))
@@ -187,6 +197,9 @@ def refresh_theme():
     if (bad := _unknown_stock(stock_code)):
         return bad
 
+    if IS_YANGBONG:
+        return request_job("theme", stock_code)
+
     body = request.get_json(silent=True) or {}
     is_admin = (g.current_user_id == ADMIN_USER_ID)
     force = is_admin and bool(body.get("force"))
@@ -213,6 +226,15 @@ def get_news():
         return ApiResponse.error("stock_code 파라미터가 필요합니다.")
     if (bad := _unknown_stock(stock_code)):
         return bad
+
+    if IS_YANGBONG:
+        # data 는 예전처럼 저장된 내용(없으면 null), 작업 정보는 최상위 news_job·stale 로 붙인다(옛 화면 호환).
+        try:
+            res = aiJobServiceImpl.news(g.db, stock_code)
+            return ApiResponse.success(res["data"], extra={"stale": res["stale"], "news_job": res["job"]})
+        except Exception as e:  # noqa: BLE001
+            logger.error(e, exc_info=True)
+            return ApiResponse.error("뉴스 요약을 불러오지 못했어요.", status=500)
 
     try:
         result = stockAiContentServiceImpl.get_or_refresh_news(

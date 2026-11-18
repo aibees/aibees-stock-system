@@ -34,6 +34,8 @@ mcp = "^1.9.0"
 uvicorn = {extras = ["standard"], version = "^0.34.0"}
 scipy = "^1.18.0"
 yfinance = "^1.5.2"
+# 양봉 AI 워커의 완료 알림 푸시(stock_shared.push.fcm). py-stock-batch 와 같은 버전대.
+firebase-admin = "^6.5.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
