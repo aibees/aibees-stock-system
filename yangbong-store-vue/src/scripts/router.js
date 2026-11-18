@@ -5,7 +5,8 @@ import { assUserSession } from "./stores/user-stores";
 import { ensureAccess } from "./useAccess.js";
 import { consumeAdPass, countGateEntry, gateInterval } from "./useAdGate.js";
 import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
-import { isAuthPath, isGuestPath, ONBOARDING_PATH } from "./authPaths.js";
+import { isAuthPath, isGuestPath, INTRO_PATH, ONBOARDING_PATH } from "./authPaths.js";
+import { isIntroSeen } from "./introState.js";
 import { usePersonaStore } from "./stores/persona-store.js";
 import { NOTICE_DETAIL_PATH, NOTICE_LIST_PATH } from "./notice.js";
 import AdGate from '@/components/AdGate.vue';
@@ -18,6 +19,7 @@ import Signup from '@/components/Signup.vue';
 import HomeEntry from '@/components/Home/HomeEntry.vue'
 import Menu from '@/components/Menu.vue'
 import Onboarding from '@/components/Home/Onboarding.vue'
+import IntroPage from '@/components/Home/IntroPage.vue'
 import StockPreset from '@/components/Stocks/StockPreset.vue'
 import TrainingHub from '@/components/Training/TrainingHub.vue'
 import TrainingHome from '@/components/Training/TrainingHome.vue'
@@ -48,6 +50,12 @@ const routes = [
         path: "/home",
         name: "home",
         component: HomeEntry
+    },
+    {
+        // 앱 소개. 앱 첫 실행 때 홈 앞에 한 번 나오고, 웹은 홈의 "처음이세요?"로 연다.
+        path: INTRO_PATH,
+        name: "intro",
+        component: IntroPage
     },
     {
         // 성향 질문(온보딩). 비로그인 접근 가능. ?pick=1 이면 질문 없이 유형 고르기 화면부터.
@@ -310,9 +318,9 @@ export const setRouterToApp = async () => {
         const persona = usePersonaStore();
         if (loggedIn) await persona.syncWithAccount();
 
-        // 처음 실행: 홈으로 들어올 때 성향 질문을 한 번 연다(권한을 받은 뒤라 매매 사용자는 제외된다).
+        // 처음 실행: 홈으로 들어올 때 앱 소개 → 성향 질문 순서로 한 번 연다(권한을 받은 뒤라 매매 사용자는 제외된다).
         if (target === '/home' && persona.needsOnboarding()) {
-            return { path: ONBOARDING_PATH };
+            return { path: isIntroSeen() ? ONBOARDING_PATH : INTRO_PATH };
         }
 
         // 광고 게이트: 접근이 허용된 게이트 대상 메뉴에 들어올 때. AD_FREE 보유자는 건너뛴다.

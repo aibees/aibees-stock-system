@@ -10,7 +10,7 @@
                 </button>
 
                 <div class="hh-actions">
-                    <button type="button" class="guide-btn" @click="router.push(ONBOARDING_PATH)"><i class="dot" aria-hidden="true"></i>처음이세요?</button>
+                    <button type="button" class="guide-btn" @click="router.push(INTRO_PATH)"><i class="dot" aria-hidden="true"></i>처음이세요?</button>
                     <div class="account" ref="accountRef">
                         <button v-if="isLoggedIn" type="button" class="icon-btn" :aria-label="`내 계정 · ${userName} 님`"
                             aria-haspopup="menu" :aria-expanded="menuOpen ? 'true' : 'false'" @click.stop="menuOpen = !menuOpen">
@@ -186,7 +186,7 @@ import { usePersonaStore } from '@scripts/stores/persona-store.js';
 import { hasRole, WORKER_ROLE } from '@scripts/useAccess.js';
 import { useShowAds } from '@scripts/useAds.js';
 import { isNativeAdsEnabled } from '@scripts/useAdMob.js';
-import { ONBOARDING_PATH, isGuestPath } from '@scripts/authPaths.js';
+import { INTRO_PATH, isGuestPath } from '@scripts/authPaths.js';
 import { NOTICE_LIST_PATH, NOTICE_DETAIL_PATH, noticeDateText } from '@scripts/notice.js';
 import { numOrNull, formatNumber, changeInfo } from '@scripts/stockSignals.js';
 import { orderForType, marketWeather } from '@scripts/persona.js';
