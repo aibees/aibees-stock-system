@@ -19,7 +19,11 @@ import HomeEntry from '@/components/Home/HomeEntry.vue'
 import Menu from '@/components/Menu.vue'
 import Onboarding from '@/components/Home/Onboarding.vue'
 import StockPreset from '@/components/Stocks/StockPreset.vue'
+import TrainingHub from '@/components/Training/TrainingHub.vue'
 import TrainingHome from '@/components/Training/TrainingHome.vue'
+import TrainingGlossary from '@/components/Training/TrainingGlossary.vue'
+import TrainingQuizHome from '@/components/Training/TrainingQuizHome.vue'
+import TrainingQuizPlay from '@/components/Training/TrainingQuizPlay.vue'
 import TrainingLesson from '@/components/Training/TrainingLesson.vue'
 import Login from '@/components/Login.vue'
 import App from '@/components/App.vue'
@@ -64,10 +68,32 @@ const routes = [
         component: StockPreset
     },
     {
-        // 트레이닝 커리큘럼(장 → 단계, 모든 단계 열림). 비로그인 접근 가능(authPaths.GUEST_PREFIXES). 정적 라우트.
+        // 트레이닝 첫 화면: 수업 듣기 · 퀴즈 · 용어 사전 입구. 비로그인 접근 가능(authPaths.GUEST_PREFIXES).
         path: "/training",
         name: "training",
+        component: TrainingHub
+    },
+    {
+        // 수업 목록(장 → 단계)
+        path: "/training/lessons",
+        name: "training-lessons",
         component: TrainingHome
+    },
+    {
+        path: "/training/glossary",
+        name: "training-glossary",
+        component: TrainingGlossary
+    },
+    {
+        path: "/training/quiz",
+        name: "training-quiz",
+        component: TrainingQuizHome
+    },
+    {
+        // all · wrong · today · <장 slug>
+        path: "/training/quiz/:set",
+        name: "training-quiz-play",
+        component: TrainingQuizPlay
     },
     {
         // 장 바로가기(전체 메뉴의 장 항목·단계 화면의 뒤로): 같은 목차 화면을 그 장 위치로 연다(scrollBehavior).

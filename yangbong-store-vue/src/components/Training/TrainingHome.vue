@@ -1,29 +1,10 @@
 <template>
     <div id="training-home">
-        <header class="tr-header">
-            <h1>트레이닝</h1>
-            <!-- 강의 / 용어 사전: 주소로 구분한다(/training, /training/glossary) — 메뉴에서 바로 열 수 있다 -->
-            <nav class="tr-tabs" aria-label="트레이닝 보기">
-                <button type="button" :class="{ on: !isGlossary }" :aria-current="!isGlossary ? 'page' : undefined" @click="router.replace(TRAINING_PATH)">강의</button>
-                <button type="button" :class="{ on: isGlossary }" :aria-current="isGlossary ? 'page' : undefined" @click="router.replace(GLOSSARY_PATH)">용어 사전</button>
-            </nav>
-        </header>
+        <BrandHeader title="수업 듣기" :back="TRAINING_PATH" />
 
         <main class="tr-main">
-            <TrainingGlossary v-if="isGlossary" />
-            <template v-else>
-            <!-- 이어서 하기: 다음 차례 단계 하나 + 버튼. 아래에 전체 진행 막대 -->
+            <!-- 전체 진행(이어서 하기는 트레이닝 첫 화면에 있다) -->
             <section class="tr-card tr-top" aria-label="진행 상황">
-                <div v-if="next" class="tr-resume">
-                    <p class="tr-resume-cap">{{ store.doneCount ? '이어서 하기' : '처음 시작하기' }} · {{ chapterOf(next).no }}장 {{ next.indexInChapter }}단계</p>
-                    <p class="tr-resume-title">{{ shortOf(next) }}</p>
-                    <p v-if="next.sub" class="tr-resume-sub">{{ next.sub }}</p>
-                    <button type="button" class="tr-resume-btn" @click="openStage(next)">{{ store.doneCount ? '이어서 하기' : '시작하기' }}</button>
-                </div>
-                <div v-else class="tr-resume">
-                    <p class="tr-resume-title">✓ 모든 단계를 마쳤어요</p>
-                    <p class="tr-resume-sub">마친 단계는 언제든 다시 볼 수 있어요.</p>
-                </div>
                 <div class="tr-prog">
                     <div class="tr-bar" role="progressbar" aria-label="완료한 단계"
                         :aria-valuenow="store.doneCount" aria-valuemin="0" :aria-valuemax="store.total">
@@ -73,7 +54,6 @@
                     <li v-for="name in soon" :key="name">{{ name }}</li>
                 </ul>
             </section>
-            </template>
 
             <p class="tr-note">설명용 자료이며 특정 종목의 매수·매도를 권하지 않습니다. 투자 판단과 책임은 본인에게 있습니다.</p>
         </main>
@@ -82,21 +62,17 @@
 
 <script setup>
 /**
- * 트레이닝 목차(2026-11-17 개편): 이어서 하기 카드 → 장별 1열 단계 리스트.
+ * 수업 목록(/training/lessons, /training/<장>): 장별 1열 단계 리스트.
  *   - 목록 줄은 짧은 제목(short) + 회색 한 줄 설명(sub). 긴 원래 제목(title)은 레슨 화면에서만 쓴다.
  *   - 기본으로 지금 차례인 장(또는 /training/:chapter 로 들어온 장)만 펼친다. 다른 장은 한 줄로 접혀 있고 누르면 펼친다.
  */
 import { chapters, soonItems, stagePath, TRAINING_PATH } from '@scripts/training.js';
 import { useTrainingStore } from '@scripts/stores/training-store.js';
-import TrainingGlossary from './TrainingGlossary.vue';
 
 const router = useRouter();
 const route = useRoute();
 const store = useTrainingStore();
 
-const GLOSSARY_SLUG = 'glossary';
-const GLOSSARY_PATH = `${TRAINING_PATH}/${GLOSSARY_SLUG}`;
-const isGlossary = computed(() => route.params.chapter === GLOSSARY_SLUG);
 
 const chapterList = chapters();
 const soon = soonItems();
@@ -104,7 +80,6 @@ const next = computed(() => store.nextStage);
 const pct = computed(() => (store.total ? Math.round(store.doneCount / store.total * 100) : 0));
 
 const shortOf = (s) => s.short || s.title;
-const chapterOf = (s) => chapterList.find(c => c.slug === s.chapterSlug) ?? { no: '' };
 const isNext = (s) => next.value?.key === s.key;
 const openStage = (s) => router.push(stagePath(s));
 
@@ -162,37 +137,6 @@ const rowCls = (s) => ({
 }
 button { font: inherit; letter-spacing: inherit; }
 
-.tr-header {
-    background: $card;
-    padding: 16px $pad-x 0;
-    border-bottom: 1px solid $line;
-    position: sticky;
-    top: env(safe-area-inset-top, 0px);
-    z-index: 10;
-
-    h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.6px; color: $ink; }
-}
-.tr-tabs {
-    display: flex;
-    gap: 20px;
-    margin-top: 6px;
-    button {
-        position: relative;
-        height: 44px;
-        padding: 0;
-        border: 0;
-        background: transparent;
-        color: $sub;
-        font-size: 16px;
-        font-weight: 500;
-        cursor: pointer;
-        &.on {
-            color: $ink;
-            font-weight: 700;
-            &::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: $ink; }
-        }
-    }
-}
 .tr-main {
     max-width: 720px;
     margin: 0 auto;
@@ -204,33 +148,9 @@ button { font: inherit; letter-spacing: inherit; }
 }
 .tr-card { background: $card; padding: 24px $pad-x; }
 
-/* ── 이어서 하기 ── */
-.tr-top { padding-top: 16px; }
-.tr-resume {
-    background: $honey-strip;
-    border-radius: 16px;
-    padding: 18px 18px 16px;
-    p { margin: 0; }
-}
-.tr-resume-cap { font-size: 13px; font-weight: 600; color: $amber-700; }
-.tr-resume .tr-resume-title { margin-top: 6px; font-size: 19px; font-weight: 700; letter-spacing: -0.5px; }
-.tr-resume .tr-resume-sub { margin-top: 4px; font-size: 14px; color: $sub-ink; }
-.tr-resume-btn {
-    width: 100%;
-    height: 48px;
-    margin-top: 16px;
-    border: 0;
-    border-radius: 12px;
-    background: $honey-300;
-    color: $honey-ink;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: transform .1s ease;
-    &:active { transform: scale(.98); }
-}
-.tr-prog { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+/* ── 전체 진행 ── */
+.tr-top { padding-top: 8px; padding-bottom: 20px; }
+.tr-prog { display: flex; align-items: center; gap: 10px; }
 .tr-bar {
     flex: 1; height: 6px; border-radius: 3px; background: $band; overflow: hidden;
     span { display: block; height: 100%; min-width: 6px; border-radius: 3px; background: $honey-dot; transition: width .3s ease; }
@@ -342,7 +262,4 @@ button { font: inherit; letter-spacing: inherit; }
 
 .tr-note { margin: 0; padding: 12px $pad-x 8px; font-size: 12px; line-height: 1.6; color: $sub-2; }
 
-/* 2026-11-17 꿀빛 톤: 이어서 하기 카드 = 꿀빛 그라데이션, 진행 막대·마친 단계 = 꿀색, 지금 차례 = 앰버 */
-.tr-resume { border-radius: $radius; }
-.tr-resume-btn { border-radius: $radius; }
 </style>

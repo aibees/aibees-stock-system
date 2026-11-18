@@ -17,6 +17,8 @@ import TOC from './data/trainingToc.json';
 import LESSONS from './data/trainingLessons.json';
 
 export const TRAINING_PATH = '/training';
+export const LESSONS_PATH = `${TRAINING_PATH}/lessons`;
+export const GLOSSARY_PATH = `${TRAINING_PATH}/glossary`;
 
 const hasLesson = (l) => !!l && ((l.body?.length ?? 0) > 0 || (l.quiz?.length ?? 0) > 0);
 
