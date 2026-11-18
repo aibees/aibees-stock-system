@@ -160,7 +160,8 @@
 </template>
 
 <script setup>
-import CandlestickChart from '../common/comp/CandlestickChart.vue';
+// 미니 봉차트는 chart.js·luxon·hammer 묶음(수백 KB)을 쓴다 → 비동기 컴포넌트로 받아 목록 글자가 먼저 뜨게 한다.
+const CandlestickChart = defineAsyncComponent(() => import('../common/comp/CandlestickChart.vue'));
 import { buyTargetCandleData, miniCandleOptions } from '@scripts/miniCandle.js';
 import aibeesApi from '@scripts/aibeesApi.js';
 import { recoLevel } from '@scripts/useAccess.js';

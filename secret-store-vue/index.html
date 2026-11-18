@@ -33,11 +33,12 @@
         } catch (e) {}
       })();
     </script>
-    <script type="text/javascript" src="https://static.nid.naver.com/js/naverLogin_implicit-1.0.3.js" charset="utf-8"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap" />
+    <!-- 브랜드명 글꼴(Do Hyeon)은 첫 화면을 막지 않게 비동기로 받는다(도착 전엔 대체 글꼴). -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap" /></noscript>
     <title>비밀상회</title>
   </head>
   <body>

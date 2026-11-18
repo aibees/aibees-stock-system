@@ -29,7 +29,8 @@
  *   짧은 주소 /notice/<notice_id> 로도 들어온다(router.js 리다이렉트).
  */
 import aibeesApi from '@scripts/aibeesApi.js';
-import { NOTICE_LIST_PATH, noticeCategoryClass, noticeDateText, isNoticeHtml, sanitizeNoticeHtml } from '@scripts/notice.js';
+import { NOTICE_LIST_PATH, noticeCategoryClass, noticeDateText } from '@scripts/notice.js';
+import { isNoticeHtml, sanitizeNoticeHtml } from '@scripts/noticeHtml.js';
 
 const route = useRoute();
 const router = useRouter();
