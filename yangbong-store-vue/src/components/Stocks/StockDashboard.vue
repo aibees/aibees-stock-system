@@ -48,7 +48,7 @@
                     <h2 id="sd-recent-title">최근 본 회사</h2>
                     <button v-if="recent.length" type="button" class="sd-link" @click="clear">지우기</button>
                 </div>
-                <p v-if="!recent.length" class="sd-empty">아직 본 회사가 없어요. 매수추천이나 AI 분석에서 회사를 열어 보세요.</p>
+                <p v-if="!recent.length" class="sd-empty">아직 본 회사가 없어요. 주목 종목이나 AI 분석에서 회사를 열어 보세요.</p>
                 <ul v-else class="sd-recent">
                     <li v-for="r in recent" :key="r.code">
                         <button type="button" class="sd-recent-row" @click="openStock(r)">
@@ -87,7 +87,7 @@ const indRows = computed(() => INDICATORS.map(d => ({ key: d.key, label: d.label
     .sort((a, b) => (a.text ? 0 : 1) - (b.text ? 0 : 1)));
 
 const ALL = [
-    { path: '/stock/buy-target', name: '매수추천', desc: '내 설정에 맞는 회사를 순서대로 보여 드려요' },
+    { path: '/stock/buy-target', name: '주목 종목', desc: '내 설정에 맞는 회사를 순서대로 보여 드려요' },
     { path: '/stock/info',       name: 'AI 분석',  desc: '종목을 하나 골라 사업·재무·뉴스를 분석해 드려요' },
     { path: '/stock/chart',      name: '차트 확인', desc: '일·주·월봉과 이동평균선으로 차트를 살펴보세요' },
     { path: PRESET_PATH,         name: '내 설정',  desc: '보조지표를 켜고 끄고 수치를 직접 고쳐요', always: true },

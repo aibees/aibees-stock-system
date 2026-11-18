@@ -118,7 +118,7 @@
                         </component>
                     </li>
                 </ol>
-                <button v-if="canOpen(BUY_TARGET_PATH)" type="button" class="more" @click="router.push(BUY_TARGET_PATH)">매수추천 전체 보기</button>
+                <button v-if="canOpen(BUY_TARGET_PATH)" type="button" class="more" @click="router.push(BUY_TARGET_PATH)">주목 종목 전체 보기</button>
             </section>
 
             <!-- ── 3. 지난달 성과: 큰 숫자 하나 + 1위 종목. 계산 기준 안내는 ⓘ 뒤로, 나머지 종목은 '전체 보기'로 펼친다 ── -->

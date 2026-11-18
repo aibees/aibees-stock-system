@@ -88,7 +88,7 @@
                         <p v-else class="muted">아직 충족한 신호가 없어요. 전체 조건은 분석내용 탭에서 볼 수 있어요.</p>
                     </section>
                     <section v-else-if="itemLoaded" class="ai-result-section">
-                        <p class="muted">이 날짜의 추천 목록에 없는 종목이라 차트 모양·신호 정보가 없어요.</p>
+                        <p class="muted">이 날짜의 주목 종목에 없는 종목이라 차트 모양·신호 정보가 없어요.</p>
                     </section>
 
                     <!-- ② 현재 테마 (버튼 갱신, 주 1회 권장) -->
@@ -158,15 +158,15 @@
                         </div>
                     </section> -->
 
-                    <!-- ③ 추천 성과 추적 (최근 1달 이내 추천된 경우) -->
+                    <!-- ③ 선정 후 성과 추적 (최근 1달 이내 추천된 경우) -->
                     <section class="rec-section" v-if="recommendationData?.rec_record && recommendationData?.now_record && recommendationData?.max_record">
                         <div class="section-header">
-                            <span class="section-title">추천 성과 추적</span>
-                            <span class="rec-date-badge">추천일 {{ recommendationData.rec_record.ymd }}</span>
+                            <span class="section-title">선정 후 성과 추적</span>
+                            <span class="rec-date-badge">선정일 {{ recommendationData.rec_record.ymd }}</span>
                         </div>
                         <div class="rec-grid">
                             <div class="rec-card base-card">
-                                <span class="rec-label">추천당시 종가 {{ recommendationData.rec_record.ymd }}</span>
+                                <span class="rec-label">선정일 종가 {{ recommendationData.rec_record.ymd }}</span>
                                 <span class="rec-price">{{ formatNumber(recommendationData.rec_record.close) }}<em>원</em></span>
                                 <span class="rec-rate-badge neutral">기준가</span>
                             </div>
@@ -178,7 +178,7 @@
                                 </span>
                             </div>
                             <div class="rec-card high-card">
-                                <span class="rec-label">추천 후 최고가 {{ recommendationData.max_record.ymd }}</span>
+                                <span class="rec-label">선정 후 최고가 {{ recommendationData.max_record.ymd }}</span>
                                 <span class="rec-price">{{ formatNumber(recommendationData.max_record.close) }}<em>원</em></span>
                                 <span class="rec-rate-badge" :class="rateClass(recommendationData.max_record.rate)">
                                     {{ formatRate(recommendationData.max_record.rate) }}
@@ -239,7 +239,7 @@
                                 <!-- 점수는 장 마감 후 산출된다 — 값이 있을 때만 보여준다 -->
                                 <p v-if="hasValue(item.score)" class="basis-note">종합 점수 {{ numOrNull(item.score) }} / 100</p>
                             </template>
-                            <p v-else class="muted card-empty">{{ itemLoaded ? '이 날짜의 추천 목록에 없는 종목이라 판별조건 정보가 없어요.' : '불러오는 중입니다…' }}</p>
+                            <p v-else class="muted card-empty">{{ itemLoaded ? '이 날짜의 주목 종목에 없는 종목이라 판별조건 정보가 없어요.' : '불러오는 중입니다…' }}</p>
                         </section>
                     </div>
 

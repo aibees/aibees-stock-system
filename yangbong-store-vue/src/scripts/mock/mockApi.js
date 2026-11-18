@@ -148,7 +148,7 @@ const menu = (code, path, name, component, parents, children = []) => ({
 });
 const MENUS = [
     menu('Stocks', '/stock', '주식분석', 'StockView', 'root', [
-        menu('StockBuyTarget', 'buy-target', '매수추천', 'StockBuyTarget', 'Stocks'),
+        menu('StockBuyTarget', 'buy-target', '주목 종목', 'StockBuyTarget', 'Stocks'),
         menu('StockInfo', 'info', 'AI 분석', 'StockInfo', 'Stocks'),
         menu('ChartStock', 'chart', '차트 확인', 'ChartStock', 'Stocks'),
     ]),

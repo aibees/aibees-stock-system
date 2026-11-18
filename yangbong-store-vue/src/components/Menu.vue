@@ -34,7 +34,7 @@
                         <span class="icon-box" aria-hidden="true">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="iconOf(sm.menu_code)"></path></svg>
                         </span>
-                        <span class="label">{{ sm.menu_title || sm.menu_name }}</span>
+                        <span class="label">{{ menuLabel(sm) }}</span>
                         <span v-if="NOTE[sm.menu_code]" class="note">{{ NOTE[sm.menu_code] }}</span>
                         <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
                     </button>
@@ -49,6 +49,7 @@
 </template>
 
 <script setup>
+import { menuLabel } from '@scripts/menuLabel.js';
 import { ensureAccess } from '@scripts/useAccess.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
 import { chapters } from '@scripts/training.js';
@@ -106,7 +107,7 @@ const filteredMenuList = computed(() => {
         .map(m => ({
             ...m,
             children: m.children.filter(sm =>
-                sm.menu_title?.toLowerCase().includes(q) || sm.menu_name?.toLowerCase().includes(q))
+                menuLabel(sm).toLowerCase().includes(q) || sm.menu_title?.toLowerCase().includes(q) || sm.menu_name?.toLowerCase().includes(q))
         }))
         .filter(m => m.children.length > 0);
 });
