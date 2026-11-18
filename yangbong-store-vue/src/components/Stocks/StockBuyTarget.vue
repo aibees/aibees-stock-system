@@ -101,6 +101,7 @@
                                 </span>
                             </span>
                         </button>
+                        <WatchStar class="row-star" :code="r.item.stock_code" :name="r.item.stock_name" :close="r.item.close" :rate="r.chgPct" />
 
                         <!-- 펼침: 이유(말) → 아직 아닌 것 → 숫자 → 버튼 -->
                         <div v-if="expandedCode === r.item.stock_code" class="reco-detail">
@@ -854,4 +855,9 @@ button { font: inherit; letter-spacing: inherit; }
 .reco-row .why { background: $honey-strip; }
 .why-ic, .rs-k { background: $honey-dot; }
 .rs.off li .rs-k { background: $band; }
+
+/* 관심 종목 담기 */
+.reco-item { position: relative; }
+.reco-row { padding-right: 34px; }
+.row-star { position: absolute; top: 15px; right: -6px; }
 </style>

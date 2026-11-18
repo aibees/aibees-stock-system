@@ -44,19 +44,35 @@ export async function initPushNotifications() {
         return;
     } // 웹 배포는 skip
 
+    try {
+        // 앱 시작 때는 권한을 묻지 않는다. 이미 허용한 기기만 등록하고, 처음 허용은 enablePushNotifications 에서 받는다.
+        const perm = await FirebaseMessaging.checkPermissions();
+        if (perm.receive === 'granted') await setupPush();
+    } catch (e) {
+        console.error('[push] 초기화 실패', e);
+    }
+}
+
+/** 사용자가 '알림 받기'를 눌렀을 때 권한을 요청한다. 허용되면 true. */
+export async function enablePushNotifications() {
+    if (!Capacitor.isNativePlatform()) return false;
+    try {
+        let perm = await FirebaseMessaging.checkPermissions();
+        if (perm.receive === 'prompt') perm = await FirebaseMessaging.requestPermissions();
+        if (perm.receive !== 'granted') return false;
+        await setupPush();
+        return true;
+    } catch (e) {
+        console.error('[push] 권한 요청 실패', e);
+        return false;
+    }
+}
+
+async function setupPush() {
+    if (initialized) return;
     initialized = true;
 
     try {
-        let perm = await FirebaseMessaging.checkPermissions();
-        console.log("[initPushNotifications] PERM : ");
-        console.log(perm);
-        if (perm.receive === 'prompt') {
-            perm = await FirebaseMessaging.requestPermissions();
-        }
-        if (perm.receive !== 'granted') {
-            console.warn('[push] 알림 권한이 거부되었습니다.');
-            return;
-        }
 
         // FCM 토큰이 (재)생성될 때마다 호출됨 — 최초 발급뿐 아니라 토큰 갱신 시에도 온다.
         FirebaseMessaging.addListener('tokenReceived', (event) => {

@@ -5,7 +5,7 @@ import { assUserSession } from "./stores/user-stores";
 import { ensureAccess } from "./useAccess.js";
 import { consumeAdPass, countGateEntry, gateInterval } from "./useAdGate.js";
 import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
-import { isAuthPath, isGuestPath, INTRO_PATH, ONBOARDING_PATH } from "./authPaths.js";
+import { isAuthPath, isGuestPath, INTRO_PATH, ONBOARDING_PATH, PICKS_PATH } from "./authPaths.js";
 import { isIntroSeen } from "./introState.js";
 import { usePersonaStore } from "./stores/persona-store.js";
 import { NOTICE_DETAIL_PATH, NOTICE_LIST_PATH } from "./notice.js";
@@ -20,6 +20,7 @@ import HomeEntry from '@/components/Home/HomeEntry.vue'
 import Menu from '@/components/Menu.vue'
 import Onboarding from '@/components/Home/Onboarding.vue'
 import IntroPage from '@/components/Home/IntroPage.vue'
+import FirstPicks from '@/components/Home/FirstPicks.vue'
 import StockPreset from '@/components/Stocks/StockPreset.vue'
 import TrainingHub from '@/components/Training/TrainingHub.vue'
 import TrainingHome from '@/components/Training/TrainingHome.vue'
@@ -56,6 +57,12 @@ const routes = [
         path: INTRO_PATH,
         name: "intro",
         component: IntroPage
+    },
+    {
+        // 첫 실행 결과: 내 조건에 맞는 종목 → 관심 종목 담기 → 알림 제안.
+        path: PICKS_PATH,
+        name: "first-picks",
+        component: FirstPicks
     },
     {
         // 성향 질문(온보딩). 비로그인 접근 가능. ?pick=1 이면 질문 없이 유형 고르기 화면부터.

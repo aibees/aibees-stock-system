@@ -31,6 +31,27 @@
 
         <main class="home-main">
 
+            <!-- 내 관심 종목: 담은 종목이 있을 때만 맨 위에. 오늘 소식은 일봉으로 판단한다 -->
+            <section v-if="watchRows.length" class="sec my-watch" aria-labelledby="my-watch-title">
+                <div class="mw-box">
+                    <div class="mw-head">
+                        <h2 id="my-watch-title">내 관심 종목</h2>
+                        <span v-if="watchlist.alerts" class="mw-tag">알림 켜짐</span>
+                        <button v-else-if="canAskPush" type="button" class="mw-tag" @click="turnOnAlerts">알림 받기</button>
+                    </div>
+                    <ul>
+                        <li v-for="w in watchRows" :key="w.code">
+                            <span class="mw-text">
+                                <b>{{ w.name }}</b>
+                                <small :class="{ quiet: w.news.kind === 'quiet' || w.news.kind === 'none' }">{{ w.news.text }}</small>
+                            </span>
+                            <span class="mw-val"><b>{{ w.price }}</b><span v-if="w.pct" class="badge" :class="w.cls">{{ w.pct }}</span></span>
+                            <WatchStar :code="w.code" :name="w.name" />
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
             <!-- ── 1. 시황: 시장 날씨 한 줄 + 코스피·코스닥·원/달러 리스트(2026-11-17 화이트 톤 개편) ── -->
             <section class="sec market" aria-labelledby="market-title">
                 <div class="sec-head">
@@ -88,6 +109,7 @@
                             <b class="line-price">{{ formatNumber(w.item.close) }}</b>
                             <span class="badge" :class="w.chg.cls">{{ w.pctText }}</span>
                         </component>
+                        <WatchStar class="row-star" :code="w.code" :name="w.name" :close="w.item.close" :rate="w.pctText" />
                         <!-- 가장 주요한 추천 이유 1개(매수추천 탭과 같은 문장·같은 띠) -->
                         <component v-if="w.reasons.top" :is="canOpen(AI_PATH) ? 'button' : 'div'" :type="canOpen(AI_PATH) ? 'button' : undefined"
                             class="why" :class="{ link: canOpen(AI_PATH) }" tabindex="-1" @click="canOpen(AI_PATH) && goToStock(w.item)">
@@ -192,6 +214,10 @@ import { numOrNull, formatNumber, changeInfo } from '@scripts/stockSignals.js';
 import { orderForType, marketWeather } from '@scripts/persona.js';
 import { evaluate, passRuleText } from '@scripts/indicators.js';
 import { recoReasons } from '@scripts/recoReasons.js';
+import { judgeStockNews, itemFromChart } from '@scripts/stockNews.js';
+import { useWatchlistStore } from '@scripts/stores/watchlist-store.js';
+import { enablePushNotifications } from '@scripts/usePushNotifications.js';
+import { Capacitor } from '@capacitor/core';
 
 const router = useRouter();
 const userSession = assUserSession();
@@ -347,6 +373,46 @@ const basisText = computed(() => {
     return ymd ? `${mdText(String(ymd).replaceAll('-', ''))} 종가 기준` : '';
 });
 watch(() => type.value, () => { showAll.value = false; });
+
+/* ── 내 관심 종목 ── */
+const watchlist = useWatchlistStore();
+const canAskPush = Capacitor.isNativePlatform();
+const turnOnAlerts = async () => watchlist.setAlerts(await enablePushNotifications());
+// 오늘 분석 목록에서 빠진 관심 종목은 일봉을 따로 받아 같은 기준으로 판단한다. code → 항목(실패 시 null)
+const watchCharts = ref({});
+watch(() => [isLoading.value, watchlist.items.map(w => w.code).join()], () => {
+    if (isLoading.value) return;
+    watchlist.items
+        .filter(w => !items.value.some(x => x.stock_code === w.code) && !(w.code in watchCharts.value))
+        .forEach(async (w) => {
+            watchCharts.value = { ...watchCharts.value, [w.code]: undefined };
+            let item = null;
+            try {
+                const { data } = await aibeesApi.get('/api/v1/charts/stock', { params: { stock_code: w.code, period: 'day' } });
+                item = itemFromChart(w.code, w.name, data?.data);
+            } catch (e) {
+                console.warn('[watchlist] 일봉 조회 실패', w.code, e?.message);
+            }
+            watchCharts.value = { ...watchCharts.value, [w.code]: item };
+        });
+}, { immediate: true });
+
+const watchRows = computed(() => watchlist.items.map((w) => {
+    const listed = items.value.find(x => x.stock_code === w.code);
+    const item = listed ?? watchCharts.value[w.code];
+    if (!item) {
+        const failed = !isLoading.value && watchCharts.value[w.code] === null;
+        return { code: w.code, name: w.name, price: w.close ? formatNumber(w.close) : '–', pct: '', cls: 'flat',
+            news: { kind: 'none', text: failed ? '소식을 불러오지 못했어요' : '소식을 확인하고 있어요' } };
+    }
+    const chg = changeInfo(item);
+    return {
+        code: w.code, name: w.name, price: formatNumber(item.close), cls: chg.cls,
+        pct: chg.pct === null ? '' : `${signed(chg.pct, 2)}%`,
+        // 내 조건 판정은 지표 값이 있는 분석 목록 종목만 한다
+        news: judgeStockNews(item, listed ? evaluate(item, type.value.settings) : null),
+    };
+}));
 
 const goToStock = (item) => router.push({
     path: AI_PATH,
@@ -924,4 +990,14 @@ button { font: inherit; letter-spacing: inherit; }
     em { font-style: normal; margin-left: 4px; font-weight: 600; color: $amber-700; }
 }
 .best { background: $honey-strip; }
+
+/* ── 내 관심 종목 ── */
+.my-watch { padding-top: 8px; padding-bottom: 16px; }
+.mw-box { padding: 15px; border-radius: $radius; background: $honey-strip; ul { margin: 8px 0 0; padding: 0; list-style: none; } li { min-height: 58px; display: flex; align-items: center; gap: 8px; } }
+.mw-head { display: flex; align-items: center; justify-content: space-between; h2 { margin: 0; font-size: 16px; } }
+.mw-tag { height: 24px; padding: 0 7px; border: 0; border-radius: $radius-sm; background: $card; color: $amber-700; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; }
+.mw-text { flex: 1; min-width: 0; b { display: block; font-size: 15px; font-weight: 600; } small { display: block; margin-top: 3px; font-size: 12.5px; color: $honey-ink; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; &.quiet { color: $sub; } } }
+.mw-val { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; b { font-size: 14px; font-weight: 600; } .badge { height: 21px; min-width: 56px; font-size: 12px; } }
+.w-li { position: relative; .line-row { padding-right: 32px; } }
+.row-star { position: absolute; top: 7px; right: -6px; }
 </style>

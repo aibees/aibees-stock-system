@@ -28,5 +28,6 @@ declare module 'vue' {
     SGridSelect: typeof import('./components/common/comp/SGridSelect.vue')['default']
     SLabelInput: typeof import('./components/common/comp/SLabelInput.vue')['default']
     SortChips: typeof import('./components/common/comp/SortChips.vue')['default']
+    WatchStar: typeof import('./components/common/comp/WatchStar.vue')['default']
   }
 }
