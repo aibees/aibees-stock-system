@@ -30,42 +30,84 @@ const collectPaths = (menus) => {
 
 let inflight = null;
 
-/** 권한을 (아직 안 받았으면) 받아 스토어에 채운다. 실패하면 빈 권한(fail-closed)으로 둔다. */
+// ── 권한 캐시(이 기기, 마지막 로그인 사용자 1명분) ──
+//   앱을 열 때마다 권한 응답을 기다린 뒤에야 첫 화면이 떴다. 지난번 권한으로 바로 띄우고 새 권한은 뒤에서 받는다.
+//   여기서 쓰는 권한은 화면 노출용이다(보안 경계는 서버 API 의 권한 검사). 뒤에서 받은 권한이 달라지면
+//   onAccessRefreshed 구독자(router)가 지금 화면을 다시 검사한다.
+const ACCESS_CACHE_KEY = 'sc-access-v1';
+const readAccessCache = (userId) => {
+    try {
+        const v = JSON.parse(localStorage.getItem(ACCESS_CACHE_KEY));
+        return v && String(v.userId) === String(userId) ? v.data : null;
+    } catch { return null; }
+};
+const writeAccessCache = (userId, data) => {
+    try { localStorage.setItem(ACCESS_CACHE_KEY, JSON.stringify({ userId, data })); } catch { /* 무시 */ }
+};
+export const clearAccessCache = () => {
+    try { localStorage.removeItem(ACCESS_CACHE_KEY); } catch { /* 무시 */ }
+};
+const refreshListeners = new Set();
+export const onAccessRefreshed = (fn) => { refreshListeners.add(fn); return () => refreshListeners.delete(fn); };
+
+const applyAccess = (store, d, guest) => {
+    const menus = d?.menus ?? [];
+    store.access.paths    = collectPaths(menus);
+    store.access.features = d?.features ?? [];
+    store.access.roles    = d?.roles ?? [];
+    store.access.settings = d?.settings ?? {};
+    // Lnb / TradeDashboard 가 sessionStorage 의 menuList 를 읽으므로 권한이 반영된
+    // 트리로 덮어쓴다(전체 목록은 router.js 가 따로 들고 있다).
+    store.setMenuList(menus);
+    store.access.asGuest = guest;
+    store.access.loaded = true;
+};
+
+const fetchAccess = async (store) => {
+    // 토큰이 있으면 로그인 사용자 권한, 없으면 게스트(공개 메뉴) 권한을 받게 된다.
+    const guest = !store.user.accessToken;
+    const userId = store.user.loginInfo?.user_id;
+    try {
+        const { data } = await aibeesApi.get('/api/v1/master/menus/my', {
+            params: { enabled_flag: 'Y' }
+        });
+        const before = JSON.stringify([store.access.paths, store.access.features, store.access.roles]);
+        applyAccess(store, data.data, guest);
+        if (!guest && userId) writeAccessCache(userId, data.data);
+        const changed = before !== JSON.stringify([store.access.paths, store.access.features, store.access.roles]);
+        if (changed) refreshListeners.forEach((fn) => { try { fn(store.access); } catch (e) { console.error(e); } });
+    } catch (e) {
+        if (store.access.fromCache) return store.access;   // 캐시로 떠 있는 중 갱신 실패 — 캐시 권한 유지(다음 실행 때 재시도)
+        console.error('[access] 권한 로드 실패 — 제한 메뉴 접근을 막는다', e);
+        store.access.paths    = [];
+        store.access.features = [];
+        store.access.roles    = [];
+        store.access.settings = {};
+        store.access.loaded   = false; // 다음 이동 때 재시도
+        store.setMenuList([]);         // 전체 목록이 메뉴에 노출되지 않게 비운다
+    } finally {
+        store.access.fromCache = false;
+    }
+    return store.access;
+};
+
+/** 권한을 (아직 안 받았으면) 받아 스토어에 채운다. 실패하면 빈 권한(fail-closed)으로 둔다.
+ *  같은 사용자의 지난 권한이 이 기기에 있으면 그걸로 즉시 돌려주고, 새 권한은 뒤에서 받는다. */
 export const ensureAccess = async (force = false) => {
     const store = assUserSession();
     if (store.access.loaded && !force) return store.access;
     if (inflight) return inflight;
 
-    inflight = (async () => {
-        // 토큰이 있으면 로그인 사용자 권한, 없으면 게스트(공개 메뉴) 권한을 받게 된다.
-        const guest = !store.user.accessToken;
-        try {
-            const { data } = await aibeesApi.get('/api/v1/master/menus/my', {
-                params: { enabled_flag: 'Y' }
-            });
-            const menus = data.data?.menus ?? [];
-            store.access.paths    = collectPaths(menus);
-            store.access.features = data.data?.features ?? [];
-            store.access.roles    = data.data?.roles ?? [];
-            store.access.settings = data.data?.settings ?? {};
-            // Lnb / TradeDashboard 가 sessionStorage 의 menuList 를 읽으므로 권한이 반영된
-            // 트리로 덮어쓴다(전체 목록은 router.js 가 따로 들고 있다).
-            store.setMenuList(menus);
-            store.access.asGuest = guest;
-            store.access.loaded = true;
-        } catch (e) {
-            console.error('[access] 권한 로드 실패 — 제한 메뉴 접근을 막는다', e);
-            store.access.paths    = [];
-            store.access.features = [];
-            store.access.roles    = [];
-            store.access.settings = {};
-            store.access.loaded   = false; // 다음 이동 때 재시도
-            store.setMenuList([]);         // 전체 목록이 메뉴에 노출되지 않게 비운다
-        } finally {
-            inflight = null;
-        }
+    const userId = store.user.loginInfo?.user_id;
+    const cached = !force && store.user.accessToken && userId ? readAccessCache(userId) : null;
+    if (cached) {
+        applyAccess(store, cached, false);
+        store.access.fromCache = true;
+        inflight = fetchAccess(store).finally(() => { inflight = null; });
         return store.access;
-    })();
+    }
+
+    inflight = fetchAccess(store).finally(() => { inflight = null; });
     return inflight;
 };
 

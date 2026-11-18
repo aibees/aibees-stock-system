@@ -2,22 +2,23 @@ import { createWebHistory, createRouter } from 'vue-router'
 import { loadComponent } from './utils/componentLoader.js'
 import aibeesApi from './aibeesApi.js'
 import { assUserSession } from "./stores/user-stores";
-import { ensureAccess } from "./useAccess.js";
+import { ensureAccess, onAccessRefreshed } from "./useAccess.js";
 import { consumeAdPass, countGateEntry, gateInterval } from "./useAdGate.js";
 import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
 import { isAuthPath } from "./authPaths.js";
 import { NOTICE_DETAIL_PATH, NOTICE_LIST_PATH } from "./notice.js";
-import AdGate from '@/components/AdGate.vue';
-import NaverCallback from '@/components/NaverCallback.vue';
-import SignupConsent from '@/components/SignupConsent.vue';
-import Signup from '@/components/Signup.vue';
+// 첫 화면(홈)만 메인 번들에 싣고, 나머지 정적 화면은 들어갈 때 받는다(로그인 사용자는 로그인·가입 화면을 거의 안 본다).
+const AdGate = () => import('@/components/AdGate.vue');
+const NaverCallback = () => import('@/components/NaverCallback.vue');
+const SignupConsent = () => import('@/components/SignupConsent.vue');
+const Signup = () => import('@/components/Signup.vue');
 
 // ----- import components -----
 import Home from '@/components/Home.vue'
-import Login from '@/components/Login.vue'
+const Login = () => import('@/components/Login.vue');
 import App from '@/components/App.vue'
-import UserOption from '@/components/UserOption.vue';
-import NotFound from '@/components/except/NotFound.vue'
+const UserOption = () => import('@/components/UserOption.vue');
+const NotFound = () => import('@/components/except/NotFound.vue');
 // -----------------------------
 
 const routes = [
@@ -95,12 +96,28 @@ const NO_ACCESS_LOG_ROUTES = new Set(['NotFound', 'ad-gate']);
 
 const normPath = (p) => '/' + String(p ?? '').replace(/^\/+/, '').replace(/\/+$/, '');
 
-const getRouteList = async () => {
-  try {
+// ── 전체 메뉴(라우트 등록용) 캐시 ──
+//   예전에는 앱을 열 때마다 /master/menus 응답을 받은 "뒤에야" 화면을 띄웠다(그동안 빈 화면).
+//   지난번 응답을 이 기기에 저장해 두고 그걸로 바로 라우트를 등록·마운트한 뒤, 새 응답은 뒤에서 받아 갱신한다.
+//   메뉴 노출·이동 허용은 이 목록이 아니라 권한(/master/menus/my)으로 정하므로 캐시가 조금 낡아도 권한이 넓어지지 않는다.
+const MENU_CACHE_KEY = 'sc-menus-v1';
+const readMenuCache = () => {
+    try { const v = JSON.parse(localStorage.getItem(MENU_CACHE_KEY)); return Array.isArray(v) ? v : null; } catch { return null; }
+};
+const writeMenuCache = (menus) => {
+    try { localStorage.setItem(MENU_CACHE_KEY, JSON.stringify(menus)); } catch { /* 저장 못 해도 다음 실행 때 서버에서 받는다 */ }
+};
+const fetchMenus = async () => {
     const { data } = await aibeesApi.get('/api/v1/master/menus', { params: { enabled_flag: 'Y' } });
-    const routerResult = data.data;
+    return data.data ?? [];
+};
+
+const getRouteList = async (preloaded = null) => {
+  try {
+    const routerResult = preloaded ?? await fetchMenus();
     const userSession = assUserSession();
-    userSession.setMenuList(routerResult);
+    // 권한 반영본(ensureAccess)이 이미 들어와 있으면 전체 목록으로 덮어쓰지 않는다(Lnb 가 이 값을 그린다).
+    if (!userSession.access.loaded) userSession.setMenuList(routerResult);
 
     restrictedPaths = new Set();
     adGatedPaths = new Set();
@@ -178,7 +195,18 @@ const getRouteList = async () => {
 // 로그인 없이 열 수 있는 화면은 로그인·가입 흐름뿐이다(authPaths.js). 홈을 포함한 나머지는 전부 로그인 필요.
 
 export const setRouterToApp = async () => {
-    const dynamicRoutes = await getRouteList();
+    // 로그인 상태면 권한 요청을 메뉴 요청과 "동시에" 시작한다(예전엔 메뉴 → 첫 이동 가드 → 권한 순으로 직렬).
+    if (assUserSession().isUserSession()) ensureAccess();
+
+    const cachedMenus = readMenuCache();
+    const freshMenus = fetchMenus().then((menus) => { writeMenuCache(menus); return menus; });
+    let dynamicRoutes;
+    if (cachedMenus) {
+        dynamicRoutes = await getRouteList(cachedMenus);
+    } else {
+        dynamicRoutes = await getRouteList(await freshMenus.catch(() => null));
+    }
+
     const router = createRouter({
       history: createWebHistory(),
       routes: [...routes],
@@ -189,11 +217,25 @@ export const setRouterToApp = async () => {
       },
     });
 
-    dynamicRoutes.forEach(d => {
+    const addDynamicRoutes = (list) => list.forEach(d => {
         // /home 은 위에서 static 으로 등록했으므로 중복 방지
         if (d.path === '/home' || d.path === 'home') return;
+        if (d.name && router.hasRoute(d.name)) router.removeRoute(d.name);
         router.addRoute(d);
     });
+    addDynamicRoutes(dynamicRoutes);
+
+    // 캐시로 띄웠으면 새 메뉴를 받아 라우트를 갱신한다(새로 생긴 메뉴·바뀐 경로 반영).
+    if (cachedMenus) {
+        freshMenus
+            .then(async (menus) => {
+                if (JSON.stringify(menus) === JSON.stringify(cachedMenus)) return;
+                addDynamicRoutes(await getRouteList(menus));
+                // 지금 보던 주소가 캐시엔 없고 새 목록에만 있으면 NotFound 였을 것 → 다시 해석
+                if (router.currentRoute.value.name === 'NotFound') router.replace(router.currentRoute.value.fullPath);
+            })
+            .catch(() => { /* 오프라인 등 — 캐시 라우트로 계속 동작 */ });
+    }
 
     // ── 전역 네비게이션 가드 ──
     router.beforeEach(async (to, from) => {
@@ -236,6 +278,12 @@ export const setRouterToApp = async () => {
         }
     });
 
+    // 지난 권한(캐시)으로 들어온 화면이 새 권한에서 빠졌으면 홈으로 돌린다.
+    onAccessRefreshed((access) => {
+        const target = normPath(router.currentRoute.value.path);
+        if (restrictedPaths.has(target) && !access.paths.includes(target)) router.replace({ path: '/home' });
+    });
+
     // ── 메뉴(화면) 접근 기록 ──
     //   로그인 사용자가 다른 화면으로 들어왔을 때만 1건(같은 화면 안의 쿼리 변경은 세지 않는다).
     //   기록 실패는 화면 이동과 무관하므로 무시한다.
@@ -267,3 +315,21 @@ export const setRouterToApp = async () => {
 
     return router;
 }
+
+// ── 화면 전환 체감 속도: 메뉴 화면 코드를 미리 받아 둔다 ──
+//   메뉴 화면은 처음 누를 때 JS 조각(chunk)을 받느라 한 박자 늦다. 첫 화면이 다 뜬 뒤 브라우저가 한가할 때
+//   권한 있는 메뉴 화면 코드를 하나씩 받아 둔다(이미 받은 건 브라우저가 재사용 — 중복 요청 없음).
+export const prefetchRouteComponents = (router) => {
+    const idle = window.requestIdleCallback ?? ((fn) => setTimeout(fn, 200));
+    const allowed = new Set(assUserSession().access.paths ?? []);
+    const loaders = router.getRoutes()
+        .filter((r) => !allowed.size || allowed.has(normPath(r.path)))
+        .map((r) => r.components?.default)
+        .filter((c) => typeof c === 'function');
+    const next = () => {
+        const load = loaders.shift();
+        if (!load) return;
+        Promise.resolve().then(load).catch(() => { /* 실패해도 실제로 들어갈 때 다시 받는다 */ }).finally(() => idle(next));
+    };
+    idle(next);
+};

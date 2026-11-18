@@ -39,10 +39,19 @@ app.provide('emitter', emitter);
 // =====================
 
 // ===== Router Resigrer =====
-import { setRouterToApp } from './router'
+import { setRouterToApp, prefetchRouteComponents } from './router'
+import { ensureAccess } from './useAccess.js'
+import { assUserSession } from './stores/user-stores'
 setRouterToApp().then(router => {
     app.use(router);
     app.mount('#app');
+
+    // 첫 화면이 뜬 뒤 한가할 때 메뉴 화면 코드를 미리 받아 둔다(화면 전환 시 chunk 대기 제거).
+    router.isReady().then(async () => {
+        if (!assUserSession().isUserSession()) return;
+        await ensureAccess();
+        prefetchRouteComponents(router);
+    });
 
     // ===== 푸시 알림(FCM) 등록 — 네이티브(iOS/Android) 앱에서만 동작 =====
     //   웹에서는 모듈 자체를 받지 않는다(Firebase 플러그인·토스트 묶음이 초기 로딩에 끼지 않게).

@@ -70,7 +70,8 @@ export const assUserSession = defineStore('user', () => {
         roles: [],      // 사용자의 권한 ID(auth_id). 예) ['STOCK_USER', 'WORKER_USER']
         paths: [],      // 이동 허용 경로(부모 + 리프, 선행 '/' 포함)
         features: [],   // AD_FREE 등
-        settings: {}    // 공통코드 화면 설정값 {code: desc}. 예) { GATE_INTERVAL: '5' }
+        settings: {},   // 공통코드 화면 설정값 {code: desc}. 예) { GATE_INTERVAL: '5' }
+        fromCache: false // 이 기기에 저장된 지난 권한으로 띄운 상태(새 권한을 뒤에서 받는 중)
     });
 
     const resetAccess = () => {
@@ -212,6 +213,7 @@ export const assUserSession = defineStore('user', () => {
         sessionStorage.removeItem('userSession');
         sessionStorage.removeItem('menuList');
         clearAutoLogin(); // 자동로그인 해제
+        try { localStorage.removeItem('sc-access-v1'); } catch { /* 권한 캐시(useAccess.js) — 순환 import 를 피해 키로 직접 지운다 */ }
 
         // [추가] 이 기기 push 소유자를 비운다(user_id=null) — 안 그러면 로그아웃
         // 후에도 이전 유저의 체결/경보 알림이 이 기기로 계속 온다.
