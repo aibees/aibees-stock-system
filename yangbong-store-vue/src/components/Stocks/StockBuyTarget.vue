@@ -7,7 +7,7 @@
             <!-- ── 1줄: 추천 단계 칩(선택 = 꿀색) + 오른쪽 날짜 ‹ 11.17 (화) ›
                  단계는 열람 가능한 단계 + 바로 위 한 단계(잠금)만 보인다. 그 위 단계는 존재 자체를 숨긴다 ── -->
             <div class="top-bar">
-                <div class="stage-chips" role="tablist" aria-label="추천 단계">
+                <div class="stage-chips" role="tablist" aria-label="종목 단계">
                     <button v-for="s in visibleStages" :key="s.code" type="button" role="tab" class="stage-chip"
                         :class="{ on: s.code === stageCode, locked: s.locked }"
                         :aria-selected="s.code === stageCode ? 'true' : 'false'" @click="stageCode = s.code">
@@ -40,21 +40,21 @@
             <section v-if="activeStage.locked" class="stage-locked">
                 <svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
                     stroke-linecap="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></svg>
-                <p class="stage-locked-title">{{ activeStage.name }} 추천이 따로 있어요</p>
+                <p class="stage-locked-title">{{ activeStage.name }} 종목이 따로 있어요</p>
                 <p class="stage-locked-desc">{{ activeStage.desc }}</p>
                 <p v-if="activeStage.unlock" class="stage-locked-unlock">{{ activeStage.unlock }}</p>
             </section>
 
             <!-- 아직 알고리즘이 확정되지 않은 단계(실전): 빈 목록 대신 준비 중 안내 -->
             <section v-else-if="activeStage.ready === false" class="stage-locked">
-                <p class="stage-locked-title">{{ activeStage.name }} 추천을 준비하고 있어요</p>
+                <p class="stage-locked-title">{{ activeStage.name }} 종목을 준비하고 있어요</p>
                 <p class="stage-locked-desc">{{ activeStage.desc }}</p>
             </section>
 
             <template v-else>
             <!-- ── 2줄: 목록 머리 + 정렬·범위 선택(누르면 기기 기본 선택 창이 뜬다) ── -->
             <div class="list-head">
-                <h2>추천 종목<span v-if="!isLoading" class="count">{{ sortedData.length }}</span></h2>
+                <h2>주목 종목<span v-if="!isLoading" class="count">{{ sortedData.length }}</span></h2>
                 <span class="basis">{{ priceLabel }} 기준</span>
             </div>
             <div class="filters">
@@ -101,6 +101,7 @@
                                 </span>
                             </span>
                         </button>
+                        <WatchStar class="row-star" :code="r.item.stock_code" :name="r.item.stock_name" :close="r.item.close" :rate="r.chgPct" />
 
                         <!-- 펼침: 이유(말) → 아직 아닌 것 → 숫자 → 버튼 -->
                         <div v-if="expandedCode === r.item.stock_code" class="reco-detail">
@@ -109,7 +110,7 @@
                                 <span v-if="r.passTotal" class="rd-match">내 조건 {{ r.passTotal }}개 중 <b>{{ r.passCount }}개</b> 충족</span>
                             </p>
                             <template v-if="r.reasons.passed.length">
-                                <h4 class="rd-h">추천 이유 {{ r.reasons.passed.length }}가지</h4>
+                                <h4 class="rd-h">주목한 이유 {{ r.reasons.passed.length }}가지</h4>
                                 <ul class="rs">
                                     <li v-for="x in r.reasons.passed" :key="x.key">
                                         <span class="rs-k" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg></span>
@@ -217,7 +218,7 @@ import {
 } from '@scripts/marketFormat.js';
 
 const router = useRouter();
-const title = ref('매수추천');
+const title = ref('주목 종목');
 
 const goToStockInfo = (stock_code, stock_name) => {
     // ymd: 상세 화면이 같은 날짜의 매수타겟 행(근거·재무·조건)을 찾는 데 쓴다.
@@ -311,10 +312,10 @@ const ADVANCED_SORT_KEYS = ['composite_rank_no', 'shape_proba', 'frgn_amt', 'org
 const SORT_ALL = [
     { key: 'persona',    label: '내 성향 순서',  dir: 'asc',  ascLabel: '성향에 맞는 순',  descLabel: '거꾸로' },
     { key: 'composite_rank_no', label: '종합 순위(신규)', dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
-    { key: 'rank_no',     label: '추천순위',     dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
+    { key: 'rank_no',     label: '주목 순위',     dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
     { key: 'score',       label: '점수',         dir: 'desc', ascLabel: '낮은 점수 먼저', descLabel: '높은 점수 먼저' },
     { key: 'volume',      label: '거래량',       dir: 'desc', ascLabel: '적은 순',        descLabel: '많은 순' },
-    { key: 'shape_proba', label: '급등패턴 순위', dir: 'desc', ascLabel: '낮은 확률 먼저', descLabel: '높은 확률 먼저' },
+    { key: 'shape_proba', label: '차트 패턴 점수', dir: 'desc', ascLabel: '낮은 점수 먼저', descLabel: '높은 점수 먼저' },
     // 시가총액·수급(/buy-target 응답의 market_cap, frgn_amt, orgn_amt — StockService.attach_market_info)
     { key: 'market_cap',  label: '시가총액',     dir: 'desc', ascLabel: '작은 순',        descLabel: '큰 순' },
     { key: 'frgn_amt',    label: '외국인 순매수', dir: 'desc', ascLabel: '순매도 큰 순',   descLabel: '순매수 큰 순' },
@@ -854,4 +855,9 @@ button { font: inherit; letter-spacing: inherit; }
 .reco-row .why { background: $honey-strip; }
 .why-ic, .rs-k { background: $honey-dot; }
 .rs.off li .rs-k { background: $band; }
+
+/* 관심 종목 담기 */
+.reco-item { position: relative; }
+.reco-row { padding-right: 34px; }
+.row-star { position: absolute; top: 15px; right: -6px; }
 </style>

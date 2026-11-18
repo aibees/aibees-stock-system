@@ -1,4 +1,6 @@
 <template>
+    <div id="training-glossary">
+    <BrandHeader title="용어 사전" :back="TRAINING_PATH" />
     <section class="gl" aria-label="주식 용어 사전">
         <label class="gl-search">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
@@ -68,11 +70,12 @@
             </article>
         </div>
     </section>
+    </div>
 </template>
 
 <script setup>
-/** 트레이닝 > 용어 사전 탭: 검색 · 분류 · 가나다 목록. 항목은 한 번에 하나만 펼친다. */
-import { allStages, stagePath } from '@scripts/training.js';
+/** 트레이닝 > 용어 사전: 검색 · 분류 · 가나다 목록. 항목은 한 번에 하나만 펼친다. */
+import { allStages, stagePath, TRAINING_PATH } from '@scripts/training.js';
 import { glossaryCategories, glossaryTerms, groupOf, matchesTerm } from '@scripts/glossary.js';
 
 const ALL = '전체';
@@ -124,14 +127,15 @@ const openRelated = async (t) => {
 
 button { font: inherit; letter-spacing: inherit; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.gl { background: $card; padding-bottom: 12px; }
+#training-glossary { min-height: 100vh; background: $card; color: $ink; text-align: left; font-family: $font-body; letter-spacing: -0.2px; -webkit-font-smoothing: antialiased; }
+.gl { max-width: 720px; margin: 0 auto; padding-bottom: 12px; }
 
 .gl-search {
     display: flex;
     align-items: center;
     gap: 8px;
     height: 44px;
-    margin: 14px $pad-x 0;
+    margin: 4px $pad-x 0;
     padding: 0 6px 0 14px;
     border-radius: $radius;
     background: $band;
@@ -178,7 +182,7 @@ button { font: inherit; letter-spacing: inherit; }
 .gl-empty { margin: 0; padding: 48px $pad-x; text-align: center; font-size: 14px; color: $sub; }
 .gl-group { margin: 0; padding: 18px $pad-x 2px; font-size: 13px; font-weight: 700; color: $amber-700; }
 
-.gl-term { margin: 0 $pad-x; border-bottom: 1px solid $line; scroll-margin-top: 104px; &:last-child { border-bottom: 0; } }
+.gl-term { margin: 0 $pad-x; border-bottom: 1px solid $line; scroll-margin-top: 64px; &:last-child { border-bottom: 0; } }
 .gl-row {
     width: 100%;
     min-height: 62px;

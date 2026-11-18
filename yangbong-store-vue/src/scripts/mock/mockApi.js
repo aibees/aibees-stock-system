@@ -148,7 +148,7 @@ const menu = (code, path, name, component, parents, children = []) => ({
 });
 const MENUS = [
     menu('Stocks', '/stock', '주식분석', 'StockView', 'root', [
-        menu('StockBuyTarget', 'buy-target', '매수추천', 'StockBuyTarget', 'Stocks'),
+        menu('StockBuyTarget', 'buy-target', '주목 종목', 'StockBuyTarget', 'Stocks'),
         menu('StockInfo', 'info', 'AI 분석', 'StockInfo', 'Stocks'),
         menu('ChartStock', 'chart', '차트 확인', 'ChartStock', 'Stocks'),
     ]),
@@ -168,12 +168,29 @@ const NOTICES = [
       content: '<p>11월 20일 02:00~03:00 서버 점검이 있습니다.</p>' },
 ].map(n => ({ ...n, view_count: 0 }));
 
+/* ── 종목 일봉: 분석 목록 종목 + 목록에서 빠진 관심 종목 확인용(900080) ── */
+const CHART_ONLY = [{ code: '900080', close: 15320, vol: 0.02, surge: 2.4 }];
+const stockChart = (code) => {
+    const i = STOCKS.findIndex(s => s.code === code);
+    const s = STOCKS[i] ?? CHART_ONLY.find(x => x.code === code);
+    if (!s) return null;
+    const rows = makeCandles(1000 + (i < 0 ? 50 : i), s.close, s.vol, s.surge);
+    return {
+        ohcl: rows.map(r => ({ x: r.date, o: r.open, h: r.high, l: r.low, c: r.close })),
+        volume: rows.map(r => ({ x: r.date, y: r.volume })),
+    };
+};
+
 /* ── 라우트 표 ── */
 const ok = (data) => ({ code: 200, message: 'mock', data });
 const ROUTES = [
     ['GET', '/api/v1/indicators/market-snapshot', () => ok(marketSnapshot())],
     ['GET', '/api/v1/stocks/buy-target/performance', () => ok(performance())],
     ['GET', '/api/v1/stocks/buy-target', () => ok(buyTargets())],
+    ['GET', '/api/v1/charts/stock', (c) => {
+        const chart = stockChart(c.params?.stock_code);
+        return chart ? ok(chart) : null;
+    }],
     ['GET', '/api/v1/notices', () => ok(NOTICES.map(({ content, ...rest }) => rest))],
     ['GET', /^\/api\/v1\/notices\/(\d+)$/, (c, m) => {
         const n = NOTICES.find(x => x.notice_id === Number(m[1]));

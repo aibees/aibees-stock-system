@@ -5,7 +5,8 @@ import { assUserSession } from "./stores/user-stores";
 import { ensureAccess } from "./useAccess.js";
 import { consumeAdPass, countGateEntry, gateInterval } from "./useAdGate.js";
 import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
-import { isAuthPath, isGuestPath, ONBOARDING_PATH } from "./authPaths.js";
+import { isAuthPath, isGuestPath, INTRO_PATH, ONBOARDING_PATH, PICKS_PATH } from "./authPaths.js";
+import { isIntroSeen } from "./introState.js";
 import { usePersonaStore } from "./stores/persona-store.js";
 import { NOTICE_DETAIL_PATH, NOTICE_LIST_PATH } from "./notice.js";
 import AdGate from '@/components/AdGate.vue';
@@ -18,8 +19,14 @@ import Signup from '@/components/Signup.vue';
 import HomeEntry from '@/components/Home/HomeEntry.vue'
 import Menu from '@/components/Menu.vue'
 import Onboarding from '@/components/Home/Onboarding.vue'
+import IntroPage from '@/components/Home/IntroPage.vue'
+import FirstPicks from '@/components/Home/FirstPicks.vue'
 import StockPreset from '@/components/Stocks/StockPreset.vue'
+import TrainingHub from '@/components/Training/TrainingHub.vue'
 import TrainingHome from '@/components/Training/TrainingHome.vue'
+import TrainingGlossary from '@/components/Training/TrainingGlossary.vue'
+import TrainingQuizHome from '@/components/Training/TrainingQuizHome.vue'
+import TrainingQuizPlay from '@/components/Training/TrainingQuizPlay.vue'
 import TrainingLesson from '@/components/Training/TrainingLesson.vue'
 import Login from '@/components/Login.vue'
 import App from '@/components/App.vue'
@@ -46,6 +53,18 @@ const routes = [
         component: HomeEntry
     },
     {
+        // 앱 소개. 앱 첫 실행 때 홈 앞에 한 번 나오고, 웹은 홈의 "처음이세요?"로 연다.
+        path: INTRO_PATH,
+        name: "intro",
+        component: IntroPage
+    },
+    {
+        // 첫 실행 결과: 내 조건에 맞는 종목 → 관심 종목 담기 → 알림 제안.
+        path: PICKS_PATH,
+        name: "first-picks",
+        component: FirstPicks
+    },
+    {
         // 성향 질문(온보딩). 비로그인 접근 가능. ?pick=1 이면 질문 없이 유형 고르기 화면부터.
         path: ONBOARDING_PATH,
         name: "onboarding",
@@ -64,10 +83,32 @@ const routes = [
         component: StockPreset
     },
     {
-        // 트레이닝 커리큘럼(장 → 단계, 모든 단계 열림). 비로그인 접근 가능(authPaths.GUEST_PREFIXES). 정적 라우트.
+        // 트레이닝 첫 화면: 수업 듣기 · 퀴즈 · 용어 사전 입구. 비로그인 접근 가능(authPaths.GUEST_PREFIXES).
         path: "/training",
         name: "training",
+        component: TrainingHub
+    },
+    {
+        // 수업 목록(장 → 단계)
+        path: "/training/lessons",
+        name: "training-lessons",
         component: TrainingHome
+    },
+    {
+        path: "/training/glossary",
+        name: "training-glossary",
+        component: TrainingGlossary
+    },
+    {
+        path: "/training/quiz",
+        name: "training-quiz",
+        component: TrainingQuizHome
+    },
+    {
+        // all · wrong · today · <장 slug>
+        path: "/training/quiz/:set",
+        name: "training-quiz-play",
+        component: TrainingQuizPlay
     },
     {
         // 장 바로가기(전체 메뉴의 장 항목·단계 화면의 뒤로): 같은 목차 화면을 그 장 위치로 연다(scrollBehavior).
@@ -284,9 +325,9 @@ export const setRouterToApp = async () => {
         const persona = usePersonaStore();
         if (loggedIn) await persona.syncWithAccount();
 
-        // 처음 실행: 홈으로 들어올 때 성향 질문을 한 번 연다(권한을 받은 뒤라 매매 사용자는 제외된다).
+        // 처음 실행: 홈으로 들어올 때 앱 소개 → 성향 질문 순서로 한 번 연다(권한을 받은 뒤라 매매 사용자는 제외된다).
         if (target === '/home' && persona.needsOnboarding()) {
-            return { path: ONBOARDING_PATH };
+            return { path: isIntroSeen() ? ONBOARDING_PATH : INTRO_PATH };
         }
 
         // 광고 게이트: 접근이 허용된 게이트 대상 메뉴에 들어올 때. AD_FREE 보유자는 건너뛴다.

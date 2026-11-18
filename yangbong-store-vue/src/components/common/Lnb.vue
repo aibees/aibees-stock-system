@@ -22,7 +22,7 @@
                         <ul v-if="hasChildren(m) && openCode === m.menu_code" class="lnb-dropdown">
                             <li v-for="c in visibleChildren(m)" :key="c.menu_code"
                                 :class="{ active: isActiveChild(m, c) }" @click.stop="goChild(m, c)">
-                                {{ c.menu_title || c.menu_name }}
+                                {{ menuLabel(c) }}
                             </li>
                         </ul>
                     </transition>
@@ -48,6 +48,7 @@
 </template>
 
 <script setup>
+import { menuLabel } from '@scripts/menuLabel.js';
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { assUserSession } from "../../scripts/stores/user-stores";

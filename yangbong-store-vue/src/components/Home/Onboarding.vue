@@ -88,13 +88,15 @@
 
 <script setup>
 /**
- * 온보딩 — 성향 질문 5개 → 유형 제안 → 사용자가 골라 확정. 가입 없이 끝까지 진행된다.
+ * 온보딩 — 성향 질문 3개 → 유형 자동 결정 → 내 조건에 맞는 종목(FirstPicks). 가입 없이 끝까지 진행된다.
+ * ?pick=1 은 유형을 직접 바꾸는 화면이다.
  * 형태는 B안 고정(소개 슬라이드 없이 질문으로 바로 시작, 2026-11-15). 질문·유형은 persona 설정(데이터)에서 읽는다.
  *   /onboarding        : 질문부터(처음 실행 시 라우터가 한 번 보내고, 홈의 "처음이세요?"로 다시 연다)
  *   /onboarding?pick=1 : 질문 없이 유형 고르기만(홈의 "바꾸기")
  */
 import { assUserSession } from '@scripts/stores/user-stores.js';
 import { usePersonaStore } from '@scripts/stores/persona-store.js';
+import { PICKS_PATH } from '@scripts/authPaths.js';
 import { suggestFromAnswers, findType } from '@scripts/persona.js';
 import { passRuleText, normalizeSettings } from '@scripts/indicators.js';
 
@@ -103,7 +105,12 @@ const route = useRoute();
 const persona = usePersonaStore();
 
 const pickOnly = computed(() => route.query.pick === '1');
-const questions = computed(() => persona.config.questions);
+// 첫 1분 흐름은 결과에 영향이 큰 3문항만 묻는다. 설정에서 키가 바뀌면 전체 문항을 쓴다.
+const QUICK_KEYS = ['drop', 'swing', 'size'];
+const questions = computed(() => {
+    const quick = persona.config.questions.filter(q => QUICK_KEYS.includes(q.key));
+    return quick.length === QUICK_KEYS.length ? quick : persona.config.questions;
+});
 const types = computed(() => persona.config.types);
 
 const step = ref(0);
@@ -114,7 +121,7 @@ const answeredCount = computed(() => answers.value.filter(a => a !== undefined &
 const progressPct = computed(() =>
     phase.value === 'result' ? 100 : Math.round(step.value / questions.value.length * 100));
 
-const suggestion = computed(() => suggestFromAnswers(persona.config, answers.value));
+const suggestion = computed(() => suggestFromAnswers({ ...persona.config, questions: questions.value }, answers.value));
 const suggestedType = computed(() => findType(persona.config, suggestion.value.type));
 
 // 화면 모드(간편/전문가) 선택은 없다 — 2026-11-15 분리 후 양봉상회에는 전문가 모드가 없다.
@@ -136,8 +143,8 @@ const choose = (i) => {
         if (step.value < questions.value.length - 1) {
             step.value += 1;
         } else {
-            chosen.value = suggestion.value.type;
-            phase.value = 'result';
+            persona.decide(suggestion.value.type);
+            router.replace(PICKS_PATH);
         }
     }, 180);
 };

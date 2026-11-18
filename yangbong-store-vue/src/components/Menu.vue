@@ -34,7 +34,7 @@
                         <span class="icon-box" aria-hidden="true">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="iconOf(sm.menu_code)"></path></svg>
                         </span>
-                        <span class="label">{{ sm.menu_title || sm.menu_name }}</span>
+                        <span class="label">{{ menuLabel(sm) }}</span>
                         <span v-if="NOTE[sm.menu_code]" class="note">{{ NOTE[sm.menu_code] }}</span>
                         <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
                     </button>
@@ -49,6 +49,7 @@
 </template>
 
 <script setup>
+import { menuLabel } from '@scripts/menuLabel.js';
 import { ensureAccess } from '@scripts/useAccess.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
 import { chapters } from '@scripts/training.js';
@@ -75,7 +76,9 @@ const trainingGroup = {
         menu_code: `Training_${ch.slug}`, menu_path: ch.slug, display_flag: 'Y',
         menu_name: ch.name, menu_title: ch.name,
     })).concat({
-        // 트레이닝 화면의 용어 사전 탭(/training/glossary)
+        menu_code: 'TrainingQuiz', menu_path: 'quiz', display_flag: 'Y',
+        menu_name: '퀴즈', menu_title: '퀴즈',
+    }, {
         menu_code: 'TrainingGlossary', menu_path: 'glossary', display_flag: 'Y',
         menu_name: '주식 용어 사전', menu_title: '주식 용어 사전',
     }),
@@ -104,7 +107,7 @@ const filteredMenuList = computed(() => {
         .map(m => ({
             ...m,
             children: m.children.filter(sm =>
-                sm.menu_title?.toLowerCase().includes(q) || sm.menu_name?.toLowerCase().includes(q))
+                menuLabel(sm).toLowerCase().includes(q) || sm.menu_title?.toLowerCase().includes(q) || sm.menu_name?.toLowerCase().includes(q))
         }))
         .filter(m => m.children.length > 0);
 });
@@ -144,11 +147,12 @@ const ICON = {
     key:     'M8 15a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 11h10M17 11v3M20 11v2',
     route:   'M6 3v12M18 9v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
     grid:    'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+    target:  'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
     book:    'M5 4.5A2.5 2.5 0 0 1 7.5 2H19v17H7.5A2.5 2.5 0 0 0 5 21.5zM5 19.5v-15M9 7h6M9 11h6',
     dot:     'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
 };
 const ICON_BY_CODE = {
-    TrainingGlossary: 'book',
+    TrainingGlossary: 'book', TrainingQuiz: 'target',
     StockBuyTarget: 'star', StockPreset: 'sliders', StockInfo: 'list', StockSector: 'grid', ChartStock: 'chart', ChartTheme: 'chart', StockThemeDetail: 'list',
     WorldIndicators: 'globe',
     BatchSetting: 'history', BatchLogSetting: 'doc', RouteList: 'route',
