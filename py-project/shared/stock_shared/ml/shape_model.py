@@ -1,7 +1,7 @@
 """
 shape_features 9종을 입력받아 "5봉 내 +13% 먼저 도달" 확률을 내는 학습모델 래퍼.
 
-scikit-learn/joblib 은 선택 의존성이다 — 설치 안 된 소비처(예: py-naver-stock-theme)에서
+scikit-learn/joblib 은 선택 의존성이다 — 설치 안 된 소비처(예: py-secret-api)에서
 이 모듈을 그냥 import 만 해도 죽지 않도록, 무거운 import 와 모델 로딩을 전부
 지연(lazy) + try/except 로 감쌌다. 실패하면 score() 가 None 을 반환할 뿐이고,
 호출부(StockBuyCheckJob)는 None 이면 shape_proba 를 그냥 비워 저장한다.

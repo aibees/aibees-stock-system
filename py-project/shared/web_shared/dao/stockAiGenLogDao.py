@@ -1,6 +1,6 @@
 from sqlalchemy import delete, func, select
 
-from app.domains.models.stockAiGenLog import StockAiGenLog
+from web_shared.models.stockAiGenLog import StockAiGenLog
 
 
 class StockAiGenLogDao:

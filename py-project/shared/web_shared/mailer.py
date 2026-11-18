@@ -14,7 +14,7 @@ import ssl
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
-from app.domains.dao.masterInfoDao import MasterInfosDao
+from web_shared.dao.masterInfoDao import MasterInfosDao
 
 _KEY_FILES = ('smtp.key', os.path.join('..', 'py-stock-batch', 'spec_keys', 'smtp.key'))
 _SENDER_NAME = '양봉상회'

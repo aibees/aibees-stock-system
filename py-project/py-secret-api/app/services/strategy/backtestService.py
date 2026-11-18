@@ -14,12 +14,12 @@ from datetime import datetime, timedelta
 
 from stock_shared.dao.userOptionRecoDao import META_PREFIX as RECO_META_PREFIX
 from stock_shared.dto.userOptionMeta import UserOptionMeta
-from app.ext_services.kis.KisEngine import KisEngine
+from web_shared.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.yf.yfEngine import yfEngine
 from stock_shared.strategy.backtester import KisBacktester
 from app.services.kis.KisStockService import KisStockService
 from stock_shared.strategy.reco import RecoStrategy
-from app.utils.constants.Literal import Literal
+from web_shared.constants.Literal import Literal
 
 # compute_indicator_df 보조 윈도우 기본값.
 # /backtest/ingest 의 _DEFAULT_USER_INFO_FOR_INGEST 와 동일하게 맞춰

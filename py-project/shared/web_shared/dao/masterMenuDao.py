@@ -1,4 +1,4 @@
-from app.domains.models.masterMenu import MasterMenu
+from web_shared.models.masterMenu import MasterMenu
 from sqlalchemy import select, update, and_, func
 from sqlalchemy.dialects.mysql import insert
 import logging

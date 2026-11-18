@@ -2,7 +2,7 @@
  * 자동매매(AutoTrade) 공통 API 래퍼
  *  - 화면 3종(ModeSetting / LimitOrder / RunStatus)에서 공유
  *
- * 모드/상태/이력: ROOT 서버(py-naver-stock-theme router_auto_trade.py, WORKER_USER 전용).
+ * 모드/상태/이력: ROOT 서버(py-secret-api router_auto_trade.py, WORKER_USER 전용).
  *  전환은 항상 즉시 적용 — worker 에 보유분 청산 후 승계(pending) 로직이 없어 예약/전원 API 는 두지 않는다.
  *  USE_MOCK=true 로 되돌리면 autoTradeMock 데모 데이터로 화면만 볼 수 있다.
  *
@@ -14,7 +14,7 @@ import * as mock from './autoTradeMock.js';
 
 export const USE_MOCK = false;
 
-/* 모드·상태·이력 — ROOT 서버(py-naver-stock-theme). */
+/* 모드·상태·이력 — ROOT 서버(py-secret-api). */
 const BASE = '/api/v1/auto-trade';
 
 /* 매도 수기등록 — 등록된 지정가는 실제 매도로 이어지므로 JWT 로 사용자를 확인하는 ROOT 서버로 보낸다. */

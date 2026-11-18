@@ -1,7 +1,7 @@
 /**
  * 로컬 목업 API (VITE_MOCK=true 일 때만 켜진다 — `npm run dev:mock`).
  *
- * 서버(py-naver-stock-theme) 없이 온보딩·홈을 눈으로 확인하려고 aibeesApi 의 axios adapter 를 통째로 바꿔 끼운다.
+ * 서버(py-secret-api) 없이 온보딩·홈을 눈으로 확인하려고 aibeesApi 의 axios adapter 를 통째로 바꿔 끼운다.
  * 화면 코드는 그대로 두고 응답만 가짜다. 운영·dev 빌드에는 켜지지 않는다.
  *
  *   - 종목 이름·숫자는 전부 지어낸 값이다(실존 종목 아님). 같은 새로고침이면 같은 값이 나오게 시드 고정.

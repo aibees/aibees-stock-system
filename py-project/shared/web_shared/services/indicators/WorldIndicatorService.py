@@ -5,8 +5,8 @@ FRED API에서 가져오는 지표를 중분류(카테고리)별로 묶어 제�
 import time
 from datetime import datetime, timedelta
 
-from app.domains.dao.masterCodesDao import MasterCodesDao
-from app.ext_services.fred.FredEngine import FredEngine
+from web_shared.dao.masterCodesDao import MasterCodesDao
+from web_shared.ext_services.fred.FredEngine import FredEngine
 
 # FRED 시리즈 ID : 국채(https://fred.stlouisfed.org/categories/115), 유가(https://fred.stlouisfed.org/categories/32255)
 INDICATOR_GROUPS = [

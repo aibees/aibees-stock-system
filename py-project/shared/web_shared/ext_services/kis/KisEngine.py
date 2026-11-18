@@ -9,7 +9,7 @@ from pykis.api.stock.chart import KisChart
 
 from pykis.api.stock.quote import KisQuoteResponse
 
-from app.utils.constants.Literal import Literal
+from web_shared.constants.Literal import Literal
 from stock_shared.kis.client import create_pykis
 from stock_shared.kis.credentials import KisCredentialError, load_creds_from_db, load_creds_from_file
 from stock_shared.kis.finance import build_fundamentals, fetch_annual_ratios, pick_settled_annual, to_db_strings

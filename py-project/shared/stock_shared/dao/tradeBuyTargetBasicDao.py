@@ -2,7 +2,7 @@
 trade_buy_target_basic DAO — 기본 단계(옛 기계식 알고리즘) 추천 종목.
 
 저장: py-stock-batch StockBuyCheckJob (watch 게이트 통과 종목 + 점수·순위)
-조회: py-naver-stock-theme GET /api/v1/stocks/buy-target (기본 단계 목록)
+조회: py-secret-api GET /api/v1/stocks/buy-target (기본 단계 목록)
 워커는 이 테이블을 읽지 않는다(trade_buy_target_stock 만 본다).
 """
 from sqlalchemy import func, select

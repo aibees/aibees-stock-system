@@ -8,7 +8,7 @@ router_oauth.py — OAuth / 이메일 인증 라우터
     - [유지] POST /email     : 이메일 로그인 (기존 라우트, 내부 로직 변경)
     - [신규] POST /refresh   : silent refresh — refreshToken으로 토큰 쌍 재발급
     - [신규] POST /logout    : 서버 측 refreshToken 폐기
-    - [신규] require_auth    : Bearer 토큰 검증 decorator (인증 필요 API에 적용)
+    - require_auth 는 web_shared.auth.decorators 로 옮겼다(2026-11-18, 양봉·비밀 웹 공통)
 """
 
 import logging
@@ -19,12 +19,13 @@ import jwt  # PyJWT
 
 from flask import Blueprint, request, g
 
-from app.services.common.authService import (AuthService, JWT_SECRET, JWT_ALGORITHM, JWT_SECRET_MISSING,
+from web_shared.auth.service import (AuthService, JWT_SECRET, JWT_ALGORITHM, JWT_SECRET_MISSING,
                                              SocialLoginError, SignupError)
-from app.exceptions import ResetRequiredException  # 단일 출처 임포트
-from app.domains.dao.masterInfoDao import MasterInfosDao
-from app.domains.dao.accessLogDao import AccessLogDao
-from app.flask_app.utils.apiResponse import ApiResponse
+from web_shared.exceptions import ResetRequiredException  # 단일 출처 임포트
+from web_shared.dao.masterInfoDao import MasterInfosDao
+from web_shared.dao.accessLogDao import AccessLogDao
+from web_shared.http.response import ApiResponse
+from web_shared.auth.decorators import require_auth
 
 
 authServiceImpl    = AuthService()
@@ -41,72 +42,6 @@ def _log_login_result(login_type, results, login_key=None):
                                           login_key=login_key)
 
 oauth_bp = Blueprint("oauth", __name__)
-
-
-# ════════════════════════════════════════════════════════════════════
-# [신규] Bearer 토큰 검증 Decorator
-# ════════════════════════════════════════════════════════════════════
-def require_auth(f):
-    """
-    인증이 필요한 모든 엔드포인트에 붙이는 decorator.
-
-    동작 순서:
-        1. Authorization 헤더에서 'Bearer <token>' 형태로 토큰 추출
-        2. PyJWT 로 서명 검증 및 만료(exp) 확인
-        3. 검증 통과 시 g.current_user_id 에 사용자 ID 저장
-           → 라우트 핸들러에서 g.current_user_id 로 접근 가능
-        4. 검증 실패 시 반드시 401 반환 (명세: 403 사용 금지)
-
-    사용 예시:
-        @stocks_bp.route("/my-stocks")
-        @require_auth
-        def get_my_stocks():
-            user_id = g.current_user_id
-            ...
-
-    명세 준수:
-        - 검증 실패 응답: { "success": false, "error": { "message": "인증이 필요합니다." } }
-        - HTTP 상태코드: 401
-    """
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        # ── 헤더에서 토큰 추출 ──────────────────────────────────────
-        auth_header = request.headers.get('Authorization', '')
-
-        # 'Bearer <token>' 형식이 아닌 경우 즉시 401
-        if not auth_header.startswith('Bearer '):
-            return ApiResponse.unauthorized("Authorization 헤더가 없거나 형식이 올바르지 않습니다.")
-
-        token = auth_header.split(' ', 1)[1]  # 'Bearer ' 이후의 토큰 문자열만 추출
-
-        # 서명 키가 설정되지 않은 서버는 어떤 토큰도 믿지 않는다(fail closed). 401 이 아니라 503 —
-        # 401 이면 프런트가 재발급·재로그인을 반복하므로 설정 문제임을 구분해 돌려준다.
-        if JWT_SECRET_MISSING:
-            return ApiResponse.error("서버 인증 설정이 없습니다. 관리자에게 알려 주세요.", status=503)
-
-        try:
-            # ── 서명 검증 + 만료 확인 ────────────────────────────────
-            # PyJWT decode():
-            #   - 서명이 틀리면 InvalidSignatureError
-            #   - exp 가 현재 시각보다 이전이면 ExpiredSignatureError 자동 발생
-            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-
-            # 검증 통과 — 이후 라우트 핸들러에서 사용자 ID 접근 가능
-            # sub 클레임이 문자열 형태이므로 int 변환
-            g.current_user_id = int(payload['sub'])
-
-        except jwt.ExpiredSignatureError:
-            # accessToken 만료 → 프론트엔드가 /refresh 를 통해 갱신해야 함
-            return ApiResponse.unauthorized("액세스 토큰이 만료되었습니다.")
-
-        except jwt.InvalidTokenError:
-            # 서명 불일치, 형식 오류 등 그 외 모든 JWT 검증 실패
-            return ApiResponse.unauthorized("유효하지 않은 액세스 토큰입니다.")
-
-        # 검증 통과 → 원래 라우트 함수 실행
-        return f(*args, **kwargs)
-
-    return decorated
 
 
 # ════════════════════════════════════════════════════════════════════

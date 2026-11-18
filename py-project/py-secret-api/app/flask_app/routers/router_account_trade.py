@@ -30,7 +30,7 @@ from flask import Blueprint, request, g, Response
 import simplejson as json
 
 from app.domains.dao.accountTradeDao import AccountTradeDao
-from app.flask_app.routers.router_oauth import require_auth
+from web_shared.auth.decorators import require_auth
 
 logging.basicConfig(level=logging.ERROR)
 
@@ -61,7 +61,7 @@ def _json(body: dict, status: int = 200) -> Response:
     # 직렬화는 ApiResponse._dumps 로 통일 (datetime 등 공통 default 적용).
     # 위 _serialize 가 대부분 미리 변환하지만, 거기 안 걸린 중첩 구조가
     # 남아 있어도 여기서 안전하게 처리된다.
-    from app.flask_app.utils.apiResponse import _dumps
+    from web_shared.http.response import _dumps
     return Response(
         _dumps(body),
         status=status,

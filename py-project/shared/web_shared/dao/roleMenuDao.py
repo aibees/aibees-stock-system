@@ -3,8 +3,8 @@ from datetime import datetime
 
 from sqlalchemy import delete, func, select, update
 
-from app.domains.models.masterMenu import MasterMenu
-from app.domains.models.roleMenu import RoleFeature, RoleMenu
+from web_shared.models.masterMenu import MasterMenu
+from web_shared.models.roleMenu import RoleFeature, RoleMenu
 from stock_shared.models.userAuth import UserAuth
 from stock_shared.models.userMaster import UserMaster
 from stock_shared.models.userRole import UserRole

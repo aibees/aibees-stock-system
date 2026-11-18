@@ -13,7 +13,7 @@ user_refresh_token 테이블에 대한 CRUD 연산을 제공하는 DAO.
 
 from datetime import datetime
 from sqlalchemy import select, update, delete
-from app.domains.models.userRefreshToken import UserRefreshToken
+from web_shared.models.userRefreshToken import UserRefreshToken
 
 
 class UserRefreshTokenDao:

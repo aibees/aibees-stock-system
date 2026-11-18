@@ -1,5 +1,5 @@
 """
-종목 재무지표(PER·PBR·EPS·BPS·ROE·PEG) 계산 — API(py-naver-stock-theme)와 배치(py-stock-batch)가 같이 쓴다.
+종목 재무지표(PER·PBR·EPS·BPS·ROE·PEG) 계산 — API(py-secret-api)와 배치(py-stock-batch)가 같이 쓴다.
 
 출처 두 가지를 짝지어 쓴다.
   1) 주식현재가 시세(FHKST01010100) : PER·PBR·EPS·BPS. PER/PBR 은 "현재가 ÷ 직전 **연간 결산** EPS/BPS".

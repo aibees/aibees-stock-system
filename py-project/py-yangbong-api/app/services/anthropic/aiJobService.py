@@ -15,7 +15,8 @@ from datetime import datetime, timedelta
 from sqlalchemy.exc import IntegrityError
 
 from app.domains.dao.stockAiJobDao import StockAiJobDao, StockFinanceSnapshotDao
-from app.services.anthropic.stockAiContentService import (
+from app.services.anthropic.content import yangbong_content_service
+from web_shared.services.anthropic.stockAiContentService import (
     GenerationQuotaError,
     StockAiContentService,
 )
@@ -37,7 +38,7 @@ class AiJobService:
     def __init__(self, content_service: StockAiContentService | None = None):
         self._jobDao = StockAiJobDao()
         self._financeDao = StockFinanceSnapshotDao()
-        self._content = content_service or StockAiContentService()
+        self._content = content_service or yangbong_content_service()
 
     # ── 버튼 요청 (overview·theme) ────────────────────────────
     def request(self, session, stock_code: str, section: str, user_id: int, is_admin: bool, force: bool) -> dict:

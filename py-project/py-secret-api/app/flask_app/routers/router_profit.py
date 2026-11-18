@@ -27,9 +27,9 @@ from datetime import date, datetime, timedelta
 
 from flask import Blueprint, request, g
 
-from app.ext_services.kis.KisEngine import KisEngine
-from app.flask_app.routers.router_oauth import require_auth
-from app.flask_app.utils.apiResponse import ApiResponse
+from web_shared.ext_services.kis.KisEngine import KisEngine
+from web_shared.auth.decorators import require_auth
+from web_shared.http.response import ApiResponse
 
 log = logging.getLogger("flask.profit")
 log.setLevel(logging.INFO)

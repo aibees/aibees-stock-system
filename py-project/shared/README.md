@@ -1,9 +1,16 @@
 # stock-shared
 
-`py-naver-stock-theme` 와 `py-stock-batch` 가 공용으로 쓰는 ORM 모델 / DAO 패키지.
+`py-secret-api` 와 `py-stock-batch` 가 공용으로 쓰는 ORM 모델 / DAO 패키지.
 
 모델은 **운영 DB(`stock`) 스키마를 정본**으로 삼아 생성했다. 두 프로젝트에 흩어져 있던
 모델 정의가 서로, 그리고 DB와 어긋나 있었기 때문에 코드가 아니라 DB를 기준으로 통일했다.
+
+## web_shared (2026-11-18)
+
+같은 폴더의 `web_shared/` 는 양봉상회·비밀상회 **웹서버끼리만** 쓰는 Flask 계층 공용 모듈이다
+(앱 생성·응답 포맷·JWT 인증·메뉴/권한/공통코드/공지 등 DAO). 배치는 쓰지 않는다.
+의존성(Flask, PyJWT, flask-cors, simplejson, requests)은 여기 선언하지 않고 쓰는 앱이 선언한다 — 선언하면 배치 이미지에도 들어간다.
+설치는 stock_shared 와 같다(path dependency, develop=true → `shared/` 가 import 경로에 잡힌다).
 
 ## 구성
 
@@ -99,7 +106,7 @@ DB 스키마가 바뀌면 모델도 DB 기준으로 갱신한다. 손으로 고�
 
 ## 버그 수정
 
-`UserMasterDao.select_user_by_phone` (py-naver-stock-theme, oAuth 로그인 경로)은
+`UserMasterDao.select_user_by_phone` (py-secret-api, oAuth 로그인 경로)은
 `user_master` 에 없는 `type` 컬럼을 참조해 호출 시 `AttributeError` 가 나던 코드였다.
 로그인 타입의 정본이 `user_login_type.login_type` 이므로 조인 방식으로 재구현했다.
 

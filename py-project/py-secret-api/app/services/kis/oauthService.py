@@ -2,7 +2,7 @@ import requests
 from datetime import datetime
 
 from stock_shared.db.database import dbConn
-from app.domains.dao.masterInfoDao import MasterInfosDao
+from web_shared.dao.masterInfoDao import MasterInfosDao
 from app.utils.mariaEnv import MariaEnv
 
 mariaEnv = MariaEnv()

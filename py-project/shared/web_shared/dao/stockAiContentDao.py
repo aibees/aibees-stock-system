@@ -1,7 +1,7 @@
 from sqlalchemy import select, and_
 from sqlalchemy.dialects.mysql import insert
 
-from app.domains.models.stockAiContent import StockAiContent
+from web_shared.models.stockAiContent import StockAiContent
 
 import logging
 

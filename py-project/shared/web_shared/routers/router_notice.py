@@ -10,8 +10,8 @@ import logging
 
 from flask import Blueprint, request, g
 
-from app.domains.dao.noticeDao import NoticeDao
-from app.flask_app.utils.apiResponse import ApiResponse
+from web_shared.dao.noticeDao import NoticeDao
+from web_shared.http.response import ApiResponse
 
 
 noticeDaoImpl = NoticeDao()

@@ -2,7 +2,7 @@
 양봉 AI 워커 — stock_ai_job 큐를 꺼내 AI 분석·재무 지표를 만들고, 기다리던 사람에게 알린다.
 설계: meetings/설계_2026-11-18_AI분석-비동기화.md · sql/yangbong/008
 
-실행:  python -m app.workers.ai_job_worker        (docker-compose.yangbong.yml 의 ai-worker 서비스)
+실행:  python -m app.workers.ai_job_worker        (py-yangbong-api/docker-compose.yml 의 ai-worker 서비스)
 
 왜 프로세스 1개인가
   KIS 는 토큰 발급을 1분 1회로 제한한다(EGW00133). API 서버(gunicorn 워커 4개)가 각자 토큰을 받으면
@@ -31,8 +31,6 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
-
-from app.utils.service import IS_YANGBONG
 
 log = logging.getLogger("ai_worker")
 
@@ -65,9 +63,9 @@ class AiJobWorker:
 
     def __init__(self):
         # 무거운 import(pykis·anthropic·DB 엔진)는 여기서 — 모듈 import 만으로 DB 에 붙지 않게.
-        from app.domains.dao.masterCodesDao import MasterCodesDao
+        from web_shared.dao.masterCodesDao import MasterCodesDao
         from app.domains.dao.stockAiJobDao import StockAiJobDao, StockFinanceSnapshotDao
-        from app.services.anthropic.stockAiContentService import StockAiContentService
+        from app.services.anthropic.content import yangbong_content_service
         from app.services.common.notificationService import NotificationService
         from stock_shared.dao.masterStockDao import MasterStockDao
         from stock_shared.db.database import dbConn
@@ -77,7 +75,7 @@ class AiJobWorker:
         self._financeDao = StockFinanceSnapshotDao()
         self._codesDao = MasterCodesDao()
         self._stockDao = MasterStockDao()
-        self._content = StockAiContentService()
+        self._content = yangbong_content_service()
         self._notify = NotificationService()
 
         self._kis = None
@@ -93,7 +91,7 @@ class AiJobWorker:
     def kis(self):
         with self._kis_lock:
             if self._kis is None:
-                from app.ext_services.kis.KisEngine import KisEngine
+                from web_shared.ext_services.kis.KisEngine import KisEngine
                 self._kis = KisEngine(virtual=False)
             return self._kis
 
@@ -277,9 +275,6 @@ class AiJobWorker:
 
 def main():
     _setup_logging()
-    if not IS_YANGBONG:
-        log.error("APP_SERVICE=yangbong 에서만 실행한다(stock_ai_job 등은 양봉 DB 에만 있다).")
-        sys.exit(2)
     worker = AiJobWorker()
     signal.signal(signal.SIGTERM, worker.stop)
     signal.signal(signal.SIGINT, worker.stop)

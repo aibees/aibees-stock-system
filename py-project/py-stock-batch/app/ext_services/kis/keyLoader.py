@@ -1,7 +1,7 @@
 """
 KIS 자격증명 로더 — 어댑터.
 
-구현은 stock_shared.kis.credentials 로 옮겼다(py-naver-stock-theme 와 공용).
+구현은 stock_shared.kis.credentials 로 옮겼다(py-secret-api 와 공용).
 이 파일에 남은 것은 batch 앱 전용인 **AES 복호화 주입**뿐이다 — aes.key 와 aesUtils 가
 이 앱에만 있어서 shared 가 가져갈 수 없다.
 

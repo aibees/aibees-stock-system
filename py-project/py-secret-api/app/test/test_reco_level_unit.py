@@ -2,7 +2,7 @@
 매수추천 알고리즘별 행 합치기·단계 구성·권한별 가공 단위 검증 — DB 불필요.
 
 실행
-    cd py-project/py-naver-stock-theme
+    cd py-project/py-secret-api
     PYTHONPATH=. python -m app.test.test_reco_level_unit
 
 stock_shared 패키지는 import 시 SQLAlchemy 를 끌어오므로, DB 가 없는 환경에서도 돌 수 있게
@@ -27,7 +27,7 @@ if 'stock_shared.reco_algo' not in sys.modules:
         spec.loader.exec_module(mod)
 
 from stock_shared.reco_algo import merge_algo_rows, merge_reco_sources, algo_stage_map  # noqa: E402
-from app.services.stocks import RecoLevel as R  # noqa: E402
+from web_shared.services.stocks import RecoLevel as R  # noqa: E402
 
 
 def row(algo, code='A', **kw):

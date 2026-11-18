@@ -1,7 +1,7 @@
 import logging
 import time
 import anthropic
-from app.config.anthropicConfig import anthropic_settings
+from web_shared.config.anthropicConfig import anthropic_settings
 
 logger = logging.getLogger(__name__)
 

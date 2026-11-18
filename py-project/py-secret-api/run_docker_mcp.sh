@@ -8,7 +8,7 @@ set -e
 # shared(공용 ORM/DAO)가 포함되어야 poetry path dependency('../shared')가 해석된다.
 cd "$(dirname "$0")/.."
 
-PROJ="py-naver-stock-theme"
+PROJ="py-secret-api"
 IMAGE="py-stock-mcp"
 CONTAINER="stock-web-mcp-server"
 

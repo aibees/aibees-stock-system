@@ -179,7 +179,7 @@
 </template>
 
 <script setup>
-// 매매손익 API 는 py-naver-stock-theme(ROOT 서버, API_SERVER_URL) 소관이라
+// 매매손익 API 는 py-secret-api(ROOT 서버, API_SERVER_URL) 소관이라
 // batchApi(py-stock-batch) 가 아니라 aibeesApi 를 쓴다. 이 엔드포인트는
 // @require_auth 로 보호되므로 Authorization 헤더가 실려야 하는데, aibeesApi 의
 // request interceptor 가 Bearer 토큰을 붙여준다(aibeesApi.js 참고).
@@ -258,7 +258,7 @@ const fetchData = async () => {
         loaded.value = true;
     } catch (e) {
         // 서버가 내려준 안내 문구(KIS 키 미등록 등)를 그대로 보여주는 게 가장 친절하다.
-        // py-naver-stock-theme 의 ApiResponse.error 는 { error: { message } } 포맷이다
+        // py-secret-api 의 ApiResponse.error 는 { error: { message } } 포맷이다
         // (py-stock-batch 는 { message } — 엔드포인트 이전 이력이 있어 둘 다 받아준다).
         errorMsg.value = e?.response?.data?.error?.message
             || e?.response?.data?.message

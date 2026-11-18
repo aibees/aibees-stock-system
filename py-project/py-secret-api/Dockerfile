@@ -2,7 +2,7 @@
 ##
 ## 빌드 컨텍스트는 py-project/ 다. shared(공용 ORM/DAO)가 컨텍스트에 포함되어야
 ## poetry 의 path dependency('../shared')가 해석된다.
-##   docker build -f py-naver-stock-theme/Dockerfile -t py-stock-web .   (py-project/ 에서)
+##   docker build -f py-secret-api/Dockerfile -t py-stock-web .   (py-project/ 에서)
 ## build_docker.sh 가 알아서 py-project/ 로 이동해 실행한다.
 
 FROM python:3.12.3
@@ -22,7 +22,7 @@ WORKDIR /workdir
 # WORKDIR 가 /workdir 이므로 pyproject 의 '../shared' 는 /shared 로 해석된다.
 COPY shared /shared
 
-COPY py-naver-stock-theme/pyproject.toml py-naver-stock-theme/poetry.lock /workdir/
+COPY py-secret-api/pyproject.toml py-secret-api/poetry.lock /workdir/
 
 # poetry.lock 의 고정 버전을 유지한 채 메타데이터만 갱신.
 # (--no-update 없이 'poetry lock' 을 돌리면 락이 무의미해져 빌드마다 버전이 달라진다)
@@ -30,7 +30,7 @@ RUN poetry lock --no-update \
  && poetry config virtualenvs.create false \
  && poetry install --no-interaction --no-ansi
 
-COPY py-naver-stock-theme/ /workdir/
+COPY py-secret-api/ /workdir/
 
 EXPOSE 5556
 

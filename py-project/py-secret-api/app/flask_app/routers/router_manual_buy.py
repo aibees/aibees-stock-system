@@ -23,8 +23,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.domains.dao.manualBuyDao import ManualBuyDao
 from app.flask_app.routers.router_auto_trade import _require_worker
-from app.flask_app.routers.router_oauth import require_auth
-from app.flask_app.utils.apiResponse import ApiResponse
+from web_shared.auth.decorators import require_auth
+from web_shared.http.response import ApiResponse
 
 manual_buy_bp = Blueprint("manual_buy", __name__)
 manualBuyDaoImpl = ManualBuyDao()

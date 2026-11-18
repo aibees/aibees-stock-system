@@ -33,11 +33,11 @@ from decimal import Decimal
 from flask import Blueprint, g, request
 
 from stock_shared import trade_mode
-from app.domains.dao.roleMenuDao import RoleMenuDao
+from web_shared.dao.roleMenuDao import RoleMenuDao
 from app.domains.dao.manualSellDao import SELL_NOW_MEMO, SELL_NOW_PRICE, ManualSellDao
 from app.domains.dao.tradeModeDao import TradeModeDao
-from app.flask_app.routers.router_oauth import require_auth
-from app.flask_app.utils.apiResponse import ApiResponse
+from web_shared.auth.decorators import require_auth
+from web_shared.http.response import ApiResponse
 
 auto_trade_bp = Blueprint("auto_trade", __name__)
 tradeModeDaoImpl = TradeModeDao()

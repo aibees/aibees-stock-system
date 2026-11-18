@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 
-from app.utils.constants.Literal import Literal
+from web_shared.constants.Literal import Literal
 
 
 class StockModService:

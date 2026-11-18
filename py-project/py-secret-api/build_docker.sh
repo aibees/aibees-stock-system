@@ -7,7 +7,7 @@
 
 cd "$(dirname "$0")/.." || exit 1
 
-PROJ="py-naver-stock-theme"
+PROJ="py-secret-api"
 
 echo 'Docker stopping....'
 docker stop stock-web-flask-app

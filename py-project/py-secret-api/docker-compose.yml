@@ -8,8 +8,13 @@
 #   172.21.1.5  stock-batch-flask-app (py-stock-batch/docker-compose.yml)
 #   172.21.1.6  stock-vue-app         (stock-vue/docker-compose.yml)
 #   172.21.1.7  stock-web-mcp-server  (docker-compose.mcp.yml)
-#   172.21.1.8  yangbong-web-flask-app (docker-compose.yangbong.yml)
+#   172.21.1.8  yangbong-web-flask-app (py-yangbong-api/docker-compose.yml)
 #   172.21.1.11 kis-user1             (py-stock-batch/docker-compose.pykis.yml)
+
+# compose 프로젝트 이름 — 2026-11-19 폴더를 py-naver-stock-theme → py-secret-api 로 바꿨다.
+#   이름을 정하지 않으면 폴더 이름(py-secret-api)이 프로젝트 이름이 되어, 서버에 옛 이름(py-naver-stock-theme)으로
+#   떠 있는 컨테이너를 다른 프로젝트로 보고 같은 container_name 으로 충돌한다. 그래서 옛 이름을 그대로 고정한다.
+name: py-naver-stock-theme
 
 services:
     app:
@@ -26,7 +31,7 @@ services:
         # poetry 의 path dependency('../shared')가 해석된다.
         build:
             context: ..
-            dockerfile: py-naver-stock-theme/Dockerfile
+            dockerfile: py-secret-api/Dockerfile
 
         # 로컬 빌드 이미지라 레지스트리 조회를 아예 막는다.
         # 이미지가 없으면 pull 실패가 아니라 build 로 넘어간다.

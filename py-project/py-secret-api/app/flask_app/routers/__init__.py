@@ -1,24 +1,22 @@
 
 from flask import Flask, request
 
-from app.utils.service import IS_YANGBONG
-
-# 두 서비스가 같이 쓰는 블루프린트 (import 경로, 변수명, url_prefix)
-#   양봉상회(APP_SERVICE=yangbong)는 이 목록만 등록한다 — 매매·배치·전략·공통코드 관리는 비밀상회에만 있다.
+# 비밀상회 API 블루프린트 (import 경로, 변수명, url_prefix). 양봉상회 API 는 py-yangbong-api 로 분리했다(2026-11-19 3단계).
+#   web_shared.routers    : 두 서버 공용 — 인증·메뉴/권한·공지·접근 로그·개인설정·시황 지표
+#   app.flask_app.routers : 비밀상회 판 — 종목·차트·AI 분석은 공용 블루프린트(web_shared create_*)에 KIS·동기 생성을 넣어 만든다
 _PUBLIC_BLUEPRINTS = [
     ("app.flask_app.routers.router_stocks",       "stocks_bp",       "/api/v1/stocks"),
-    ("app.flask_app.routers.router_oauth",        "oauth_bp",        "/api/oauth"),
-    ("app.flask_app.routers.router_master",       "master_bp",       "/api/v1/master"),
+    ("web_shared.routers.router_oauth",           "oauth_bp",        "/api/oauth"),
+    ("web_shared.routers.router_master",          "master_bp",       "/api/v1/master"),
     ("app.flask_app.routers.router_chart",        "chart_bp",        "/api/v1/charts"),
     ("app.flask_app.routers.router_anthropic",    "anthropic_bp",    "/api/v1/anthropic"),
-    ("app.flask_app.routers.router_user_options", "user_options_bp", "/api/v1"),
-    ("app.flask_app.routers.router_indicators",   "indicators_bp",   "/api/v1/indicators"),
-    ("app.flask_app.routers.router_access_log",   "access_log_bp",   "/api/v1/access-logs"),
-    ("app.flask_app.routers.router_notice",       "notice_bp",       "/api/v1/notices"),
+    ("web_shared.routers.router_user_options",    "user_options_bp", "/api/v1"),
+    ("web_shared.routers.router_indicators",      "indicators_bp",   "/api/v1/indicators"),
+    ("web_shared.routers.router_access_log",      "access_log_bp",   "/api/v1/access-logs"),
+    ("web_shared.routers.router_notice",          "notice_bp",       "/api/v1/notices"),
 ]
 
-# 비밀상회에만 있는 블루프린트. 양봉상회 서버에서는 import 도 하지 않는다
-# (import 시점에 서비스 객체를 만드는 모듈이 있어, 양봉상회 DB 에 없는 테이블·KIS 키를 건드리지 않게).
+# 비밀상회에만 있는 블루프린트 — 배치·공통코드 관리·전략·계좌·매매·최우선타겟.
 _SECRET_ONLY_BLUEPRINTS = [
     ("app.flask_app.routers.router_batches",       "batch_bp",          "/api/v1"),
     ("app.flask_app.routers.router_commoncode",    "common_bp",         "/api/v1/common-codes"),
@@ -28,23 +26,15 @@ _SECRET_ONLY_BLUEPRINTS = [
     ("app.flask_app.routers.router_auto_trade",    "auto_trade_bp",     "/api/v1/auto-trade"),
     ("app.flask_app.routers.router_manual_buy",    "manual_buy_bp",     "/api/v1/auto-trade/manual-buy"),
     ("app.flask_app.routers.router_manual_sell",   "manual_sell_bp",    "/api/v1/auto-trade/manual-sell"),
+    # 최우선타겟 지정 — 매매 워커가 읽는다(2026-11-19 router_stocks 에서 분리, 경로는 그대로 /api/v1/stocks/buy-target/priority)
+    ("app.flask_app.routers.router_priority_target", "priority_bp",     "/api/v1/stocks"),
     # ("app.flask_app.routers.router_upbit",       "upbit_bp",          "/api/v1/upbit"),
-]
-
-
-# 양봉상회에만 있는 블루프린트 — sql/yangbong/008 의 표(작업 큐·알림함·푸시 토큰)를 쓴다.
-#   AI 분석 비동기화(meetings/설계_2026-11-18_AI분석-비동기화.md). 비밀상회 DB(stock)에는 이 표가 없다.
-_YANGBONG_ONLY_BLUEPRINTS = [
-    ("app.flask_app.routers.router_ai_job",       "ai_job_bp",       "/api/v1/anthropic/stock-analysis"),
-    ("app.flask_app.routers.router_notification", "notification_bp", "/api/v1/notifications"),
-    ("app.flask_app.routers.router_notification", "notify_bp",       "/api/v1/notify"),
 ]
 
 
 def _blueprints():
     import importlib
-    entries = _PUBLIC_BLUEPRINTS + _YANGBONG_ONLY_BLUEPRINTS if IS_YANGBONG \
-        else _PUBLIC_BLUEPRINTS + _SECRET_ONLY_BLUEPRINTS
+    entries = _PUBLIC_BLUEPRINTS + _SECRET_ONLY_BLUEPRINTS
     for module_path, attr, prefix in entries:
         yield getattr(importlib.import_module(module_path), attr), prefix
 

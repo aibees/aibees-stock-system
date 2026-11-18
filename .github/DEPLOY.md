@@ -1,24 +1,44 @@
 # 배포 (GitHub Actions + self-hosted runner)
 
-서비스 5개를 각각 따로 배포한다. 워크플로 하나 = 서비스 하나.
+서비스 6개를 각각 따로 배포한다. 워크플로 하나 = 서비스 하나.
 
 | 워크플로 | 대상 | 서버(runner 라벨) | 언제 |
 |---|---|---|---|
 | `deploy-yangbong-fe.yml` | 양봉상회 웹 `yangbong-vue-app` | 클라우드 (`cloud`) | `yangbong-store-vue/` push 시 자동 + 수동 |
 | `deploy-secret-fe.yml` | 비밀상회 웹 `secret-vue-app` | 클라우드 (`cloud`) | `secret-store-vue/` push 시 자동 + 수동 |
-| `deploy-web-be.yml` | 웹 API `stock-web-flask-app` (+ 떠 있으면 `yangbong-web-flask-app`, `yangbong-ai-worker`) | 홈 (`home`) | `py-naver-stock-theme/`·`shared/` push 시 자동 + 수동 |
+| `deploy-web-be.yml` | 비밀상회 API `stock-web-flask-app` (이미지 `py-stock-web`) | 홈 (`home`) | `py-secret-api/`·`shared/` push 시 자동 + 수동 |
+| `deploy-yangbong-be.yml` | 양봉상회 API `yangbong-web-flask-app` + AI 워커 `yangbong-ai-worker` (이미지 `py-yangbong-web`) — **떠 있을 때만 교체**, 처음 기동은 손으로 | 홈 (`home`) | `py-yangbong-api/`·`shared/` push 시 자동 + 수동 |
 | `deploy-batch-be.yml` | 배치 `stock-batch-flask-app` | 홈 (`home`) | **수동만** (돌던 배치가 끊기므로) |
 | `deploy-kis-workers.yml` | 워커 `kis-user1~4` | 워커 서버 (`worker`) | **수동만**, 평일 07:30~20:10 KST 차단(force 로 우회) |
 
 ## 동작 방식
 
 - runner 가 저장소를 새로 받지 않는다. **서버에 이미 있는 clone 폴더**에서 `git pull` 후 빌드한다.
-  그래서 gitignore 된 `.env`, `.env.prd`, `.env.yangbong`, `aes.key`, `firebase-service-account.json` 등은 지금처럼 서버에만 두면 된다. GitHub Secrets 는 쓰지 않는다.
+  그래서 gitignore 된 `.env`, `.env.prd`, `.env.yangbong`(이제 `py-yangbong-api/` 안), `aes.key`, `firebase-service-account.json` 등은 지금처럼 서버에만 두면 된다. GitHub Secrets 는 쓰지 않는다.
 - 레지스트리를 쓰지 않는다. 이미지는 지금처럼 각 서버에서 로컬 빌드한다.
 - 새 이미지 빌드가 성공한 뒤에만 컨테이너를 바꾼다. 빌드가 깨지면 기존 컨테이너가 그대로 남는다.
 - runner 는 서버로 들어오는 포트가 필요 없다(GitHub 로 나가는 연결만 씀).
-- `shared/` 가 바뀌면 웹 BE 만 자동 배포된다. 배치·워커도 `shared` 를 쓰므로 필요하면 수동으로 돌린다.
+- `shared/` 가 바뀌면 웹 BE 두 개(비밀·양봉)가 자동 배포된다(`shared/web_shared` 는 두 웹서버 공용). 배치·워커도 `shared/stock_shared` 를 쓰므로 필요하면 수동으로 돌린다.
+- 양봉 BE 는 이미지를 `docker build` 로 직접 만든다. compose build 는 `.env.yangbong` 이 없는 서버에서 빌드 전에 실패하기 때문이다.
 - `sql/` 마이그레이션은 자동 적용하지 않는다. 배포 전에 손으로 적용한다.
+
+## 폴더 이름 변경 (2026-11-19 py-naver-stock-theme → py-secret-api)
+
+`git pull` 은 git 이 추적하는 파일만 새 폴더로 옮긴다. gitignore 된 시크릿은 **옛 폴더에 남는다.**
+그래서 이 변경을 push 하기 **전에** 홈 서버 clone 폴더(`$HOME_DEPLOY_ROOT/py-project`)에서 시크릿을 새 폴더로 먼저 복사해 둔다.
+
+```bash
+cd "$HOME_DEPLOY_ROOT/py-project"
+mkdir -p py-secret-api/app/config/keys
+cp -a py-naver-stock-theme/.env py-naver-stock-theme/.env.mcp py-secret-api/
+cp -a py-naver-stock-theme/app/config/keys/anthropic.env py-secret-api/app/config/keys/
+```
+
+- 새 폴더에 무시 파일만 있어도 `git pull` 은 정상으로 된다(추적 파일과 겹치지 않는다).
+- 먼저 복사하지 않고 push 하면 웹 BE 배포가 `.env` 를 못 찾아 **교체 단계에서 실패**한다. 기존 컨테이너는 그대로 돈다. 위 복사 후 워크플로를 다시 실행하면 된다.
+- compose 프로젝트 이름은 `name: py-naver-stock-theme` 로 고정해 두었다. 폴더 이름이 바뀌어도 떠 있는 `stock-web-flask-app`·`stock-web-mcp-server` 를 같은 프로젝트로 보고 교체한다.
+- 배포가 정상인 것을 확인한 뒤 옛 폴더(`py-naver-stock-theme/`, 이제 무시 파일만 남음)를 지운다.
+- 양봉 compose 는 Anthropic 키를 `../py-secret-api/app/config/keys/anthropic.env` 에서 마운트한다.
 
 ## 처음 한 번 설정
 

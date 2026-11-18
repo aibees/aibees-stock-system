@@ -1,4 +1,4 @@
-"""KIS 실전 자격증명 해석 — py-stock-batch / py-naver-stock-theme 공용.
+"""KIS 실전 자격증명 해석 — py-stock-batch / py-secret-api 공용.
 
 정본 컬럼
     user_detail.kis_id / kis_account / kis_app_key / kis_sec_key

@@ -1,4 +1,4 @@
-from app.domains.models.masterInfos import MasterInfos
+from web_shared.models.masterInfos import MasterInfos
 from sqlalchemy import delete, select, update, and_, func
 from sqlalchemy.dialects.mysql import insert
 import logging

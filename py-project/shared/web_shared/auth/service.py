@@ -22,11 +22,11 @@ import jwt  # PyJWT 패키지 (pyproject.toml에 PyJWT = "^2.8.0" 추가됨)
 from dotenv import load_dotenv
 
 from stock_shared.dao.userMasterDao import UserMasterDao
-from app.domains.dao.userRefreshTokenDao import UserRefreshTokenDao  # [신규] refreshToken DAO
-from app.exceptions import ResetRequiredException  # 단일 출처 임포트 — 이 파일에서 직접 정의하지 않음
-from app.domains.dao.masterInfoDao import MasterInfosDao
-from app.domains.dao.socialLoginDao import SocialLoginDao
-from app.utils import mailer
+from web_shared.dao.userRefreshTokenDao import UserRefreshTokenDao  # [신규] refreshToken DAO
+from web_shared.exceptions import ResetRequiredException  # 단일 출처 임포트 — 이 파일에서 직접 정의하지 않음
+from web_shared.dao.masterInfoDao import MasterInfosDao
+from web_shared.dao.socialLoginDao import SocialLoginDao
+from web_shared import mailer
 
 import requests
 

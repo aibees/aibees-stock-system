@@ -3,9 +3,9 @@ import traceback
 
 from flask import Blueprint, g
 
-from app.flask_app.utils.apiResponse import ApiResponse
-from app.services.indicators.WorldIndicatorService import WorldIndicatorService
-from app.services.indicators.MarketSnapshotService import MarketSnapshotService
+from web_shared.http.response import ApiResponse
+from web_shared.services.indicators.WorldIndicatorService import WorldIndicatorService
+from web_shared.services.indicators.MarketSnapshotService import MarketSnapshotService
 
 indicators_bp = Blueprint("indicators", __name__)
 

@@ -29,13 +29,13 @@ from flask import Blueprint, g, request
 
 from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.tradeCandleDataDao import TradeCandleDataDao
-from app.domains.dao.userOptionsDao import UserOptionsDao
+from web_shared.dao.userOptionsDao import UserOptionsDao
 from app.domains.dao.masterStrategyParamDao import MasterStrategyParamDao
 from stock_shared.dao.userOptionRecoDao import META_PREFIX as RECO_META_PREFIX
 from stock_shared.dto.userOptionMeta import UserOptionMeta
-from app.ext_services.kis.KisEngine import KisEngine
-from app.flask_app.routers.router_oauth import require_auth
-from app.flask_app.utils.apiResponse import ApiResponse
+from web_shared.ext_services.kis.KisEngine import KisEngine
+from web_shared.auth.decorators import require_auth
+from web_shared.http.response import ApiResponse
 from stock_shared.strategy.backtester import KisBacktester
 from stock_shared.strategy.buy_order import DEFAULT_BUY_ORDER, describe_buy_order
 from stock_shared.strategy.buy_target_sim import BuyTargetSimulator
@@ -217,7 +217,7 @@ def _error(code: str, message: str, status: int = 400):
     여기서 json.dumps 를 직접 부르면 응답 계층의 직렬화 규칙을 우회하게 된다.
     """
     from flask import Response
-    from app.flask_app.utils.apiResponse import _dumps
+    from web_shared.http.response import _dumps
     return Response(
         _dumps({'success': False, 'error': {'code': code, 'message': message}}),
         status=status,

@@ -1,10 +1,10 @@
 import json
 from pprint import pprint
 
-from app.ext_services.kis.KisEngine import KisEngine
+from web_shared.ext_services.kis.KisEngine import KisEngine
 from app.mcp_server import StockMcpServer
-from app.services.stocks.StockModService import StockModService
-from app.utils.constants.Literal import Literal
+from web_shared.services.stocks.StockModService import StockModService
+from web_shared.constants.Literal import Literal
 
 kis = KisEngine(virtual=False)
 

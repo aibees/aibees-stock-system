@@ -14,10 +14,10 @@ import logging
 
 from flask import Blueprint, Response, g, request
 
-from app.flask_app.routers.router_oauth import require_auth
-from app.flask_app.utils.apiResponse import ApiResponse, _dumps
+from web_shared.auth.decorators import require_auth
+from web_shared.http.response import ApiResponse, _dumps
 from app.services.anthropic.aiJobService import USER_SECTIONS, AiJobService
-from app.services.anthropic.stockAiContentService import (
+from web_shared.services.anthropic.stockAiContentService import (
     AnnouncementMonthRequiredError,
     GenerationQuotaError,
     RefreshCooldownError,

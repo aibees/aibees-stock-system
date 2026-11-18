@@ -1,7 +1,7 @@
 from flask import Blueprint, request, g
 
-from app.flask_app.utils.apiResponse import ApiResponse
-from app.domains.dao.masterCodesDao import MasterCodesDao
+from web_shared.http.response import ApiResponse
+from web_shared.dao.masterCodesDao import MasterCodesDao
 
 common_bp = Blueprint('common-codes', __name__)
 

@@ -1,6 +1,6 @@
 # Upbit Balance 조회 API — 개발 적용 명세서
 
-> 프로젝트: `py-naver-stock-theme`
+> 프로젝트: `py-secret-api`
 > 작성일: 2026-07-21
 > 목적: 다른 프로젝트(서버)가 Upbit 거래소 잔고를 조회하도록 서버간 API를 신규 추가한 내역 정리 (핸드오프용)
 

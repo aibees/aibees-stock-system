@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import yfinance as yf
 
-from app.utils.constants.Literal import Literal
+from web_shared.constants.Literal import Literal
 
 
 class yfEngine:

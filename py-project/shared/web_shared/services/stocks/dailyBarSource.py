@@ -13,7 +13,7 @@ from datetime import date, timedelta
 import pandas as pd
 
 from stock_shared.dao.stockOhlcvDailyDao import StockOhlcvDailyDao
-from app.utils.constants.Literal import Literal
+from web_shared.constants.Literal import Literal
 
 _dao = StockOhlcvDailyDao()
 

@@ -6,7 +6,7 @@
   1시간 재호출 제한은 관리자(user_id=1)만 force=True 로 우회 가능.
 - news(최근 공시·뉴스): 버튼 없이 조회 시 자동 — 마지막 갱신 후 2시간 지났으면
   KIS 헤드라인을 먼저 가져와 그걸 근거로 Claude가 요약(웹서치 미사용, 비용 절감).
-  KIS 를 쓰지 않는 서버(양봉상회, KIS_ENABLED=false)는 새로 만들지 않고 저장된 것만 보여 준다.
+  뉴스용 KIS 가 없는 서버(news_kis_factory=None — 양봉상회 API)는 새로 만들지 않고 저장된 것만 보여 준다.
 
 하루 생성 한도(2026-11-16) — 양봉상회는 누구나 가입하므로, 로그인만으로 Anthropic 비용을 쓸 수 있으면 안 된다.
   - 사용자별: 하루 GEN_PER_USER_DAY 건(관리자 user_id=1 은 제외)
@@ -19,14 +19,13 @@ import logging
 import os
 from datetime import datetime, timedelta
 
-from app.domains.dao.stockAiContentDao import StockAiContentDao
-from app.domains.dao.stockAiGenLogDao import StockAiGenLogDao
-from app.domains.dao.masterCodesDao import MasterCodesDao
-from app.utils.service import IS_YANGBONG, KIS_ENABLED
+from web_shared.dao.stockAiContentDao import StockAiContentDao
+from web_shared.dao.stockAiGenLogDao import StockAiGenLogDao
+from web_shared.dao.masterCodesDao import MasterCodesDao
 from stock_shared.dao.masterStockDao import MasterStockDao
-from app.ext_services.kis.KisEngine import KisEngine
-from app.services.anthropic.anthropicService import AnthropicService
-from app.services.anthropic.stockAnalysisTemplate import (
+from web_shared.ext_services.kis.KisEngine import KisEngine
+from web_shared.services.anthropic.anthropicService import AnthropicService
+from web_shared.services.anthropic.stockAnalysisTemplate import (
     STOCK_ANALYSIS_SYSTEM,
     build_overview_messages,
     build_theme_messages,
@@ -40,8 +39,9 @@ NEWS_TTL = timedelta(hours=2)
 ANNOUNCEMENT_MONTHS = {2, 5, 8, 11}
 
 # 하루 생성 한도 기본값. 양봉상회는 공개 가입이라 낮게, 비밀상회는 private 회원뿐이라 넉넉하게.
-_DEFAULT_LIMITS = {'GEN_PER_USER_DAY': 5, 'GEN_TOTAL_DAY': 100} if IS_YANGBONG \
-    else {'GEN_PER_USER_DAY': 30, 'GEN_TOTAL_DAY': 300}
+#   어느 쪽인지는 서비스를 만드는 서버가 정한다(StockAiContentService(default_limits=...)).
+YANGBONG_LIMITS = {'GEN_PER_USER_DAY': 5, 'GEN_TOTAL_DAY': 100}
+SECRET_LIMITS = {'GEN_PER_USER_DAY': 30, 'GEN_TOTAL_DAY': 300}
 _LIMIT_CODES_KEY = {'system': 'stock', 'source': 'setting', 'category': 'ai'}
 
 
@@ -65,8 +65,15 @@ class AnnouncementMonthRequiredError(Exception):
 
 
 class StockAiContentService:
+    """
+    default_limits    : 하루 생성 한도 기본값(YANGBONG_LIMITS·SECRET_LIMITS). 공통코드·환경변수가 있으면 그것이 우선.
+    news_kis_factory  : 동기 뉴스 생성(get_or_refresh_news)에 쓸 KisEngine 을 만드는 함수. None 이면 저장된 뉴스만 보여 준다.
+                        (양봉상회 API 는 None — 뉴스는 AI 워커가 generate_now(kis=...) 로 만든다)
+    """
 
-    def __init__(self):
+    def __init__(self, default_limits: dict, news_kis_factory=None):
+        self._default_limits = dict(default_limits)
+        self._news_kis_factory = news_kis_factory
         self._dao = StockAiContentDao()
         self._masterStockDao = MasterStockDao()
         self._anthropic = AnthropicService()
@@ -110,8 +117,8 @@ class StockAiContentService:
         cached = self._dao.select_by_stock_section(session, stock_code, "news")
         if cached and (datetime.now() - cached["updated_at"]) < NEWS_TTL:
             return cached
-        if not KIS_ENABLED:
-            # 뉴스 헤드라인은 KIS 로만 받는다 — 출처가 정해질 때까지 저장된 것만(없으면 None).
+        if self._news_kis_factory is None:
+            # 뉴스 헤드라인은 KIS 로만 받는다 — KIS 를 쓰지 않는 서버는 저장된 것만(없으면 None).
             return cached
 
         stock = self._masterStockDao.select_master_stock_by_id(session, {"stock_code": stock_code})
@@ -121,7 +128,7 @@ class StockAiContentService:
             # 뉴스는 버튼이 아니라 조회만으로 만들어진다. 한도를 넘으면 오류 대신 지난 내용을 보여 준다.
             return self._generate(session, stock_code, "news", user_id, is_admin, lambda: self._anthropic.chat(
                 messages=build_news_messages(
-                    stock_code, KisEngine(virtual=False).get_news_title(stock_code, stock_name=stock_name)),
+                    stock_code, self._news_kis_factory().get_news_title(stock_code, stock_name=stock_name)),
                 system=STOCK_ANALYSIS_SYSTEM,
                 use_web_search=True,
             ))
@@ -188,7 +195,7 @@ class StockAiContentService:
 
     # ── 내부 ──────────────────────────────────────────────────
     def _limits(self, session) -> dict:
-        limits = dict(_DEFAULT_LIMITS)
+        limits = dict(self._default_limits)
         try:
             codes = {r['code']: r['desc'] for r in self._codesDao.select_master_code(session, _LIMIT_CODES_KEY)}
         except Exception as e:   # 공통코드를 못 읽어도 환경변수·기본값으로 센다

@@ -6,15 +6,15 @@ from flask import Blueprint, request, g
 
 from stock_shared.dao.batchJobMasterDao import BatchJobMasterDao
 from app.domains.dao.nBatchLogDao import BatchLogDao
-from app.flask_app.utils.apiResponse import ApiResponse
-from app.flask_app.routers.router_master import require_admin
+from web_shared.http.response import ApiResponse
+from web_shared.auth.decorators import require_admin
 from stock_shared.db.database import dbConn
 
 logging.basicConfig(level=logging.ERROR)
 
 batch_bp = Blueprint("batches", __name__)
 # 배치 정의·실행·로그는 관리자만(@require_admin). 예전엔 인증이 없어 주소만 알면 누구나 배치를 돌릴 수 있었다.
-# 양봉상회 서버에는 이 블루프린트를 등록하지 않는다(yangbong 스키마에 배치 테이블이 없다).
+# 비밀상회 전용(양봉상회 py-yangbong-api 에는 없다 — yangbong 스키마에 배치 테이블이 없다).
 
 batchJobMasterDaoImpl = BatchJobMasterDao()
 batchLogDaoImpl = BatchLogDao()

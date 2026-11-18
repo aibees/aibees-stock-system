@@ -17,9 +17,9 @@ import logging
 
 from flask import Blueprint, g, request
 
-from app.flask_app.routers.router_master import optional_auth
-from app.flask_app.routers.router_oauth import require_auth
-from app.flask_app.utils.apiResponse import ApiResponse
+from web_shared.auth.decorators import optional_auth
+from web_shared.auth.decorators import require_auth
+from web_shared.http.response import ApiResponse
 from app.services.common.notificationService import NotificationService
 from stock_shared.dao.devicePushTokenDao import DevicePushTokenDao
 

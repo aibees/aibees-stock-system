@@ -7,10 +7,10 @@ router_access_log.py — 로그인·메뉴(화면) 접근 기록 (sql/37_user_ac
 """
 from flask import Blueprint, request, g
 
-from app.domains.dao.accessLogDao import AccessLogDao
-from app.flask_app.routers.router_oauth import require_auth
-from app.flask_app.routers.router_master import require_admin
-from app.flask_app.utils.apiResponse import ApiResponse
+from web_shared.dao.accessLogDao import AccessLogDao
+from web_shared.auth.decorators import require_auth
+from web_shared.auth.decorators import require_admin
+from web_shared.http.response import ApiResponse
 
 
 accessLogDaoImpl = AccessLogDao()

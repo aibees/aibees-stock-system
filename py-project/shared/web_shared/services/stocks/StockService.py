@@ -5,57 +5,48 @@ from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
 from stock_shared.dao.tradeBuyTargetBasicDao import TradeBuyTargetBasicDao
 from stock_shared.reco_algo import merge_reco_sources
 from stock_shared.dao.tradeBuyTargetChartDao import TradeBuyTargetChartDao
-from stock_shared.dao.tradeBuyTargetPriorityDao import TradeBuyTargetPriorityDao
 from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.stockInvestorDailyDao import StockInvestorDailyDao
-from app.ext_services.kis.KisEngine import KisEngine
-from app.services.stocks import dailyBarSource
-from app.utils.service import KIS_ENABLED
-from stock_shared.kis.credentials import KisCredentialError
-from app.services.stocks.StockModService import StockModService
+from web_shared.services.stocks import dailyBarSource
+from web_shared.services.stocks.StockModService import StockModService
 from stock_shared import chart_analysis
-from app.domains.dao.masterCodesDao import MasterCodesDao
-from app.utils.constants.Literal import Literal
+from web_shared.dao.masterCodesDao import MasterCodesDao
+from web_shared.constants.Literal import Literal
 from datetime import datetime, timedelta
 
 
-class StockService:
+class DbBarSource:
+    """시세 출처 — DB 일봉(stock_ohlcv_daily, 전 거래일까지). 양봉상회 기본. 배치(StockOhlcvDailyJob)가 매일 적재한다."""
 
-    def __init__(self):
+    def recent_bars(self, session, stock_code, count, unit):
+        return dailyBarSource.recent_bars(session, stock_code, count, unit)
+
+    def bars_between(self, session, stock_code, date_from, date_to):
+        return dailyBarSource.bars_between(session, stock_code, date_from, date_to)
+
+
+class StockService:
+    """종목·매수추천·차트 공용 서비스(양봉상회·비밀상회 웹서버 공용, 2026-11-19 web_shared 로 옮김).
+
+    bar_source : 차트·추천 기록의 시세 출처. recent_bars(session, code, count, unit)·bars_between(session, code, from, to)
+                 를 가진 객체. 없으면 DB 일봉(DbBarSource). 비밀상회는 KIS(장중 봉 포함) 출처를 넘긴다.
+    최우선타겟 지정(매매 워커용)은 비밀상회 전용이라 여기 없다(py-secret-api PriorityTargetService).
+    """
+
+    def __init__(self, bar_source=None):
         self.buyTargetStockDaoImpl = TradeBuyTargetStockDao()
         self.buyTargetBasicDaoImpl = TradeBuyTargetBasicDao()
         self.buyTargetChartDaoImpl = TradeBuyTargetChartDao()
-        self.buyTargetPriorityDaoImpl = TradeBuyTargetPriorityDao()
         self.masterStockDaoImpl = MasterStockDao()
         self.investorDaoImpl = StockInvestorDailyDao()
         self.modService = StockModService()
-        # KisEngine 은 처음 쓸 때 만든다. 예전엔 여기서 바로 만들어 **라우터 import 시점에**
-        # 1번 사용자의 KIS 키를 DB 에서 읽었다 → KIS 키가 없는 DB(양봉상회)로는 서버가 아예 뜨지 않았다.
-        self._kis_engine = None
+        self.bar_source = bar_source or DbBarSource()
 
-    @property
-    def kis(self) -> KisEngine:
-        if self._kis_engine is None:
-            self._kis_engine = KisEngine(virtual=False)
-        return self._kis_engine
-
-    # 시세 출처: KIS(실시간·장중 봉 포함) 또는 DB 일봉(전 거래일까지).
-    #   KIS_ENABLED=false(양봉상회 기본)면 DB 만 쓴다. KIS 를 쓰는 서버라도 키가 없으면 DB 로 그린다.
     def _period_bars(self, session, stock_code, count, unit):
-        if KIS_ENABLED:
-            try:
-                return self.kis.get_ohlcv_period_unit(stock_code, count, unit=unit)
-            except KisCredentialError as e:
-                logging.warning(f"[chart] KIS 키 없음 → DB 일봉 사용: {e}")
-        return dailyBarSource.recent_bars(session, stock_code, count, unit)
+        return self.bar_source.recent_bars(session, stock_code, count, unit)
 
     def _bars_between(self, session, stock_code, date_from, date_to):
-        if KIS_ENABLED:
-            try:
-                return self.kis.getOHLCV(stock_code, date_from, date_to)
-            except KisCredentialError as e:
-                logging.warning(f"[rec-record] KIS 키 없음 → DB 일봉 사용: {e}")
-        return dailyBarSource.bars_between(session, stock_code, date_from, date_to)
+        return self.bar_source.bars_between(session, stock_code, date_from, date_to)
 
     def get_buy_target_stock_list(self, session, ymd, lite: bool = False):
         """매수추천 목록. 두 테이블을 종목당 한 줄로 합치고 행마다 algos(걸린 알고리즘)를 붙인다.
@@ -164,28 +155,6 @@ class StockService:
             return n if n > 0 else None
         except (TypeError, ValueError):
             return None
-
-    # ────────────────────────────────────────────────────────────────
-    # 최우선타겟 (Home.vue 매수추천 카드 select) — 유저당 1건, 날짜 무관.
-    # worker(RecoBuyExecutor)가 다음 영업일 정규장 라운드에서 읽어 소비(1회성 null화)한다.
-    # ────────────────────────────────────────────────────────────────
-    def get_priority_target(self, session, user_id: int):
-        return self.buyTargetPriorityDaoImpl.select_by_user_id(session, user_id)
-
-    def set_priority_target(self, session, user_id: int, ymd: str, stock_code: str):
-        """지정 전, 그 ymd 매수타겟 목록에 실제 존재하는 종목인지 검증한다
-        (프론트가 sortedData 밖의 값을 보낼 리 없지만 방어적으로 한 번 더 막는다).
-        검증 실패 시 ValueError를 던진다 — 라우터가 400 으로 변환."""
-        found = self.buyTargetStockDaoImpl.exists_stock_on_ymd(session, ymd, stock_code)
-        if not found:
-            raise ValueError(f"{ymd} 매수타겟 목록에 없는 종목입니다: {stock_code}")
-        self.buyTargetPriorityDaoImpl.upsert(
-            session, user_id, stock_code, found["stock_name"], ymd
-        )
-        return {"stock_code": stock_code, "stock_name": found["stock_name"], "set_ymd": ymd}
-
-    def clear_priority_target(self, session, user_id: int):
-        self.buyTargetPriorityDaoImpl.clear(session, user_id)
 
     def get_target_rec_record(self, session, params):
         stock_code = params.get(Literal.STOCK_CODE, None)

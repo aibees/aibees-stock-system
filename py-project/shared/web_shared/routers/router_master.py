@@ -8,12 +8,12 @@ from flask import Blueprint, request, g
 from stock_shared.dao.masterStockDao import MasterStockDao
 from functools import wraps
 
-from app.domains.dao.masterMenuDao import MasterInfosDao
-from app.domains.dao.masterInfoDao import MasterInfosDao as MasterKeyDao
-from app.domains.dao.roleMenuDao import RoleMenuDao, ADMIN_AUTH_ID, is_super_user
-from app.domains.dao.masterCodesDao import MasterCodesDao
-from app.flask_app.routers.router_oauth import require_auth
-from app.flask_app.utils.apiResponse import ApiResponse
+from web_shared.dao.masterMenuDao import MasterInfosDao
+from web_shared.dao.masterInfoDao import MasterInfosDao as MasterKeyDao
+from web_shared.dao.roleMenuDao import RoleMenuDao, ADMIN_AUTH_ID, is_super_user
+from web_shared.dao.masterCodesDao import MasterCodesDao
+from web_shared.auth.decorators import require_auth, require_admin, optional_auth, require_super
+from web_shared.http.response import ApiResponse
 
 master_bp = Blueprint("master", __name__)
 masterMenuDaoImpl = MasterInfosDao()
@@ -42,45 +42,6 @@ def _app_settings(session) -> dict:
         # 설정값을 못 읽어도 메뉴/권한 응답은 내보낸다(프런트가 기본값으로 동작)
         logging.warning(f"[menus/my] app settings 조회 실패: {e}")
         return {}
-
-
-def require_admin(f):
-    """ADMIN 권한 사용자만 통과. JWT 검증(@require_auth)을 포함한다."""
-    @wraps(f)
-    @require_auth
-    def decorated(*args, **kwargs):
-        auth_ids = roleMenuDaoImpl.select_user_auth_ids(g.db, g.current_user_id)
-        if ADMIN_AUTH_ID not in auth_ids:
-            return ApiResponse.error("관리자 권한이 필요합니다.", status=403)
-        return f(*args, **kwargs)
-    return decorated
-
-def optional_auth(f):
-    """토큰이 없으면 게스트(g.current_user_id=None)로 통과, 있으면 @require_auth 와 동일하게 검증.
-
-    토큰이 있는데 만료/위조면 401 이 나가야 프런트의 silent refresh 가 동작한다
-    (게스트로 조용히 강등하면 로그인 사용자의 메뉴가 사라진 채 새로고침 루프가 생긴다).
-    """
-    authed = require_auth(f)
-
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not request.headers.get('Authorization', '').startswith('Bearer '):
-            g.current_user_id = None
-            return f(*args, **kwargs)
-        return authed(*args, **kwargs)
-    return decorated
-
-
-def require_super(f):
-    """슈퍼유저(SUPER_USER_IDS, 기본 user_id=1)만 통과. JWT 검증을 포함한다."""
-    @wraps(f)
-    @require_auth
-    def decorated(*args, **kwargs):
-        if not is_super_user(g.current_user_id):
-            return ApiResponse.error("권한이 없습니다.", status=403)
-        return f(*args, **kwargs)
-    return decorated
 
 
 # MASTER ROUTE ROOT :: TEST

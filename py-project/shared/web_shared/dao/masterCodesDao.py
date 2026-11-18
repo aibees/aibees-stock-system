@@ -1,4 +1,4 @@
-from app.domains.models.masterCodes import MasterCodes
+from web_shared.models.masterCodes import MasterCodes
 from sqlalchemy import select, update, and_, func
 
 import logging

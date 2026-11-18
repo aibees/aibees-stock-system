@@ -29,10 +29,10 @@ from starlette.routing import Mount
 from stock_shared.db.database import dbConn
 from stock_shared.dao.masterStockDao import MasterStockDao
 from stock_shared.dao.tradeBuyTargetStockDao import TradeBuyTargetStockDao
-from app.ext_services.kis.KisEngine import KisEngine
+from web_shared.ext_services.kis.KisEngine import KisEngine
 from app.ext_services.yf.yfEngine import yfEngine
-from app.services.stocks.StockModService import StockModService
-from app.utils.constants.Literal import Literal
+from web_shared.services.stocks.StockModService import StockModService
+from web_shared.constants.Literal import Literal
 
 # ────────────────────────────────────────────────────────────
 # 설정
@@ -238,9 +238,10 @@ class StockMcpServer:
             ),
         )
         def get_stock_recent_record(stock_code: str) -> str:
-            from app.services.stocks.StockService import StockService
+            from web_shared.services.stocks.StockService import StockService
+            from app.services.stocks.kisBarSource import KisBarSource
             with self._db() as session:
-                result = StockService().get_target_rec_record(
+                result = StockService(bar_source=KisBarSource()).get_target_rec_record(
                     session, {Literal.STOCK_CODE: stock_code}
                 )
                 return json.dumps(result, ensure_ascii=False, default=str)

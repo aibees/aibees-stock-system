@@ -21,8 +21,8 @@ from flask import Blueprint, g, request
 
 from app.domains.dao.manualSellDao import ManualSellDao
 from app.flask_app.routers.router_auto_trade import _require_worker
-from app.flask_app.routers.router_oauth import require_auth
-from app.flask_app.utils.apiResponse import ApiResponse
+from web_shared.auth.decorators import require_auth
+from web_shared.http.response import ApiResponse
 
 manual_sell_bp = Blueprint("manual_sell", __name__)
 manualSellDaoImpl = ManualSellDao()

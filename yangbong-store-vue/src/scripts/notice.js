@@ -1,5 +1,5 @@
 // 공지사항 공통 — 목록(NoticeList)·상세(NoticeDetail)·홈(Home) 이 같이 쓴다.
-//   API : GET /api/v1/notices?page=&size=  /  GET /api/v1/notices/<id>  (py-naver-stock-theme router_notice.py)
+//   API : GET /api/v1/notices?page=&size=  /  GET /api/v1/notices/<id>  (py-secret-api router_notice.py)
 //   카테고리는 뱃지 없이 글자색으로만 구분한다. 목록에 없는 카테고리는 기본 글자색.
 import DOMPurify from 'dompurify';
 
