@@ -116,16 +116,70 @@
                 </div>
 
             </form>
+
+            <!-- 계정 삭제: 앱스토어 심사 필수(앱 안에서 탈퇴). 서버 DELETE /api/oauth/account -->
+            <section v-if="!isLoading && !isSpecialUser" class="danger-zone">
+                <button type="button" class="danger-link" @click="openDelete">계정 삭제</button>
+            </section>
+        </div>
+
+        <div v-if="deleteOpen" class="del-dim" @click.self="closeDelete">
+            <section class="del-sheet" role="dialog" aria-modal="true" aria-labelledby="del-title">
+                <h2 id="del-title">계정을 삭제할까요?</h2>
+                <p>삭제하면 아래 정보가 바로 지워지고 되돌릴 수 없어요.</p>
+                <ul>
+                    <li>로그인 정보와 연결된 네이버·구글 계정 연결</li>
+                    <li>성향, 내 설정, 서버에 저장된 관심 종목</li>
+                    <li>알림 수신 기기 정보</li>
+                </ul>
+                <p class="del-note">법령에 따라 보관해야 하는 접속 기록은 정해진 기간 동안만 보관 후 파기해요.</p>
+                <label class="del-check">
+                    <input v-model="deleteAgree" type="checkbox" />
+                    <span>되돌릴 수 없다는 것을 확인했어요</span>
+                </label>
+                <p v-if="deleteError" class="del-error" role="alert">{{ deleteError }}</p>
+                <div class="del-actions">
+                    <button type="button" class="del-cancel" :disabled="isDeleting" @click="closeDelete">취소</button>
+                    <button type="button" class="del-confirm" :disabled="!deleteAgree || isDeleting" @click="deleteAccount">
+                        {{ isDeleting ? '삭제 중…' : '계정 삭제' }}
+                    </button>
+                </div>
+            </section>
         </div>
     </div>
 </template>
 
 <script setup>
 import aibeesApi from '@scripts/aibeesApi.js';
+import mariaToast from '@scripts/mariaToast.js';
 import { assUserSession } from '@scripts/stores/user-stores';
 import { hasRole, WORKER_ROLE } from '@scripts/useAccess.js';
 
 const title = ref('계정 설정');
+const router = useRouter();
+
+/* ── 계정 삭제 ── */
+const deleteOpen = ref(false);
+const deleteAgree = ref(false);
+const isDeleting = ref(false);
+const deleteError = ref('');
+const openDelete = () => { deleteOpen.value = true; deleteAgree.value = false; deleteError.value = ''; };
+const closeDelete = () => { if (!isDeleting.value) deleteOpen.value = false; };
+const deleteAccount = async () => {
+    isDeleting.value = true;
+    deleteError.value = '';
+    try {
+        await aibeesApi.delete('/api/oauth/account');
+        userSession.logoutUser();
+        deleteOpen.value = false;
+        mariaToast.info('계정을 삭제했어요. 그동안 이용해 주셔서 감사합니다.');
+        router.replace('/home');
+    } catch (e) {
+        deleteError.value = e?.response?.data?.message || '계정 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.';
+    } finally {
+        isDeleting.value = false;
+    }
+};
 
 const userSession = assUserSession();
 // user_id = 1 사용자는 별도 주문(추가 설정)이 예정되어 있어 분기 처리.
@@ -407,4 +461,23 @@ const save = async () => {
 @media (max-width: 480px) {
     .field-grid.two-col { grid-template-columns: 1fr; }
 }
+
+/* ── 계정 삭제 ── */
+.danger-zone { margin-top: 28px; padding-top: 16px; border-top: 1px solid #ECEBE6; text-align: center; }
+.danger-link { min-height: 44px; padding: 0 12px; border: 0; background: transparent; color: #8B95A1; font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; }
+.del-dim { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: flex-end; justify-content: center; background: rgba(25, 31, 40, .42); }
+.del-sheet { width: 100%; max-width: 480px; box-sizing: border-box; padding: 22px 22px calc(18px + env(safe-area-inset-bottom, 0px)); border-radius: 16px 16px 0 0; background: #fff; color: #191F28; text-align: left; }
+.del-sheet h2 { margin: 0; font-size: 20px; letter-spacing: -0.5px; }
+.del-sheet p { margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: #4E5968; word-break: keep-all; }
+.del-sheet ul { margin: 12px 0 0; padding: 12px 12px 12px 30px; border-radius: 12px; background: #F4F4F1; font-size: 14px; line-height: 1.7; color: #191F28; }
+.del-sheet .del-note { font-size: 12.5px; color: #8B95A1; }
+.del-check { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 14px; cursor: pointer; }
+.del-check input { width: 20px; height: 20px; margin: 0; accent-color: #E42939; }
+.del-sheet .del-error { color: #E42939; }
+.del-actions { display: flex; gap: 8px; margin-top: 18px; }
+.del-actions button { flex: 1; height: 52px; border: 0; border-radius: 12px; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.del-cancel { background: #F4F4F1; color: #4E5968; }
+.del-confirm { background: #E42939; color: #fff; }
+.del-confirm:disabled { opacity: .4; cursor: default; }
+@media (min-width: 700px) { .del-dim { align-items: center; } .del-sheet { border-radius: 16px; } }
 </style>
