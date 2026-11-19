@@ -10,7 +10,7 @@ from stock_shared.models.tradeBuyTargetStock import TradeBuyTargetStock
 
 logging.basicConfig(level=logging.ERROR)
 
-# py-naver-stock-theme 의 Literal 상수와 동일한 값.
+# py-secret-api 의 Literal 상수와 동일한 값.
 # shared 는 특정 프로젝트 모듈에 의존하지 않기 위해 값을 직접 정의한다.
 _YMD = "ymd"
 _STOCK_CODE = "stock_code"

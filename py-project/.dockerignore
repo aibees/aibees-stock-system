@@ -1,7 +1,7 @@
 # 빌드 컨텍스트 슬림화 (context = py-project/)
 #
 # 이 파일 하나가 py-project/ 를 컨텍스트로 쓰는 모든 이미지에 적용된다.
-# (py-stock-web, py-stock-batch, py-stock-worker, py-stock-mcp)
+# (py-stock-web, py-yangbong-web, py-stock-batch, py-stock-worker, py-stock-mcp)
 # Docker 는 컨텍스트 루트의 .dockerignore 만 읽으므로 하위 프로젝트에
 # .dockerignore 를 둬도 무시된다.
 #
@@ -31,3 +31,6 @@
 
 # 연구팀 백테스트 스크립트(py-stock-batch/app/test/bt_*) — 실 운영과 무관, 이미지에 넣지 않는다.
 **/app/test/bt_*
+
+# 양봉 AI 워커 시크릿(KIS 키 파일) — py-yangbong-api/docker-compose.yml 의 ai-worker 가 마운트한다. git·이미지에 넣지 않는다.
+**/secrets/

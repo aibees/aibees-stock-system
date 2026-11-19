@@ -1,7 +1,7 @@
 """
 공용 매매 전략 패키지.
 
-py-stock-batch(실전 worker·배치·시뮬)와 py-naver-stock-theme(웹 백테스트)이
+py-stock-batch(실전 worker·배치·시뮬)와 py-secret-api(웹 백테스트)이
 같은 전략 코드를 쓰도록 이관한 것. **정본은 py-stock-batch 버전**이다.
 
 구성:

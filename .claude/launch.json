@@ -33,14 +33,14 @@
     },
     {
       "name": "yangbong-api",
-      "runtimeExecutable": "py-project/py-naver-stock-theme/.venv/Scripts/python",
-      "runtimeArgs": ["py-project/py-naver-stock-theme/run_yangbong_local.py"],
+      "runtimeExecutable": "py-project/py-yangbong-api/.venv/Scripts/python",
+      "runtimeArgs": ["py-project/py-yangbong-api/run_local.py"],
       "port": 5556
     },
     {
       "name": "api",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd /Users/user/Documents/workspace3/aibees-stock-system/py-project/py-naver-stock-theme && .venv/bin/python3 -m app.main"],
+      "runtimeArgs": ["-c", "cd /Users/user/Documents/workspace3/aibees-stock-system/py-project/py-secret-api && .venv/bin/python3 -m app.main"],
       "port": 5556
     }
   ]

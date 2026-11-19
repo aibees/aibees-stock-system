@@ -1,5 +1,5 @@
 """
-stock_shared — py-naver-stock-theme / py-stock-batch 공용 패키지.
+stock_shared — py-secret-api / py-stock-batch 공용 패키지.
 
 구성:
     stock_shared.base    : 공용 declarative Base

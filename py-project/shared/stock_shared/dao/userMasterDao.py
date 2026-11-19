@@ -51,7 +51,7 @@ class UserMasterDao(BaseDao):
         """
         전화번호 + 로그인타입 기준 사용자 조회 (oAuth 로그인용).
 
-        주의: 원본(py-naver-stock-theme)은 `UserMaster.type` 을 참조했으나
+        주의: 원본(py-secret-api)은 `UserMaster.type` 을 참조했으나
         user_master 에는 해당 컬럼이 없어 호출 시 AttributeError 가 났다.
         로그인 타입의 정본은 user_login_type.login_type 이므로 조인으로 재구현했다.
         (login_type 은 DB 에 대문자로 저장된다: EMAIL / KAKAO / NAVER)
@@ -208,7 +208,7 @@ class UserMasterDao(BaseDao):
     # 제외된 메서드
     # ------------------------------------------------------------------
     # select_user_by_phone(session, param)
-    #   py-naver-stock-theme 에 있었으나 user_master 에 존재하지 않는
+    #   py-secret-api 에 있었으나 user_master 에 존재하지 않는
     #   `type` 컬럼(UserMaster.type)을 참조해 호출 시 AttributeError 가 난다.
     #   로그인 타입은 user_login_type.login_type 이므로
     #   select_user_authinfo() 를 사용하거나, 전화번호 기반이 필요하면

@@ -1,0 +1,73 @@
+# KIS 트레이딩 워커(kis-user1~4, 이미지 py-stock-worker) 배포
+#   수동 실행만 한다. 워커는 실주문 프로세스라 재시작 = 그 순간 매매 중단이다.
+#   기본으로 평일 07:30~20:10(KST, NXT 프리마켓 08:00 ~ KRX 애프터마켓 20:00)에는 실행을 막는다.
+#   급한 수정이면 force 를 켜서 장중에도 배포할 수 있다.
+#   공휴일은 판단하지 않는다(평일로 취급해 막는다 — force 로 우회).
+#
+#   서버 clone 의 deploy_worker.sh 를 그대로 돌린다(git pull → 이미지 빌드 → 4개 재기동).
+#   배포 뒤 부팅 로그('[부팅] 실제 매수가능=...')가 뜨는지 확인한다.
+#   설정 방법: .github/DEPLOY.md
+name: 배포 · KIS 워커
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "장 시간(평일 07:30~20:10)에도 강제로 배포"
+        type: boolean
+        required: true
+        default: false
+
+concurrency:
+  group: deploy-kis-workers
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, worker]
+    timeout-minutes: 30
+    env:
+      ROOT: ${{ vars.WORKER_DEPLOY_ROOT || vars.HOME_DEPLOY_ROOT }}
+    steps:
+      - name: 장 시간 확인
+        env:
+          FORCE: ${{ inputs.force }}
+        run: |
+          dow="$(TZ=Asia/Seoul date +%u)"   # 1=월 … 7=일
+          hm="$(TZ=Asia/Seoul date +%H%M)"
+          echo "지금 KST: $(TZ=Asia/Seoul date '+%Y-%m-%d (%a) %H:%M')"
+          if [ "$dow" -le 5 ] && [ "$((10#$hm))" -ge 730 ] && [ "$((10#$hm))" -lt 2010 ]; then
+            if [ "$FORCE" = "true" ]; then
+              echo "::warning::장 시간이지만 force 로 배포합니다"
+            else
+              echo "::error::평일 07:30~20:10(KST)에는 워커를 재시작하지 않습니다. 장 마감 뒤 실행하거나 force 를 켜세요"
+              exit 1
+            fi
+          fi
+
+      - name: 배포 경로 확인
+        run: |
+          if [ -z "$ROOT" ] || [ ! -f "$ROOT/py-project/py-stock-batch/deploy_worker.sh" ]; then
+            echo "::error::저장소 변수 WORKER_DEPLOY_ROOT(없으면 HOME_DEPLOY_ROOT) 경로에 deploy_worker.sh 가 없습니다 ($ROOT)"
+            exit 1
+          fi
+
+      - name: 빌드·재기동
+        run: bash "$ROOT/py-project/py-stock-batch/deploy_worker.sh" main
+
+      - name: 부팅 로그 확인
+        run: |
+          sleep 20
+          fail=0
+          for c in $(docker ps -a --filter 'name=^/kis-user[0-9]+$' --format '{{.Names}}' | sort); do
+            status="$(docker ps -a --filter "name=^/${c}$" --format '{{.Status}}')"
+            boot="$(docker logs --since 3m "$c" 2>&1 | grep -m1 '\[부팅\]' || true)"
+            echo "· $c: $status"
+            echo "    ${boot:-(부팅 로그 아직 없음)}"
+            case "$status" in Up*) ;; *) fail=1 ;; esac
+            {
+              echo "- **$c** $status"
+              echo "  - ${boot:-부팅 로그 아직 없음}"
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
+          [ "$fail" = 0 ] || { echo "::error::기동 실패한 워커가 있습니다"; exit 1; }

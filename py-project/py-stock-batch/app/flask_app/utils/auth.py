@@ -1,5 +1,5 @@
 """
-배치 서버 인증 — 비밀상회 API(py-naver-stock-theme)가 발급한 accessToken(JWT)을 같은 키로 검증한다.
+배치 서버 인증 — 비밀상회 API(py-secret-api)가 발급한 accessToken(JWT)을 같은 키로 검증한다.
 
 예전에는 이 서버에 인증이 아예 없었다. 웹 nginx 가 /api/v1/jobs·/api/v1/notify 를 그대로 넘기므로
 주소만 알면 누구나 배치를 돌리고(/jobs/once), 전체 사용자에게 푸시를 보내고(/notify/test-send),

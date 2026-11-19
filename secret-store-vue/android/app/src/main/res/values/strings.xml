@@ -2,8 +2,8 @@
 <resources>
     <string name="app_name">비밀상회</string>
     <string name="title_activity_main">비밀상회</string>
-    <string name="package_name">com.aibeesworld.secretstore</string>
-    <string name="custom_url_scheme">com.aibeesworld.secretstore</string>
+    <string name="package_name">com.chagoklabs.secretstore</string>
+    <string name="custom_url_scheme">com.chagoklabs.secretstore</string>
     <!-- AdMob Android 앱 ID -->
     <string name="admob_app_id">ca-app-pub-5330672724286218~9642267822</string>
 </resources>

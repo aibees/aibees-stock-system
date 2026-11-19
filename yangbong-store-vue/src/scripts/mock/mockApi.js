@@ -1,13 +1,18 @@
 /**
  * 로컬 목업 API (VITE_MOCK=true 일 때만 켜진다 — `npm run dev:mock`).
  *
- * 서버(py-naver-stock-theme) 없이 온보딩·홈을 눈으로 확인하려고 aibeesApi 의 axios adapter 를 통째로 바꿔 끼운다.
+ * 서버(py-secret-api) 없이 온보딩·홈을 눈으로 확인하려고 aibeesApi 의 axios adapter 를 통째로 바꿔 끼운다.
  * 화면 코드는 그대로 두고 응답만 가짜다. 운영·dev 빌드에는 켜지지 않는다.
  *
  *   - 종목 이름·숫자는 전부 지어낸 값이다(실존 종목 아님). 같은 새로고침이면 같은 값이 나오게 시드 고정.
  *   - 등록되지 않은 경로는 404 로 거절한다(화면의 try/catch 가 "데이터 없음"으로 처리).
  *   - 비로그인 게스트 기준이라 권한(menus/my)은 빈 목록이다. 트레이닝은 정적 라우트라 메뉴 권한과 무관하다.
  */
+
+import { evaluate, normalizeSettings, DEFAULT_SETTINGS } from '../indicators.js';
+import { orderForType } from '../persona.js';
+import { recoReasons } from '../recoReasons.js';
+import { parseRate } from '../stockSignals.js';
 
 export const MOCK_ENABLED = import.meta.env.VITE_MOCK === 'true';
 
@@ -114,11 +119,11 @@ const WEATHER_RATES = { sunny: [2.1, 2.6], warm: [0.5, 0.3], cloudy: [-0.7, -0.4
 const weatherOverride = () => WEATHER_RATES[new URLSearchParams(location.search).get('weather')] ?? null;
 const marketSnapshot = () => {
     const w = weatherOverride();
-    return base().map(m => (w && m.key === 'kospi' ? { ...m, rate_1d: w[0] } : (w && m.key === 'kosdaq' ? { ...m, rate_1d: w[1] } : m)));
+    return base().map(m => (w && m.key === 'kospi' ? { ...m, rate: w[0] } : (w && m.key === 'kosdaq' ? { ...m, rate: w[1] } : m)));
 };
 const base = () => [
-    { key: 'kospi', label: '코스피', price: 2684.31, rate_1d: 1.12, rate_5d: 1.42, rate_20d: 3.85, spark: spark(1, 2585, 0.0385) },
-    { key: 'kosdaq', label: '코스닥', price: 861.07, rate_1d: 0.64, rate_5d: -0.63, rate_20d: 1.27, spark: spark(2, 850, 0.0127) },
+    { key: 'kospi', label: '코스피', price: 2684.31, rate: 1.12, rate_5d: 1.42, rate_20d: 3.85, spark: spark(1, 2585, 0.0385) },
+    { key: 'kosdaq', label: '코스닥', price: 861.07, rate: 0.64, rate_5d: -0.63, rate_20d: 1.27, spark: spark(2, 850, 0.0127) },
     { key: 'usdkrw', label: '원/달러', price: 1382.5, rate: -0.34, change: -4.7 },
 ];
 
@@ -181,11 +186,35 @@ const stockChart = (code) => {
     };
 };
 
+/* ── 홈 AI 분석 종목(/stocks/buy-target/home) ──
+ * 운영은 서버(HomePickService)가 계산한다. 목업은 그 정본인 화면 JS 로 같은 모양을 만든다. */
+const homePicks = (params = {}) => {
+    let settings = null;
+    try { settings = params.settings ? JSON.parse(params.settings) : null; } catch { settings = null; }
+    const s = normalizeSettings(settings ?? DEFAULT_SETTINGS);
+    const all = buyTargets();
+    const matched = all.filter(item => evaluate(item, s).match);
+    const ordered = orderForType(matched, { order: s.order });
+    const watch = new Set(String(params.watch || '').split(',').filter(Boolean));
+    return {
+        watch_items: all.filter(it => watch.has(it.stock_code)).map(it => ({ ...it, match: evaluate(it, s).match })),
+        ymd: all[0]?.ymd ?? null,
+        candidate_count: all.length,
+        matched_count: matched.length,
+        items: ordered.slice(0, Number(params.limit) || 3).map(it => {
+            const r = recoReasons(it);
+            return { stock_code: it.stock_code, stock_name: it.stock_name, ymd: it.ymd, close: it.close,
+                rate_pct: parseRate(it.rate), reason: r.top ? r.top.text : null, reason_rest: r.rest };
+        }),
+    };
+};
+
 /* ── 라우트 표 ── */
 const ok = (data) => ({ code: 200, message: 'mock', data });
 const ROUTES = [
     ['GET', '/api/v1/indicators/market-snapshot', () => ok(marketSnapshot())],
     ['GET', '/api/v1/stocks/buy-target/performance', () => ok(performance())],
+    ['GET', '/api/v1/stocks/buy-target/home', (c) => ok(homePicks(c.params))],
     ['GET', '/api/v1/stocks/buy-target', () => ok(buyTargets())],
     ['GET', '/api/v1/charts/stock', (c) => {
         const chart = stockChart(c.params?.stock_code);

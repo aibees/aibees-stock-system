@@ -1,0 +1,67 @@
+# py-stock-web — Flask API 전용 compose
+#
+# 이미지는 build_docker.sh 가 py-project/ 컨텍스트에서 미리 빌드한다(py-stock-web).
+# MCP 서버는 여기가 아니라 docker-compose.mcp.yml + run_docker_mcp.sh 로 따로 운영한다.
+#
+# aibees 네트워크 고정 IP 배정 현황(중복 금지):
+#   172.21.1.4  stock-web-flask-app   (이 파일)
+#   172.21.1.5  stock-batch-flask-app (py-stock-batch/docker-compose.yml)
+#   172.21.1.6  stock-vue-app         (stock-vue/docker-compose.yml)
+#   172.21.1.7  stock-web-mcp-server  (docker-compose.mcp.yml)
+#   172.21.1.8  yangbong-web-flask-app (py-yangbong-api/docker-compose.yml)
+#   172.21.1.11 kis-user1             (py-stock-batch/docker-compose.pykis.yml)
+
+# compose 프로젝트 이름 — 2026-11-19 폴더를 py-naver-stock-theme → py-secret-api 로 바꿨다.
+#   이름을 정하지 않으면 폴더 이름(py-secret-api)이 프로젝트 이름이 되어, 서버에 옛 이름(py-naver-stock-theme)으로
+#   떠 있는 컨테이너를 다른 프로젝트로 보고 같은 container_name 으로 충돌한다. 그래서 옛 이름을 그대로 고정한다.
+name: secret-api
+
+services:
+    app:
+        image: py-stock-web
+        container_name: stock-web-flask-app
+        working_dir: /workdir
+        # build 를 명시해야 로컬에 이미지가 없을 때 compose 가 **직접 빌드**한다.
+        #   없으면 compose 는 레지스트리에서 pull 을 시도하고,
+        #   py-stock-web 은 로컬 전용 태그라 이렇게 끝난다:
+        #     pull access denied for py-stock-web, repository does not exist
+        #   (구 build_docker.sh 가 rmi 로 이미지를 먼저 지우는 바람에 실제로 발생)
+        #
+        # context 는 .. = py-project/ 여야 한다. shared 가 컨텍스트에 포함되어야
+        # poetry 의 path dependency('../shared')가 해석된다.
+        build:
+            context: ..
+            dockerfile: py-secret-api/Dockerfile
+
+        # 로컬 빌드 이미지라 레지스트리 조회를 아예 막는다.
+        # 이미지가 없으면 pull 실패가 아니라 build 로 넘어간다.
+        pull_policy: never
+        ports:
+            - "5556:5556"
+        # 시크릿은 이 폴더의 .env(gitignored, 이미지에는 안 들어감 — py-project/.dockerignore)에서 읽는다.
+        #   JWT_SECRET_KEY : 로그인 토큰 서명 키(32자 이상). 배치 서버(py-stock-batch/.env)와 같은 값이어야
+        #                    관리 화면의 배치 실행이 통과한다. 없으면 로그인·인증 API 가 모두 거절된다.
+        #   .env.example 참고. 파일이 없으면 compose 가 기동을 거부한다.
+        env_file:
+            - .env
+        environment:
+            # 컨테이너 기본 TZ 는 UTC. 로그·스케줄 시각을 KST 로 맞춘다.
+            - TZ=Asia/Seoul
+            # DB 연결 풀(워커당). gunicorn 워커가 4개라 평소 2×4=8개, 최대 5×4=20개.
+            #   DB max_connections 가 50 이라 공용 기본값(3+7)을 그대로 두면 이 서버만으로 40까지 간다.
+            - DB_POOL_SIZE=2
+            - DB_MAX_OVERFLOW=3
+        # 로그 무제한 증가 방지. gunicorn access log 를 켰기 때문에 더 필요하다.
+        logging:
+            driver: json-file
+            options:
+                max-size: "20m"
+                max-file: "5"
+        networks:
+            aibees:
+                ipv4_address: 172.21.1.4
+        restart: unless-stopped
+
+networks:
+    aibees:
+        external: true

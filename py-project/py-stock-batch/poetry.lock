@@ -3583,7 +3583,7 @@ sqlcipher = ["sqlcipher3_binary"]
 [[package]]
 name = "stock-shared"
 version = "0.1.0"
-description = "py-naver-stock-theme / py-stock-batch 공용 ORM 모델 및 DAO"
+description = "py-secret-api / py-stock-batch 공용 ORM 모델 및 DAO"
 optional = false
 python-versions = "^3.12"
 groups = ["main"]

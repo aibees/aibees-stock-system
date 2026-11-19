@@ -1,0 +1,6 @@
+# actionlint 설정 — self-hosted runner 에 붙인 라벨(.github/DEPLOY.md 참고)
+self-hosted-runner:
+  labels:
+    - cloud
+    - home
+    - worker

@@ -2,8 +2,8 @@
 stock_investor_daily DAO — 종목별 투자자 순매수(일별).
 
 적재: py-stock-batch StockInvestorJob (07:10, KIS FHKST01010900)
-조회: py-naver-stock-theme GET /api/v1/stocks/id/<code> (종목 화면의 '전일 수급')
-      py-naver-stock-theme GET /api/v1/stocks/sectors (업종 화면 — 종가 두 영업일로 등락률, 순매수 합계)
+조회: py-secret-api GET /api/v1/stocks/id/<code> (종목 화면의 '전일 수급')
+      py-secret-api GET /api/v1/stocks/sectors (업종 화면 — 종가 두 영업일로 등락률, 순매수 합계)
 """
 from datetime import datetime, timedelta
 

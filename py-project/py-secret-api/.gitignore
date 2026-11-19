@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+
+.venv/
+.vscode/
+.idea/
+.DS_Store
+
+# 시크릿 — .env.mcp.example 만 커밋한다
+.env
+.env.mcp
+
+# 옛 양봉상회 시크릿 위치(2026-11-19 py-yangbong-api 로 이전) — 서버에 남은 파일이 커밋되지 않게 그대로 둔다
+.env.yangbong
+
+# 옛 양봉 AI 워커 시크릿 위치(이제 py-yangbong-api/secrets/)
+secrets/

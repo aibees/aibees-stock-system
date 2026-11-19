@@ -1,10 +1,10 @@
 [tool.poetry]
 name = "stock-shared"
 version = "0.1.0"
-description = "py-naver-stock-theme / py-stock-batch 공용 ORM 모델 및 DAO"
+description = "py-secret-api / py-stock-batch 공용 ORM 모델 및 DAO"
 readme = "README.md"
 authors = ["aibees <aibees1129@naver.com>"]
-packages = [{ include = "stock_shared" }]
+packages = [{ include = "stock_shared" }, { include = "web_shared" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -16,7 +16,7 @@ python-kis = "^2.1.6"
 scikit-learn = "1.9.1"
 joblib = "1.6.0"
 # stock_shared.crypto 는 ccxt 를 지연 import 한다. 여기 선언하지 않는 이유: 추가하면
-# py-naver-stock-theme 의 lock/이미지에도 ccxt 가 들어간다. 쓰는 앱(py-stock-batch)이 직접 선언.
+# py-secret-api 의 lock/이미지에도 ccxt 가 들어간다. 쓰는 앱(py-stock-batch)이 직접 선언.
 
 [build-system]
 requires = ["poetry-core"]

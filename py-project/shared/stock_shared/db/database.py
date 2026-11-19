@@ -13,7 +13,7 @@ def _env_int(name: str, default: int) -> int:
 #: 10+20 을 잡던 예전 값으로는 인증 서버(gunicorn 4워커)만으로 한도를 넘길 수 있었다
 #: → 'Too many connections' 로 기동 실패. 평소 열어 두는 연결(pool_size)을 줄이고,
 #: 배치의 KIS 엔진 스레드(사용자 수만큼) + 메인 세션이 동시에 써도 모자라지 않게 최대 10 으로 둔다.
-#: 워커가 여러 개인 프로세스는 환경변수로 더 줄인다 (py-naver-stock-theme/docker-compose.yml).
+#: 워커가 여러 개인 프로세스는 환경변수로 더 줄인다 (py-secret-api/docker-compose.yml).
 DB_POOL_SIZE = _env_int("DB_POOL_SIZE", 3)
 DB_MAX_OVERFLOW = _env_int("DB_MAX_OVERFLOW", 7)
 

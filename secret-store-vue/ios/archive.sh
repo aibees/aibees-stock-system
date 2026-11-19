@@ -9,6 +9,8 @@
 #   ./ios/archive.sh --upload        위 + App Store Connect(TestFlight) 업로드
 #   ./ios/archive.sh --no-web        웹빌드/cap sync 생략 (dist 재사용)
 #   ./ios/archive.sh --version 1.1   MARKETING_VERSION(표시 버전) 지정
+#   ./ios/archive.sh --submit        업로드 + 빌드 처리 대기 + 심사 제출(ios/asc-submit.mjs). --upload 를 포함한다
+#   ./ios/archive.sh --submit --release after   승인되면 바로 출시(기본은 manual: 승인 후 직접 출시)
 #
 # 빌드번호(CFBundleVersion)는 기본값이 현재시각(YYYYMMDDHHMM) 이다.
 #   - pbxproj 의 CURRENT_PROJECT_VERSION 이 1 로 하드코딩돼 있어 그대로 올리면
@@ -22,14 +24,17 @@
 # 업로드(--upload)에 필요한 App Store Connect API 키 — 환경변수로 넘긴다:
 #   ASC_KEY_ID      키 ID. AuthKey_XXXXXXXXXX.p8 의 XXXXXXXXXX 부분
 #   ASC_ISSUER_ID   Issuer ID (App Store Connect > 사용자 및 액세스 > 통합)
-#   ASC_KEY_PATH    .p8 파일 경로 (생략 시 stock-vue/AuthKey_<ASC_KEY_ID>.p8)
+#   ASC_KEY_PATH    .p8 파일 경로 (생략 시 secret-store-vue/AuthKey_<ASC_KEY_ID>.p8)
+#   ※ 키는 49JM9DT87K 를 쓴다. 7PFAYQMD47 은 401 로 거절된다(2026-11).
 #   또는 ios/asc.env.local 에 같은 이름으로 적어 두면 자동으로 읽는다.
 # 이 값들을 주면 archive 단계도 Apple 과 통신해 프로비저닝/인증서를 자동 갱신한다
 # (-allowProvisioningUpdates). 주지 않으면 Xcode 에 로그인된 계정으로 서명한다.
+#
+# 번들 ID 는 pbxproj 의 PRODUCT_BUNDLE_IDENTIFIER(com.chagoklabs.secretstore)를 그대로 쓴다(2026-11-19 변경).
 # =============================================================================
 set -euo pipefail
 
-cd "$(dirname "$0")/.."          # stock-vue/
+cd "$(dirname "$0")/.."          # secret-store-vue/
 ROOT="$(pwd)"
 
 PROJECT="ios/App/App.xcodeproj"
@@ -42,12 +47,16 @@ PLIST="$BUILD_DIR/ExportOptions.plist"
 
 DO_WEB=1
 DO_UPLOAD=0
+DO_SUBMIT=0
+RELEASE="manual"
 MARKETING_VERSION=""
 BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --upload)  DO_UPLOAD=1; shift ;;
+    --submit)  DO_UPLOAD=1; DO_SUBMIT=1; shift ;;
+    --release) RELEASE="${2:?--release 뒤에 manual 또는 after 가 필요합니다}"; shift 2 ;;
     --no-web)  DO_WEB=0; shift ;;
     --version) MARKETING_VERSION="${2:?--version 뒤에 버전이 필요합니다}"; shift 2 ;;
     -h|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -102,6 +111,15 @@ elif [[ $DO_UPLOAD -eq 1 ]]; then
   exit 1
 else
   echo ">>> ASC 키 없음 → Xcode 에 로그인된 계정으로 서명합니다."
+fi
+
+# ── 0) iOS SDK 버전 확인 ─────────────────────────────────────────────────────
+# Apple: 2027-04 부터 iOS 27 SDK(Xcode 27) 이상으로 빌드해야 업로드·제출 가능(ITMS-90725).
+# 그 전에는 경고만 나오므로 여기서 미리 알려 준다. Xcode 를 올리면 이 경고는 사라진다.
+REQUIRED_SDK_MAJOR=27
+SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || echo 0)"
+if [[ "${SDK_VERSION%%.*}" -lt $REQUIRED_SDK_MAJOR ]]; then
+  echo ">>> [경고] iOS SDK $SDK_VERSION ($(xcodebuild -version | head -1)) — 2027-04 부터 iOS ${REQUIRED_SDK_MAJOR} SDK 이상이어야 업로드됩니다. Xcode 를 올려 두세요." >&2
 fi
 
 # ── 1) 웹 자산 빌드 + 네이티브 동기화 ────────────────────────────────────────
@@ -171,6 +189,14 @@ echo ">>> DONE  (build number = $BUILD_NUMBER)"
 echo "    archive : $ARCHIVE"
 if [[ $DO_UPLOAD -eq 1 ]]; then
   echo "    업로드 완료 → App Store Connect 에서 처리(수 분) 후 TestFlight 에 보입니다."
+  if [[ $DO_SUBMIT -eq 1 ]]; then
+    # 빌드 처리 완료를 기다렸다가 버전 연결·메타데이터 점검·심사 제출까지 한다.
+    # 빠진 메타데이터가 있으면 제출하지 않고 무엇이 빠졌는지 알려 준다(업로드는 이미 끝난 상태).
+    echo ""
+    echo ">>> [5/5] 심사 제출 (ios/asc-submit.mjs, 출시 방식=$RELEASE)"
+    node "$ROOT/ios/asc-submit.mjs" --build "$BUILD_NUMBER" \
+      ${MARKETING_VERSION:+--version "$MARKETING_VERSION"} --release "$RELEASE"
+  fi
 else
   echo "    ipa     : $(ls "$EXPORT_DIR"/*.ipa 2>/dev/null || echo "$EXPORT_DIR")"
   echo "    업로드까지 하려면 --upload 를 붙여 다시 실행하세요."
