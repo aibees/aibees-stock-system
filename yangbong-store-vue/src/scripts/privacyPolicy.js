@@ -8,7 +8,7 @@
 export const PRIVACY_POLICY_VERSION = '2026-10-23';   // 구글 로그인 수집 항목 추가 (.2: 휴대전화번호 수집 항목 삭제)
 
 // TODO(운영): 개인정보 보호책임자 실제 정보로 교체 후 배포
-const PRIVACY_OFFICER = '개인정보 보호책임자: (성명) / 연락처: chagoklabs@gmail.com';
+const PRIVACY_OFFICER = '개인정보 보호책임자: 차곡랩스 개인정보보호 담당 / 연락처: chagoklabs@gmail.com';
 
 // 수집·이용 동의 고지 4항목(개인정보 보호법 제15조 제2항) — 동의 화면 상단 표로 보여준다
 export const CONSENT_SUMMARY = [
