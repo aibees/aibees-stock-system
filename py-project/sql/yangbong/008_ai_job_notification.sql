@@ -85,7 +85,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON yangbong.stock_ai_job            TO 'yan
 GRANT SELECT, INSERT, UPDATE, DELETE ON yangbong.stock_ai_job_subscriber TO 'yangbong'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON yangbong.user_notification       TO 'yangbong'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON yangbong.stock_finance_snapshot  TO 'yangbong'@'%';
--- 푸시 토큰 등록을 배치 서버에서 양봉 API 로 옮긴다(002 의 GRANT 는 'yangbong_api' 로 적혀 있어 다시 준다).
+-- 푸시 토큰 등록을 배치 서버에서 양봉 API 로 옮긴다(2026-11-20 전까지 002 의 GRANT 가 옛 이름 'yangbong_api' 로 적혀 있어 여기서 다시 준다).
 GRANT SELECT, INSERT, UPDATE, DELETE ON yangbong.device_push_token       TO 'yangbong'@'%';
 
 INSERT IGNORE INTO yangbong.master_codes (`system`, source, category, code, `desc`) VALUES

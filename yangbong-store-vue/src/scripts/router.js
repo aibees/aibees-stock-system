@@ -5,7 +5,7 @@ import { assUserSession } from "./stores/user-stores";
 import { ensureAccess } from "./useAccess.js";
 import { consumeAdPass, countGateEntry, gateInterval } from "./useAdGate.js";
 import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
-import { isAuthPath, isGuestPath, INTRO_PATH, ONBOARDING_PATH, PICKS_PATH } from "./authPaths.js";
+import { isAuthPath, isGuestPath, rememberAfterLogin, INTRO_PATH, ONBOARDING_PATH, PICKS_PATH } from "./authPaths.js";
 import { isIntroSeen } from "./introState.js";
 import { usePersonaStore } from "./stores/persona-store.js";
 import { NOTICE_DETAIL_PATH, NOTICE_LIST_PATH } from "./notice.js";
@@ -312,7 +312,10 @@ export const setRouterToApp = async () => {
         if (!loggedIn) {
             // 비로그인: 로그인·가입 흐름은 그대로, 홈·온보딩은 게스트로 연다. 나머지는 모두 로그인 화면으로.
             if (isAuth) return true;
-            if (!isGuest) return { path: '/login' };
+            if (!isGuest) {
+                rememberAfterLogin(to.fullPath);   // 로그인하면 이 화면으로 돌아온다(authPaths.takeAfterLogin)
+                return { path: '/login' };
+            }
         } else if (to.path === '/login' || to.path === '/signup') {
             // 로그인 상태에서 로그인·가입 화면으로 오면 홈으로(네이버 콜백·동의 화면은 흐름 중이라 그대로 둔다).
             return { path: '/home' };

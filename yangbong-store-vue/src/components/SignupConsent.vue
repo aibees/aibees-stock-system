@@ -35,6 +35,7 @@
 </template>
 
 <script setup>
+import { takeAfterLogin } from '@scripts/authPaths.js';
 /**
  * 소셜(네이버·구글) 가입 — 가입 동의 화면(/oauth/naver/consent). 만 14세·이용약관·개인정보 수집·이용을 항목별로 받는다.
  * NaverCallback·Login(구글)이 서버 응답 consentRequired 를 받으면 { provider, consentToken, socialResult, profile } 을
@@ -96,7 +97,7 @@ const submit = async () => {
         const label = PROVIDERS[provider];
         if (data.data.socialResult === 'created') alert(`${label} 계정으로 가입했어요. 환영합니다!`);
         else if (data.data.socialResult === 'linked') alert(`기존 계정에 ${label} 로그인을 연결했어요.`);
-        router.replace({ name: 'home' });
+        router.replace(takeAfterLogin() || { name: 'home' });
     } catch (err) {
         errorMsg.value = err?.response?.data?.error?.message ?? err?.error?.message ?? '가입을 완료하지 못했어요.';
         submitting.value = false;

@@ -92,6 +92,7 @@
 </template>
 
 <script setup>
+import { takeAfterLogin } from '@scripts/authPaths.js';
 import aibeesApi from '../scripts/aibeesApi.js'
 import * as StrUtils from '@/scripts/utils/stringUtils.js'
 import { assUserSession } from '../scripts/stores/user-stores';
@@ -201,7 +202,7 @@ const emaillogin = async () => {
                 localStorage.removeItem('savedEmail')
             }
             userSession.loginUser(data.data, autoLogin.value);
-            router.push({ name: 'home' });
+            router.push(takeAfterLogin() || { name: 'home' });   // 보려던 화면이 있으면 그리로
         } else if (data.error?.code == 'RESET_REQUIRED') {
             openResetModal(data.error.message);
         } else {
@@ -232,7 +233,7 @@ const onGoogleResponse = (res) => {
     userSession.loginUser(res, autoLogin.value)
     if (res.socialResult === 'linked') alert('기존 계정에 구글 로그인을 연결했어요.')
     else if (res.socialResult === 'created') alert('구글 계정으로 가입했어요. 환영합니다!')
-    router.replace({ name: 'home' })
+    router.replace(takeAfterLogin() || { name: 'home' })
 }
 
 onMounted(async () => {

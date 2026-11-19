@@ -18,6 +18,7 @@
 </template>
 
 <script setup>
+import { takeAfterLogin } from '@scripts/authPaths.js';
 /**
  * 네이버 로그인 콜백(/oauth/naver).
  * 네이버가 붙여 보낸 code/state 를 서버(POST /api/oauth/naver)로 넘기면, 서버가 네이버에서 사용자 정보를
@@ -72,7 +73,7 @@ onMounted(async () => {
         userSession.loginUser(data.data, localStorage.getItem('autoLogin') === 'true');
         if (data.data.naverResult === 'linked') alert('기존 계정에 네이버 로그인을 연결했어요.');
         else if (data.data.naverResult === 'created') alert('네이버 계정으로 가입했어요. 환영합니다!');
-        router.replace({ name: 'home' });
+        router.replace(takeAfterLogin() || { name: 'home' });
     } catch (err) {
         fail(err?.response?.data?.error?.message ?? err?.error?.message ?? '네이버 로그인에 실패했어요.');
     }

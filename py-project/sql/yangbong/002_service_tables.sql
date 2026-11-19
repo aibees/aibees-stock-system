@@ -12,7 +12,7 @@
 --
 -- 쓰기 권한은 여기 테이블마다 준다(001: 스키마 전체는 SELECT 만). 테이블을 새로 만들면 GRANT 도 같이 넣는다.
 --
--- 확인: SHOW TABLES FROM yangbong;  SHOW GRANTS FOR 'yangbong_api'@'%';
+-- 확인: SHOW TABLES FROM yangbong;  SHOW GRANTS FOR 'yangbong'@'%';
 -- ============================================================================
 
 -- ── 회원·인증 ──
@@ -63,24 +63,24 @@ CREATE TABLE IF NOT EXISTS yangbong.user_persona (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='성향 테스트 결과(계정 저장)';
 
 -- ── 쓰기 권한(서비스 테이블만) ──
-GRANT INSERT, UPDATE, DELETE ON yangbong.user_master          TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.user_detail          TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.user_login_type      TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.user_auth            TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.user_role            TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.user_consent         TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.user_refresh_token   TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.user_options         TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.user_login_log       TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.user_menu_access_log TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.device_push_token    TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.master_menu          TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.role_menu            TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.role_feature         TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.master_codes         TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.master_infos         TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.notice               TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.user_interest_groups TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.user_interest_stocks TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.stock_ai_content     TO 'yangbong_api'@'%';
-GRANT INSERT, UPDATE, DELETE ON yangbong.user_persona         TO 'yangbong_api'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.user_master          TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.user_detail          TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.user_login_type      TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.user_auth            TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.user_role            TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.user_consent         TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.user_refresh_token   TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.user_options         TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.user_login_log       TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.user_menu_access_log TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.device_push_token    TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.master_menu          TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.role_menu            TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.role_feature         TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.master_codes         TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.master_infos         TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.notice               TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.user_interest_groups TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.user_interest_stocks TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.stock_ai_content     TO 'yangbong'@'%';
+GRANT INSERT, UPDATE, DELETE ON yangbong.user_persona         TO 'yangbong'@'%';

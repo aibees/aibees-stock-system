@@ -230,9 +230,9 @@ const showAds = useShowAds();
 // 앱(AdMob)은 네이티브 광고가 화면 위에 겹쳐 그려져 스크롤되는 자리에 못 넣는다 → 하단 배너가 맡는다.
 const heroAdVisible = computed(() => !isWorker.value && showAds.value && !isNativeAdsEnabled());
 
-// 종목 상세(/stock/info)는 로그인하고 그 메뉴 권한이 있는 사용자만 연다. 아니면 목록 행을 누를 수 없게 그린다
-// (게스트 권한에 공개 메뉴로 들어 있어도 비로그인은 홈·온보딩 밖으로 못 나가므로 누르면 로그인 화면으로 튕긴다).
-const canOpenDetail = computed(() => isLoggedIn.value && userSession.access.paths.includes('/stock/info'));
+// 종목 상세(/stock/info)는 로그인 사용자만 쓴다(2026-11-20). 메뉴가 열려 있으면 비로그인에게도 행을 누를 수 있게 그리고,
+// 누르면 라우터 가드가 로그인 화면으로 안내한 뒤 로그인하면 그 종목으로 돌려보낸다(authPaths.rememberAfterLogin).
+const canOpenDetail = computed(() => userSession.access.paths.includes('/stock/info'));
 
 /* ── 계정 메뉴·헤더 ── */
 const menuOpen = ref(false);

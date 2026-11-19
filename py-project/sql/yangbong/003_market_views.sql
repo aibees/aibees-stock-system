@@ -3,10 +3,10 @@
 --
 -- 시장 데이터를 `yangbong` 에서 같은 이름으로 읽게 하는 읽기 전용 뷰.
 --   - 원본은 `stock` 에 하나만 있고 배치가 매일 쓴다(복사하지 않는다). 양봉상회 API 코드는 테이블 이름 그대로 읽는다.
---   - SQL SECURITY DEFINER: yangbong_api 는 `stock` 권한 없이 뷰 권한(SELECT)만으로 읽는다.
+--   - SQL SECURITY DEFINER: yangbong 계정은 `stock` 권한 없이 뷰 권한(SELECT)만으로 읽는다.
 --     DEFINER 는 이 파일을 실행한 관리자 계정이 된다 — 그 계정을 지우면 뷰가 깨진다.
 --   - ALGORITHM=MERGE: 조회 조건이 원본 테이블 인덱스를 그대로 탄다(일봉 320만 행).
---   - yangbong_api 에게는 SELECT 만 있으므로 뷰를 통해 원본을 고칠 수 없다(001 의 권한 설계 참고).
+--   - yangbong 계정에는 SELECT 만 있으므로 뷰를 통해 원본을 고칠 수 없다(001 의 권한 설계 참고).
 --
 -- ⚠ SELECT * 는 뷰를 만든 시점의 컬럼으로 고정된다. 원본(`stock`) 테이블에 컬럼을 추가하면
 --   여기 해당 줄을 다시 실행해야 양봉상회에서 새 컬럼이 보인다.
@@ -18,7 +18,7 @@
 --   테마·관리종목은 양봉상회 화면에만 쓴다(2026-11-15 결정) — 원본은 시장 데이터라 `stock` 에 두고,
 --     비밀상회는 화면에서 메뉴를 뺀다.
 --
--- 확인: SELECT COUNT(*) FROM yangbong.trade_buy_target_stock;  (관리자 / yangbong_api 둘 다)
+-- 확인: SELECT COUNT(*) FROM yangbong.trade_buy_target_stock;  (관리자 / yangbong 계정 둘 다)
 -- 되돌리기: DROP VIEW yangbong.<이름>;
 -- ============================================================================
 

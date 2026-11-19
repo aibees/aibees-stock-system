@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS yangbong.stock_ai_gen_log (
     KEY idx_stock_ai_gen_log_user (user_id, created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = 'AI 분석 생성 기록(하루 생성 한도 계산)';
 
--- 계정 이름은 001 의 CREATE USER 를 따른다('yangbong'). ⚠ 002 의 GRANT 는 아직 'yangbong_api' 로 적혀 있다.
+-- 계정 이름은 001 의 CREATE USER 를 따른다('yangbong'). (2026-11-20 002 의 옛 이름 'yangbong_api' 도 'yangbong' 으로 통일)
 GRANT INSERT, DELETE ON yangbong.stock_ai_gen_log TO 'yangbong'@'%';
 
 INSERT IGNORE INTO yangbong.master_codes (`system`, source, category, code, `desc`) VALUES
