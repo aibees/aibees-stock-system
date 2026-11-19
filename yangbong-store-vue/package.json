@@ -14,7 +14,9 @@
     "cap:dev": "cp capacitor.config.dev.json capacitor.config.json && npx cap sync ios",
     "cap:prod": "cp capacitor.config.prod.json capacitor.config.json && npm run build:app && npx cap sync ios",
     "ios:archive": "./ios/archive.sh",
-    "ios:release": "./ios/archive.sh --upload"
+    "ios:release": "./ios/archive.sh --upload",
+    "ios:submit": "./ios/archive.sh --submit",
+    "ios:check": "node ios/asc-submit.mjs --check"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.2.0",

@@ -1,4 +1,4 @@
-package com.aibeesworld.stock;
+package com.chagoklabs.secretstore;
 
 import static org.junit.Assert.*;
 
@@ -21,6 +21,6 @@ public class ExampleInstrumentedTest {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
 
-        assertEquals("com.aibeesworld.stock", appContext.getPackageName());
+        assertEquals("com.chagoklabs.secretstore", appContext.getPackageName());
     }
 }

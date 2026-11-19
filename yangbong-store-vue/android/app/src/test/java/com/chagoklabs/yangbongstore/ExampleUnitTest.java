@@ -1,4 +1,4 @@
-package com.aibeesworld.stock;
+package com.chagoklabs.yangbongstore;
 
 import static org.junit.Assert.*;
 

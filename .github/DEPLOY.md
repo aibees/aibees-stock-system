@@ -22,6 +22,21 @@
 - 양봉 BE 는 이미지를 `docker build` 로 직접 만든다. compose build 는 `.env.yangbong` 이 없는 서버에서 빌드 전에 실패하기 때문이다.
 - `sql/` 마이그레이션은 자동 적용하지 않는다. 배포 전에 손으로 적용한다.
 
+## 서버에서 손으로 배포할 때 (2026-11-19)
+
+워크플로를 쓰지 않거나 **양봉을 처음 띄울 때**는 홈 서버 clone 에서 스크립트 하나로 한다.
+git pull → 필수 파일 확인 → 이미지 빌드 → 컨테이너 기동/교체 → 헬스체크까지 한 번에 하고, 빌드가 성공한 뒤에만 교체한다.
+
+```bash
+./py-project/py-secret-api/deploy.sh                 # 비밀상회 API
+./py-project/py-yangbong-api/deploy.sh               # 양봉상회 API + AI 워커 (--api-only / --worker-only)
+```
+
+- 확인하는 것: `.env`·`.env.yangbong` 의 필수 값(JWT 키 길이, 양봉·비밀 JWT 가 서로 다른지, DB_URL 자리표시), Anthropic 키 파일,
+  KIS 키 JSON 항목·권한, Firebase 파일, docker 네트워크 `aibees`, 폴더 이름 변경 뒤 옛 폴더에만 남은 시크릿.
+- 헬스체크: 컨테이너 Up, API 응답, DB 조회(양봉은 sql 003 시장 뷰 누락을 따로 알려 줌), AI 워커 시작 로그.
+- `--no-pull` 로 pull 없이 실행. 공통 함수는 `py-project/scripts/deploy_lib.sh`.
+
 ## 폴더 이름 변경 (2026-11-19 py-naver-stock-theme → py-secret-api)
 
 `git pull` 은 git 이 추적하는 파일만 새 폴더로 옮긴다. gitignore 된 시크릿은 **옛 폴더에 남는다.**

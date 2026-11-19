@@ -1,14 +1,14 @@
 # iOS / Android 앱 테스트 방법 (Capacitor)
 
-stock-vue → Capacitor 네이티브 앱 테스트 가이드. `android/`, `ios/` 폴더는 이미 스캐폴딩되어 있음.
+secret-store-vue(비밀상회) → Capacitor 네이티브 앱 테스트 가이드. `android/`, `ios/` 폴더는 이미 스캐폴딩되어 있음.
 
 ---
 
 ## 0. 공통: 빌드 + 동기화 (코드/env 바꿀 때마다 매번)
 
 ```bash
-cd stock-vue
-cp .env.prd .env      # 실제 서버(stock.aibeesworld.com) 대상 빌드
+cd secret-store-vue
+cp .env.prd .env      # 운영 서버(.env.prd 의 VITE_SERVER_URL) 대상 빌드
 yarn build             # dist/ 생성
 npx cap sync           # dist/ → ios/android 네이티브 프로젝트로 복사 + 플러그인 동기화
 ```
@@ -54,7 +54,7 @@ Mac Safari: 환경설정 > 고급 > "메뉴 막대에서 개발자용 메뉴 보
 > ⚠ `npx cap sync --config <file>` 은 이 CLI 버전(@capacitor/cli 8.x)에 없는 옵션임(`unknown option '--config'`). 대신 `capacitor.config.json`(Capacitor가 실제로 읽는 파일) 자체를 dev/prod 두 버전으로 바꿔치기하는 방식으로 함 — `capacitor.config.dev.json` / `capacitor.config.prod.json` 두 파일을 원본으로 두고, `package.json`에 스왑용 스크립트를 추가해둠.
 
 ```bash
-cd stock-vue
+cd secret-store-vue
 
 # 터미널 1 — vite dev 서버 켜두기 (계속 실행 상태 유지)
 yarn dev
@@ -102,7 +102,7 @@ Chrome 주소창에 `chrome://inspect#devices` 입력 (PC의 Chrome, USB 연결�
 
 ## 3. 테스트 시 꼭 확인할 것 (최근 수정 사항 검증)
 
-앱은 웹과 달리 `https://localhost`(iOS/Android WebView) 라는 별개 origin에서 뜨기 때문에, API 서버(`stock.aibeesworld.com`)로의 모든 호출이 진짜 cross-origin이 됨. 아래를 Web Inspector / DevTools 네트워크 탭에서 확인:
+앱은 웹과 달리 `https://localhost`(iOS/Android WebView) 라는 별개 origin에서 뜨기 때문에, API 서버(`.env.prd` 의 `VITE_SERVER_URL`)로의 모든 호출이 진짜 cross-origin이 됨. 아래를 Web Inspector / DevTools 네트워크 탭에서 확인:
 
 - [ ] 이메일 로그인 (`/api/oauth/email`) — 정상 응답 오는지, CORS 에러 안 뜨는지
       → ROOT 서버(별도 저장소, 5556) CORS 설정에 `Authorization` 헤더 허용 안 돼있으면 여기서 막힘.
@@ -126,16 +126,45 @@ CORS 에러가 뜨면: Web Inspector/DevTools 콘솔에 `has been blocked by COR
 시뮬레이터/USB 실행이 아니라 **TestFlight·App Store, Play Store(또는 사내 배포)용 설치 파일**을 뽑는 방법. 공통 전제: 반드시 운영 설정(`yarn cap:prod`)으로 빌드할 것 — dev 상태로 패키징하면 로컬 vite 서버를 찾다가 흰 화면만 뜨는 앱이 나감.
 
 ```bash
-cd stock-vue
+cd secret-store-vue
 yarn cap:prod        # capacitor.config.json 을 운영용으로 (혹시 dev 상태였다면 필수)
 yarn build && npx cap sync
 ```
+
+### 5-0. 실제로 쓰는 배포 명령 (2026-11-19 기준)
+
+Xcode 화면 대신 스크립트로 한다. 아래 5-1 은 원리 설명으로 남겨 둔다.
+
+```bash
+cd secret-store-vue
+npm run cap:prod                             # 운영 설정 복사 + 웹 빌드 + iOS 동기화
+npm run ios:release -- --version 1.2.0       # archive + .ipa + App Store Connect 업로드
+npm run ios:submit -- --version 1.2.0        # 위 + 빌드 처리 대기 + 심사 제출까지 한 번에(출시는 승인 후 수동)
+npm run ios:check                            # 제출 전 점검만(아무것도 바꾸지 않음)
+node ios/asc-submit.mjs --build <빌드번호> --version 1.2.0   # 이미 올린 빌드를 다시 빌드하지 않고 제출
+```
+
+- 심사 제출(`ios/asc-submit.mjs`)은 편집 중인 버전을 재사용하거나 만들고, 빌드를 연결하고, 메타데이터를 점검한 뒤 제출한다.
+  빠진 것(설명·키워드·지원 URL·스크린샷·심사 연락처·개인정보처리방침 URL·카테고리·연령 등급)이 있으면 제출하지 않고 목록을 보여 준다.
+- API 로 못 채우는 것: 앱 개인정보(데이터 수집) 응답, 가격·배포 국가 — 새 앱이면 처음 한 번 웹에서.
+- 승인 즉시 출시하려면 `--release after` (`npm run ios:submit -- --version 1.2.0 --release after`).
+
+- App Store Connect API 키: `ios/asc.env.local`(gitignored)에 `ASC_KEY_ID=49JM9DT87K`, `ASC_ISSUER_ID=…` 를 적어 둔다.
+  `.p8` 파일은 `secret-store-vue/AuthKey_49JM9DT87K.p8`. 다른 키(7PFAYQMD47)는 401 로 거절된다.
+- 이 Mac 에는 Distribution 인증서가 없어서 키가 없으면 export 가 실패한다. 업로드가 아니어도 키를 쓴다.
+- 빌드 번호는 스크립트가 현재 시각으로 넣는다. 표시 버전만 `--version` 으로 올린다.
+- 번들 ID: **`com.chagoklabs.secretstore`** (2026-11-19 변경). 번들 ID 가 바뀌어 스토어에서는 **새 앱**이다.
+  처음 올리기 전에 아래를 먼저 해 둔다.
+  1. Apple Developer → Identifiers 에 `com.chagoklabs.secretstore` 등록, Push Notifications 켜기(Xcode 자동 서명이 만들어 주기도 한다)
+  2. App Store Connect → 새 앱 등록(번들 ID `com.chagoklabs.secretstore`)
+  3. Firebase → iOS 앱(`com.chagoklabs.secretstore`) 추가 → 새 `GoogleService-Info.plist` 로 `ios/App/App/` 의 파일 교체, APNs 키 연결
+  4. AdMob → 새 앱으로 연결해 앱 ID 확인(`Info.plist` 의 `GADApplicationIdentifier`)
 
 ### 5-1. iOS — .ipa (App Store / TestFlight)
 
 **유료 Apple Developer Program 필요 ($99/년)** — 무료 개인 팀으로는 시뮬레이터/USB 실행만 되고 TestFlight·App Store 배포는 불가능함.
 
-1. [Apple Developer](https://developer.apple.com) 가입 (유료) → [App Store Connect](https://appstoreconnect.apple.com)에서 새 앱 등록. Bundle ID는 `capacitor.config.json`의 `appId` 그대로: `com.aibeesworld.stock`.
+1. [Apple Developer](https://developer.apple.com) 가입 (유료) → [App Store Connect](https://appstoreconnect.apple.com)에서 새 앱 등록. Bundle ID는 `capacitor.config.json`의 `appId` 그대로: `com.chagoklabs.secretstore`.
 2. Xcode에서 `npx cap open ios` → 상단 디바이스를 **"Any iOS Device (arm64)"** 로 선택 (시뮬레이터 선택된 채로는 Archive 메뉴가 비활성화됨).
 3. Signing & Capabilities에서 Team을 유료 계정으로 변경, "Automatically manage signing" 유지.
 4. General 탭에서 버전(Version)·빌드(Build) 번호 확인 — 업데이트할 때마다 최소 Build 번호는 올려야 스토어가 새 버전으로 인식함.
@@ -161,7 +190,7 @@ yarn build && npx cap sync
 ### 5-3. 공통 체크리스트
 
 - [ ] `yarn cap:prod` 로 운영 설정 상태 확인 (dev config로 패키징하면 안 됨)
-- [ ] `.env.prd` 기준으로 빌드됐는지 확인 (`stock.aibeesworld.com` 대상)
+- [ ] `.env.prd` 기준으로 빌드됐는지 확인 (`VITE_SERVER_URL` 이 운영 API 주소인지)
 - [ ] 버전/빌드 번호 갱신 (iOS: Xcode General 탭, Android: `android/app/build.gradle`의 `versionCode`/`versionName`)
 - [ ] 앱 아이콘/스플래시는 이미 준비돼 있음 (`ios/App/App/Assets.xcassets`, `android/app/src/main/res/mipmap-*`) — 로고 바꾸고 싶으면 별도로 알려줘, `@capacitor/assets` 같은 도구로 한번에 재생성 가능
 

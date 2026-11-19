@@ -1,4 +1,4 @@
-package com.aibeesworld.stocks;
+package com.chagoklabs.yangbongstore;
 
 import com.getcapacitor.BridgeActivity;
 
