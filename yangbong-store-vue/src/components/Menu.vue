@@ -84,6 +84,17 @@ const trainingGroup = {
     }),
 };
 // 내 설정(preset)은 주식분석 그룹의 정적 화면 — 서버 메뉴에 그 그룹이 있으면 그 끝에 붙이고, 없으면 혼자 한 그룹으로 둔다.
+// 고객지원 묶음. 하위 경로가 '/'로 시작하면 그 경로로 바로 간다(joinPath).
+const supportGroup = computed(() => ({
+    menu_code: 'SupportGroup', menu_path: 'support', menu_name: '고객지원', menu_title: '고객지원', display_flag: 'Y',
+    children: [
+        { menu_code: 'SupportFaq', menu_path: 'faq', menu_name: '자주 묻는 질문', menu_title: '자주 묻는 질문', display_flag: 'Y' },
+        { menu_code: 'SupportContact', menu_path: 'contact', menu_name: '문의하기', menu_title: '문의하기', display_flag: 'Y' },
+        { menu_code: 'SupportTerms', menu_path: 'terms', menu_name: '이용약관', menu_title: '이용약관', display_flag: 'Y' },
+        { menu_code: 'SupportPrivacy', menu_path: 'privacy', menu_name: '개인정보 처리방침', menu_title: '개인정보 처리방침', display_flag: 'Y' },
+        ...(isLoggedIn.value ? [{ menu_code: 'SupportAccount', menu_path: '/user-option', menu_name: '계정 설정·삭제', menu_title: '계정 설정·삭제', display_flag: 'Y' }] : []),
+    ],
+}));
 const presetItem = { menu_code: 'StockPreset', menu_path: 'preset', display_flag: 'Y', menu_name: '내 설정', menu_title: '내 설정' };
 const withPreset = (menus) => {
     const isStock = (m) => String(m.menu_path ?? '').replace(/^\/+|\/+$/g, '') === 'stock';
@@ -94,7 +105,7 @@ const withPreset = (menus) => {
     return [...menus, { menu_code: 'StockGroup', menu_path: 'stock', display_flag: 'Y', menu_name: '주식분석', menu_title: '주식분석', children: [presetItem] }];
 };
 const menuList = computed(() =>
-    withPreset([trainingGroup, ...(userStore.user.menuList ?? [])])
+    [...withPreset([trainingGroup, ...(userStore.user.menuList ?? [])]), supportGroup.value]
         .filter(m => m.display_flag === 'Y')
         .map(m => ({ ...m, children: (m.children ?? []).filter(sm => sm.display_flag === 'Y') }))
         .filter(m => m.children.length > 0)
@@ -115,7 +126,7 @@ const filteredMenuList = computed(() => {
 onMounted(() => ensureAccess());
 
 // 최상위 경로는 '/stock' 처럼 선행 슬래시가 붙어 오고, 하위는 아닐 수 있어 항상 정규화해 이어 붙인다.
-const joinPath = (parent, child) =>
+const joinPath = (parent, child) => String(child ?? '').startsWith('/') ? child :
     `/${String(parent ?? '').replace(/^\/+|\/+$/g, '')}/${String(child ?? '').replace(/^\/+|\/+$/g, '')}`;
 
 const goTo = (path) => router.push({ path });
@@ -150,9 +161,13 @@ const ICON = {
     target:  'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
     book:    'M5 4.5A2.5 2.5 0 0 1 7.5 2H19v17H7.5A2.5 2.5 0 0 0 5 21.5zM5 19.5v-15M9 7h6M9 11h6',
     dot:     'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
+    help:    'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01',
+    mail:    'M3 6h18v12H3zM3 7l9 6 9-6',
+    bell:    'M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0',
 };
 const ICON_BY_CODE = {
     TrainingGlossary: 'book', TrainingQuiz: 'target',
+    SupportFaq: 'help', SupportContact: 'mail', SupportTerms: 'doc', SupportPrivacy: 'shield', SupportAccount: 'user',
     StockBuyTarget: 'star', StockPreset: 'sliders', StockInfo: 'list', StockSector: 'grid', ChartStock: 'chart', ChartTheme: 'chart', StockThemeDetail: 'list',
     WorldIndicators: 'globe',
     BatchSetting: 'history', BatchLogSetting: 'doc', RouteList: 'route',

@@ -9,7 +9,7 @@
 export const TERMS_VERSION = '2026-10-10';
 
 // TODO(운영): 실제 정보로 교체 후 배포
-const OPERATOR = '양봉상회(운영자: (성명 또는 상호))';
+const OPERATOR = '양봉상회(운영자: 차곡랩스)';
 const CONTACT = 'chagoklabs@gmail.com';
 
 export const TERMS_SECTIONS = [

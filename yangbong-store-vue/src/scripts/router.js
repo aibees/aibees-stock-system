@@ -25,6 +25,9 @@ import StockPreset from '@/components/Stocks/StockPreset.vue'
 import TrainingHub from '@/components/Training/TrainingHub.vue'
 import TrainingHome from '@/components/Training/TrainingHome.vue'
 import TrainingGlossary from '@/components/Training/TrainingGlossary.vue'
+import SupportFaq from '@/components/Support/SupportFaq.vue'
+import SupportContact from '@/components/Support/SupportContact.vue'
+import SupportDoc from '@/components/Support/SupportDoc.vue'
 import TrainingQuizHome from '@/components/Training/TrainingQuizHome.vue'
 import TrainingQuizPlay from '@/components/Training/TrainingQuizPlay.vue'
 import TrainingLesson from '@/components/Training/TrainingLesson.vue'
@@ -94,6 +97,15 @@ const routes = [
         name: "training-lessons",
         component: TrainingHome
     },
+    {
+        // 고객지원: 자주 묻는 질문 · 문의하기 · 이용약관 · 개인정보 처리방침. 비밀번호 없이 열린다(authPaths.GUEST_PREFIXES).
+        path: "/support",
+        redirect: "/support/faq"
+    },
+    { path: "/support/faq", name: "support-faq", component: SupportFaq },
+    { path: "/support/contact", name: "support-contact", component: SupportContact },
+    { path: "/support/terms", name: "support-terms", component: SupportDoc },
+    { path: "/support/privacy", name: "support-privacy", component: SupportDoc },
     {
         path: "/training/glossary",
         name: "training-glossary",
