@@ -418,3 +418,56 @@ def oauth_logout():
         return ApiResponse.success(None)
     except Exception as e:
         return ApiResponse.error(str(e))
+
+
+# ════════════════════════════════════════════════════════════════════
+# 계정 삭제(회원 탈퇴) — 양봉상회 전용. 앱스토어 심사 필수 항목(앱 안에서 계정 삭제).
+# ════════════════════════════════════════════════════════════════════
+# 본인 행만 지운다. 자식 테이블부터, user_master 는 마지막.
+# 접속 기록(user_login_log, user_menu_access_log)과 AI 생성 횟수(stock_ai_gen_log)는
+# 개인 식별 정보가 없고 법정 보관·남용 방지 목적이라 남긴다(개인정보 처리방침의 '관계 법령 보존' 범위).
+_ACCOUNT_DELETE_TABLES = (
+    'device_push_token', 'user_refresh_token', 'user_interest_stocks', 'user_interest_groups',
+    'user_persona', 'user_options', 'user_option_reco', 'user_consent', 'user_role', 'user_auth',
+    'user_login_type', 'user_detail', 'user_master',
+)
+
+
+@oauth_bp.route("/account", methods=['DELETE'])
+@require_auth
+def oauth_delete_account():
+    """
+    DELETE /api/oauth/account   (Authorization 필요)
+
+    로그인한 본인 계정과 연결 데이터를 지운다. user_id 는 JWT 에서만 읽는다.
+    - 양봉상회에서만 열린다(비밀상회는 매매 데이터가 묶여 있어 404).
+    - 관리자(user_id=1)는 지울 수 없다(403).
+    - 테이블에 user_id 열이 있는지 먼저 확인하고, 있는 테이블만 지운다.
+    """
+    from sqlalchemy import text
+    from app.utils.service import IS_YANGBONG
+
+    if not IS_YANGBONG:
+        return ApiResponse.error("지원하지 않는 기능입니다.", status=404)
+    user_id = g.current_user_id
+    if user_id == 1:
+        return ApiResponse.error("관리자 계정은 삭제할 수 없습니다.", status=403)
+
+    try:
+        rows = g.db.execute(text(
+            "SELECT table_name FROM information_schema.columns "
+            "WHERE table_schema = DATABASE() AND column_name = 'user_id'"
+        )).fetchall()
+        present = {str(r[0]).lower() for r in rows}
+        deleted = {}
+        for table in _ACCOUNT_DELETE_TABLES:
+            if table in present:
+                result = g.db.execute(text(f"DELETE FROM `{table}` WHERE user_id = :uid"), {"uid": user_id})
+                deleted[table] = result.rowcount
+        g.db.commit()
+        logging.warning(f"[account] 계정 삭제 user_id={user_id} rows={deleted}")
+        return ApiResponse.success(None)
+    except Exception as e:
+        g.db.rollback()
+        logging.exception(e)
+        return ApiResponse.error("계정 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.")

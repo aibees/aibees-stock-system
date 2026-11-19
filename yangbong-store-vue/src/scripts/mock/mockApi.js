@@ -191,6 +191,9 @@ const ROUTES = [
         const chart = stockChart(c.params?.stock_code);
         return chart ? ok(chart) : null;
     }],
+    // 계정 설정·계정 삭제(로그인 흉내: sessionStorage userSession 을 직접 넣어 확인한다)
+    ['GET', '/api/v1/user-options', () => ok({ user_master: { email: 'tester@example.com' }, user_detail: {}, user_options: {} })],
+    ['DELETE', '/api/oauth/account', () => ok(null)],
     ['GET', '/api/v1/notices', () => ok(NOTICES.map(({ content, ...rest }) => rest))],
     ['GET', /^\/api\/v1\/notices\/(\d+)$/, (c, m) => {
         const n = NOTICES.find(x => x.notice_id === Number(m[1]));
