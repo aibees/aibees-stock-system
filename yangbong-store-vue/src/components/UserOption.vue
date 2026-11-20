@@ -118,8 +118,10 @@
             </form>
 
             <!-- 계정 삭제: 앱스토어 심사 필수(앱 안에서 탈퇴). 서버 DELETE /api/oauth/account -->
-            <section v-if="!isLoading && !isSpecialUser" class="danger-zone">
-                <button type="button" class="danger-link" @click="openDelete">계정 삭제</button>
+            <!-- 관리자(user_id=1)는 서버도 삭제를 막는다(403) — 버튼 대신 이유를 보여 준다(숨기면 '메뉴가 없다'로 보임) -->
+            <section v-if="!isLoading" class="danger-zone">
+                <p v-if="isSpecialUser" class="danger-note">관리자 계정은 탈퇴할 수 없어요.</p>
+                <button v-else type="button" class="danger-link" @click="openDelete">회원 탈퇴(계정 삭제)</button>
             </section>
         </div>
 
@@ -154,6 +156,7 @@ import aibeesApi from '@scripts/aibeesApi.js';
 import mariaToast from '@scripts/mariaToast.js';
 import { assUserSession } from '@scripts/stores/user-stores';
 import { hasRole, WORKER_ROLE } from '@scripts/useAccess.js';
+import { appleLoginAvailable, authorizeApple } from '@scripts/appleLogin.js';
 
 const title = ref('계정 설정');
 const router = useRouter();
@@ -165,17 +168,40 @@ const isDeleting = ref(false);
 const deleteError = ref('');
 const openDelete = () => { deleteOpen.value = true; deleteAgree.value = false; deleteError.value = ''; };
 const closeDelete = () => { if (!isDeleting.value) deleteOpen.value = false; };
+/**
+ * Apple 로그인이 연결된 계정은 서버가 409 를 준다 → Apple 재인증으로 받은 코드를 붙여 다시 요청(서버가 Apple 연결 해지).
+ * iOS 앱이 아니면 Apple 재인증을 할 수 없어 해지 없이 삭제한다(Apple ID 설정에서 직접 끊도록 안내).
+ */
+const requestDeleteAccount = async () => {
+    try {
+        await aibeesApi.delete('/api/oauth/account');
+        return;
+    } catch (e) {
+        if (e?.response?.status !== 409) throw e;
+    }
+    if (!appleLoginAvailable()) {
+        await aibeesApi.delete('/api/oauth/account', { data: { skipAppleRevoke: true } });
+        alert('Apple 연결은 iPhone 설정 > Apple 계정 > 로그인 및 보안 > Apple로 로그인에서 해제할 수 있어요.');
+        return;
+    }
+    const apple = await authorizeApple();
+    if (!apple) throw new Error('APPLE_CANCELED');
+    await aibeesApi.delete('/api/oauth/account', { data: { appleAuthorizationCode: apple.authorizationCode } });
+};
+
 const deleteAccount = async () => {
     isDeleting.value = true;
     deleteError.value = '';
     try {
-        await aibeesApi.delete('/api/oauth/account');
+        await requestDeleteAccount();
         userSession.logoutUser();
         deleteOpen.value = false;
         mariaToast.info('계정을 삭제했어요. 그동안 이용해 주셔서 감사합니다.');
         router.replace('/home');
     } catch (e) {
-        deleteError.value = e?.response?.data?.message || '계정 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.';
+        deleteError.value = e?.message === 'APPLE_CANCELED'
+            ? 'Apple 계정 확인을 취소해서 삭제하지 않았어요.'
+            : (e?.response?.data?.error?.message || e?.response?.data?.message || '계정 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
         isDeleting.value = false;
     }
@@ -464,7 +490,8 @@ const save = async () => {
 
 /* ── 계정 삭제 ── */
 .danger-zone { margin-top: 28px; padding-top: 16px; border-top: 1px solid #ECEBE6; text-align: center; }
-.danger-link { min-height: 44px; padding: 0 12px; border: 0; background: transparent; color: #8B95A1; font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; }
+.danger-link { min-height: 44px; padding: 0 12px; border: 0; background: transparent; color: #6B7684; font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; }
+.danger-note { margin: 0; padding: 12px 0; font-size: 13px; color: #8B95A1; }
 .del-dim { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: flex-end; justify-content: center; background: rgba(25, 31, 40, .42); }
 .del-sheet { width: 100%; max-width: 480px; box-sizing: border-box; padding: 22px 22px calc(18px + env(safe-area-inset-bottom, 0px)); border-radius: 16px 16px 0 0; background: #fff; color: #191F28; text-align: left; }
 .del-sheet h2 { margin: 0; font-size: 20px; letter-spacing: -0.5px; }

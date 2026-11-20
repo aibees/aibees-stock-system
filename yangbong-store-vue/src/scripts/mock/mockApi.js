@@ -240,6 +240,18 @@ const AI_ANALYSIS = {
 
 /* ── 라우트 표 ── */
 const ok = (data) => ({ code: 200, message: 'mock', data });
+// 인증 API 는 ApiResponse 형식({ success, data } / { success:false, error:{ message } })을 화면이 직접 본다
+const okS = (data) => ({ success: true, data });
+const failS = (message) => ({ success: false, error: { message } });
+const mockBody = (c) => { try { return typeof c.data === 'string' ? JSON.parse(c.data) : (c.data || {}); } catch { return {}; } };
+const mockLogin = (userId, userName) => {
+    const b64 = (o) => btoa(JSON.stringify(o)).replace(/=+$/, '');
+    return {
+        accessToken: `${b64({ alg: 'HS256' })}.${b64({ sub: String(userId), exp: Math.floor(Date.now() / 1000) + 3600 })}.mock`,
+        refreshToken: 'mock-refresh',
+        loginInfo: { user_id: String(userId), user_name: userName, role: ['STOCK_USER'] },
+    };
+};
 const ROUTES = [
     ['GET', '/api/v1/indicators/market-snapshot', () => ok(marketSnapshot())],
     ['GET', '/api/v1/stocks/buy-target/performance', () => ok(performance())],
@@ -252,6 +264,20 @@ const ROUTES = [
     // 계정 설정·계정 삭제(로그인 흉내: sessionStorage userSession 을 직접 넣어 확인한다)
     ['GET', '/api/v1/user-options', () => ok({ user_master: { email: 'tester@example.com' }, user_detail: {}, user_options: {} })],
     ['DELETE', '/api/oauth/account', () => ok(null)],
+    // 아이디 로그인·회원가입(2026-11-20). 인증코드는 항상 123456, 이미 있는 아이디는 aibees1129·tester.
+    ['POST', '/api/oauth/signup/login-id/check', (c) => {
+        const id = String(mockBody(c).loginId || '').toLowerCase();
+        const taken = ['aibees1129', 'tester'].includes(id);
+        return okS({ loginId: id, available: !taken, message: taken ? '이미 사용 중인 아이디예요.' : '사용할 수 있는 아이디예요.' });
+    }],
+    ['POST', '/api/oauth/signup/code', () => okS({ verifyToken: 'mock-verify', expiresIn: 600 })],
+    ['POST', '/api/oauth/signup/code/verify', (c) => (mockBody(c).code === '123456'
+        ? okS({ verifiedToken: 'mock-verified', email: 'new@example.com', expiresIn: 1800 })
+        : failS('인증코드가 맞지 않아요. (4번 남음)'))],
+    ['POST', '/api/oauth/signup', (c) => (mockBody(c).verifiedToken === 'mock-verified' && mockBody(c).loginId
+        ? okS(mockLogin(7, mockBody(c).userName || '신규')) : failS('이메일 인증을 먼저 해 주세요.'))],
+    ['POST', '/api/oauth/email', (c) => (mockBody(c).loginId === 'tester' && mockBody(c).pswd
+        ? okS(mockLogin(7, '테스터')) : failS('사용자를 찾을 수 없습니다.'))],
     ['GET', '/api/v1/notices', () => ok(NOTICES.map(({ content, ...rest }) => rest))],
     ['GET', /^\/api\/v1\/notices\/(\d+)$/, (c, m) => {
         const n = NOTICES.find(x => x.notice_id === Number(m[1]));

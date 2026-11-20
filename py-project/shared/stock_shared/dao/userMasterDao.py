@@ -26,7 +26,13 @@ class UserMasterDao(BaseDao):
     # 인증 / 계정
     # ------------------------------------------------------------------
     def select_user_authinfo(self, session, param):
-        """이메일 + 로그인타입 기준 인증 정보 조회 (UserMaster + LoginType + Detail)."""
+        """로그인타입 + (아이디 또는 이메일) 기준 인증 정보 조회 (UserMaster + LoginType + Detail).
+
+        param: {'type': 'EMAIL', 'login_id': ...} — 아이디 로그인(2026-11-20~). user_master.login_id(UNIQUE).
+               {'type': 'EMAIL', 'email': ...}    — 이메일 로그인(비밀상회·옛 앱 빌드 호환).
+        """
+        key_cond = (UserMaster.login_id == param["login_id"]) if param.get("login_id") \
+            else (UserMaster.email == param["email"])
         stmt = (
             select(UserMaster, UserLoginType, UserDetail)
             .join(UserLoginType, UserMaster.user_id == UserLoginType.user_id)
@@ -34,7 +40,7 @@ class UserMasterDao(BaseDao):
             .where(
                 UserLoginType.enabled_flag == "Y",
                 UserLoginType.login_type == param["type"],
-                UserMaster.email == param["email"],
+                key_cond,
             )
         )
         results = session.execute(stmt).all()

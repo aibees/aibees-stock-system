@@ -5,26 +5,49 @@
         <main class="su-main">
             <form class="su-form" novalidate @submit.prevent="submit">
 
-                <!-- 이메일 + 인증코드 -->
+                <!-- 아이디 + 중복 확인 -->
+                <div class="su-field">
+                    <label for="su-id">아이디</label>
+                    <div class="su-inline">
+                        <input id="su-id" v-model.trim="loginId" type="text" maxlength="20" autocomplete="username"
+                            autocapitalize="none" autocorrect="off" spellcheck="false"
+                            placeholder="영문 소문자·숫자 4~20자" @input="onLoginIdInput" />
+                        <button type="button" class="btn-line" :disabled="!loginIdValid || checkingId || idChecked" @click="checkLoginId">
+                            {{ checkingId ? '확인 중…' : (idChecked ? '확인 완료' : '중복 확인') }}
+                        </button>
+                    </div>
+                    <p v-if="loginId && !loginIdValid" class="su-err">4~20자 영문 소문자·숫자로 쓰고, . _ - 를 섞을 수 있어요(첫 글자는 영문·숫자).</p>
+                    <p v-else-if="idChecked" class="su-ok" aria-live="polite">✓ 사용할 수 있는 아이디예요.</p>
+                    <p v-else-if="idMessage" class="su-err" aria-live="polite">{{ idMessage }}</p>
+                </div>
+
+                <!-- 이메일 + 인증코드(받기 → 확인) -->
                 <div class="su-field">
                     <label for="su-email">이메일</label>
                     <div class="su-inline">
                         <input id="su-email" v-model.trim="email" type="email" inputmode="email"
-                            autocomplete="email" placeholder="example@email.com" :disabled="sending" @input="onEmailInput" />
-                        <button type="button" class="btn-line" :disabled="!emailValid || sending || cooldown > 0" @click="sendCode">
+                            autocomplete="email" placeholder="example@email.com" :disabled="sending || emailVerified" @input="onEmailInput" />
+                        <button v-if="!emailVerified" type="button" class="btn-line" :disabled="!emailValid || sending || cooldown > 0" @click="sendCode">
                             {{ sending ? '보내는 중…' : (verifyToken ? (cooldown > 0 ? `재발송 ${cooldown}초` : '다시 받기') : '인증코드 받기') }}
                         </button>
+                        <button v-else type="button" class="btn-line" :disabled="submitting" @click="resetEmail">변경</button>
                     </div>
                     <p v-if="email && !emailValid" class="su-err">이메일 주소를 확인해 주세요.</p>
+                    <p v-else-if="emailVerified" class="su-ok">✓ 이메일 인증을 마쳤어요.</p>
+                    <p v-else-if="verifyToken" class="su-help">메일로 받은 6자리 인증코드를 입력하고 확인을 눌러 주세요.</p>
                 </div>
 
-                <div v-if="verifyToken" class="su-field">
+                <div v-if="verifyToken && !emailVerified" class="su-field">
                     <label for="su-code">인증코드</label>
                     <div class="su-inline">
                         <input id="su-code" v-model.trim="code" type="text" inputmode="numeric" maxlength="6"
-                            autocomplete="one-time-code" placeholder="메일로 받은 6자리" />
+                            autocomplete="one-time-code" placeholder="메일로 받은 6자리" @keydown.enter.prevent="verifyCode" />
                         <span class="su-timer" :class="{ over: remain <= 0 }" aria-live="polite">{{ remainText }}</span>
+                        <button type="button" class="btn-line" :disabled="!/^\d{6}$/.test(code) || remain <= 0 || verifying" @click="verifyCode">
+                            {{ verifying ? '확인 중…' : '확인' }}
+                        </button>
                     </div>
+                    <p v-if="codeError" class="su-err" role="alert">{{ codeError }}</p>
                 </div>
 
                 <!-- 이름 -->
@@ -63,10 +86,12 @@
 
 <script setup>
 /**
- * 이메일 회원가입(/signup).
- * ① POST /api/oauth/signup/code  — 이메일로 6자리 코드 발송, verifyToken 을 받는다(코드는 응답에 없다)
- * ② POST /api/oauth/signup       — 코드·이름·비밀번호·항목별 동의를 보내면 가입 후 바로 로그인 토큰을 준다
- * 이미 가입된 이메일(네이버 가입 포함)은 서버가 거절한다.
+ * 회원가입(/signup). 로그인은 아이디로, 이메일은 인증·연락용으로 따로 받는다(2026-11-20).
+ * ① POST /api/oauth/signup/login-id/check — 아이디 중복 확인
+ * ② POST /api/oauth/signup/code          — 이메일로 6자리 코드 발송, verifyToken 을 받는다(코드는 응답에 없다)
+ * ③ POST /api/oauth/signup/code/verify   — 코드 확인, verifiedToken 을 받는다(30분 유효)
+ * ④ POST /api/oauth/signup               — verifiedToken·아이디·이름·비밀번호·항목별 동의 → 가입 후 바로 로그인
+ * 이미 가입된 이메일(소셜 가입 포함)·이미 있는 아이디는 서버가 다시 거절한다.
  */
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores';
@@ -78,9 +103,12 @@ const router = useRouter();
 const userSession = assUserSession();
 
 const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+// 서버 LOGIN_ID_REGEX 와 같다(web_shared/auth/service.py). 대문자는 소문자로 바꿔 검사한다.
+const LOGIN_ID_REGEX = /^[a-z0-9][a-z0-9._-]{3,19}$/;
 // 비밀번호 재설정(Login.vue)과 같은 규칙. 서버도 같은 규칙으로 다시 검사한다.
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
+const loginId = ref('');
 const email = ref('');
 const code = ref('');
 const userName = ref('');
@@ -89,15 +117,25 @@ const password2 = ref('');
 const agree = ref({ age14: false, terms: false, privacy: false });
 
 const verifyToken = ref('');
+const verifiedToken = ref('');
+const verifying = ref(false);
+const codeError = ref('');
+const checkingId = ref(false);
+const checkedId = ref('');     // 중복 확인을 통과한 아이디(소문자). 입력이 바뀌면 다시 확인해야 한다
+const idMessage = ref('');
 const sending = ref(false);
 const submitting = ref(false);
 const errorMsg = ref('');
 
 const emailValid = computed(() => EMAIL_REGEX.test(email.value));
+const normalizedId = computed(() => loginId.value.toLowerCase());
+const loginIdValid = computed(() => LOGIN_ID_REGEX.test(normalizedId.value));
+const idChecked = computed(() => !!checkedId.value && checkedId.value === normalizedId.value);
+const emailVerified = computed(() => !!verifiedToken.value);
 const passwordStrong = computed(() => PASSWORD_REGEX.test(password.value));
 const allAgreed = computed(() => agree.value.age14 && agree.value.terms && agree.value.privacy);
 const canSubmit = computed(() =>
-    !!verifyToken.value && /^\d{6}$/.test(code.value) && remain.value > 0
+    idChecked.value && emailVerified.value
     && userName.value.length > 0 && passwordStrong.value && password.value === password2.value
     && allAgreed.value);
 
@@ -120,7 +158,18 @@ const onEmailInput = () => {
     if (verifyToken.value) {
         verifyToken.value = '';
         code.value = '';
+        codeError.value = '';
     }
+};
+const resetEmail = () => {
+    verifiedToken.value = '';
+    verifyToken.value = '';
+    code.value = '';
+    codeError.value = '';
+};
+
+const onLoginIdInput = () => {
+    if (!idChecked.value) idMessage.value = '';
 };
 
 const apiError = (err, fallback) =>
@@ -144,14 +193,50 @@ const sendCode = async () => {
     }
 };
 
+const checkLoginId = async () => {
+    if (!loginIdValid.value || checkingId.value) return;
+    checkingId.value = true;
+    idMessage.value = '';
+    const target = normalizedId.value;
+    try {
+        const { data } = await aibeesApi.post('/api/oauth/signup/login-id/check', { loginId: target });
+        if (!data?.success) throw { error: data?.error };
+        if (normalizedId.value !== target) return;   // 확인하는 사이 입력이 바뀜
+        checkedId.value = data.data.available ? data.data.loginId : '';
+        idMessage.value = data.data.message;
+    } catch (err) {
+        checkedId.value = '';
+        idMessage.value = apiError(err, '아이디를 확인하지 못했어요.');
+    } finally {
+        checkingId.value = false;
+    }
+};
+
+const verifyCode = async () => {
+    if (!/^\d{6}$/.test(code.value) || remain.value <= 0 || verifying.value) return;
+    verifying.value = true;
+    codeError.value = '';
+    try {
+        const { data } = await aibeesApi.post('/api/oauth/signup/code/verify', {
+            verifyToken: verifyToken.value, code: code.value,
+        });
+        if (!data?.success) throw { error: data?.error };
+        verifiedToken.value = data.data.verifiedToken;
+    } catch (err) {
+        codeError.value = apiError(err, '인증코드를 확인하지 못했어요.');
+    } finally {
+        verifying.value = false;
+    }
+};
+
 const submit = async () => {
     if (!canSubmit.value || submitting.value) return;
     submitting.value = true;
     errorMsg.value = '';
     try {
         const { data } = await aibeesApi.post('/api/oauth/signup', {
-            verifyToken: verifyToken.value,
-            code: code.value,
+            verifiedToken: verifiedToken.value,
+            loginId: normalizedId.value,
             userName: userName.value,
             password: password.value,
             termsVersion: TERMS_VERSION,
@@ -235,6 +320,8 @@ $cream: #FFF8E1;
 }
 
 .su-err { margin: 0; font-size: 12px; color: #C0392B; }
+.su-ok { margin: 0; font-size: 12px; color: #1E7A46; }
+.su-help { margin: 0; font-size: 12px; color: $sub; }
 .su-error { margin: 0; font-size: 13px; color: #C0392B; }
 
 .su-actions { display: flex; flex-direction: column; gap: 8px; }

@@ -5,6 +5,7 @@ router_oauth.py — OAuth / 이메일 인증 라우터
     - [유지] POST /login     : 소셜 oAuth 로그인 (기존)
     - [유지] GET  /infos/<type> : 소셜 키 정보 조회 (기존, GOOGLE 추가)
     - [신규] POST /google, /google/consent : 구글 로그인(웹 GIS ID 토큰) / 가입 동의
+    - [신규] POST /apple, /apple/consent   : Apple 로그인(iOS 앱 identityToken) / 가입 동의
     - [유지] POST /email     : 이메일 로그인 (기존 라우트, 내부 로직 변경)
     - [신규] POST /refresh   : silent refresh — refreshToken으로 토큰 쌍 재발급
     - [신규] POST /logout    : 서버 측 refreshToken 폐기
@@ -181,6 +182,53 @@ def oauth_google_consent():
         return ApiResponse.error("가입 처리 중 오류가 발생했습니다.")
 
 
+# ── Apple 로그인 (iOS 앱) ────────────────────────────────────────────
+@oauth_bp.route("/apple", methods=['POST'])
+def oauth_login_apple():
+    """
+    POST /api/oauth/apple
+
+    Request : { "identityToken": "<Sign in with Apple 이 준 토큰>", "nonce": "<요청에 넣은 nonce 원문>",
+                "givenName": "..."(첫 로그인만), "familyName": "..."(첫 로그인만) }
+    Response: 구글과 같은 형식 (동의가 없으면 consentRequired/consentToken → POST /apple/consent)
+
+    identityToken 은 서버가 Apple 공개키로 직접 검증한다(aud = master_infos APPLE_AUTH 의 APPLE_CLIENT_ID).
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        results = authServiceImpl.appleProcess(g.db, data)
+        _log_login_result('APPLE', results)
+        return ApiResponse.success(results)
+    except SocialLoginError as e:
+        g.db.rollback()
+        accessLogDaoImpl.insert_login_log('APPLE', 'FAIL', fail_reason=str(e))
+        return ApiResponse.error(str(e), status=400)
+    except Exception as e:
+        g.db.rollback()
+        logging.exception(e)
+        accessLogDaoImpl.insert_login_log('APPLE', 'FAIL', fail_reason=str(e))
+        return ApiResponse.error("Apple 로그인 중 오류가 발생했습니다.")
+
+
+@oauth_bp.route("/apple/consent", methods=['POST'])
+def oauth_apple_consent():
+    """POST /api/oauth/apple/consent — /google/consent 와 같은 형식(consentToken 은 Apple 로그인 때 받은 것만 통과)"""
+    data = request.get_json(silent=True) or {}
+    try:
+        results = authServiceImpl.socialConsentProcess(g.db, data, 'APPLE')
+        _log_login_result('APPLE_CONSENT', results)
+        return ApiResponse.success(results)
+    except SocialLoginError as e:
+        g.db.rollback()
+        accessLogDaoImpl.insert_login_log('APPLE_CONSENT', 'FAIL', fail_reason=str(e))
+        return ApiResponse.error(str(e), status=400)
+    except Exception as e:
+        g.db.rollback()
+        logging.exception(e)
+        accessLogDaoImpl.insert_login_log('APPLE_CONSENT', 'FAIL', fail_reason=str(e))
+        return ApiResponse.error("가입 처리 중 오류가 발생했습니다.")
+
+
 # ── 이메일 회원가입 ──────────────────────────────────────────────────
 @oauth_bp.route("/signup/code", methods=['POST'])
 def oauth_signup_code():
@@ -200,14 +248,48 @@ def oauth_signup_code():
         return ApiResponse.error("인증코드를 보내지 못했어요.")
 
 
+@oauth_bp.route("/signup/code/verify", methods=['POST'])
+def oauth_signup_code_verify():
+    """
+    POST /api/oauth/signup/code/verify — 인증코드 확인(가입 전 단계)
+
+    Request : { "verifyToken", "code" }
+    Response: { "verifiedToken": "...", "email": "...", "expiresIn": 1800 }   → 가입 요청에 verifiedToken 을 보낸다
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        return ApiResponse.success(authServiceImpl.signupVerifyCode(g.db, data))
+    except SignupError as e:
+        return ApiResponse.error(str(e), status=400)
+    except Exception as e:
+        logging.exception(e)
+        return ApiResponse.error("인증코드를 확인하지 못했어요.")
+
+
+@oauth_bp.route("/signup/login-id/check", methods=['POST'])
+def oauth_signup_login_id_check():
+    """
+    POST /api/oauth/signup/login-id/check — 아이디 사용 가능 여부
+
+    Request : { "loginId": "..." }
+    Response: { "loginId": "정규화(소문자)", "available": bool, "message": "..." }
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        return ApiResponse.success(authServiceImpl.checkLoginId(g.db, data))
+    except Exception as e:
+        logging.exception(e)
+        return ApiResponse.error("아이디를 확인하지 못했어요.")
+
+
 @oauth_bp.route("/signup", methods=['POST'])
 def oauth_signup():
     """
     POST /api/oauth/signup — 인증코드 확인 + 이메일 가입 + 동의 기록 후 바로 로그인
 
-    Request : { "verifyToken", "code", "userName", "password",
+    Request : { "verifiedToken"(또는 옛 화면 "verifyToken"+"code"), "loginId", "userName", "password",
                 "agreeAge14", "agreeTerms", "agreePrivacy", "termsVersion", "policyVersion" }
-    Response: 이메일 로그인과 같은 형식
+    Response: 아이디 로그인과 같은 형식 — loginId 가 없으면 이메일 @ 앞부분을 아이디로 쓴다
     실패는 400 — 401 이면 프런트 interceptor 가 refresh/강제 로그아웃을 시도한다.
     """
     data = request.get_json(silent=True) or {}
@@ -232,9 +314,10 @@ def oauth_signup():
 @oauth_bp.route("/email", methods=['POST'])
 def oauth_login_email():
     """
-    POST /api/oauth/email
+    POST /api/oauth/email — 아이디 로그인(2026-11-20~, 주소는 호환을 위해 그대로)
 
-    Request : { "email": "...", "pswd": "..." }
+    Request : { "loginId": "...", "pswd": "..." }
+              옛 형식 { "email": "...", "pswd": "..." } 도 받는다('@' 가 있으면 이메일로 찾음 — 비밀상회·옛 앱 빌드)
     Response: {
         "success": true,
         "data": {
@@ -244,8 +327,8 @@ def oauth_login_email():
         }
     }
     """
-    data = request.get_json()
-    email = str((data or {}).get('email') or '')
+    data = request.get_json(silent=True) or {}
+    email = str(data.get('loginId') or data.get('email') or '')   # 로그 키(아이디 또는 이메일)
     try:
         results = authServiceImpl.emailProcess(g.db, data)
         _log_login_result('EMAIL', results, login_key=email)
@@ -272,7 +355,7 @@ def oauth_password_reset():
     reset_flag == 'Y' 인 계정의 비밀번호를 새 값으로 교체.
     성공 시 기존 refreshToken 전체 폐기 → 이전 세션 무효화.
 
-    Request : { "email": "...", "new_password": "..." }
+    Request : { "loginId": "...", "new_password": "..." }   (옛 형식 email 도 받는다)
     Response (성공):
         { "success": true, "data": null }
 

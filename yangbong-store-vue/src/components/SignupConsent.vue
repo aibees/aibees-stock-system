@@ -52,7 +52,7 @@ import { TERMS_VERSION } from '@scripts/termsOfService.js';
 const router = useRouter();
 const userSession = assUserSession();
 
-const PROVIDERS = { naver: '네이버', google: '구글' };
+const PROVIDERS = { naver: '네이버', google: '구글', apple: 'Apple' };
 
 const readPending = () => {
     try {

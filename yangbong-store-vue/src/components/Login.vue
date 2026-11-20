@@ -11,9 +11,10 @@
         <main class="lg-main">
             <form class="lg-form" novalidate @submit.prevent="emaillogin">
                 <div class="lg-field">
-                    <label for="lg-email">이메일</label>
-                    <input id="lg-email" v-model.trim="emailData.email" type="email" inputmode="email"
-                        autocomplete="username" />
+                    <label for="lg-id">아이디</label>
+                    <input id="lg-id" v-model.trim="emailData.loginId" type="text" autocomplete="username"
+                        autocapitalize="none" autocorrect="off" spellcheck="false" />
+                    <p class="lg-hint">기존 회원은 가입한 이메일의 @ 앞부분이 아이디예요.</p>
                 </div>
                 <div class="lg-field">
                     <label for="lg-pw">비밀번호</label>
@@ -44,13 +45,21 @@
             <!-- 구글 버튼은 GIS 가 그린다(구글 브랜드 가이드). 웹에서 클라이언트 ID 가 설정됐을 때만 보인다 -->
             <div v-show="googleReady" ref="googleBtnEl" class="lg-google"></div>
 
+            <!-- Apple 로그인(iOS 앱만). Apple 디자인 가이드: 검은 바탕·흰 로고·다른 소셜 버튼과 같은 크기 -->
+            <button v-if="showApple" type="button" class="btn-apple" :disabled="isLoading" @click="applelogin">
+                <svg class="apple-logo" viewBox="0 0 17 20" width="15" height="18" aria-hidden="true">
+                    <path fill="currentColor" d="M14.1 10.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9C3.5 4.8 1.8 5.8.9 7.4c-1.9 3.3-.5 8.1 1.3 10.8.9 1.3 1.9 2.7 3.3 2.7 1.3-.1 1.8-.9 3.4-.9s2 .9 3.4.8c1.4 0 2.3-1.3 3.2-2.6 1-1.5 1.4-2.9 1.4-3-.1 0-2.8-1.1-2.8-4.6zM11.5 3c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z"/>
+                </svg>
+                Apple로 계속하기
+            </button>
+
             <button type="button" class="btn-naver" :disabled="isLoading" @click="naverlogin">
                 <span class="naver-n" aria-hidden="true">N</span>
                 네이버로 계속하기
             </button>
 
             <p class="lg-signup">
-                처음이신가요? <router-link to="/signup">이메일로 회원가입</router-link>
+                처음이신가요? <router-link to="/signup">회원가입</router-link>
             </p>
         </main>
 
@@ -97,6 +106,7 @@ import aibeesApi from '../scripts/aibeesApi.js'
 import * as StrUtils from '@/scripts/utils/stringUtils.js'
 import { assUserSession } from '../scripts/stores/user-stores';
 import { renderGoogleButton } from '@/scripts/googleLogin.js'
+import { appleLoginAvailable, authorizeApple } from '@/scripts/appleLogin.js'
 
 const userSession = assUserSession();
 const router = useRouter()
@@ -134,7 +144,7 @@ const closeResetModal = () => {
 
 /**
  * POST /api/oauth/password/reset
- * body: { email, new_password }
+ * body: { loginId, new_password }
  * 성공 시 modal 닫고 재로그인 유도
  */
 const submitReset = async () => {
@@ -142,7 +152,7 @@ const submitReset = async () => {
     isResetting.value = true
     try {
         await aibeesApi.post('/api/oauth/password/reset', {
-            email: emailData.email,
+            loginId: emailData.loginId,
             new_password: resetData.newPswd
         })
         closeResetModal()
@@ -164,9 +174,11 @@ const naver_info_url = '/api/oauth/infos/naver'
 const rememberEmail = ref(localStorage.getItem('rememberEmail') === 'true')
 const autoLogin     = ref(localStorage.getItem('autoLogin')     === 'true')
 
+// 아이디 로그인(2026-11-20~). 저장 키는 savedLoginId — 예전 savedEmail 이 남아 있으면 그 값을 쓴다
+// (서버가 '@' 가 있는 값은 이메일로 찾아 준다). 다음 로그인 때 savedLoginId 로 바뀐다.
 const emailData = reactive({
-    email: localStorage.getItem('rememberEmail') === 'true'
-        ? (localStorage.getItem('savedEmail') ?? '')
+    loginId: localStorage.getItem('rememberEmail') === 'true'
+        ? (localStorage.getItem('savedLoginId') ?? localStorage.getItem('savedEmail') ?? '')
         : '',
     pswd: ''
 });
@@ -174,7 +186,7 @@ const emailData = reactive({
 // 체크 해제 시 저장된 ID도 즉시 제거
 watch(rememberEmail, (val) => {
     localStorage.setItem('rememberEmail', val)
-    if (!val) localStorage.removeItem('savedEmail')
+    if (!val) { localStorage.removeItem('savedLoginId'); localStorage.removeItem('savedEmail') }
 })
 watch(autoLogin, (val) => {
     localStorage.setItem('autoLogin', val)
@@ -184,22 +196,23 @@ watch(autoLogin, (val) => {
 
 const emaillogin = async () => {
     errorMsg.value = ''
-    if (StrUtils.isEmpty(emailData.email) || StrUtils.isEmpty(emailData.pswd)) {
-        errorMsg.value = '이메일과 비밀번호를 입력해 주세요.'
+    if (StrUtils.isEmpty(emailData.loginId) || StrUtils.isEmpty(emailData.pswd)) {
+        errorMsg.value = '아이디와 비밀번호를 입력해 주세요.'
         return;
     }
 
     isLoading.value = true;
 
     try {
-        const body = { email: emailData.email, pswd: emailData.pswd };
+        const body = { loginId: emailData.loginId, pswd: emailData.pswd };
         const { data } = await aibeesApi.post('/api/oauth/email', body);
         if (data.success) {
             // 아이디 기억하기
+            localStorage.removeItem('savedEmail')   // 예전 키 정리
             if (rememberEmail.value) {
-                localStorage.setItem('savedEmail', emailData.email)
+                localStorage.setItem('savedLoginId', emailData.loginId)
             } else {
-                localStorage.removeItem('savedEmail')
+                localStorage.removeItem('savedLoginId')
             }
             userSession.loginUser(data.data, autoLogin.value);
             router.push(takeAfterLogin() || { name: 'home' });   // 보려던 화면이 있으면 그리로
@@ -243,6 +256,43 @@ onMounted(async () => {
         onError: (msg) => { isLoading.value = false; errorMsg.value = msg },
     })
 })
+// ─────────────────────────────────────────────────────────────
+
+// ── Apple 로그인 (iOS 앱) ──────────────────────────────────────
+const showApple = appleLoginAvailable()
+
+const applelogin = async () => {
+    errorMsg.value = ''
+    isLoading.value = true
+    try {
+        const apple = await authorizeApple()
+        if (!apple) return   // 사용자가 취소
+        const { data } = await aibeesApi.post('/api/oauth/apple', {
+            identityToken: apple.identityToken,
+            nonce: apple.nonce,
+            givenName: apple.givenName,
+            familyName: apple.familyName,
+        })
+        const res = data.data
+        if (res.consentRequired) {
+            sessionStorage.setItem('socialConsent', JSON.stringify({
+                provider: 'apple',
+                consentToken: res.consentToken,
+                socialResult: res.socialResult,
+                profile: res.profile,
+            }))
+            return router.replace({ name: 'signup-consent' })
+        }
+        userSession.loginUser(res, autoLogin.value)
+        if (res.socialResult === 'linked') alert('기존 계정에 Apple 로그인을 연결했어요.')
+        else if (res.socialResult === 'created') alert('Apple 계정으로 가입했어요. 환영합니다!')
+        router.replace(takeAfterLogin() || { name: 'home' })
+    } catch (err) {
+        errorMsg.value = apiError(err, 'Apple 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.')
+    } finally {
+        isLoading.value = false
+    }
+}
 // ─────────────────────────────────────────────────────────────
 
 const naverlogin = async () => {
@@ -363,6 +413,7 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
     }
 }
 .lg-field-err { margin: 0; font-size: 12px; color: #C0392B; }
+.lg-hint { margin: 0; font-size: 12px; color: #8B7B6B; }
 
 .lg-options { display: flex; gap: 18px; }
 .lg-check {
@@ -403,7 +454,7 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
 }
 
 /* ── 버튼 ── */
-.btn-primary, .btn-ghost, .btn-naver {
+.btn-primary, .btn-ghost, .btn-naver, .btn-apple {
     min-height: 50px;
     padding: 0 20px;
     border-radius: 10px;
@@ -425,6 +476,17 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
     background: $naver;
     color: #fff;
     .naver-n { font-size: 18px; font-weight: 900; }
+}
+
+.btn-apple {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 0;
+    background: #000;
+    color: #fff;
+    .apple-logo { margin-top: -2px; }
 }
 
 /* ── 비밀번호 재설정 모달 ── */

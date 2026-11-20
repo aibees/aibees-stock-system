@@ -9,7 +9,7 @@ import hashlib
 import secrets
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from stock_shared.models.userAuth import UserAuth
 from stock_shared.models.userConsent import UserConsent
@@ -75,7 +75,12 @@ class SocialLoginDao:
             row.linked_date = now
         session.flush()
 
-    def create_user(self, session, *, user_name, email, phone, login_type, provider_uid, auth_id, password=None):
+    def select_user_by_login_id(self, session, login_id):
+        """로그인 아이디(user_master.login_id)로 사용자 1명. 없으면 None."""
+        return session.execute(select(UserMaster).where(UserMaster.login_id == login_id)).scalars().first()
+
+    def create_user(self, session, *, user_name, email, phone, login_type, provider_uid, auth_id, password=None,
+                    login_id=None):
         """신규 가입(소셜 또는 이메일). 반환: 새 user_id.
 
         user_master.user_id 는 AUTO_INCREMENT 가 아니라 MAX+1 로 채번한다(기존 사용자 생성 관례).
@@ -86,7 +91,7 @@ class SocialLoginDao:
         now = datetime.now()
         new_id = (session.execute(select(func.max(UserMaster.user_id))).scalar() or 0) + 1
 
-        session.add(UserMaster(user_id=new_id, user_name=user_name, email=email, user_phone=phone))
+        session.add(UserMaster(user_id=new_id, login_id=login_id, user_name=user_name, email=email, user_phone=phone))
         salt = secrets.token_hex(8)  # 16자 (user_detail.salt VARCHAR(16))
         session.add(UserDetail(user_id=new_id, salt=salt,
                                pswd=hashlib.sha256((salt + (password or secrets.token_hex(32))).encode()).hexdigest(),
@@ -112,3 +117,19 @@ class SocialLoginDao:
             row.version = version
             row.agreed_date = now
         session.flush()
+        if self._has_consent_history(session):
+            session.execute(text(
+                "INSERT INTO user_consent_history (user_id, consent_type, version, agreed_date) "
+                "VALUES (:uid, :ctype, :ver, :at)"),
+                {"uid": user_id, "ctype": consent_type, "ver": version, "at": now})
+
+    # 동의 이력 테이블(sql/yangbong/010)은 양봉 스키마에만 있다 — 스키마(DATABASE())별로 한 번만 확인한다.
+    _consent_history_cache = {}
+
+    def _has_consent_history(self, session) -> bool:
+        schema = session.execute(text("SELECT DATABASE()")).scalar()
+        if schema not in self._consent_history_cache:
+            self._consent_history_cache[schema] = session.execute(text(
+                "SELECT COUNT(*) FROM information_schema.tables "
+                "WHERE table_schema = DATABASE() AND table_name = 'user_consent_history'")).scalar() > 0
+        return self._consent_history_cache[schema]

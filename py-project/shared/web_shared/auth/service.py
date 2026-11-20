@@ -73,8 +73,20 @@ GOOGLE_CERTS_URL = 'https://www.googleapis.com/oauth2/v3/certs'
 GOOGLE_ISSUERS = ('accounts.google.com', 'https://accounts.google.com')
 _google_jwks = jwt.PyJWKClient(GOOGLE_CERTS_URL, cache_keys=True, lifespan=3600)
 
+# ── Apple 로그인 (iOS 앱: 네이티브 Sign in with Apple 이 준 identityToken 을 서버가 직접 검증) ──────
+# master_infos category='APPLE_AUTH':
+#   APPLE_CLIENT_ID   토큰 aud = iOS 번들 ID(com.chagoklabs.yangbongstore). *_CLIENT_ID 가 여럿이면 모두 허용
+#   APPLE_TEAM_ID / APPLE_KEY_ID / APPLE_PRIVATE_KEY(.p8 내용)  계정 삭제 때 Apple 토큰 해지용 client_secret 서명
+# APPLE_AUTH 는 router_oauth.SOCIAL_PROVIDERS 에 넣지 않는다(공개 API /infos 로 키 정보가 나가지 않게).
+APPLE = 'APPLE'
+APPLE_ISSUER = 'https://appleid.apple.com'
+APPLE_KEYS_URL = 'https://appleid.apple.com/auth/keys'
+APPLE_TOKEN_URL = 'https://appleid.apple.com/auth/token'
+APPLE_REVOKE_URL = 'https://appleid.apple.com/auth/revoke'
+_apple_jwks = jwt.PyJWKClient(APPLE_KEYS_URL, cache_keys=True, lifespan=3600)
+
 # 화면 문구용 이름
-PROVIDER_LABELS = {NAVER: '네이버', GOOGLE: '구글'}
+PROVIDER_LABELS = {NAVER: '네이버', GOOGLE: '구글', APPLE: 'Apple'}
 
 # ── 가입 동의 (이용약관 / 개인정보 수집·이용 / 만 14세 이상) — 항목별로 따로 받아 따로 기록한다 ──
 # 버전은 프런트(stock-vue src/scripts/termsOfService.js, privacyPolicy.js)와 같아야 한다.
@@ -99,6 +111,7 @@ SIGNUP_TOKEN_SECRET = JWT_SECRET + ':email-signup'
 SIGNUP_CODE_EXPIRE_MINUTES = 10
 SIGNUP_CODE_MAX_ATTEMPTS = 5        # 토큰 1개당 틀릴 수 있는 횟수
 SIGNUP_CODE_RESEND_SECONDS = 60     # 같은 이메일로 다시 보내기까지 대기
+SIGNUP_VERIFIED_EXPIRE_MINUTES = 30 # 인증 확인 후 가입을 마칠 때까지(verifiedToken 유효시간)
 EMAIL_REGEX = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 # 비밀번호 규칙: 비밀번호 재설정 화면(Login.vue PASSWORD_REGEX)과 같다 — 8자 이상, 대/소문자·숫자·특수문자 각 1자 이상
 PASSWORD_REGEX = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$')
@@ -109,7 +122,8 @@ _signup_used = {}       # {jti: 사용 시각}
 
 
 def _prune_signup_state(now: float) -> None:
-    ttl = SIGNUP_CODE_EXPIRE_MINUTES * 60 + 60
+    # 인증 확인 토큰(verifiedToken)이 더 오래 살므로 그 시간까지 사용 기록을 둔다
+    ttl = max(SIGNUP_CODE_EXPIRE_MINUTES, SIGNUP_VERIFIED_EXPIRE_MINUTES) * 60 + 60
     for d in (_signup_sent_at, _signup_used):
         for k in [k for k, t in d.items() if now - t > ttl]:
             d.pop(k, None)
@@ -129,6 +143,33 @@ class SignupError(Exception):
     """사용자에게 그대로 보여줄 수 있는 회원가입 실패 사유."""
 
 
+# ── 로그인 아이디 (2026-11-20 이메일 로그인 → 아이디 로그인) ─────────────
+# 아이디는 user_master.login_id(UNIQUE)에 둔다(sql/yangbong/009, stock 스키마는 sql/stock/005 의 빈 열).
+# 기존 회원은 이메일 @ 앞부분으로 전환. 이메일은 연락·인증용으로 따로 남는다.
+# 아이디 로그인은 user_login_type 의 EMAIL(비밀번호) 행이 켜진 회원만 된다.
+LOGIN_ID_REGEX = re.compile(r'^[a-z0-9][a-z0-9._-]{3,19}$')   # 4~20자, 영문 소문자·숫자·. _ -
+LOGIN_ID_RULE = "아이디는 4~20자 영문 소문자·숫자로 쓰고, . _ - 를 섞을 수 있어요(첫 글자는 영문·숫자)."
+
+
+def _normalize_login_id(value) -> str:
+    return str(value or '').strip().lower()
+
+
+def _login_lookup_param(data: dict) -> tuple:
+    """로그인·재설정 요청의 계정 키 → (DAO param, 로그용 키).
+
+    loginId 가 오면 아이디로 찾는다. 값에 '@' 가 있거나 옛 email 필드만 오면 이메일로 찾는다
+    (비밀상회 화면·이미 설치된 앱 빌드는 email 을 보낸다).
+    """
+    raw = str((data or {}).get('loginId') or (data or {}).get('email') or '').strip()
+    if not raw:
+        raise Exception("아이디를 입력해 주세요.")
+    if '@' in raw:
+        return {'type': EMAIL, 'email': raw}, raw
+    login_id = _normalize_login_id(raw)
+    return {'type': EMAIL, 'login_id': login_id}, login_id
+
+
 def _check_consents(data: dict, error_cls) -> None:
     """가입 동의 3항목이 모두 체크됐고, 화면이 보여준 문구가 현재 버전인지 확인."""
     if data.get('agreeAge14') is not True:
@@ -140,6 +181,16 @@ def _check_consents(data: dict, error_cls) -> None:
     if data.get('termsVersion') != TERMS_VERSION or data.get('policyVersion') != PRIVACY_POLICY_VERSION:
         # 화면이 오래된 문구를 보여준 경우 — 새로 받은 문구로 다시 동의받는다
         raise error_cls("약관 또는 개인정보 처리방침이 변경됐어요. 화면을 새로고침한 뒤 다시 시도해 주세요.")
+
+
+def _apple_name(given, family):
+    """Apple 이 준 이름 → 표시용 이름. 한글이면 성+이름 붙여 쓰기, 아니면 '이름 성'."""
+    given, family = str(given or '').strip(), str(family or '').strip()
+    if not given and not family:
+        return None
+    if re.search(r'[가-힣]', given + family):
+        return (family + given)[:45]
+    return ' '.join(p for p in (given, family) if p)[:45]
 
 
 class AuthService:
@@ -164,13 +215,8 @@ class AuthService:
             3. role 필드를 ['USER', 'ADMIN'] 형태의 문자열 리스트로 변환
                → 프론트엔드 명세가 요구하는 포맷과 일치
         """
-        # ── 1. 사용자 존재 여부 확인 ──────────────────────────────────
-        user_email = data['email']
-        param = {
-            'type': 'EMAIL',
-            'email': user_email
-        }
-        print(param)
+        # ── 1. 사용자 존재 여부 확인 (아이디 — '@' 가 있으면 이메일, _login_lookup_param) ──
+        param, user_email = _login_lookup_param(data)
         user_data = self.userMasterDaoImpl.select_user_authinfo(session, param)
 
         if len(user_data) != 1:
@@ -190,7 +236,7 @@ class AuthService:
         # ── 2. 비밀번호 일치 여부 확인 ────────────────────────────────
         # salt + pswd 를 SHA-256 해싱해 저장된 해시와 비교
         hashed = hashlib.sha256(
-            bytes(user_info['salt'], 'utf-8') + data['pswd'].encode()
+            bytes(user_info['salt'], 'utf-8') + str(data.get('pswd') or '').encode()
         ).hexdigest()
 
         if hashed != user_info['pswd']:
@@ -267,6 +313,35 @@ class AuthService:
         # 구글이 확인하지 않은 이메일로는 기존 계정에 연결하거나 가입하지 않는다
         email = (claims.get('email') or '').strip() if claims.get('email_verified') is True else None
         return self._social_login(session, GOOGLE, google_id, email, claims.get('name'))
+
+    # ────────────────────────────────────────────────────────────────
+    # Apple 로그인 (iOS 앱, 네이버·구글과 같은 계정 결정 규칙)
+    # ────────────────────────────────────────────────────────────────
+    def appleProcess(self, session, data):
+        """
+        프런트(iOS 네이티브 플러그인 AppleSignIn)는 identityToken 과, 요청에 넣은 nonce 의 원문을 보낸다.
+        플러그인이 sha256(원문) 을 Apple 요청에 넣으므로 토큰의 nonce 는 sha256 hex 다.
+        이름은 Apple 이 첫 로그인 때만 앱에 주므로 클라이언트 값을 받는다(표시용 이름에만 쓴다).
+        반환: 이메일 로그인과 같은 형식 + 'socialResult': 'login' | 'linked' | 'created'
+        Raises: SocialLoginError(사용자에게 보여줄 메시지)
+        """
+        data = data or {}
+        token, nonce = data.get('identityToken'), data.get('nonce')
+        if not token or not nonce:
+            raise SocialLoginError("Apple 인증 정보가 없습니다. 다시 시도해 주세요.")
+
+        claims = self._apple_claims(session, token)
+        expected = hashlib.sha256(str(nonce).encode('utf-8')).hexdigest()
+        if not hmac.compare_digest(str(claims.get('nonce') or ''), expected):
+            raise SocialLoginError("로그인 요청이 올바르지 않아요. 다시 시도해 주세요.")
+        apple_id = claims.get('sub')
+        if not apple_id:
+            raise SocialLoginError("Apple 사용자 정보를 받지 못했습니다.")
+        # email_verified 는 문자열 "true" 로 올 때가 있다. 가린 이메일(privaterelay)도 Apple 이 확인한 주소다.
+        verified = str(claims.get('email_verified')).lower() == 'true'
+        email = (claims.get('email') or '').strip() if verified else None
+        return self._social_login(session, APPLE, apple_id, email,
+                                  _apple_name(data.get('givenName'), data.get('familyName')))
 
     def _social_login(self, session, login_type, provider_uid, email, name):
         """
@@ -429,20 +504,27 @@ class AuthService:
         _signup_sent_at[email] = now
         return {'verifyToken': token, 'expiresIn': SIGNUP_CODE_EXPIRE_MINUTES * 60}
 
-    def signupProcess(self, session, data):
+    def checkLoginId(self, session, data):
         """
-        Request : { "verifyToken", "code", "userName", "password",
-                    "agreeAge14", "agreeTerms", "agreePrivacy", "termsVersion", "policyVersion" }
-        반환    : 이메일 로그인과 같은 형식(가입 즉시 로그인)
+        Request : { "loginId": "..." }
+        반환    : { "loginId": 정규화한 값, "available": bool, "message": 화면에 보일 문구 }
         """
-        data = data or {}
-        _check_consents(data, SignupError)
+        login_id = _normalize_login_id((data or {}).get('loginId'))
+        if not LOGIN_ID_REGEX.match(login_id):
+            return {'loginId': login_id, 'available': False, 'message': LOGIN_ID_RULE}
+        if self.socialLoginDaoImpl.select_user_by_login_id(session, login_id) is not None:
+            return {'loginId': login_id, 'available': False, 'message': "이미 사용 중인 아이디예요."}
+        return {'loginId': login_id, 'available': True, 'message': "사용할 수 있는 아이디예요."}
 
+    def _verify_signup_code(self, data):
+        """verifyToken + code 확인 → (jti, email). 틀리면 횟수를 센다(토큰당 5번)."""
         try:
             payload = jwt.decode(data.get('verifyToken') or '', SIGNUP_TOKEN_SECRET, algorithms=[JWT_ALGORITHM])
         except jwt.ExpiredSignatureError:
             raise SignupError("인증코드 유효시간이 지났어요. 코드를 다시 받아 주세요.")
         except jwt.InvalidTokenError:
+            raise SignupError("이메일 인증을 먼저 해 주세요.")
+        if payload.get('verified'):
             raise SignupError("이메일 인증을 먼저 해 주세요.")
 
         jti, email = payload['jti'], payload['email']
@@ -458,6 +540,53 @@ class AuthService:
             _signup_attempts[jti] = (fails + 1, now)
             left = SIGNUP_CODE_MAX_ATTEMPTS - fails - 1
             raise SignupError(f"인증코드가 맞지 않아요. ({left}번 남음)" if left else "인증코드를 여러 번 틀렸어요. 코드를 다시 받아 주세요.")
+        return jti, email
+
+    def signupVerifyCode(self, session, data):
+        """
+        인증코드 확인 단계(가입 전에 바로 맞는지 알려 준다).
+        Request : { "verifyToken", "code" }
+        반환    : { "verifiedToken": "...", "email": "...", "expiresIn": 1800 }
+                  → 가입 요청에 code 대신 verifiedToken 을 보낸다(30분 안에 가입을 마쳐야 한다).
+        """
+        jti, email = self._verify_signup_code(data or {})
+        exp = datetime.now(tz=timezone.utc) + timedelta(minutes=SIGNUP_VERIFIED_EXPIRE_MINUTES)
+        token = jwt.encode({'email': email, 'jti': jti, 'verified': True, 'exp': exp},
+                           SIGNUP_TOKEN_SECRET, algorithm=JWT_ALGORITHM)
+        return {'verifiedToken': token, 'email': email, 'expiresIn': SIGNUP_VERIFIED_EXPIRE_MINUTES * 60}
+
+    def signupProcess(self, session, data):
+        """
+        Request : { "verifiedToken"(인증 확인 단계 결과) 또는 "verifyToken"+"code"(옛 화면),
+                    "loginId", "userName", "password",
+                    "agreeAge14", "agreeTerms", "agreePrivacy", "termsVersion", "policyVersion" }
+        반환    : 아이디 로그인과 같은 형식(가입 즉시 로그인)
+        loginId 가 없으면(옛 화면·비밀상회) 이메일 @ 앞부분을 아이디로 쓴다 — 규칙에 안 맞거나 이미 있으면 거절.
+        """
+        data = data or {}
+        _check_consents(data, SignupError)
+
+        if data.get('verifiedToken'):
+            try:
+                payload = jwt.decode(data['verifiedToken'], SIGNUP_TOKEN_SECRET, algorithms=[JWT_ALGORITHM])
+            except jwt.ExpiredSignatureError:
+                raise SignupError("이메일 인증 후 시간이 오래 지났어요. 인증코드를 다시 받아 주세요.")
+            except jwt.InvalidTokenError:
+                raise SignupError("이메일 인증을 먼저 해 주세요.")
+            if not payload.get('verified'):
+                raise SignupError("이메일 인증을 먼저 해 주세요.")
+            jti, email = payload['jti'], payload['email']
+            if jti in _signup_used:
+                raise SignupError("이미 가입에 사용한 인증이에요. 인증코드를 다시 받아 주세요.")
+        else:
+            jti, email = self._verify_signup_code(data)
+        now = time.time()
+
+        login_id = _normalize_login_id(data.get('loginId') or email.split('@')[0])
+        if not LOGIN_ID_REGEX.match(login_id):
+            raise SignupError(LOGIN_ID_RULE)
+        if self.socialLoginDaoImpl.select_user_by_login_id(session, login_id) is not None:
+            raise SignupError("이미 사용 중인 아이디예요. 다른 아이디를 입력해 주세요.")
 
         user_name = (data.get('userName') or '').strip()
         if not 1 <= len(user_name) <= 45:
@@ -470,7 +599,8 @@ class AuthService:
 
         new_id = self.socialLoginDaoImpl.create_user(
             session, user_name=user_name, email=email, phone=None,
-            login_type=EMAIL, provider_uid=None, auth_id=DEFAULT_SIGNUP_ROLE, password=password)
+            login_type=EMAIL, provider_uid=None, auth_id=DEFAULT_SIGNUP_ROLE, password=password,
+            login_id=login_id)
         self._save_required_consents(session, new_id)
         _signup_used[jti] = now
         return self._login_result(session, new_id, user_name)
@@ -527,6 +657,63 @@ class AuthService:
             print(f"[googleProcess] iss 불일치: {claims.get('iss')}", flush=True)
             raise SocialLoginError("구글 인증 정보가 올바르지 않아요. 다시 로그인해 주세요.")
         return claims
+
+    def _apple_config(self, session) -> dict:
+        return {r['key_type']: r['key_value'] for r in
+                self.masterInfosDaoImpl.select_master_key_by_category(session, 'APPLE_AUTH') if r.get('key_value')}
+
+    def _apple_claims(self, session, token):
+        """Apple identityToken 검증 → claims. aud 는 APPLE_AUTH 의 *_CLIENT_ID(번들 ID) 중 하나."""
+        audiences = [v for k, v in self._apple_config(session).items() if str(k).upper().endswith('_CLIENT_ID')]
+        if not audiences:
+            raise SocialLoginError("Apple 로그인 설정이 없습니다. 관리자에게 문의해 주세요.")
+        try:
+            signing_key = _apple_jwks.get_signing_key_from_jwt(token)
+            claims = jwt.decode(token, signing_key.key, algorithms=['RS256'], audience=audiences,
+                                issuer=APPLE_ISSUER, leeway=60,
+                                options={'require': ['exp', 'iat', 'iss', 'aud', 'sub']})
+        except jwt.ExpiredSignatureError:
+            raise SocialLoginError("Apple 인증이 만료됐어요. 다시 로그인해 주세요.")
+        except (jwt.InvalidTokenError, jwt.PyJWKClientError) as e:
+            print(f"[appleProcess] identityToken 검증 실패: {e}", flush=True)
+            raise SocialLoginError("Apple 인증 정보가 올바르지 않아요. 다시 로그인해 주세요.")
+        return claims
+
+    def revokeAppleToken(self, session, authorization_code) -> bool:
+        """
+        계정 삭제 때 Apple 연결 해지(App Store 심사 가이드라인 5.1.1(v)).
+        앱이 방금 다시 받은 authorizationCode 를 토큰으로 바꾼 뒤 그 토큰을 해지한다
+        (Apple 토큰을 DB 에 보관하지 않으려고 삭제 시점에 재인증한다). 실패해도 계정 삭제는 계속한다 → False.
+        """
+        cfg = self._apple_config(session)
+        client_id = next((v for k, v in cfg.items() if str(k).upper() == 'APPLE_CLIENT_ID'), None)
+        team_id, key_id, private_key = cfg.get('APPLE_TEAM_ID'), cfg.get('APPLE_KEY_ID'), cfg.get('APPLE_PRIVATE_KEY')
+        if not (authorization_code and client_id and team_id and key_id and private_key):
+            print("[apple revoke] 설정 또는 authorizationCode 없음 — 해지 생략", flush=True)
+            return False
+        now = datetime.now(tz=timezone.utc)
+        client_secret = jwt.encode(
+            {'iss': team_id, 'iat': now, 'exp': now + timedelta(minutes=5), 'aud': APPLE_ISSUER, 'sub': client_id},
+            private_key.replace('\\n', '\n'), algorithm='ES256', headers={'kid': key_id})
+        try:
+            res = requests.post(APPLE_TOKEN_URL, timeout=10, data={
+                'client_id': client_id, 'client_secret': client_secret,
+                'code': authorization_code, 'grant_type': 'authorization_code'})
+            body = res.json() if res.content else {}
+            token = body.get('refresh_token') or body.get('access_token')
+            if not token:
+                print(f"[apple revoke] 토큰 교환 실패: {res.status_code} {body.get('error')}", flush=True)
+                return False
+            hint = 'refresh_token' if body.get('refresh_token') else 'access_token'
+            res = requests.post(APPLE_REVOKE_URL, timeout=10, data={
+                'client_id': client_id, 'client_secret': client_secret, 'token': token, 'token_type_hint': hint})
+            if res.status_code != 200:
+                print(f"[apple revoke] 해지 실패: {res.status_code} {res.text[:200]}", flush=True)
+                return False
+            return True
+        except requests.RequestException as e:
+            print(f"[apple revoke] 요청 실패: {e}", flush=True)
+            return False
 
     # ────────────────────────────────────────────────────────────────
     # [신규] 토큰 재발급 (Silent Refresh)
@@ -621,26 +808,18 @@ class AuthService:
         Returns:
             None  →  라우터에서 { "success": true, "data": null } 로 응답
         """
-        email        = data.get('email', '').strip()
         new_password = data.get('new_password', '')
+        if not new_password:
+            raise Exception("new_password 는 필수 항목입니다.")
 
-        if not email or not new_password:
-            raise Exception("email 과 new_password 는 필수 항목입니다.")
-
-        # ── 1. 이메일로 user_id 조회 ──────────────────────────────────
-        user_id = self.userMasterDaoImpl.select_user_id_by_email(session, email)
-        if user_id is None:
+        # ── 1·2. 아이디(loginId, '@' 가 있으면 이메일)로 계정 조회 + reset_flag 확인 ──
+        param, _ = _login_lookup_param(data)
+        user_data = self.userMasterDaoImpl.select_user_authinfo(session, param)
+        if not user_data:
             raise Exception("존재하지 않는 사용자입니다.")
 
-        # ── 2. reset_flag 확인 ────────────────────────────────────────
-        # select_user_authinfo 를 재활용해 user_detail 까지 한 번에 조회
-        param = {'type': 'EMAIL', 'email': email}
-        user_data = self.userMasterDaoImpl.select_user_authinfo(session, param)
-
-        if not user_data:
-            raise Exception("인증 정보를 찾을 수 없습니다.")
-
         userInfo = user_data[0]
+        user_id = userInfo['user_id']
         if userInfo.get('reset_flag') != 'Y':
             raise Exception("비밀번호 재설정 대상 계정이 아닙니다.")
 
