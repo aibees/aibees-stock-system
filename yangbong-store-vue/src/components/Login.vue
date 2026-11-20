@@ -9,10 +9,31 @@
         </header>
 
         <main class="lg-main">
-            <form class="lg-form" novalidate @submit.prevent="emaillogin">
+            <!-- 소셜 로그인이 먼저. 아이디 입력란은 '아이디로 로그인'을 눌러야 펼쳐진다(2026-11-21) -->
+            <!-- 구글 버튼은 GIS 가 그린다(구글 브랜드 가이드). 웹에서 클라이언트 ID 가 설정됐을 때만 보인다 -->
+            <div v-show="googleReady" ref="googleBtnEl" class="lg-google"></div>
+
+            <!-- Apple 로그인(iOS 앱만). Apple 디자인 가이드: 검은 바탕·흰 로고·다른 소셜 버튼과 같은 크기 -->
+            <button v-if="showApple" type="button" class="btn-apple" :disabled="isLoading" @click="applelogin">
+                <svg class="apple-logo" viewBox="0 0 17 20" width="15" height="18" aria-hidden="true">
+                    <path fill="currentColor" d="M14.1 10.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9C3.5 4.8 1.8 5.8.9 7.4c-1.9 3.3-.5 8.1 1.3 10.8.9 1.3 1.9 2.7 3.3 2.7 1.3-.1 1.8-.9 3.4-.9s2 .9 3.4.8c1.4 0 2.3-1.3 3.2-2.6 1-1.5 1.4-2.9 1.4-3-.1 0-2.8-1.1-2.8-4.6zM11.5 3c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z"/>
+                </svg>
+                Apple로 계속하기
+            </button>
+
+            <button type="button" class="btn-naver" :disabled="isLoading" @click="naverlogin">
+                <span class="naver-n" aria-hidden="true">N</span>
+                네이버로 계속하기
+            </button>
+
+            <button v-if="!showIdLogin" type="button" class="btn-ghost" :disabled="isLoading" @click="openIdLogin">
+                아이디로 로그인
+            </button>
+
+            <form v-else class="lg-form" novalidate @submit.prevent="emaillogin">
                 <div class="lg-field">
                     <label for="lg-id">아이디</label>
-                    <input id="lg-id" v-model.trim="emailData.loginId" type="text" autocomplete="username"
+                    <input id="lg-id" ref="idInputEl" v-model.trim="emailData.loginId" type="text" autocomplete="username"
                         autocapitalize="none" autocorrect="off" spellcheck="false" />
                     <p class="lg-hint">기존 회원은 가입한 이메일의 @ 앞부분이 아이디예요.</p>
                 </div>
@@ -40,27 +61,17 @@
                 </button>
             </form>
 
-            <div class="lg-or" aria-hidden="true"><span>또는</span></div>
+            <p v-if="!showIdLogin && errorMsg" class="lg-error" role="alert">{{ errorMsg }}</p>
 
-            <!-- 구글 버튼은 GIS 가 그린다(구글 브랜드 가이드). 웹에서 클라이언트 ID 가 설정됐을 때만 보인다 -->
-            <div v-show="googleReady" ref="googleBtnEl" class="lg-google"></div>
-
-            <!-- Apple 로그인(iOS 앱만). Apple 디자인 가이드: 검은 바탕·흰 로고·다른 소셜 버튼과 같은 크기 -->
-            <button v-if="showApple" type="button" class="btn-apple" :disabled="isLoading" @click="applelogin">
-                <svg class="apple-logo" viewBox="0 0 17 20" width="15" height="18" aria-hidden="true">
-                    <path fill="currentColor" d="M14.1 10.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9C3.5 4.8 1.8 5.8.9 7.4c-1.9 3.3-.5 8.1 1.3 10.8.9 1.3 1.9 2.7 3.3 2.7 1.3-.1 1.8-.9 3.4-.9s2 .9 3.4.8c1.4 0 2.3-1.3 3.2-2.6 1-1.5 1.4-2.9 1.4-3-.1 0-2.8-1.1-2.8-4.6zM11.5 3c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z"/>
-                </svg>
-                Apple로 계속하기
-            </button>
-
-            <button type="button" class="btn-naver" :disabled="isLoading" @click="naverlogin">
-                <span class="naver-n" aria-hidden="true">N</span>
-                네이버로 계속하기
-            </button>
-
-            <p class="lg-signup">
-                처음이신가요? <router-link to="/signup">회원가입</router-link>
-            </p>
+            <!-- 회원가입은 왼쪽, 아이디·비밀번호 찾기는 오른쪽 -->
+            <nav class="lg-links" aria-label="계정">
+                <router-link to="/signup" class="lg-link strong">회원가입</router-link>
+                <span class="lg-links-right">
+                    <router-link :to="{ path: '/find-account', query: { tab: 'id' } }" class="lg-link">아이디 찾기</router-link>
+                    <span class="lg-sep" aria-hidden="true">·</span>
+                    <router-link :to="{ path: '/find-account', query: { tab: 'pw' } }" class="lg-link">비밀번호 찾기</router-link>
+                </span>
+            </nav>
         </main>
 
         <!-- 비밀번호 재설정 Modal -->
@@ -114,6 +125,15 @@ const route = useRoute()
 const isLoading = ref(false)
 const isResetTarget = computed(() => route.query.status === 'reset')
 const errorMsg = ref('')
+
+// 아이디 입력란은 '아이디로 로그인'을 눌러야 보인다. 초기화 안내로 들어왔을 때는 바로 펼친다.
+const showIdLogin = ref(isResetTarget.value)
+const idInputEl = ref(null)
+const openIdLogin = async () => {
+    showIdLogin.value = true
+    await nextTick()
+    idInputEl.value?.focus()
+}
 
 const apiError = (err, fallback) =>
     err?.response?.data?.error?.message ?? err?.error?.message ?? fallback
@@ -356,16 +376,16 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
-    padding: calc(env(safe-area-inset-top, 0px) + 48px) 20px 28px;
+    gap: 4px;
+    padding: calc(env(safe-area-inset-top, 0px) + 22px) 20px 14px;
     background: $bar;
 }
-.lg-logo { width: 64px; height: 64px; }
+.lg-logo { width: 44px; height: 44px; }
 .lg-name {
     margin: 0;
     font-family: 'Pretendard', sans-serif;
     font-weight: 700;
-    font-size: 34px;
+    font-size: 26px;
     font-weight: 400;
     color: $brown-ink;
     letter-spacing: .5px;
@@ -385,10 +405,10 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
 .lg-main {
     max-width: 400px;
     margin: 0 auto;
-    padding: 36px 20px 40px;
+    padding: 28px 20px 32px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
 }
 
 .lg-form { display: flex; flex-direction: column; gap: 14px; }
@@ -438,13 +458,25 @@ $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
     &::before, &::after { content: ''; flex: 1; height: 1px; background: $line; }
 }
 
-.lg-signup {
-    margin: 4px 0 0;
-    text-align: center;
+.lg-links {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 4px;
     font-size: 14px;
-    color: $sub;
-    a { color: $brown; font-weight: 700; text-decoration: underline; }
 }
+.lg-links-right { display: inline-flex; align-items: center; gap: 6px; }
+.lg-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: $sub;
+    text-decoration: none;
+    &.strong { color: $brown; font-weight: 700; }
+    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; border-radius: 4px; }
+}
+.lg-sep { color: #C9BBA6; }
 
 /* ── 구글 버튼(GIS iframe) — 가운데 정렬, 높이는 다른 버튼과 비슷하게 ── */
 .lg-google {

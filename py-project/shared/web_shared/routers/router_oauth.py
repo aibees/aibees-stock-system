@@ -282,6 +282,50 @@ def oauth_signup_login_id_check():
         return ApiResponse.error("아이디를 확인하지 못했어요.")
 
 
+# ── 아이디 찾기 / 비밀번호 재설정 (이메일 인증코드, 2026-11-21) ─────────────
+# 가입되지 않은 이메일이어도 code 요청 응답은 같다(가입 여부를 응답으로 알 수 없게). 실패는 400.
+def _code_route(fn, fallback):
+    data = request.get_json(silent=True) or {}
+    try:
+        return ApiResponse.success(fn(g.db, data))
+    except SignupError as e:
+        g.db.rollback()
+        return ApiResponse.error(str(e), status=400)
+    except Exception as e:
+        g.db.rollback()
+        logging.exception(e)
+        return ApiResponse.error(fallback)
+
+
+@oauth_bp.route("/find-id/code", methods=['POST'])
+def oauth_find_id_code():
+    """Request { "email" } → { "verifyToken", "expiresIn" }"""
+    return _code_route(authServiceImpl.findIdSendCode, "인증코드를 보내지 못했어요.")
+
+
+@oauth_bp.route("/find-id/verify", methods=['POST'])
+def oauth_find_id_verify():
+    """Request { "verifyToken", "code" } → { "maskedLoginIds": [...] } (앞뒤 2자만 보임)"""
+    return _code_route(authServiceImpl.findIdVerify, "아이디를 찾지 못했어요.")
+
+
+@oauth_bp.route("/password/code", methods=['POST'])
+def oauth_password_code():
+    """Request { "email" } → { "verifyToken", "expiresIn" } (아이디 찾기와 별개의 코드)"""
+    return _code_route(authServiceImpl.passwordSendCode, "인증코드를 보내지 못했어요.")
+
+
+@oauth_bp.route("/password/reset-by-code", methods=['POST'])
+def oauth_password_reset_by_code():
+    """Request { "verifyToken", "code", "loginId", "newPassword" } → null. 성공하면 모든 기기에서 로그아웃된다."""
+    result = _code_route(authServiceImpl.passwordResetByCode, "비밀번호를 바꾸지 못했어요.")
+    data = request.get_json(silent=True) or {}
+    ok = getattr(result, 'status_code', 200) == 200
+    accessLogDaoImpl.insert_login_log('PASSWORD_RESET', 'SUCCESS' if ok else 'FAIL',
+                                      login_key=str(data.get('loginId') or '')[:200])
+    return result
+
+
 @oauth_bp.route("/signup", methods=['POST'])
 def oauth_signup():
     """

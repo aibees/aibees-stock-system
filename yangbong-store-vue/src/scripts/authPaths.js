@@ -4,7 +4,7 @@
  */
 
 /** 로그인·가입 흐름. 로그인한 사용자가 /login·/signup 으로 오면 홈으로 보낸다. */
-export const AUTH_PATHS = ['/login', '/signup', '/oauth/naver', '/oauth/naver/consent'];
+export const AUTH_PATHS = ['/login', '/signup', '/find-account', '/oauth/naver', '/oauth/naver/consent'];
 
 export const isAuthPath = (path) => AUTH_PATHS.includes(path);
 

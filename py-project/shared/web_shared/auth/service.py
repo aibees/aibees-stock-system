@@ -151,6 +151,19 @@ LOGIN_ID_REGEX = re.compile(r'^[a-z0-9][a-z0-9._-]{3,19}$')   # 4~20자, 영문 
 LOGIN_ID_RULE = "아이디는 4~20자 영문 소문자·숫자로 쓰고, . _ - 를 섞을 수 있어요(첫 글자는 영문·숫자)."
 
 
+# 메일 인증코드 용도(토큰 pur). 다른 용도의 코드로는 확인되지 않는다.
+CODE_SIGNUP, CODE_FIND_ID, CODE_RESET_PW = 'signup', 'find_id', 'reset_pw'
+CODE_TITLES = {CODE_SIGNUP: '회원가입', CODE_FIND_ID: '아이디 찾기', CODE_RESET_PW: '비밀번호 재설정'}
+
+
+def mask_login_id(login_id: str) -> str:
+    """아이디 찾기 결과: 앞뒤 2자만 보이고 가운데는 *. 4자 아이디는 앞 2자만 보인다(전부 드러나지 않게)."""
+    s = str(login_id or '')
+    if len(s) <= 4:
+        return s[:2] + '*' * max(len(s) - 2, 2)
+    return s[:2] + '*' * (len(s) - 4) + s[-2:]
+
+
 def _normalize_login_id(value) -> str:
     return str(value or '').strip().lower()
 
@@ -482,27 +495,105 @@ class AuthService:
         if self.socialLoginDaoImpl.select_users_by_email(session, email):
             raise SignupError("이미 가입된 이메일이에요. 로그인해 주세요.")
 
+        return self._send_mail_code(session, email, CODE_SIGNUP)
+
+    def _send_mail_code(self, session, email, purpose, send=True):
+        """6자리 코드를 메일로 보내고 verifyToken(이메일·용도·코드 HMAC 서명)을 돌려준다.
+
+        purpose 가 토큰에 들어가므로 회원가입·아이디 찾기·비밀번호 재설정 코드는 서로 바꿔 쓸 수 없다.
+        send=False 면 메일을 보내지 않고 같은 모양의 토큰만 준다 — 가입되지 않은 이메일로 찾기를 요청했을 때
+        응답만 보고 가입 여부를 알 수 없게 한다(아무도 코드를 모르니 확인 단계에서 항상 틀린다).
+        """
         now = time.time()
         _prune_signup_state(now)
-        last = _signup_sent_at.get(email)
+        sent_key = f'{purpose}:{email}'
+        last = _signup_sent_at.get(sent_key)
         if last and now - last < SIGNUP_CODE_RESEND_SECONDS:
             raise SignupError(f"인증코드는 {SIGNUP_CODE_RESEND_SECONDS}초 뒤에 다시 받을 수 있어요.")
 
         code = f'{secrets.randbelow(10 ** 6):06d}'
         jti = secrets.token_hex(8)
         exp = datetime.now(tz=timezone.utc) + timedelta(minutes=SIGNUP_CODE_EXPIRE_MINUTES)
-        token = jwt.encode({'email': email, 'jti': jti, 'mac': _code_mac(jti, code), 'exp': exp},
+        token = jwt.encode({'email': email, 'jti': jti, 'pur': purpose, 'mac': _code_mac(jti, code), 'exp': exp},
                            SIGNUP_TOKEN_SECRET, algorithm=JWT_ALGORITHM)
-        try:
-            mailer.send(session, email, '[양봉상회] 회원가입 인증코드',
-                        f'<p>양봉상회 회원가입 인증코드입니다.</p>'
-                        f'<p style="font-size:24px;font-weight:700;letter-spacing:4px">{code}</p>'
-                        f'<p>{SIGNUP_CODE_EXPIRE_MINUTES}분 안에 입력해 주세요. 본인이 요청하지 않았다면 이 메일을 무시하세요.</p>')
-        except mailer.MailerError as e:
-            print(f"[signupSendCode] 메일 발송 실패: {e}", flush=True)
-            raise SignupError("인증 메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요.")
-        _signup_sent_at[email] = now
+        if send:
+            title = CODE_TITLES[purpose]
+            try:
+                mailer.send(session, email, f'[양봉상회] {title} 인증코드',
+                            f'<p>양봉상회 {title} 인증코드입니다.</p>'
+                            f'<p style="font-size:24px;font-weight:700;letter-spacing:4px">{code}</p>'
+                            f'<p>{SIGNUP_CODE_EXPIRE_MINUTES}분 안에 입력해 주세요. 본인이 요청하지 않았다면 이 메일을 무시하세요.</p>')
+            except mailer.MailerError as e:
+                print(f"[_send_mail_code:{purpose}] 메일 발송 실패: {e}", flush=True)
+                raise SignupError("인증 메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요.")
+        _signup_sent_at[sent_key] = now
         return {'verifyToken': token, 'expiresIn': SIGNUP_CODE_EXPIRE_MINUTES * 60}
+
+    # ────────────────────────────────────────────────────────────────
+    # 아이디 찾기 / 비밀번호 재설정 (이메일 인증코드, 2026-11-21)
+    #   코드는 비밀번호 로그인(EMAIL)이 켜진 회원의 이메일로만 보낸다. 가입되지 않은 이메일이어도 응답은 같다.
+    # ────────────────────────────────────────────────────────────────
+    def _email_login_users(self, session, email):
+        """이 이메일의, 아이디·비밀번호 로그인이 켜진 회원 목록."""
+        out = []
+        for user in self.socialLoginDaoImpl.select_users_by_email(session, email):
+            row = self.socialLoginDaoImpl.select_login_type(session, user.user_id, EMAIL)
+            if row is not None and row.enabled_flag == 'Y' and user.login_id:
+                out.append(user)
+        return out
+
+    def _find_email(self, data):
+        email = ((data or {}).get('email') or '').strip().lower()
+        if not EMAIL_REGEX.match(email) or len(email) > 200:
+            raise SignupError("이메일 주소를 확인해 주세요.")
+        return email
+
+    def findIdSendCode(self, session, data):
+        """Request { "email" } → { "verifyToken", "expiresIn" }"""
+        email = self._find_email(data)
+        return self._send_mail_code(session, email, CODE_FIND_ID,
+                                    send=bool(self._email_login_users(session, email)))
+
+    def findIdVerify(self, session, data):
+        """Request { "verifyToken", "code" } → { "maskedLoginIds": ["ai******29"] } (앞뒤 2자만 보인다)"""
+        jti, email = self._verify_signup_code(data or {}, CODE_FIND_ID)
+        users = self._email_login_users(session, email)
+        if not users:
+            raise SignupError("이 이메일로 가입된 아이디가 없어요.")
+        _signup_used[jti] = time.time()
+        return {'maskedLoginIds': [mask_login_id(u.login_id) for u in users]}
+
+    def passwordSendCode(self, session, data):
+        """Request { "email" } → { "verifyToken", "expiresIn" } (아이디 찾기와 별개의 새 코드)"""
+        email = self._find_email(data)
+        return self._send_mail_code(session, email, CODE_RESET_PW,
+                                    send=bool(self._email_login_users(session, email)))
+
+    def passwordResetByCode(self, session, data):
+        """
+        Request { "verifyToken", "code", "loginId", "newPassword" } → None
+        코드가 맞고, 아이디가 그 이메일의 아이디·비밀번호 로그인 회원이면 비밀번호를 바꾸고 모든 기기에서 로그아웃시킨다.
+        """
+        data = data or {}
+        password = data.get('newPassword') or ''
+        if not PASSWORD_REGEX.match(password):
+            raise SignupError("비밀번호는 8자 이상, 대문자·소문자·숫자·특수문자를 각 1자 이상 포함해야 해요.")
+        login_id = _normalize_login_id(data.get('loginId'))
+        if not login_id:
+            raise SignupError("아이디를 입력해 주세요.")
+
+        jti, email = self._verify_signup_code(data, CODE_RESET_PW)
+        user = next((u for u in self._email_login_users(session, email) if u.login_id == login_id), None)
+        if user is None:
+            raise SignupError("아이디와 이메일이 일치하지 않아요.")
+
+        salt = secrets.token_hex(8)
+        self.userMasterDaoImpl.update_user_password(
+            session, user_id=user.user_id, new_salt=salt,
+            new_pswd=hashlib.sha256(salt.encode() + password.encode()).hexdigest())
+        self.refreshTokenDaoImpl.revoke_all_by_user(session, user.user_id)
+        _signup_used[jti] = time.time()
+        return None
 
     def checkLoginId(self, session, data):
         """
@@ -516,16 +607,18 @@ class AuthService:
             return {'loginId': login_id, 'available': False, 'message': "이미 사용 중인 아이디예요."}
         return {'loginId': login_id, 'available': True, 'message': "사용할 수 있는 아이디예요."}
 
-    def _verify_signup_code(self, data):
-        """verifyToken + code 확인 → (jti, email). 틀리면 횟수를 센다(토큰당 5번)."""
+    def _verify_signup_code(self, data, purpose=None):
+        """verifyToken + code 확인 → (jti, email). 틀리면 횟수를 센다(토큰당 5번).
+        purpose 가 토큰의 용도(pur, 없으면 회원가입)와 다르면 거절한다."""
+        purpose = purpose or CODE_SIGNUP
         try:
             payload = jwt.decode(data.get('verifyToken') or '', SIGNUP_TOKEN_SECRET, algorithms=[JWT_ALGORITHM])
         except jwt.ExpiredSignatureError:
             raise SignupError("인증코드 유효시간이 지났어요. 코드를 다시 받아 주세요.")
         except jwt.InvalidTokenError:
             raise SignupError("이메일 인증을 먼저 해 주세요.")
-        if payload.get('verified'):
-            raise SignupError("이메일 인증을 먼저 해 주세요.")
+        if payload.get('verified') or payload.get('pur', CODE_SIGNUP) != purpose:
+            raise SignupError("인증코드를 다시 받아 주세요.")
 
         jti, email = payload['jti'], payload['email']
         now = time.time()

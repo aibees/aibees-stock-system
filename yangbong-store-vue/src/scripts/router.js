@@ -13,6 +13,7 @@ import AdGate from '@/components/AdGate.vue';
 import NaverCallback from '@/components/NaverCallback.vue';
 import SignupConsent from '@/components/SignupConsent.vue';
 import Signup from '@/components/Signup.vue';
+import FindAccount from '@/components/FindAccount.vue';
 
 // ----- import components -----
 // 홈은 간편/전문가 모드로 갈린다(HomeEntry). 기존 Home.vue 는 전문가 모드 화면으로 그대로 둔다.
@@ -161,6 +162,12 @@ const routes = [
         path: "/signup",
         name: "signup",
         component: Signup
+    },
+    {
+        // 아이디·비밀번호 찾기(?tab=id|pw). 비로그인 화면(authPaths.AUTH_PATHS).
+        path: "/find-account",
+        name: "find-account",
+        component: FindAccount
     },
     {
         path: "/user-option",
@@ -316,7 +323,7 @@ export const setRouterToApp = async () => {
                 rememberAfterLogin(to.fullPath);   // 로그인하면 이 화면으로 돌아온다(authPaths.takeAfterLogin)
                 return { path: '/login' };
             }
-        } else if (to.path === '/login' || to.path === '/signup') {
+        } else if (to.path === '/login' || to.path === '/signup' || to.path === '/find-account') {
             // 로그인 상태에서 로그인·가입 화면으로 오면 홈으로(네이버 콜백·동의 화면은 흐름 중이라 그대로 둔다).
             return { path: '/home' };
         }

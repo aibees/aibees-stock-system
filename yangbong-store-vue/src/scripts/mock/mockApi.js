@@ -276,6 +276,16 @@ const ROUTES = [
         : failS('인증코드가 맞지 않아요. (4번 남음)'))],
     ['POST', '/api/oauth/signup', (c) => (mockBody(c).verifiedToken === 'mock-verified' && mockBody(c).loginId
         ? okS(mockLogin(7, mockBody(c).userName || '신규')) : failS('이메일 인증을 먼저 해 주세요.'))],
+    // 아이디·비밀번호 찾기: 코드 123456, 가입된 아이디 aibees1129(마스킹 ai******29), 비밀번호 재설정은 아이디 tester
+    ['POST', '/api/oauth/find-id/code', () => okS({ verifyToken: 'mock-find', expiresIn: 600 })],
+    ['POST', '/api/oauth/find-id/verify', (c) => (mockBody(c).code === '123456'
+        ? okS({ maskedLoginIds: ['ai******29'] }) : failS('인증코드가 맞지 않아요. (4번 남음)'))],
+    ['POST', '/api/oauth/password/code', () => okS({ verifyToken: 'mock-reset', expiresIn: 600 })],
+    ['POST', '/api/oauth/password/reset-by-code', (c) => {
+        const b = mockBody(c);
+        if (b.code !== '123456') return failS('인증코드가 맞지 않아요. (4번 남음)');
+        return b.loginId === 'tester' ? okS(null) : failS('아이디와 이메일이 일치하지 않아요.');
+    }],
     ['POST', '/api/oauth/email', (c) => (mockBody(c).loginId === 'tester' && mockBody(c).pswd
         ? okS(mockLogin(7, '테스터')) : failS('사용자를 찾을 수 없습니다.'))],
     ['GET', '/api/v1/notices', () => ok(NOTICES.map(({ content, ...rest }) => rest))],
