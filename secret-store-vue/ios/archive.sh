@@ -64,6 +64,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# 표시 버전은 App Store 규칙상 숫자 최대 3개(예: 1.2.3). 4자리(1.2.2.1)는 archive 가 끝난 뒤 export 검증에서야 떨어지므로 먼저 막는다.
+if [[ -n "$MARKETING_VERSION" && ! "$MARKETING_VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+  echo ">>> [ERROR] --version '$MARKETING_VERSION' 은 쓸 수 없습니다. 숫자 3개까지만 됩니다(예: 1.2.3)" >&2
+  exit 2
+fi
+
 # ── App Store Connect 인증 플래그 (3개가 모두 있을 때만 사용) ────────────────
 # 매번 환경변수로 넘기지 않도록 ios/asc.env.local 이 있으면 읽는다(*.local 은 gitignore 대상).
 #   ASC_KEY_ID=49JM9DT87K
