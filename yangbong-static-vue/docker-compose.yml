@@ -1,0 +1,24 @@
+version: '3.8'
+# 양봉상회 소개·정책 페이지(yangbong.chagoklabs.com — 앱 소개, /privacy, /terms).
+#   클라우드 서버에서 정적 파일만 서빙한다. TLS·도메인은 클라우드 호스트 nginx 가 맡는다.
+#
+# 클라우드 aibees 네트워크(172.23.0.0/16) 고정 IP 배정 현황(중복 금지):
+#   172.23.0.2  yangbong-vue-app     127.0.0.1:5555  (yangbong-store-vue)
+#   172.23.0.3  secret-vue-app       127.0.0.1:5556  (secret-store-vue)
+#   172.23.0.4  yangbong-static-app  127.0.0.1:5557  (yangbong-static-vue)
+# 네트워크가 없으면 먼저: docker network create --subnet 172.23.0.0/16 aibees
+services:
+    yangbong-static-app:
+        container_name: yangbong-static-app
+        build:
+            context: .
+            dockerfile: Dockerfile
+        ports:
+            - "127.0.0.1:5557:5557"
+        networks:
+            aibees:
+                ipv4_address: 172.23.0.4
+        restart: unless-stopped
+networks:
+    aibees:
+        external: true

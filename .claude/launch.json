@@ -4,43 +4,92 @@
     {
       "name": "yangbong",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "yangbong-store-vue"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "yangbong-store-vue"
+      ],
       "port": 19010
     },
     {
       "name": "yangbong-mock",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:mock", "--prefix", "yangbong-store-vue"],
+      "runtimeArgs": [
+        "run",
+        "dev:mock",
+        "--prefix",
+        "yangbong-store-vue"
+      ],
       "port": 19010
     },
     {
       "name": "yangbong-alt",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "yangbong-store-vue", "--", "--port", "19012", "--strictPort"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "yangbong-store-vue",
+        "--",
+        "--port",
+        "19012",
+        "--strictPort"
+      ],
       "port": 19012
     },
     {
       "name": "yangbong-mock-alt",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:mock", "--prefix", "yangbong-store-vue", "--", "--port", "19013", "--strictPort"],
+      "runtimeArgs": [
+        "run",
+        "dev:mock",
+        "--prefix",
+        "yangbong-store-vue",
+        "--",
+        "--port",
+        "19013",
+        "--strictPort"
+      ],
       "port": 19013
     },
     {
       "name": "secret",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "secret-store-vue"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "secret-store-vue"
+      ],
       "port": 19011
     },
     {
       "name": "yangbong-api",
       "runtimeExecutable": "py-project/py-yangbong-api/.venv/Scripts/python",
-      "runtimeArgs": ["py-project/py-yangbong-api/run_local.py"],
+      "runtimeArgs": [
+        "py-project/py-yangbong-api/run_local.py"
+      ],
       "port": 5556
+    },
+    {
+      "name": "yangbong-static",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "yangbong-static-vue"
+      ],
+      "port": 19014
     },
     {
       "name": "api",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd /Users/user/Documents/workspace3/aibees-stock-system/py-project/py-secret-api && .venv/bin/python3 -m app.main"],
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/user/Documents/workspace3/aibees-stock-system/py-project/py-secret-api && .venv/bin/python3 -m app.main"
+      ],
       "port": 5556
     }
   ]

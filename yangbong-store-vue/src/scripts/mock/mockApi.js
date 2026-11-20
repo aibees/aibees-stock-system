@@ -209,6 +209,35 @@ const homePicks = (params = {}) => {
     };
 };
 
+/* ── AI 분석 예시(지어낸 회사) ── */
+const AI_UPDATED_AT = '2026-11-13T16:20:00+09:00';
+const AI_ANALYSIS = {
+    overview: {
+        updated_at: AI_UPDATED_AT,
+        content: [
+            '**한빛반도체**는 반도체 후공정(패키징·테스트) 장비를 만드는 회사예요. 매출의 약 70%가 국내 대형 메모리 업체에서 나와요.',
+            '',
+            '- **매출**: 최근 4개 분기 연속 늘었어요. 고대역폭 메모리(HBM)용 장비 주문이 늘어난 영향이에요.',
+            '- **이익**: 영업이익률이 12%대로, 1년 전(8%대)보다 좋아졌어요.',
+            '- **재무 안정성**: 부채비율 45%로 낮은 편이에요.',
+        ].join('\n'),
+    },
+    theme: {
+        updated_at: AI_UPDATED_AT,
+        content: [
+            '- **HBM·AI 반도체**: AI 서버용 메모리 투자가 이어지며 관련 장비주가 함께 주목받고 있어요.',
+            '- **후공정 국산화**: 해외 장비를 국산으로 바꾸려는 흐름의 수혜주로 묶여요.',
+        ].join('\n'),
+    },
+    news: {
+        updated_at: AI_UPDATED_AT,
+        content: [
+            '- **11/12 공시** — 국내 메모리 업체와 312억 원 규모 장비 공급 계약을 맺었어요(최근 매출의 약 9%).',
+            '- **11/10 뉴스** — 3분기 실적이 시장 예상보다 좋았다는 분석이 나왔어요.',
+        ].join('\n'),
+    },
+};
+
 /* ── 라우트 표 ── */
 const ok = (data) => ({ code: 200, message: 'mock', data });
 const ROUTES = [
@@ -228,6 +257,10 @@ const ROUTES = [
         const n = NOTICES.find(x => x.notice_id === Number(m[1]));
         return n ? ok(n) : null;
     }],
+    // AI 분석(종목 상세 'AI 견해' 탭). 내용은 지어낸 회사(한빛반도체) 기준 예시 문장이다 — 다른 종목도 같은 글을 돌려준다.
+    ['GET', '/api/v1/anthropic/stock-analysis/overview', () => ok(AI_ANALYSIS.overview)],
+    ['GET', '/api/v1/anthropic/stock-analysis/theme', () => ok(AI_ANALYSIS.theme)],
+    ['GET', '/api/v1/anthropic/stock-analysis/news', () => ok(AI_ANALYSIS.news)],
     // 라우트 등록용 전체 메뉴·내 권한(홈·온보딩·트레이닝·메뉴는 정적 라우트).
     ['GET', '/api/v1/master/menus/my', () => ok({ menus: MENUS, features: [], roles: [], settings: {} })],
     ['GET', '/api/v1/master/menus', () => ok(MENUS)],

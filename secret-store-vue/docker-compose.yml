@@ -5,6 +5,7 @@ version: '3.8'
 # 클라우드 aibees 네트워크(172.23.0.0/16) 고정 IP 배정 현황(중복 금지):
 #   172.23.0.2  yangbong-vue-app  127.0.0.1:5555  (yangbong-store-vue)
 #   172.23.0.3  secret-vue-app    127.0.0.1:5556  (secret-store-vue)
+#   172.23.0.4  yangbong-static-app  127.0.0.1:5557  (yangbong-static-vue)
 # 네트워크가 없으면 먼저: docker network create --subnet 172.23.0.0/16 aibees
 services:
     secret-vue-app:

@@ -1,0 +1,63 @@
+:root {
+  --bg: #ffffff;
+  --ink: #2b1d14;
+  --sub: #6b5b4e;
+  --line: #efe6d6;
+  --head: #fbf7ef;
+  --brand: #74462a;
+  --honey: #ffc107;
+  --link: #8a4b22;
+  --muted: #a8998a;
+  /* 화면 이미지 배경(스토어 스크린샷 크림색)과 맞춘 패널. 이미지 가장자리와 이어지도록 다크 모드에서도 그대로 둔다 */
+  --panel: #fff5d9;
+  --panel-ink: #3a2414;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17130f;
+    --ink: #f2ebe3;
+    --sub: #b3a596;
+    --line: #2f2820;
+    --head: #201a15;
+    --brand: #e0a872;
+    --link: #f0b884;
+    --muted: #7d7064;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  font-size: 15px;
+  line-height: 1.75;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--link); }
+.wrap { max-width: 760px; margin: 0 auto; padding-left: 16px; padding-right: 16px; }
+
+/* 정책 문서 공통(개인정보 처리방침·이용약관) */
+.doc { padding-top: 32px; padding-bottom: 72px; }
+.doc h1 { margin: 0 0 6px; font-size: 26px; line-height: 1.35; }
+.doc .meta { margin: 0 0 24px; color: var(--sub); font-size: 13px; }
+.doc h2 { margin: 40px 0 12px; font-size: 18px; line-height: 1.45; }
+.doc p { margin: 0 0 10px; }
+.doc ul, .doc ol { margin: 0 0 10px; padding-left: 20px; }
+.doc li { margin: 2px 0; }
+.doc .note { color: var(--sub); font-size: 14px; }
+.doc .table-wrap { overflow-x: auto; margin: 6px 0 12px; }
+.doc table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 14px; line-height: 1.6; }
+.doc th, .doc td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.doc th { background: var(--head); font-weight: 600; white-space: nowrap; }
+.doc td:first-child { white-space: nowrap; font-weight: 500; }
+.doc dl { margin: 0; }
+.doc dl > div { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.doc dl > div:first-child { border-top: 1px solid var(--line); }
+.doc dt { font-weight: 600; }
+.doc dd { margin: 2px 0 0; color: var(--sub); }
