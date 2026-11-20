@@ -58,6 +58,25 @@ checks_done() {
   return 0
 }
 
+# ── 컨테이너 교체 보조 ──
+# adopt_container <compose 파일> <컨테이너 이름>…
+#   compose 파일의 프로젝트 이름(name:)을 바꾸면, 옛 이름으로 떠 있는 같은 container_name 을
+#   compose 가 남의 것으로 보고 "Conflict. The container name ... is already in use" 로 멈춘다.
+#   다른 프로젝트 소속이면 지워서 새 프로젝트 이름으로 다시 만들게 한다(빌드가 끝난 뒤 부르므로 공백은 몇 초).
+adopt_container() {
+  local file="$1"; shift
+  local want name cur
+  want="$(sed -n 's/^name:[[:space:]]*//p' "$file" | head -1 | tr -d "\"'\r")"
+  [[ -z "$want" ]] && return 0
+  for name in "$@"; do
+    cur="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$name" 2>/dev/null || true)"
+    if [[ -n "$cur" && "$cur" != "$want" ]] || { docker inspect "$name" >/dev/null 2>&1 && [[ -z "$cur" ]]; }; then
+      warn "$name 이 다른 compose 프로젝트(${cur:-수동 실행}) 소속 → 지우고 '$want' 로 다시 만듭니다"
+      docker rm -f "$name" >/dev/null
+    fi
+  done
+}
+
 # ── 3) 헬스체크 ──
 # wait_up <컨테이너> — 15초 안에 Up 이 아니면 로그를 보여 주고 실패
 wait_up() {

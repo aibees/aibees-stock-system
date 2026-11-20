@@ -93,6 +93,11 @@ ok "빌드 완료"
 # ── 4) 컨테이너 기동/교체 ──
 # AI 워커는 교체 때 돌던 AI 호출이 끝나길 최대 160초 기다린다(stop_grace_period) — 여기서 잠시 멈춘 것처럼 보일 수 있다.
 step "컨테이너 기동/교체 (${SERVICES[*]})"
+ADOPT=()
+for svc in "${SERVICES[@]}"; do
+  case "$svc" in app) ADOPT+=(yangbong-web-flask-app) ;; ai-worker) ADOPT+=(yangbong-ai-worker) ;; esac
+done
+adopt_container "$COMPOSE" "${ADOPT[@]}"
 docker compose -f "$COMPOSE" up -d --no-build "${SERVICES[@]}"
 
 # ── 5) 헬스체크 ──
@@ -121,4 +126,3 @@ docker image prune -f >/dev/null 2>&1 || true
 echo
 if [[ $FAILS -gt 0 ]]; then die "기동은 했지만 헬스체크에 실패했습니다. 위 메시지와 docker logs 를 확인하세요."; fi
 echo "$(_c 32)배포 완료$(_c 0) — $(git -C "$REPO" log -1 --format='%h %s')"
-echo "  다음: 홈 서버 5558 포트 개방 · 클라우드 nginx 의 양봉 /api upstream 을 홈:5558 로 (비밀 화면 도메인 분리 후)"

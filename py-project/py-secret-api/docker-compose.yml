@@ -13,7 +13,8 @@
 
 # compose 프로젝트 이름 — 2026-11-19 폴더를 py-naver-stock-theme → py-secret-api 로 바꿨다.
 #   이름을 정하지 않으면 폴더 이름(py-secret-api)이 프로젝트 이름이 되어, 서버에 옛 이름(py-naver-stock-theme)으로
-#   떠 있는 컨테이너를 다른 프로젝트로 보고 같은 container_name 으로 충돌한다. 그래서 옛 이름을 그대로 고정한다.
+#   떠 있는 컨테이너를 다른 프로젝트로 보고 같은 container_name 으로 충돌한다.
+#   지금은 secret-api 로 바꿨고, 옛 프로젝트 소속 컨테이너는 deploy.sh(adopt_container)가 지우고 새로 만든다.
 name: secret-api
 
 services:

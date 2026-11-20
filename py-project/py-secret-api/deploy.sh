@@ -5,7 +5,7 @@
 #   ./py-project/py-secret-api/deploy.sh            전부
 #   ./py-project/py-secret-api/deploy.sh --no-pull  git pull 생략(지금 받은 코드로)
 #
-#   이미지 py-stock-web · 컨테이너 stock-web-flask-app(docker-compose.yml, 프로젝트 이름 py-naver-stock-theme 고정)
+#   이미지 py-stock-web · 컨테이너 stock-web-flask-app(docker-compose.yml, compose 프로젝트 이름 secret-api)
 #   MCP 서버(stock-web-mcp-server)는 따로 — run_docker_mcp.sh
 #
 # 옛 build_docker.sh 와 달리 컨테이너를 먼저 지우지 않는다. 빌드가 성공한 뒤에만 교체하므로
@@ -73,6 +73,7 @@ ok "빌드 완료"
 
 # ── 4) 컨테이너 교체 ──
 step "컨테이너 교체 ($CONTAINER)"
+adopt_container "$COMPOSE" "$CONTAINER"
 docker compose -f "$COMPOSE" up -d --no-build app
 
 # ── 5) 헬스체크 ──
