@@ -53,6 +53,7 @@ import { menuLabel } from '@scripts/menuLabel.js';
 import { ensureAccess } from '@scripts/useAccess.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
 import { chapters } from '@scripts/training.js';
+import { requireStockNotice } from '@scripts/stockNotice.js';
 
 const router    = useRouter();
 const userStore = assUserSession();
@@ -129,7 +130,11 @@ onMounted(() => ensureAccess());
 const joinPath = (parent, child) => String(child ?? '').startsWith('/') ? child :
     `/${String(parent ?? '').replace(/^\/+|\/+$/g, '')}/${String(child ?? '').replace(/^\/+|\/+$/g, '')}`;
 
-const goTo = (path) => router.push({ path });
+// 주식분석(/stock 아래) 항목은 탭바와 같이, 유의사항에 동의하기 전이면 팝업부터 띄운다(scripts/stockNotice.js).
+const goTo = (path) => {
+    if (/^\/stock(\/|$)/.test(path) && !requireStockNotice(path)) return;
+    router.push({ path });
+};
 
 const handleLogout = () => {
     userStore.logoutUser();

@@ -1,6 +1,7 @@
 <script setup>
 import Lnb from './common/Lnb.vue';
 import AdSideBanners from './common/AdSideBanners.vue';
+import StockNoticeDialog from './common/StockNoticeDialog.vue';
 // 하단 탭바 아래 고정 배너(AdBottomBanner)는 2026-11-17 기획 결정으로 뺐다 — 컴포넌트 파일은 다시 켤 때를 위해 남겨 둔다.
 import { isFocusPath } from '@scripts/authPaths.js';
 import { MOCK_ENABLED } from '@scripts/mock/mockApi.js';
@@ -17,6 +18,8 @@ const showLnb = computed(() => !isFocusPath(route.path));
     <Lnb v-if="showLnb" />
     <AdSideBanners />
     <router-view />
+    <!-- 주식분석 첫 진입 유의사항(내비에서 처음 누를 때) -->
+    <StockNoticeDialog />
     <!-- 목업 모드(npm run dev:mock)에서만: 화면의 종목·시황·성과가 가짜 값임을 알린다 -->
     <p v-if="MOCK_ENABLED" class="mock-note">목업 데이터</p>
   </div>

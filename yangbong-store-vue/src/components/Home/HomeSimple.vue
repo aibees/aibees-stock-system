@@ -67,8 +67,17 @@
                         <b class="wx-desc">{{ weather.desc }}</b>
                     </span>
                 </div>
-                <!-- 코스피·코스닥·원/달러: 한 줄씩(이름 · 미니 차트 · 지수 · 오늘 등락). 2026-11-17 v3 '숨 쉬는 버전' -->
+                <!-- 달러 금리·코스피·코스닥·원/달러: 한 줄씩(이름 · 미니 차트 · 값 · 오늘 등락). 2026-11-17 v3 '숨 쉬는 버전' -->
                 <ul class="rows idx-rows">
+                    <!-- 달러 금리(미국 10년물 국채금리, 2026-11-22): 등락은 %p -->
+                    <li v-if="usRateItem" class="row idx-row">
+                        <span class="idx-name">달러 금리</span>
+                        <svg v-if="usRateItem.sparkPoints" class="idx-spark" :class="usRateItem.sparkCls" viewBox="0 0 64 24" preserveAspectRatio="none" aria-hidden="true">
+                            <polyline :points="usRateItem.sparkPoints" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                        </svg>
+                        <b class="idx-price">{{ usRateItem.priceText }}</b>
+                        <span class="badge" :class="usRateItem.cls">{{ usRateItem.chgText }}</span>
+                    </li>
                     <li v-for="m in indexCards" :key="m.key" class="row idx-row">
                         <span class="idx-name">{{ m.label }}</span>
                         <svg v-if="m.sparkPoints" class="idx-spark" :class="m.sparkCls" viewBox="0 0 64 24" preserveAspectRatio="none" aria-hidden="true">
@@ -79,6 +88,9 @@
                     </li>
                     <li v-if="fxItem" class="row idx-row">
                         <span class="idx-name">원/달러</span>
+                        <svg v-if="fxItem.sparkPoints" class="idx-spark" :class="fxItem.sparkCls" viewBox="0 0 64 24" preserveAspectRatio="none" aria-hidden="true">
+                            <polyline :points="fxItem.sparkPoints" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                        </svg>
                         <b class="idx-price">{{ fxItem.priceText }}</b>
                         <span class="badge" :class="fxItem.cls">{{ fxItem.pctText }}</span>
                     </li>
@@ -276,7 +288,8 @@ const marketData = ref([]);
 let marketTimer = null;
 const loadMarketSnapshot = async () => {
     try {
-        const { data } = await aibeesApi.get('/api/v1/indicators/market-snapshot');
+        // extra=us10y: 달러 금리(미국 10년물)를 함께 받는다 — 비밀상회 홈과 같은 API 라 요청할 때만 붙는다
+        const { data } = await aibeesApi.get('/api/v1/indicators/market-snapshot', { params: { extra: 'us10y' } });
         if (Array.isArray(data?.data) && data.data.length) marketData.value = data.data;
     } catch (e) { /* 보조 정보 — 직전 값 유지 */ }
 };
@@ -288,7 +301,9 @@ const sparkPoints = (values) => {
     return vs.map((v, i) => `${(i / (vs.length - 1) * 64).toFixed(1)},${(22 - (v - min) / span * 20).toFixed(1)}`).join(' ');
 };
 const INDEX_LABEL = { kospi: '코스피', kosdaq: '코스닥' };
-const indexCards = computed(() => marketData.value.filter(m => m.key !== 'usdkrw').map(m => {
+// 지수 줄은 코스피·코스닥만(원/달러·달러 금리는 아래 따로 그린다)
+const NON_INDEX_KEYS = ['usdkrw', 'us10y'];
+const indexCards = computed(() => marketData.value.filter(m => !NON_INDEX_KEYS.includes(m.key)).map(m => {
     const r5 = numOrNull(m.rate_5d);
     const r20 = numOrNull(m.rate_20d);
     const r1 = dailyRate(m);   // 서버 필드는 rate(전일 대비 %). 없으면 spark 마지막 두 값으로 계산
@@ -315,9 +330,27 @@ const fxItem = computed(() => {
     const chgPart = change !== null && dir !== 0 ? `${signed(change, 2)} ` : '';  // 예) −4.70 (0.34%)
     return {
         priceText: priceText(m.price),
+        // 미니 차트 색은 지수와 같이 20일 흐름 기준
+        sparkPoints: sparkPoints(m.spark),
+        sparkCls: clsOf(m.rate_20d),
         chgText: rate === null ? '' : `${chgPart}(${Math.abs(rate).toFixed(2)}%)`,
         pctText: rate === null ? '' : `${signed(rate, 1)}%`,
         cls: clsOf(rate),
+    };
+});
+// 달러 금리: 값은 %, 오늘 등락은 금리 자체의 차이(%p). 미니 차트 색은 20거래일 전보다 올랐는지로.
+const usRateItem = computed(() => {
+    const m = marketData.value.find(x => x.key === 'us10y');
+    const price = numOrNull(m?.price);
+    if (!m || price === null) return null;
+    const change = numOrNull(m.change);
+    const spark = (m.spark || []).map(numOrNull).filter(v => v !== null);
+    return {
+        priceText: `${price.toFixed(2)}%`,
+        chgText: change === null ? '' : `${signed(change, 2)}%p`,
+        cls: clsOf(change === null ? 0 : Math.round(change * 100) / 100),
+        sparkPoints: sparkPoints(m.spark),
+        sparkCls: clsOf(spark.length >= 2 ? spark.at(-1) - spark[0] : 0),
     };
 });
 const weather = computed(() => marketWeather(marketData.value));

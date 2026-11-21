@@ -73,7 +73,7 @@
 import { assUserSession } from '@scripts/stores/user-stores.js';
 import { ensureAccess } from '@scripts/useAccess.js';
 import { usePersonaStore } from '@scripts/stores/persona-store.js';
-import { INDICATORS, orderLabel, indicatorSummary, passRuleText } from '@scripts/indicators.js';
+import { BASIC_INDICATORS, orderLabel, indicatorSummary, passRuleText } from '@scripts/indicators.js';
 import { getRecent, clearRecent } from '@scripts/recentStocks.js';
 
 const PRESET_PATH = '/stock/preset';
@@ -83,7 +83,7 @@ const persona = usePersonaStore();
 const type = computed(() => persona.currentType);
 const passRule = computed(() => passRuleText(type.value.settings));
 // 켠 지표는 수치와 함께, 끈 지표는 "사용 안 함"으로 — 지금 어떤 값이 적용 중인지 한눈에
-const indRows = computed(() => INDICATORS.map(d => ({ key: d.key, label: d.label, text: indicatorSummary(d.key, type.value.settings) }))
+const indRows = computed(() => BASIC_INDICATORS.map(d => ({ key: d.key, label: d.label, text: indicatorSummary(d.key, type.value.settings) }))
     .sort((a, b) => (a.text ? 0 : 1) - (b.text ? 0 : 1)));
 
 const ALL = [

@@ -250,38 +250,19 @@ class StockService:
         # datetime('%Y-%m-%d %H:%M:%S') → ymd('%Y-%m-%d')
         created[Literal.YMD] = created[Literal.YMD].str[:10]
 
+        # iterrows 는 행마다 Series 를 만들어 느리다(200봉 × 10회). 열을 파이썬 리스트로 한 번에 꺼내 묶는다.
+        #   값·모양은 예전 iterrows 판과 같다: x 는 'YYYY-MM-DD', y 는 소수 2자리(NaN 이면 None), 가격·거래량은 float, rate 는 문자열.
+        xs = [str(v) for v in created[Literal.YMD].tolist()]
+
         def to_xy(col):
-            return [
-                {
-                    'x': str(row[Literal.YMD]),
-                    'y': round(row[col], 2) if pd.notna(row[col]) else None}
-                for _, row in created.iterrows()
-            ]
+            return [{'x': x, 'y': (round(y, 2) if pd.notna(y) else None)}
+                    for x, y in zip(xs, created[col].astype(float).tolist())]
 
-        ohcl = [
-            {
-                'x': str(row[Literal.YMD]),
-                'o': float(row[Literal.OPEN]),
-                'h': float(row[Literal.HIGH]),
-                'c': float(row[Literal.CLOSE]),
-                'l': float(row[Literal.LOW]),
-            }
-            for _, row in created.iterrows()
-        ]
-
-        vol = [
-            {
-                'x': str(row[Literal.YMD]),
-                'y': float(row[Literal.VOLUME]),
-            } for _, row in created.iterrows()
-        ]
-
-        rate = [
-            {
-                'x': str(row[Literal.YMD]),
-                'y': str(row['RATE'])
-            } for _, row in created.iterrows()
-        ]
+        o_, h_, c_, l_ = (created[k].astype(float).tolist()
+                          for k in (Literal.OPEN, Literal.HIGH, Literal.CLOSE, Literal.LOW))
+        ohcl = [{'x': x, 'o': o, 'h': h, 'c': c, 'l': l} for x, o, h, c, l in zip(xs, o_, h_, c_, l_)]
+        vol = [{'x': x, 'y': y} for x, y in zip(xs, created[Literal.VOLUME].astype(float).tolist())]
+        rate = [{'x': x, 'y': str(y)} for x, y in zip(xs, created['RATE'].tolist())]
 
         result = {
             'ohcl':     ohcl,

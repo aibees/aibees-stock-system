@@ -52,6 +52,7 @@ import { menuLabel } from '@scripts/menuLabel.js';
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { assUserSession } from "../../scripts/stores/user-stores";
+import { requireStockNotice } from '@scripts/stockNotice.js';
 
 const router = useRouter();
 const route = useRoute();
@@ -111,13 +112,17 @@ const isActiveTop = (m) => currentTop.value === m.menu_path;
 const isActiveChild = (m, c) => route.path === `/${m.menu_path}/${c.menu_path}`;
 
 /* ── 이동 ── */
+// 내비에서 주식분석(/stock 아래)을 누를 때, 이 기기에서 아직 유의사항에 동의하지 않았으면 팝업부터 띄운다
+// (scripts/stockNotice.js). 홈 등 다른 화면의 링크로 들어가는 길은 막지 않는다.
+const isStockPath = (path) => /^\/?stock(\/|$)/.test(String(path ?? ''));
 const goPath = (path) => {
+    if (isStockPath(path) && !requireStockNotice(path)) return;
     router.push({ path });
 };
 
 const goChild = (m, c) => {
     openCode.value = '';
-    router.push({ path: `${m.menu_path}/${c.menu_path}` });
+    goPath(`/${String(m.menu_path).replace(/^\/+|\/+$/g, '')}/${String(c.menu_path).replace(/^\/+/, '')}`);
 };
 
 const onTopClick = (m) => {

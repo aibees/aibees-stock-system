@@ -30,7 +30,7 @@ authServiceImpl = AuthService()
 _ACCOUNT_DELETE_TABLES = (
     'user_notification', 'stock_ai_job_subscriber',
     'device_push_token', 'user_refresh_token', 'user_interest_groups',
-    'user_persona', 'user_options', 'user_option_reco', 'user_consent_history', 'user_consent', 'user_role', 'user_auth',
+    'user_persona', 'user_training_progress', 'user_options', 'user_option_reco', 'user_consent_history', 'user_consent', 'user_role', 'user_auth',
     'user_login_type', 'user_detail', 'user_master',
 )
 

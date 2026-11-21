@@ -11,31 +11,58 @@
 import { numOrNull, volumeFacts } from './stockSignals.js';
 import { volatilityPct } from './persona.js';
 
-/** 지표 정의. params 는 화면의 − + 입력 범위. */
+/**
+ * 지표 정의. params 는 화면의 − + 입력 범위(choices 가 있으면 그 값들 사이만 오간다).
+ *
+ * tier (2026-11-22 내 설정 개편)
+ *   basic   : 기본 제공 — 거래량 급증·MACD·OBV·이평선(5·20·60)·볼린저밴드·ATR.
+ *             트레이닝에서 그 지표의 단계(lesson, 트레이닝 단계 key)를 마치면 내 설정에서 직접 켜고 끌 수 있다.
+ *             마치기 전에는 성향(preset)이 정한 값 그대로 쓰이고, 화면에서는 반투명하게 잠가 둔다.
+ *             lesson 이 null 이면 아직 그 지표의 트레이닝이 없어 열리지 않는다.
+ *   premium : 프리미엄(준비 중) — 화면에서 가리고, 판정에도 쓰지 않는다(normalizeSettings 가 항상 끈다).
+ */
 export const INDICATORS = [
-    { key: 'volume', label: '거래량', desc: '오늘 거래량이 최근 평균보다 얼마나 많은가',
-      params: [{ key: 'ratio', label: '최근 20일 평균의', unit: '배 이상', min: 1, max: 10, step: 0.5 }] },
-    { key: 'surge', label: '거래 급증', desc: '며칠 안에 전날보다 거래가 갑자기 늘었는가',
+    { key: 'surge', label: '거래량 급증', tier: 'basic', lesson: 'chart-basic/volume',
+      desc: '며칠 안에 전날보다 거래가 갑자기 늘었는가',
       params: [{ key: 'ratio', label: '전날의', unit: '배 이상', min: 1.5, max: 10, step: 0.5 },
                { key: 'days', label: '최근', unit: '일 안에', min: 1, max: 10, step: 1 }] },
-    { key: 'macd', label: 'MACD', desc: '내리던 흐름이 오름으로 바뀌었는가(MACD선이 시그널선을 위로 뚫음)',
+    { key: 'macd', label: 'MACD', tier: 'basic', lesson: 'chart-advanced/macd-obv',
+      desc: '내리던 흐름이 오름으로 바뀌었는가(MACD선이 시그널선을 위로 뚫음)',
       params: [{ key: 'fast', label: '짧은 기간', unit: '일', min: 3, max: 20, step: 1 },
                { key: 'slow', label: '긴 기간', unit: '일', min: 10, max: 60, step: 1 },
                { key: 'signal', label: '시그널', unit: '일', min: 3, max: 20, step: 1 },
                { key: 'days', label: '최근', unit: '일 안에', min: 1, max: 10, step: 1 }] },
-    { key: 'obv', label: 'OBV', desc: '사려는 거래가 늘고 있는가(OBV가 평균선을 위로 뚫음)',
+    { key: 'obv', label: 'OBV', tier: 'basic', lesson: 'chart-advanced/macd-obv',
+      desc: '사려는 거래가 늘고 있는가(OBV가 평균선을 위로 뚫음)',
       params: [{ key: 'ma', label: '평균 기간', unit: '일', min: 3, max: 30, step: 1 },
                { key: 'days', label: '최근', unit: '일 안에', min: 1, max: 10, step: 1 }] },
-    { key: 'ma', label: '이동평균선', desc: '종가가 평균 가격 위에 있는가',
-      params: [{ key: 'period', label: '', unit: '일선 위', min: 5, max: 120, step: 5 }] },
-    { key: 'bb', label: '볼린저밴드', desc: '종가가 밴드 상단 아래라서 아직 과열은 아닌가',
+    { key: 'ma', label: '이평선', tier: 'basic', lesson: 'chart-basic/ma',
+      desc: '종가가 평균 가격(5·20·60일선) 위에 있는가',
+      params: [{ key: 'period', label: '', unit: '일선 위', min: 5, max: 60, step: 1, choices: [5, 20, 60] }] },
+    { key: 'bb', label: '볼린저밴드', tier: 'basic', lesson: 'chart-advanced/bb',
+      desc: '종가가 밴드 상단 아래라서 아직 과열은 아닌가',
       params: [{ key: 'period', label: '기간', unit: '일', min: 5, max: 60, step: 1 },
                { key: 'std', label: '폭', unit: '배(표준편차)', min: 1, max: 3, step: 0.5 }] },
-    { key: 'cap', label: '회사 규모', desc: '시가총액이 일정 크기 이상인가',
-      params: [{ key: 'minEok', label: '시가총액', unit: '억 원 이상', min: 100, max: 100000, step: 100 }] },
-    { key: 'volat', label: '가격 변동', desc: '하루 평균 가격 움직임(최근 20일)이 일정 크기 이상인가',
+    { key: 'volat', label: 'ATR(가격변동성)', tier: 'basic', lesson: 'chart-advanced/atr',
+      desc: '최근 20일 하루 평균 가격 움직임(ATR)이 종가의 일정 % 이상인가',
       params: [{ key: 'minPct', label: '하루 평균', unit: '% 이상', min: 1, max: 15, step: 0.5 }] },
+
+    // ── 프리미엄(준비 중) ──
+    { key: 'volume', label: '거래량 평균 대비', tier: 'premium', lesson: null,
+      desc: '오늘 거래량이 최근 N일 평균의 M배 이상인가',
+      params: [{ key: 'ratio', label: '최근 20일 평균의', unit: '배 이상', min: 1, max: 10, step: 0.5 }] },
+    { key: 'cap', label: '회사 규모', tier: 'premium', lesson: null,
+      desc: '시가총액이 일정 크기 이상인가',
+      params: [{ key: 'minEok', label: '시가총액', unit: '억 원 이상', min: 100, max: 100000, step: 100 }] },
 ];
+export const BASIC_INDICATORS = INDICATORS.filter(d => d.tier === 'basic');
+export const PREMIUM_INDICATORS = INDICATORS.filter(d => d.tier === 'premium');
+const isPremium = (key) => PREMIUM_INDICATORS.some(d => d.key === key);
+
+/** choices 가 있는 수치는 가장 가까운 선택지로 맞춘다. */
+const snapChoice = (p, v) => (p.choices
+    ? p.choices.reduce((best, c) => (Math.abs(c - v) < Math.abs(best - v) ? c : best), p.choices[0])
+    : v);
 
 export const ORDER_OPTIONS = [
     { key: 'default',    label: '시장이 주목하는 순서', desc: '서버가 정한 순서 그대로' },
@@ -48,13 +75,13 @@ export const orderLabel = (key) => (ORDER_OPTIONS.find(o => o.key === key) ?? OR
 export const DEFAULT_SETTINGS = {
     minPass: 2,
     order: 'default',
-    volume: { on: true,  ratio: 1.5 },
+    volume: { on: false, ratio: 1.5 },   // 프리미엄(준비 중) — 항상 꺼짐
     surge:  { on: false, ratio: 3, days: 5 },
     macd:   { on: true,  fast: 12, slow: 26, signal: 9, days: 3 },
     obv:    { on: true,  ma: 9, days: 3 },
     ma:     { on: true,  period: 20 },
     bb:     { on: false, period: 20, std: 2 },
-    cap:    { on: false, minEok: 1000 },
+    cap:    { on: false, minEok: 1000 },  // 프리미엄(준비 중) — 항상 꺼짐
     volat:  { on: false, minPct: 3 },
 };
 
@@ -67,12 +94,13 @@ const clamp = (v, min, max, fallback) => {
 /** 모르는 값·빠진 값·범위 밖 값을 기본값/범위로 바로잡은 새 객체. base 는 비어 있는 칸을 채울 값. */
 export const normalizeSettings = (s, base = DEFAULT_SETTINGS) => {
     const out = {};
-    const onCount = (o) => INDICATORS.filter(d => o[d.key]?.on).length;
+    const onCount = (o) => BASIC_INDICATORS.filter(d => o[d.key]?.on).length;
     for (const d of INDICATORS) {
         const b = base[d.key] ?? DEFAULT_SETTINGS[d.key];
         const v = s?.[d.key] ?? {};
-        const row = { on: typeof v.on === 'boolean' ? v.on : !!b.on };
-        for (const p of d.params) row[p.key] = clamp(v[p.key] ?? b[p.key], p.min, p.max, b[p.key] ?? p.min);
+        // 프리미엄 지표는 준비 중이라 저장된 값·성향과 관계없이 항상 끈다
+        const row = { on: isPremium(d.key) ? false : (typeof v.on === 'boolean' ? v.on : !!b.on) };
+        for (const p of d.params) row[p.key] = snapChoice(p, clamp(v[p.key] ?? b[p.key], p.min, p.max, b[p.key] ?? p.min));
         out[d.key] = row;
     }
     if (out.macd.fast >= out.macd.slow) out.macd.fast = Math.max(3, out.macd.slow - 1);
@@ -91,7 +119,7 @@ const eokText = (n) => (n >= 10000 ? `${fmtNum(n / 10000)}조` : `${n.toLocaleSt
 /** 지표 한 줄 요약(내 설정 보기·목록용). 꺼져 있으면 null. 예) "평소 거래량의 1.5배 이상" */
 export const indicatorSummary = (key, s) => {
     const v = s[key];
-    if (!v?.on) return null;
+    if (!v?.on || isPremium(key)) return null;
     switch (key) {
         case 'volume': return `최근 20일 평균의 ${fmtNum(v.ratio)}배 이상`;
         case 'surge':  return `최근 ${v.days}일 안에 전날의 ${fmtNum(v.ratio)}배 이상`;
@@ -105,7 +133,8 @@ export const indicatorSummary = (key, s) => {
     }
 };
 
-export const enabledKeys = (s) => INDICATORS.filter(d => s[d.key]?.on).map(d => d.key);
+/** 켜 둔 지표(프리미엄은 쓰지 않으므로 빼고 센다). */
+export const enabledKeys = (s) => BASIC_INDICATORS.filter(d => s[d.key]?.on).map(d => d.key);
 
 /** "N개 중 M개 이상" 문구. */
 export const passRuleText = (s) => {

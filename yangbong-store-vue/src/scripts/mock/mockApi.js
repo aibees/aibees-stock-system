@@ -118,14 +118,17 @@ const spark = (seed, start, drift) => {
 // 주소에 ?weather=sunny|warm|cloudy|storm 을 붙이면 그 날씨가 나오게 오늘 등락률을 바꾼다(홈 날씨 확인용).
 const WEATHER_RATES = { sunny: [2.1, 2.6], warm: [0.5, 0.3], cloudy: [-0.7, -0.4], storm: [-5.6, -6.8] };
 const weatherOverride = () => WEATHER_RATES[new URLSearchParams(location.search).get('weather')] ?? null;
-const marketSnapshot = () => {
+const marketSnapshot = (params) => {
     const w = weatherOverride();
-    return base().map(m => (w && m.key === 'kospi' ? { ...m, rate: w[0] } : (w && m.key === 'kosdaq' ? { ...m, rate: w[1] } : m)));
+    // extra=us10y 를 붙이면 달러 금리(미국 10년물)를 맨 앞에 더한다(실서버와 같게)
+    const extra = String(params?.extra ?? '').split(',').includes('us10y')
+        ? [{ key: 'us10y', label: '달러 금리', price: 4.912, rate: -2.77, change: -0.14, rate_20d: -1.2, spark: spark(4, 4.97, -0.012) }] : [];
+    return [...extra, ...base()].map(m => (w && m.key === 'kospi' ? { ...m, rate: w[0] } : (w && m.key === 'kosdaq' ? { ...m, rate: w[1] } : m)));
 };
 const base = () => [
     { key: 'kospi', label: '코스피', price: 2684.31, rate: 1.12, rate_5d: 1.42, rate_20d: 3.85, spark: spark(1, 2585, 0.0385) },
     { key: 'kosdaq', label: '코스닥', price: 861.07, rate: 0.64, rate_5d: -0.63, rate_20d: 1.27, spark: spark(2, 850, 0.0127) },
-    { key: 'usdkrw', label: '원/달러', price: 1382.5, rate: -0.34, change: -4.7 },
+    { key: 'usdkrw', label: '원/달러', price: 1382.5, rate: -0.34, change: -4.7, rate_5d: -0.4, rate_20d: 0.9, spark: spark(3, 1370, 0.009) },
 ];
 
 /* ── 지난달 성과 ── */
@@ -253,8 +256,21 @@ const mockLogin = (userId, userName) => {
         loginInfo: { user_id: String(userId), user_name: userName, role: ['STOCK_USER'] },
     };
 };
+// 계정의 학습 기록·주식분석 동의(목업 서버 메모리 — 새로고침하면 비워진다). 처음엔 계정에만 있는 단계 하나를 넣어 둔다.
+const MOCK_TRAINING = { done: [{ stage_key: 'chart-basic/candle', done_at: Date.now() - 86400000 }], stock_notice: null };
 const ROUTES = [
-    ['GET', '/api/v1/indicators/market-snapshot', () => ok(marketSnapshot())],
+    ['GET', '/api/v1/training/progress', () => okS(MOCK_TRAINING)],
+    ['POST', '/api/v1/training/progress', (c) => {
+        for (const k of mockBody(c).stage_keys || []) {
+            if (!MOCK_TRAINING.done.some(r => r.stage_key === k)) MOCK_TRAINING.done.push({ stage_key: k, done_at: Date.now() });
+        }
+        return okS(MOCK_TRAINING);
+    }],
+    ['POST', '/api/v1/training/stock-notice', (c) => {
+        MOCK_TRAINING.stock_notice = { version: String(mockBody(c).version), agreed_at: Date.now() };
+        return okS(MOCK_TRAINING);
+    }],
+    ['GET', '/api/v1/indicators/market-snapshot', (c) => ok(marketSnapshot(c.params))],
     ['GET', '/api/v1/stocks/buy-target/performance', () => ok(performance())],
     ['GET', '/api/v1/stocks/buy-target/home', (c) => ok(homePicks(c.params))],
     ['GET', '/api/v1/stocks/buy-target', () => ok(buyTargets())],

@@ -22,6 +22,8 @@ _BLUEPRINTS = [
     ("app.flask_app.routers.router_notification", "notify_bp",       "/api/v1/notify"),
     # 성향 테스트 결과(user_persona — yangbong 스키마에만 있다)
     ("app.flask_app.routers.router_persona",      "persona_bp",      "/api/v1"),
+    # 트레이닝 학습 기록(user_training_progress — sql/yangbong/011)·주식분석 유의사항 동의(user_consent STOCK_NOTICE)
+    ("app.flask_app.routers.router_training",     "training_bp",     "/api/v1"),
 ]
 
 

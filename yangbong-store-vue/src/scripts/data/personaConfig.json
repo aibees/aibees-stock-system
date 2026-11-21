@@ -11,7 +11,7 @@
         "minPass": 3,
         "order": "market_cap",
         "volume": {
-          "on": true,
+          "on": false,
           "ratio": 1.5
         },
         "surge": {
@@ -41,7 +41,7 @@
           "std": 2
         },
         "cap": {
-          "on": true,
+          "on": false,
           "minEok": 5000
         },
         "volat": {
@@ -60,7 +60,7 @@
         "minPass": 2,
         "order": "default",
         "volume": {
-          "on": true,
+          "on": false,
           "ratio": 1.5
         },
         "surge": {
@@ -109,7 +109,7 @@
         "minPass": 2,
         "order": "volatility",
         "volume": {
-          "on": true,
+          "on": false,
           "ratio": 2
         },
         "surge": {

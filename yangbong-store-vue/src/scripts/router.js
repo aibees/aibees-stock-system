@@ -8,6 +8,7 @@ import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
 import { isAuthPath, isGuestPath, rememberAfterLogin, INTRO_PATH, ONBOARDING_PATH, PICKS_PATH } from "./authPaths.js";
 import { isIntroSeen } from "./introState.js";
 import { usePersonaStore } from "./stores/persona-store.js";
+import { useTrainingStore } from "./stores/training-store.js";
 import { NOTICE_DETAIL_PATH, NOTICE_LIST_PATH } from "./notice.js";
 import AdGate from '@/components/AdGate.vue';
 import NaverCallback from '@/components/NaverCallback.vue';
@@ -346,6 +347,8 @@ export const setRouterToApp = async () => {
         //   이미 맞췄으면 바로 돌아온다. 실패해도 기기 값으로 진행한다.
         const persona = usePersonaStore();
         if (loggedIn) await persona.syncWithAccount();
+        // 트레이닝 학습 기록·주식분석 유의사항 동의도 같은 때 계정과 맞춘다(기기 기록과 합집합). 실패해도 기기 기록으로 진행한다.
+        if (loggedIn) await useTrainingStore().syncWithAccount();
 
         // 처음 실행: 홈으로 들어올 때 앱 소개 → 성향 질문 순서로 한 번 연다(권한을 받은 뒤라 매매 사용자는 제외된다).
         if (target === '/home' && persona.needsOnboarding()) {
