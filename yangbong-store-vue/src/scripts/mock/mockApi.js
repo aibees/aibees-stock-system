@@ -99,6 +99,7 @@ const buyTargets = () => STOCKS.map((s0, i) => {
         close: s.close,
         rate: `${s.rate > 0 ? '+' : ''}${s.rate.toFixed(2)}%`,
         market_cap: s.cap,
+        open: last.open, high: last.high, low: last.low,
         volume: last.volume,
         chart_data: chart,
         is_vol_surge: 'N', is_bb_mid_breakout: 'N', is_over_on_mid: 'N', is_under_bb_upper: 'N',

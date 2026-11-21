@@ -1,65 +1,86 @@
 <template>
     <div id="login" :aria-busy="isLoading.toString()">
 
-        <!-- 상단: 홈과 같은 크림 띠 + 물결 가장자리, 가운데 브랜드 -->
-        <header class="lg-head">
-            <img class="lg-logo" src="/favicon.svg" alt="" aria-hidden="true" />
-            <h1 class="lg-name">양봉상회</h1>
-            <div class="lg-edge" aria-hidden="true"></div>
-        </header>
+        <!-- 화면 정중앙에 [타이틀 / (아이디 폼) / 로그인 버튼들 / 링크] 묶음을 둔다. 스크롤 없음(2026-11-21).
+             '아이디로 로그인'을 누르면 가운데 칸이 열리면서 타이틀은 위로, 소셜 버튼은 아래로 밀린다. -->
+        <!-- 뒤로가기: 아이디 폼이 열려 있으면 폼을 닫고, 아니면 이전 화면으로 -->
+        <button type="button" class="lg-back" aria-label="뒤로가기" @click="goBack">
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+                <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+        </button>
 
-        <main class="lg-main">
-            <!-- 소셜 로그인이 먼저. 아이디 입력란은 '아이디로 로그인'을 눌러야 펼쳐진다(2026-11-21) -->
-            <!-- 구글 버튼은 GIS 가 그린다(구글 브랜드 가이드). 웹에서 클라이언트 ID 가 설정됐을 때만 보인다 -->
-            <div v-show="googleReady" ref="googleBtnEl" class="lg-google"></div>
+        <main class="lg-stage">
+            <header class="lg-head">
+                <img class="lg-logo" src="/favicon.svg" alt="" aria-hidden="true" />
+                <h1 class="lg-name">양봉상회</h1>
+            </header>
 
-            <!-- Apple 로그인(iOS 앱만). Apple 디자인 가이드: 검은 바탕·흰 로고·다른 소셜 버튼과 같은 크기 -->
-            <button v-if="showApple" type="button" class="btn-apple" :disabled="isLoading" @click="applelogin">
-                <svg class="apple-logo" viewBox="0 0 17 20" width="15" height="18" aria-hidden="true">
-                    <path fill="currentColor" d="M14.1 10.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9C3.5 4.8 1.8 5.8.9 7.4c-1.9 3.3-.5 8.1 1.3 10.8.9 1.3 1.9 2.7 3.3 2.7 1.3-.1 1.8-.9 3.4-.9s2 .9 3.4.8c1.4 0 2.3-1.3 3.2-2.6 1-1.5 1.4-2.9 1.4-3-.1 0-2.8-1.1-2.8-4.6zM11.5 3c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z"/>
-                </svg>
-                Apple로 계속하기
-            </button>
+            <!-- 가운데 칸: 아이디·비밀번호 폼 (열리면 높이 0 → 자동) -->
+            <div class="lg-slot" :class="{ open: showIdLogin }" :inert="showIdLogin ? null : ''">
+                <div class="lg-slot-inner">
+                    <form class="lg-form" novalidate @submit.prevent="emaillogin">
+                        <div class="lg-field">
+                            <label for="lg-id">아이디</label>
+                            <input id="lg-id" ref="idInputEl" v-model.trim="emailData.loginId" type="text" autocomplete="username"
+                                autocapitalize="none" autocorrect="off" spellcheck="false" />
+                            <p class="lg-hint">기존 회원은 가입한 이메일의 @ 앞부분이 아이디예요.</p>
+                        </div>
+                        <div class="lg-field">
+                            <label for="lg-pw">비밀번호</label>
+                            <input id="lg-pw" v-model="emailData.pswd" type="password" autocomplete="current-password" />
+                        </div>
 
-            <button type="button" class="btn-naver" :disabled="isLoading" @click="naverlogin">
-                <span class="naver-n" aria-hidden="true">N</span>
-                네이버로 계속하기
-            </button>
+                        <div class="lg-options">
+                            <label class="lg-check">
+                                <input type="checkbox" v-model="rememberEmail" />
+                                <span>아이디 기억하기</span>
+                            </label>
+                            <label class="lg-check">
+                                <input type="checkbox" v-model="autoLogin" />
+                                <span>자동로그인</span>
+                            </label>
+                        </div>
 
-            <button v-if="!showIdLogin" type="button" class="btn-ghost" :disabled="isLoading" @click="openIdLogin">
-                아이디로 로그인
-            </button>
+                        <p v-if="isResetTarget" class="lg-error" role="alert">계정 초기화 대상입니다. 관리자에게 문의하세요.</p>
+                        <p v-if="errorMsg" class="lg-error" role="alert">{{ errorMsg }}</p>
 
-            <form v-else class="lg-form" novalidate @submit.prevent="emaillogin">
-                <div class="lg-field">
-                    <label for="lg-id">아이디</label>
-                    <input id="lg-id" ref="idInputEl" v-model.trim="emailData.loginId" type="text" autocomplete="username"
-                        autocapitalize="none" autocorrect="off" spellcheck="false" />
-                    <p class="lg-hint">기존 회원은 가입한 이메일의 @ 앞부분이 아이디예요.</p>
+                        <button type="submit" class="btn-primary" :disabled="isLoading">
+                            {{ isLoading ? '로그인 중…' : '로그인' }}
+                        </button>
+                    </form>
                 </div>
-                <div class="lg-field">
-                    <label for="lg-pw">비밀번호</label>
-                    <input id="lg-pw" v-model="emailData.pswd" type="password" autocomplete="current-password" />
+            </div>
+
+            <!-- 로그인 버튼 중 가장 위: 아이디로 로그인 (폼이 열리면 접힌다) -->
+            <div class="lg-slot" :class="{ open: !showIdLogin }" :inert="showIdLogin ? '' : null">
+                <div class="lg-slot-inner">
+                    <button type="button" class="btn-ghost lg-idbtn" :disabled="isLoading" @click="openIdLogin">
+                        아이디로 로그인
+                    </button>
                 </div>
+            </div>
 
-                <div class="lg-options">
-                    <label class="lg-check">
-                        <input type="checkbox" v-model="rememberEmail" />
-                        <span>아이디 기억하기</span>
-                    </label>
-                    <label class="lg-check">
-                        <input type="checkbox" v-model="autoLogin" />
-                        <span>자동로그인</span>
-                    </label>
-                </div>
+            <div class="lg-or" aria-hidden="true"><span>또는</span></div>
 
-                <p v-if="isResetTarget" class="lg-error" role="alert">계정 초기화 대상입니다. 관리자에게 문의하세요.</p>
-                <p v-if="errorMsg" class="lg-error" role="alert">{{ errorMsg }}</p>
+            <!-- 소셜 로그인 -->
+            <div class="lg-social">
+                <!-- 구글 버튼은 GIS 가 그린다(구글 브랜드 가이드). 웹에서 클라이언트 ID 가 설정됐을 때만 보인다 -->
+                <div v-show="googleReady" ref="googleBtnEl" class="lg-google"></div>
 
-                <button type="submit" class="btn-primary" :disabled="isLoading">
-                    {{ isLoading ? '로그인 중…' : '로그인' }}
+                <!-- Apple 로그인(iOS 앱만). Apple 디자인 가이드: 검은 바탕·흰 로고·다른 소셜 버튼과 같은 크기 -->
+                <button v-if="showApple" type="button" class="btn-apple" :disabled="isLoading" @click="applelogin">
+                    <svg class="apple-logo" viewBox="0 0 17 20" width="15" height="18" aria-hidden="true">
+                        <path fill="currentColor" d="M14.1 10.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9C3.5 4.8 1.8 5.8.9 7.4c-1.9 3.3-.5 8.1 1.3 10.8.9 1.3 1.9 2.7 3.3 2.7 1.3-.1 1.8-.9 3.4-.9s2 .9 3.4.8c1.4 0 2.3-1.3 3.2-2.6 1-1.5 1.4-2.9 1.4-3-.1 0-2.8-1.1-2.8-4.6zM11.5 3c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z"/>
+                    </svg>
+                    Apple로 계속하기
                 </button>
-            </form>
+
+                <button type="button" class="btn-naver" :disabled="isLoading" @click="naverlogin">
+                    <span class="naver-n" aria-hidden="true">N</span>
+                    네이버로 계속하기
+                </button>
+            </div>
 
             <p v-if="!showIdLogin && errorMsg" class="lg-error" role="alert">{{ errorMsg }}</p>
 
@@ -133,6 +154,17 @@ const openIdLogin = async () => {
     showIdLogin.value = true
     await nextTick()
     idInputEl.value?.focus()
+}
+
+const goBack = () => {
+    // 초기화 안내로 들어온 경우가 아니면, 열린 아이디 폼부터 닫는다
+    if (showIdLogin.value && !isResetTarget.value) {
+        showIdLogin.value = false
+        errorMsg.value = ''
+        return
+    }
+    if (window.history.state?.back) router.back()
+    else router.replace({ name: 'home' })
 }
 
 const apiError = (err, fallback) =>
@@ -362,53 +394,134 @@ $cream:     #FFF8E1;
 $naver:     #03C75A;   // 네이버 로그인 버튼 가이드 색
 
 #login {
-    min-height: 100vh;
-    min-height: 100svh;
+    // 화면 전체 고정 — 어떤 크기에서도 스크롤이 생기지 않는다
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;      // 묶음 전체를 세로 정중앙에
+    justify-content: center;
     background: #fff;
     color: $ink;
     text-align: left;
     font-family: 'Pretendard', 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
 }
 
-/* ── 상단 브랜드 띠 ── */
+.lg-back {
+    position: absolute;
+    z-index: 2;
+    top: calc(env(safe-area-inset-top, 0px) + 32px);
+    left: 8px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: $brown-ink;
+    cursor: pointer;
+    &:focus-visible { outline: 2px solid $brown; outline-offset: 2px; }
+}
+@media (max-height: 560px) {
+    .lg-back { top: calc(env(safe-area-inset-top, 0px) + 20px); }
+}
+
+.lg-stage {
+    width: 100%;
+    max-width: 400px;
+    max-height: 100%;
+    box-sizing: border-box;
+    padding: env(safe-area-inset-top, 0px) 20px env(safe-area-inset-bottom, 0px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* ── 타이틀 ── */
+/* 노란 지붕: 타이틀 뒤에서 화면 맨 위까지 이어지고, 아래 가장자리는 물결. 타이틀이 움직이면 같이 움직인다. */
 .lg-head {
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: calc(env(safe-area-inset-top, 0px) + 22px) 20px 14px;
-    background: $bar;
+    gap: 6px;
+    padding-bottom: 16px;
+    margin-bottom: 8px;
+    &::before {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        left: calc(50% - 50vw);
+        width: 100vw;
+        top: -100vh;
+        bottom: 0;
+        background: $bar;
+    }
+    &::after {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        left: calc(50% - 50vw);
+        width: 100vw;
+        bottom: -8px;
+        height: 8px;
+        background: radial-gradient(circle at 50% 0, #{$bar} 6.5px, transparent 7px) repeat-x;
+        background-size: 16px 8px;
+    }
 }
-.lg-logo { width: 44px; height: 44px; }
+.lg-logo { width: 56px; height: 56px; }
 .lg-name {
     margin: 0;
     font-family: 'Pretendard', sans-serif;
-    font-weight: 700;
     font-size: 26px;
-    font-weight: 400;
+    font-weight: 700;
     color: $brown-ink;
     letter-spacing: .5px;
 }
-// 홈 헤더와 같은 물결 가장자리
-.lg-edge {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -8px;
-    height: 8px;
-    background: radial-gradient(circle at 50% 0, #{$bar} 6.5px, transparent 7px) repeat-x;
-    background-size: 16px 8px;
-}
 
-/* ── 본문 ── */
-.lg-main {
-    max-width: 400px;
-    margin: 0 auto;
-    padding: 28px 20px 32px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+/* ── 접히고 펼쳐지는 칸(높이 0 ↔ 자동). 묶음이 정중앙이라 열리면 타이틀은 위로, 소셜은 아래로 밀린다 ── */
+.lg-slot {
+    display: grid;
+    grid-template-rows: 0fr;
+    margin-bottom: -12px;     // 접힌 상태에서 gap 이 남지 않게
+    opacity: 0;
+    visibility: hidden;
+    transition: grid-template-rows .45s cubic-bezier(.2, .8, .2, 1), margin-bottom .45s cubic-bezier(.2, .8, .2, 1),
+        opacity .3s ease, visibility 0s linear .45s;
+    &.open {
+        grid-template-rows: 1fr;
+        margin-bottom: 0;
+        opacity: 1;
+        visibility: visible;
+        transition: grid-template-rows .45s cubic-bezier(.2, .8, .2, 1), margin-bottom .45s cubic-bezier(.2, .8, .2, 1),
+            opacity .35s ease .1s, visibility 0s;
+    }
+}
+.lg-slot-inner { min-height: 0; overflow: hidden; padding: 2px; margin: -2px; }
+.lg-idbtn { width: 100%; }
+
+.lg-social { display: flex; flex-direction: column; gap: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .lg-slot, .lg-slot.open { transition: none; }
+}
+/* 키가 작은 화면: 장식·보조 문구를 줄여 스크롤 없이 들어가게 */
+@media (max-height: 700px) {
+    .lg-stage { gap: 8px; }
+    .lg-slot { margin-bottom: -8px; }
+    .lg-logo { width: 40px; height: 40px; }
+    .lg-name { font-size: 22px; }
+    .lg-head { padding-bottom: 4px; }
+    .lg-hint { display: none; }
+    .lg-form { gap: 8px; }
+    .btn-primary, .btn-ghost, .btn-naver, .btn-apple { min-height: 44px; }
+    .lg-link { min-height: 36px; }
+}
+@media (max-height: 560px) {
+    .lg-logo { display: none; }
+    .lg-check { min-height: 24px; }
 }
 
 .lg-form { display: flex; flex-direction: column; gap: 14px; }

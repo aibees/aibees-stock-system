@@ -17,7 +17,8 @@
             <transition name="fade-slide">
                 <div v-if="stockDetail" class="body-box">
 
-                    <!-- ═══ 종목 요약 헤더: 이름/코드 + (추천 행이 있으면) 현재가·등락·장 상태 ═══ -->
+                    <!-- ═══ 종목 요약 + 탭 (한 장의 흰 판): 이름/코드 + (추천 행이 있으면) 현재가·등락·장 상태 ═══ -->
+                    <div class="top-card">
                     <section class="stock-head">
                         <div class="sh-who">
                             <span class="sh-name">{{ item?.stock_name || inputName }}</span>
@@ -25,7 +26,7 @@
                         </div>
                         <div v-if="item" class="sh-px">
                             <span class="sh-price">{{ formatNumber(item.close) }}</span>
-                            <span class="sh-chg" :class="chg.cls">{{ chg.text }}</span>
+                            <span class="sh-chg badge" :class="chg.cls">{{ chg.text }}</span>
                         </div>
                         <div v-if="item" class="sh-status" :class="status.state"><i class="dot"></i>{{ status.label }}</div>
                     </section>
@@ -37,6 +38,7 @@
                             {{ t.label }}
                         </button>
                     </div>
+                    </div><!-- /top-card -->
 
                     <!-- ───────────── AI 견해 탭(기업개요·테마·뉴스·추천 이력) ───────────── -->
                     <div v-show="tab === 'basis'" class="tab-panel" role="tabpanel">
@@ -68,6 +70,17 @@
                         </div>
                         <DayCandle class="flat-candle" :open="item.open" :high="item.high" :low="item.low" :close="item.close"
                             :volume="item.volume" :close-label="status.state === 'live' ? '현재가' : '종가'" />
+                        <!-- 봉 해석: AI 없이 정해진 규칙(몸통·꼬리 비율, 직전 봉, 거래량)으로 자동 판독 -->
+                        <div v-if="candleRead" class="candle-read">
+                            <p class="cr-head">
+                                <span class="badge" :class="candleRead.tone">{{ CR_TONE[candleRead.tone] }}</span>
+                                <span class="cr-text">{{ candleRead.head }}</span>
+                            </p>
+                            <ul v-if="candleRead.lines.length" class="cr-list">
+                                <li v-for="ln in candleRead.lines" :key="ln">{{ ln }}</li>
+                            </ul>
+                            <p class="cr-note">정해진 규칙으로 자동 판독한 설명이에요(AI 아님). 투자 권유가 아니에요.</p>
+                        </div>
                     </section>
 
                     <!-- 충족한 신호: 칩 나열 대신 체크 + 이름 + 한 줄 설명의 목록(전체 조건은 분석내용 탭) -->
@@ -263,7 +276,7 @@ import { addRecent } from '@scripts/recentStocks.js';
 import { assUserSession } from '@scripts/stores/user-stores';
 import {
     numOrNull, formatNumber as fmtNum, hasValue, changeInfo, fundamentalRows, technicalRows,
-    conditionCount, kstNowParts, marketStatus, getLatestBatchDate,
+    conditionCount, kstNowParts, marketStatus, getLatestBatchDate, candleReading,
 } from '@scripts/stockSignals.js';
 
 // marked 옵션
@@ -317,6 +330,8 @@ const loadFin = async (code, force = false) => {
 };
 watch(tab, (t) => { if (t === 'analysis') loadFin(stockDetail.value?.code); });
 const finRows = computed(() => (fin.value ? fundamentalRows(fin.value) : []));
+const candleRead = computed(() => (item.value ? candleReading(item.value) : null));
+const CR_TONE = { up: '강세 해석', down: '약세 해석', flat: '중립' };
 const passedSignals = computed(() => condRows.value.filter(r => r.pass));
 const itemDateLabel = computed(() => {
     const y = item.value?.ymd;
@@ -573,144 +588,150 @@ const formatRate = (v) => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
 </script>
 
 <style scoped lang="scss">
-/* ── 색상 변수: 양봉상회 토큰(홈·매수추천과 동일). 변수명은 유지하고 값만 브랜드 톤으로 ── */
-$white:    #ffffff;
-$gray-50:  #FFFDF5;
-$gray-100: #F3EAD2;
-$gray-200: #EFE2BC;
-$gray-300: #EAD9A6;
-$gray-400: #9A8C7E;
-$gray-500: #6B5B4E;
-$gray-700: #4A3628;
-$gray-900: #2B1D14;
-$blue:     #7A4423;
-$navy:     #7A4423;
-$red:      #C8282A;
-$amber:    #A0662F;
+@use '@@/_home-tokens.scss' as *;
 
-/* ── 기본 레이아웃 ── */
+/* 2026-11-21 홈(HomeSimple)과 같은 톤으로 개편: 섹션 = 흰 판, 섹션 사이 = 연회색 띠($band-h).
+ * 글자 위계 — 섹션 제목 20 / 항목 16 / 보조 13(회색) / 부가 12(연회색). 색은 등락에만, 꿀빛은 포인트(체크·탭·버튼)에만. */
 #stock-analysis {
     min-height: 100vh;
-    background: $white;
-    color: $gray-900;
-    font-family: 'Pretendard', -apple-system, sans-serif;
+    background: $band;
+    color: $ink;
+    text-align: left;
+    font-family: $font-body;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.2px;
+    -webkit-font-smoothing: antialiased;
 }
+button { font: inherit; letter-spacing: inherit; }
 
 .contents {
-    max-width: 600px;
+    max-width: 640px;
     margin: 0 auto;
-    padding: 20px 16px 100px;
-}
-
-/* ── 검색 영역 — SAutoInput 스타일 오버라이드 ── */
-.search-section {
-    margin-bottom: 20px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: $band-h;
+    padding: 0 0 calc(112px + env(safe-area-inset-bottom, 0px));
+}
+.body-box { display: flex; flex-direction: column; gap: $band-h; }
 
-    .chart-btn {
-        align-self: flex-end;
-        padding: 5px 12px;
-        border: 1px solid $gray-200;
-        border-radius: 0;
-        background: $white;
-        color: $gray-700;
-        font-size: 0.72rem;
-        font-weight: 600;
-        font-family: inherit;
-        cursor: pointer;
-        transition: border-color .12s, color .12s, background .12s;
+/* ── 흰 판(섹션) ── */
+.search-section,
+.top-card,
+.ai-result-section,
+.rec-section,
+.an-section {
+    background: $card;
+    padding: 28px $pad-x 20px;
+}
 
-        &:hover { border-color: $blue; color: $blue; background: $gray-50; }
-    }
+/* ── 검색 — SAutoInput 겉모습만 덮어쓴다 ── */
+.search-section {
+    padding-top: 16px;
+    padding-bottom: 16px;
 
-    /* ① 컨테이너 자체 여백 제거 */
-    :deep(.auto-complete-container) {
-        margin: 0;
-        width: 100%;
-    }
-
-    /* ② 각 요소별로 :deep() 평탄하게 선언 — 중첩 컴파일 문제 방지 */
+    :deep(.auto-complete-container) { margin: 0; width: 100%; }
     :deep(.search-bar) {
-        width: 100% !important;   /* SAutoInput의 width:90% 덮어쓰기 */
+        width: 100% !important;
         box-sizing: border-box;
         margin: 0 !important;
-        background: $white;
-        border: 1.5px solid $gray-200;
-        border-radius: 0;
         padding: 6px 6px 6px 14px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        transition: border-color 0.15s;
-
-        &:focus-within {
-            border-color: $blue;
-            box-shadow: 0 2px 12px rgba(25, 113, 194, 0.12);
-        }
+        background: $card;
+        border: 1px solid $line;
+        border-radius: $radius;
+        box-shadow: none;
+        transition: border-color .15s;
+        &:focus-within { border-color: $honey-500; }
     }
-
-    :deep(.search-bar .search-icon) {
-        font-size: 1rem;
-        margin-right: 10px;
-    }
-
-    :deep(.search-bar input) {
-        color: $gray-900;
-        font-size: 0.95rem;
-
-        &::placeholder { color: $gray-400; }
-    }
-
+    :deep(.search-bar .search-icon) { display: none; }
+    :deep(.search-bar input) { color: $ink; font-size: 16px; &::placeholder { color: $sub-2; } }   // 16px: iOS 확대 방지
     :deep(.search-bar .search-btn) {
-        background: $navy;
-        color: $white;
-        border-radius: 0;
-        padding: 9px 18px;
-        font-size: 0.88rem;
+        min-height: 40px;
+        padding: 0 16px;
+        border-radius: 8px;
+        background: $honey-300;
+        color: $honey-ink;
+        font-size: 14px;
         font-weight: 700;
         font-family: inherit;
         white-space: nowrap;
-
-        &:hover  { background: $blue; }
-        &:active { transform: scale(0.97); }
+        &:active { transform: scale(.97); }
     }
-
-    /* 자동완성 드롭다운 */
-    :deep(.suggestion-div) {
-        background: $white;
-        border: 1px solid $gray-200;
-        border-radius: 0;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-    }
-
-    :deep(.suggestion-header) {
-        background: $gray-50;
-        border-bottom: 1px solid $gray-100;
-
-        .item {
-            color: $gray-500;
-            font-size: 0.75rem;
-            font-weight: 700;
-        }
-    }
-
+    :deep(.suggestion-div) { background: $card; border: 1px solid $line; border-radius: $radius; box-shadow: 0 8px 24px rgba(0, 0, 0, .08); overflow: hidden; }
+    :deep(.suggestion-header) { background: $bg; border-bottom: 1px solid $line; .item { color: $sub; font-size: 12px; font-weight: 700; } }
     :deep(.list-item) {
-        .s_code { color: $gray-400; }
-        .s_name { color: $gray-900; }
-        .s_type { color: $gray-400; }
-
-        &:hover { background: $gray-50; }
+        .s_code, .s_type { color: $sub-2; }
+        .s_name { color: $ink; }
+        &:hover { background: $bg; }
     }
 }
 
-/* ── body-box ── */
-.body-box {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+/* ── 종목 요약 + 탭 ── */
+.top-card { padding: 24px 0 0; }
+.stock-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    align-items: end;
+    padding: 0 $pad-x;
+
+    .sh-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .sh-name { font-size: 24px; font-weight: 700; letter-spacing: -0.6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sh-code { font-size: 13px; color: $sub; }
+    .sh-px { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    .sh-price { font-size: 26px; font-weight: 700; letter-spacing: -0.6px; line-height: 1.1; }
+    .sh-status {
+        grid-column: 1 / -1;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: $sub;
+        .dot { width: 6px; height: 6px; border-radius: 3px; background: $sub-2; }
+        &.live .dot { background: $honey-500; }
+    }
+}
+// 등락 배지(홈과 같은 모양)
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+    min-width: 62px;
+    padding: 0 6px;
+    border-radius: $radius-sm;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: $sub;
+    background: $band;
+    &.up   { color: $up;   background: $up-bg; }
+    &.down { color: $down; background: $down-bg; }
 }
 
-/* ── 공통: 섹션 헤더 — 제목은 한 줄 유지, 공간이 모자라면 업데이트 시각·버튼이 다음 줄로 ── */
+.tabs {
+    // 탭 개수만큼 전체 폭을 똑같이 나눈다
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    margin-top: 18px;
+    border-bottom: 1px solid $line;
+
+    .tab-btn {
+        min-height: 48px;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        background: transparent;
+        color: $sub;
+        font-size: 16px;
+        cursor: pointer;
+        &.on { color: $ink; font-weight: 700; border-bottom-color: $ink; }
+        &:focus-visible { outline: 2px solid $honey-500; outline-offset: -2px; }
+    }
+}
+.tab-panel { display: flex; flex-direction: column; gap: $band-h; }
+
+/* ── 섹션 제목 ── 제목은 한 줄 유지, 공간이 모자라면 업데이트 시각·버튼이 다음 줄로 */
 .section-header {
     display: flex;
     flex-wrap: wrap;
@@ -718,209 +739,69 @@ $amber:    #A0662F;
     gap: 4px 8px;
     margin-bottom: 12px;
 
-    .section-icon {
-        font-size: 0.95rem;
-    }
-
-    .section-title {
-        text-align: start;
-        font-size: 17px;
-        font-weight: 700;
-        color: $gray-900;
-        flex: 1 0 auto;
-        white-space: nowrap;
-    }
-
-    .section-badge {
-        font-size: 0.68rem;
-        font-weight: 700;
-        color: $navy;
-        background: #efefef;
-        border: 1px solid #c4c4c4;
-        padding: 2px 8px;
-        border-radius: 0;
-    }
-
-    .token-info {
-        font-size: 12px;
-        font-weight: 500;
-        color: $gray-400;
-        white-space: nowrap;
-        font-variant-numeric: tabular-nums;
-    }
-
-    .section-unit {
-        font-size: 0.72rem;
-        color: $gray-400;
-    }
-
+    .section-title { flex: 1 0 auto; text-align: start; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; white-space: nowrap; }
+    .token-info { font-size: 12px; color: $sub; white-space: nowrap; }
+    .rec-date-badge { font-size: 13px; color: $sub; }
     .ai-refresh-btn {
         flex-shrink: 0;
         min-height: 32px;
-        padding: 0 10px;
-        border: 1px solid $gray-300;
+        padding: 0 12px;
+        border: 1px solid $line;
         border-radius: 8px;
-        background: $white;
-        color: $blue;
-        font-family: inherit;
-        font-size: 12px;
+        background: $card;
+        color: $sub-ink;
+        font-size: 13px;
         font-weight: 600;
         cursor: pointer;
         white-space: nowrap;
-        transition: border-color .15s, color .15s;
-
-        &:hover:not(:disabled) { border-color: $blue; color: $blue; }
-        &:disabled { color: $gray-400; cursor: not-allowed; }
+        &:disabled { color: $sub-2; cursor: not-allowed; }
+        @media (hover: hover) { &:hover:not(:disabled) { background: $bg; } }
     }
 }
+.an-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.an-title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+.an-basis { font-size: 12px; color: $sub; white-space: nowrap; }
+// 판별조건 섹션도 같은 제목 간격
+.an-section > .an-title { margin-bottom: 12px; }
+.an-section { display: flex; flex-direction: column; }
 
-/* ── ① AI 분석 결과 섹션 ── */
+/* ── AI 견해: 기업개요·테마·뉴스(마크다운) ── */
 .ai-result-section {
-    background: $white;
-    border: 1px solid $gray-200;
-    border-radius: 0;
-    padding: 18px 16px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-
     .ai-result-body {
-        // min-height: 80vw; /* 모바일 기준 화면 폭의 80% → 세로 큰 공간 */
         max-height: 50vh;
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
-
-        @media (min-width: 600px) {
-            min-height: 400px;
-        }
-
-        /* 3개 섹션으로 나뉘며 공간을 덜 차지하도록 축소 */
-        &.compact {
-            max-height: 40vh;
-
-            @media (min-width: 600px) {
-                min-height: 160px;
-            }
-        }
+        @media (min-width: 600px) { min-height: 160px; }
+        &.compact { max-height: 40vh; }
     }
+    .ai-empty { display: flex; align-items: center; justify-content: center; flex: 1; padding: 24px 0; font-size: 14px; color: $sub; }
 
-    .ai-empty {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex: 1;
-        padding: 24px 0;
-        font-size: 0.85rem;
-        color: $gray-400;
-    }
-
-    /* ── marked 렌더링 영역 ── */
     .markdown-body {
-        overflow: scroll;
+        overflow-y: auto;
         text-align: start;
-        font-size: 0.9rem;
-        line-height: 1.8;
-        color: $gray-700;
+        font-size: 15px;
+        line-height: 1.75;
+        color: $sub-ink;
         word-break: keep-all;
 
-        :deep(h1), :deep(h2) {
-        font-size: 0.95rem;
-            font-weight: 700;
-            color: $navy;
-            margin: 18px 0 6px;
-            padding-bottom: 5px;
-            border-bottom: 1px solid $gray-100;
-        }
-
-        :deep(h3) {
-            font-size: 0.88rem;
-            font-weight: 700;
-            color: $gray-900;
-            margin: 14px 0 4px;
-        }
-
-        :deep(p) {
-            margin: 6px 0;
-        color: $gray-700;
-        }
-
-        :deep(ul), :deep(ol) {
-            padding-left: 18px;
-            margin: 6px 0;
-
-            li {
-                font-size: 0.88rem;
-                line-height: 1.7;
-                color: $gray-700;
-            }
-        }
-
-        :deep(strong) {
-            font-weight: 700;
-            color: $gray-900;
-        }
-
-        :deep(code) {
-            background: $gray-50;
-            border: 1px solid $gray-100;
-            border-radius: 0;
-            padding: 1px 5px;
-            font-size: 0.82rem;
-            color: $navy;
-        }
-
-        :deep(pre) {
-            background: $gray-50;
-            border: 1px solid $gray-100;
-            border-radius: 0;
-            padding: 12px 14px;
-            overflow-x: auto;
-
-            code {
-                border: none;
-                padding: 0;
-                background: none;
-            }
-        }
-
-        :deep(blockquote) {
-            border-left: 3px solid $blue;
-            margin: 8px 0;
-            padding: 4px 12px;
-            color: $gray-500;
-            background: $gray-50;
-            border-radius: 0;
-        }
-
+        :deep(h1), :deep(h2) { margin: 18px 0 6px; font-size: 16px; font-weight: 700; color: $ink; }
+        :deep(h3) { margin: 14px 0 4px; font-size: 15px; font-weight: 700; color: $ink; }
+        :deep(p) { margin: 6px 0; }
+        :deep(ul), :deep(ol) { padding-left: 18px; margin: 6px 0; li { font-size: 15px; line-height: 1.7; } }
+        :deep(strong) { font-weight: 700; color: $ink; }
+        :deep(code) { padding: 1px 5px; border-radius: 4px; background: $band; font-size: 13px; color: $ink; }
+        :deep(pre) { padding: 12px 14px; border-radius: 8px; background: $band; overflow-x: auto; code { padding: 0; background: none; } }
+        :deep(blockquote) { margin: 8px 0; padding: 8px 12px; border-left: 3px solid $honey-500; border-radius: 0 8px 8px 0; background: $honey-strip; color: $honey-ink; }
         :deep(table) {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.82rem;
             margin: 10px 0;
-
-            th {
-                background: $gray-50;
-                color: $gray-500;
-                font-weight: 700;
-                padding: 7px 8px;
-                border: 1px solid $gray-100;
-                text-align: center;
-            }
-
-            td {
-                padding: 7px 8px;
-                border: 1px solid $gray-100;
-                color: $gray-700;
-                text-align: right;
-
-                &:first-child { text-align: left; }
-            }
-
-            tr:nth-child(even) td { background: $gray-50; }
+            font-size: 13px;
+            th { padding: 8px; background: $band; color: $sub-ink; font-weight: 700; border: 1px solid $line; text-align: center; }
+            td { padding: 8px; border: 1px solid $line; text-align: right; &:first-child { text-align: left; } }
         }
-
-        /* 첫 번째 h2 상단 여백 제거 */
-        :deep(> h1:first-child),
-        :deep(> h2:first-child) { margin-top: 0; }
+        :deep(> h1:first-child), :deep(> h2:first-child) { margin-top: 0; }
     }
 
     .ai-loading {
@@ -930,379 +811,135 @@ $amber:    #A0662F;
         justify-content: center;
         flex: 1;
         gap: 14px;
-
-        .loading-dots {
-            display: flex;
-            gap: 8px;
-
-            span {
-                width: 8px;
-                height: 8px;
-                background: $blue;
-                border-radius: 4px;
-                animation: bounce 1.2s infinite ease-in-out;
-
-                &:nth-child(2) { animation-delay: 0.2s; }
-                &:nth-child(3) { animation-delay: 0.4s; }
-            }
-        }
-
-        .loading-label {
-            font-size: 0.85rem;
-            color: $gray-500;
-        }
+        padding: 20px 0;
+        .loading-dots { display: flex; gap: 8px; span { width: 8px; height: 8px; border-radius: 4px; background: $honey-500; animation: bounce 1.2s infinite ease-in-out; &:nth-child(2) { animation-delay: .2s; } &:nth-child(3) { animation-delay: .4s; } } }
+        .loading-label { font-size: 14px; color: $sub; }
     }
 }
-
-/* ── ② 분기 실적 ── */
-.quarterly-section {
-    background: $white;
-    border: 1px solid $gray-200;
-    border-radius: 0;
-    padding: 18px 16px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.quarterly-table {
-    border: 1px solid $gray-100;
-    border-radius: 0;
-    overflow: hidden;
-
-    .qt-row {
-        display: grid;
-        grid-template-columns: 5.5rem repeat(4, 1fr);
-        border-bottom: 1px solid $gray-100;
-
-        &.qt-head {
-            background: $gray-50;
-
-            .qt-cell {
-                font-size: 0.72rem;
-                font-weight: 700;
-                color: $gray-500;
-            }
-        }
-
-        &.last {
-            border-bottom: none;
-        }
-    }
-
-    .qt-cell {
-        padding: 9px 4px;
-        text-align: center;
-        font-size: 0.8rem;
-        color: $gray-700;
-
-        &.label-col {
-            text-align: left;
-            padding-left: 10px;
-            font-size: 0.78rem;
-            font-weight: 600;
-            color: $gray-500;
-            background: $gray-50;
-            border-right: 1px solid $gray-100;
-        }
-
-        &.num {
-            font-weight: 600;
-            font-size: 0.82rem;
-        }
-    }
-
-    .val-up   { color: $red; }
-    .val-down { color: $navy; }
-}
-
-/* ── ③ 추천 성과 ── */
-.rec-section {
-    background: $white;
-    border: 1px solid $gray-200;
-    border-radius: 0;
-    padding: 18px 16px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.rec-date-badge {
-    font-size: 12px;
-    color: $gray-500;
-}
-
-// 세 값은 박스 없이 세로 구분선으로만 나눈다
-.rec-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-}
-
-.rec-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 8px;
-    text-align: center;
-    border-left: 1px solid $gray-200;
-
-    &:first-child { border-left: 0; }
-
-    .rec-label {
-        font-size: 0.68rem;
-        font-weight: 600;
-        color: $gray-500;
-        line-height: 1.3;
-    }
-
-    .rec-price {
-        font-size: 1rem;
-        font-weight: 800;
-        color: $gray-900;
-        line-height: 1.2;
-
-        em {
-            font-size: 0.7rem;
-            font-weight: 500;
-            color: $gray-500;
-            font-style: normal;
-            margin-left: 1px;
-        }
-    }
-}
-
-.rec-rate-badge {
-    font-size: 13px;
-    font-weight: 700;
-
-    &.neutral  { color: $gray-500; }
-    &.rate-up  { color: #C8282A; }
-    &.rate-down{ color: #1F5BD1; }
-}
-
-/* ── 전환 애니메이션 ── */
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-    transition: opacity 0.3s ease, transform 0.3s ease;
-}
-.fade-slide-enter-from {
-    opacity: 0;
-    transform: translateY(16px);
-}
-.fade-slide-leave-to {
-    opacity: 0;
-}
-
-/* ── 로딩 바운스 ── */
-@keyframes bounce {
-    0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
-    40%           { transform: scale(1);   opacity: 1; }
-}
-
-/* ════════════════════════════════════════════════════════════════
- * 양봉상회 상세 화면 테마 (홈과 같은 토큰). 아래 규칙이 위의 기본 규칙을 덮어쓴다.
- * ════════════════════════════════════════════════════════════════ */
-$yb-bg:     #FFFBEA;
-$yb-bar:    #FFF6D2;
-$yb-line:   #EFE2BC;
-$yb-line-2: #EAD9A6;
-$yb-brown:  #7A4423;
-$yb-brown-d:#4A2814;
-$yb-yellow: #FFC20E;
-$yb-ink:    #2B1D14;
-$yb-sub:    #6B5B4E;
-$yb-up:     #D12B2B;
-$yb-down:   #1F5BD1;
-
-#stock-analysis :deep(.search-btn) {
-    background: $yb-yellow;
-    color: #3A200F;
-    font-weight: 700;
-    border-radius: 8px;
-}
-#stock-analysis :deep(.search-bar) {
-    border-radius: 14px;
-    border-color: $yb-line-2;
-    background: #fff;
-    box-shadow: none;
-}
-#stock-analysis :deep(.search-bar .search-icon) { display: none; }   // 돋보기 이모지는 다른 화면과 맞춰 숨긴다
-#stock-analysis :deep(.search-bar input) { font-size: 16px; }         // iOS 포커스 확대 방지
-
-#stock-analysis {
-    background: #fff;
-    color: $yb-ink;
-    font-variant-numeric: tabular-nums;
-    text-align: left;
-}
-.contents { padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
-
-// 섹션은 카드 없이 위쪽 구분선 + 제목으로만 나눈다(홈·트레이드와 같은 방식)
-.ai-result-section,
-.rec-section {
-    background: transparent;
-    border: 0;
-    border-top: 1px solid $yb-line;
-    border-radius: 0;
-    box-shadow: none;
-    padding: 16px 0 4px;
-    margin: 0;
-}
-.section-header .section-title { color: $yb-ink; }
-.ai-refresh-btn { border-radius: 8px; }
-
-.body-box { display: flex; flex-direction: column; gap: 12px; }
-
-/* ── 종목 요약 헤더 ── */
-.stock-head {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 4px 12px;
-    align-items: end;
-    padding: 4px 2px 0;
-
-    .sh-who { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-    .sh-name { font-size: 22px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .sh-code { font-size: 13px; color: #7A6B5D; }
-    .sh-px { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-    .sh-price { font-size: 22px; font-weight: 700; }
-    .sh-chg {
-        font-size: 13px;
-        font-weight: 600;
-        &.up { color: $yb-up; }
-        &.down { color: $yb-down; }
-        &.flat { color: $yb-sub; }
-    }
-    .sh-status {
-        grid-column: 1 / -1;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 12px;
-        color: $yb-sub;
-        .dot { width: 7px; height: 7px; border-radius: 4px; background: #9A8F84; }
-        &.live .dot { background: #E07A00; }
-    }
-}
-
-/* ── 탭 ── */
-.tabs {
-    // 탭 개수만큼 전체 폭을 똑같이 나눈다(오른쪽 빈칸 없이)
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    border-bottom: 1px solid $yb-line-2;
-    margin-top: 4px;
-
-    .tab-btn {
-        min-height: 44px;
-        border: 0;
-        border-bottom: 3px solid transparent;
-        background: transparent;
-        color: $yb-sub;
-        font-size: 15px;
-        font-family: inherit;
-        cursor: pointer;
-        em { font-style: normal; font-size: 13px; margin-left: 4px; }
-
-        &.on {
-            color: $yb-brown;
-            font-weight: 700;
-            border-bottom-color: $yb-yellow;
-        }
-    }
-}
-.tab-panel { display: flex; flex-direction: column; gap: 12px; }
-// 분석내용 탭: 재무 / 조건 두 묶음 — 카드 없이 소제목 + 구분선으로 나눈다
-.an-section { display: flex; flex-direction: column; gap: 10px; }
-.an-section + .an-section { margin-top: 8px; padding-top: 16px; border-top: 1px solid #EFE2BC; }
-.an-title { margin: 0; font-size: 15px; font-weight: 700; color: #2B1D14; }
-.an-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.an-basis { font-size: 11px; color: #7A6B5D; white-space: nowrap; }
-// 탭 밑줄 바로 아래라 첫 섹션의 위쪽 구분선은 겹쳐 보인다 — 빼고 간격만 둔다
-.tab-panel > section:first-child { border-top: 0; padding-top: 6px; }
-
-.muted { margin: 0; font-size: 13px; color: $yb-sub; line-height: 1.5; }
-.card-empty { padding: 28px 0; text-align: center; }
-.link-btn { margin-left: 6px; padding: 0; border: 0; background: none; color: #7A4423; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
-
-/* ── 봉 모양: DayCandle 의 자체 테두리 박스는 이 화면에서만 걷어낸다(카드 최소화) ── */
-// 루트 요소에는 부모 scope 속성이 붙으므로 :deep 없이 잡힌다. 섹션 클래스를 앞에 둬 DayCandle 자체 규칙보다 우선.
+// 봉 모양: DayCandle 자체 테두리 박스는 이 화면에서만 걷어낸다(루트에 부모 scope 속성이 붙어 :deep 없이 잡힌다)
 .ai-result-section .flat-candle { border: 0; border-radius: 0; padding: 0; background: transparent; }
 
-/* ── 충족한 신호: 체크 + 이름 + 한 줄 설명 ── */
+/* ── 봉 해석(규칙 기반 자동 판독) ── */
+.candle-read { margin-top: 16px; padding: 14px 16px; border-radius: $radius; background: $honey-strip; }
+.cr-head { display: flex; align-items: flex-start; gap: 8px; margin: 0; }
+.cr-head .badge { flex: none; height: 22px; min-width: 0; margin-top: 1px; padding: 0 7px; font-size: 12px; background: $card; }
+.cr-head .badge.up   { background: $up-bg; }
+.cr-head .badge.down { background: $down-bg; }
+.cr-text { font-size: 16px; font-weight: 700; line-height: 1.45; word-break: keep-all; }
+.cr-list { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.cr-list li { position: relative; padding-left: 12px; font-size: 14px; line-height: 1.55; color: $honey-ink; word-break: keep-all; }
+.cr-list li::before { content: ''; position: absolute; left: 0; top: 9px; width: 4px; height: 4px; border-radius: 2px; background: $amber-700; }
+.cr-note { margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: $sub; }
+
+/* ── 충족한 신호 ── */
 .sig-count {
     font-size: 14px;
-    color: $yb-sub;
-    b { font-size: 20px; font-weight: 700; color: $yb-brown; margin-right: 1px; }
+    color: $sub;
+    b { margin-right: 1px; font-size: 20px; font-weight: 700; color: $amber-700; }
 }
 .sig-list {
     margin: 0;
     padding: 0;
     list-style: none;
-
-    li {
-        display: grid;
-        grid-template-columns: 24px minmax(0, 1fr);
-        gap: 10px;
-        padding: 10px 0;
-        border-top: 1px solid $yb-line;
-        &:first-child { border-top: 0; padding-top: 2px; }
-    }
+    li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; padding: 12px 0; }
     .sig-mark {
         width: 22px; height: 22px; margin-top: 1px; border-radius: 11px;
         display: inline-flex; align-items: center; justify-content: center;
-        background: $yb-yellow; color: $yb-brown-d; font-size: 12px; font-weight: 700;
+        background: $honey-dot; color: $honey-ink; font-size: 12px; font-weight: 700;
     }
-    .sig-name { font-size: 15px; font-weight: 700; color: $yb-ink; }
-    .sig-desc { margin-top: 2px; font-size: 13px; line-height: 1.5; color: $yb-sub; }
+    .sig-name { font-size: 16px; font-weight: 600; }
+    .sig-desc { margin-top: 2px; font-size: 13px; line-height: 1.5; color: $sub; }
 }
 
-/* ── 분석내용 탭 · 재무: 판별조건(.cond-list)과 같은 체크 목록. 한 줄에 "지표명 | 값 + 판정", 그 아래 작은 설명 ── */
-.fin-list li { padding: 10px 0; align-items: start; }
-.fin-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.fin-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 24px; }
-.fin-label { font-size: 14px; font-weight: 700; color: $yb-ink; }
-.fin-right { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.fin-value { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.fin-desc { font-size: 11px; line-height: 1.4; color: $yb-sub; }
-// 판정은 색만이 아니라 글자("적합/높음/…")로도 구분한다
-.verdict {
-    flex-shrink: 0;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 700;
-    &.ok { background: $yb-bar; color: #5C3118; border: 1px solid $yb-line-2; }
-    &.ng { background: #FDECEC; color: #A32020; }
-    &.na { background: #F1ECE2; color: $yb-sub; }
-}
-.basis-note { margin: 0; font-size: 12px; line-height: 1.5; color: #7A6B5D; }
-
-/* ── 분석내용 탭 · 조건: 체크리스트 ── */
-.cond-head {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 4px 0 2px;
-    strong { font-size: 15px; }
-}
+/* ── 분석내용 탭: 재무·판별조건 체크 목록(선 없이 여백으로 나눈다) ── */
+.cond-head { padding: 0 0 4px; strong { font-size: 16px; font-weight: 700; } }
 .cond-list {
     margin: 0;
     padding: 0;
     list-style: none;
-    border-top: 1px solid $yb-line;
 
-    li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 14px 0; border-bottom: 1px solid $yb-line; }
+    li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; padding: 12px 0; }
     .mark {
-        width: 24px; height: 24px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
-        background: #F1ECE2; color: $yb-sub; font-weight: 700; font-size: 13px;
+        width: 22px; height: 22px; margin-top: 1px; border-radius: 11px;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: $band; color: $sub-2; font-weight: 700; font-size: 12px;
     }
-    li.ok .mark { background: $yb-yellow; color: $yb-brown-d; }
-    .cond-name { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-    .cond-state { font-size: 12px; font-weight: 700; color: $yb-sub; }
-    li.ok .cond-state { color: $yb-brown; }
-    .cond-desc { margin-top: 3px; font-size: 12px; line-height: 1.5; color: $yb-sub; }
+    li.ok .mark { background: $honey-dot; color: $honey-ink; }
+    .cond-name { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; }
+    .cond-state { font-size: 12px; font-weight: 700; color: $sub; }
+    li.ok .cond-state { color: $amber-700; }
+    .cond-desc { margin-top: 2px; font-size: 13px; line-height: 1.5; color: $sub; }
+}
+.fin-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fin-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 24px; }
+.fin-label { font-size: 16px; font-weight: 600; }
+.fin-right { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.fin-value { font-size: 16px; font-weight: 700; }
+.fin-desc { font-size: 13px; line-height: 1.5; color: $sub; }
+// 판정은 색만이 아니라 글자("적합/높음/…")로도 구분한다
+.verdict {
+    flex-shrink: 0;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: $radius-sm;
+    display: inline-flex;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    &.ok { background: $honey-strip; color: $amber-700; }
+    &.ng { background: $up-bg; color: $up; }
+    &.na { background: $band; color: $sub; }
+}
+.basis-note { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: $sub; }
+
+.muted { margin: 0; font-size: 14px; line-height: 1.5; color: $sub; }
+.card-empty { padding: 24px 0; text-align: center; }
+.link-btn { margin-left: 6px; padding: 0; border: 0; background: none; color: $sub-ink; font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+/* ── 선정 후 성과 추적: 꿀빛 띠 안에 세 값 ── */
+.rec-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 14px 0;
+    border-radius: $radius;
+    background: $honey-strip;
+}
+.rec-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    text-align: center;
+    border-left: 1px solid $honey-100;
+    &:first-child { border-left: 0; }
+
+    .rec-label { font-size: 12px; font-weight: 500; line-height: 1.3; color: $sub; }
+    .rec-price { font-size: 16px; font-weight: 700; line-height: 1.2; em { margin-left: 1px; font-size: 12px; font-weight: 500; font-style: normal; color: $sub; } }
+}
+.rec-rate-badge {
+    font-size: 13px;
+    font-weight: 700;
+    &.neutral   { color: $sub; }
+    &.rate-up   { color: $up; }
+    &.rate-down { color: $down; }
 }
 
-.disclaimer { margin: 4px 0 0; font-size: 11px; line-height: 1.5; color: #7A6B5D; text-align: center; }
+/* ── 고지: 띠 색 바탕 위 작은 글자 ── */
+.disclaimer { margin: 0; padding: 4px $pad-x 8px; font-size: 12px; line-height: 1.6; color: $sub; }
+
+/* ── 전환·로딩 ── */
+.fade-slide-enter-active, .fade-slide-leave-active { transition: opacity .3s ease, transform .3s ease; }
+.fade-slide-enter-from { opacity: 0; transform: translateY(16px); }
+.fade-slide-leave-to { opacity: 0; }
+@keyframes bounce {
+    0%, 80%, 100% { transform: scale(.7); opacity: .4; }
+    40%           { transform: scale(1);  opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .fade-slide-enter-active, .fade-slide-leave-active { transition: none; }
+    .ai-loading .loading-dots span { animation: none; }
+}
 
 /* ── 하단 고정 버튼 (모바일에서는 하단 탭바 위) ── */
 .action-bar {
@@ -1313,26 +950,27 @@ $yb-down:   #1F5BD1;
     z-index: 900;
     display: flex;
     gap: 8px;
-    padding: 10px 16px;
-    background: $yb-bar;
-    border-top: 1px solid $yb-line-2;
+    padding: 10px $pad-x;
+    background: $card;
+    border-top: 1px solid $line;
 
     .act {
         flex: 1;
-        min-height: 48px;
-        border-radius: 12px;
-        font-size: 15px;
+        min-height: 50px;
+        border: 0;
+        border-radius: $radius;
+        font-size: 16px;
         font-weight: 700;
-        font-family: inherit;
         cursor: pointer;
-        &.primary { border: 0; background: $yb-yellow; color: #3A200F; }
+        &.primary { background: $honey-300; color: $honey-ink; }
+        &:focus-visible { outline: 2px solid $honey-ink; outline-offset: 2px; }
     }
 
     // 데스크톱: 하단 탭바가 없으므로 화면 맨 아래, 내용 폭에 맞춘다
     @media (min-width: 640px) {
         bottom: 0;
-        padding-left: calc(50% - 284px);
-        padding-right: calc(50% - 284px);
+        padding-left: calc(50% - 300px);
+        padding-right: calc(50% - 300px);
     }
 }
 </style>

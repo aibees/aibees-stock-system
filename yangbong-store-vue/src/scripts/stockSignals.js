@@ -263,6 +263,107 @@ export const rangePos = (item, value) => {
     return Math.min(100, Math.max(0, ((v - low) / (high - low)) * 100));
 };
 
+/* ── 봉 모양 해석 (AI 아님: 시·고·저·종 + 최근 일봉으로 정해진 규칙만 적용) ──
+ * 몸통/꼬리 비율로 봉 종류를 고르고, 직전 봉과의 관계(장악·갭·연속)와 거래량을 덧붙인다.
+ * 반환: { head, tone: 'up'|'down'|'flat', lines: [..] } — tone 은 강세/약세 해석(색은 화면에서 입힌다). 봉을 못 만들면 null.
+ * 어디까지나 "그런 모양"이라는 설명이지 매수·매도 권유가 아니다. */
+const dayKey = (r) => String(r?.date || '').slice(0, 10).replaceAll('-', '');
+const pctDiff = (a, b) => (b ? ((a - b) / b) * 100 : null);
+
+export const candleReading = (item) => {
+    const ymd = String(item.ymd || '');
+    // 행에 시·고·저·종이 없으면 일봉(chart_data)의 기준일 봉으로 대신한다.
+    const dayRow = (item.chart_data || []).find(r => dayKey(r) === ymd) ?? null;
+    const pick = (k) => numOrNull(item[k]) ?? numOrNull(dayRow?.[k]);
+    const o = pick('open');
+    const h = pick('high');
+    const l = pick('low');
+    const c = pick('close');
+    if ([o, h, l, c].some(v => v === null) || h < l || c <= 0) return null;
+
+    // 기준일 이전 일봉(오래된 → 최근). 직전 봉·추세 판단에 쓴다.
+    const hist = (item.chart_data || [])
+        .filter(r => !ymd || dayKey(r) < ymd)
+        .map(r => ({ o: numOrNull(r.open), h: numOrNull(r.high), l: numOrNull(r.low), c: numOrNull(r.close) }))
+        .filter(r => r.o !== null && r.c !== null);
+    const prev = hist.length ? hist[hist.length - 1] : null;
+
+    const range = h - l;
+    const body = Math.abs(c - o);
+    const dir = c > o ? 1 : (c < o ? -1 : 0);
+    const bodyR = range ? body / range : 0;
+    const upperR = range ? (h - Math.max(o, c)) / range : 0;
+    const lowerR = range ? (Math.min(o, c) - l) / range : 0;
+    const closePos = range ? (c - l) / range : 0.5;
+    const chg = prev ? pctDiff(c, prev.c) : pctDiff(c, o);
+
+    // 직전 5거래일 흐름: ±3% 넘게 움직였을 때만 추세로 본다(그 아래는 횡보).
+    let trend = 'flat';
+    if (hist.length >= 6) {
+        const t = pctDiff(hist[hist.length - 1].c, hist[hist.length - 6].c);
+        if (t !== null) trend = t <= -3 ? 'down' : (t >= 3 ? 'up' : 'flat');
+    }
+
+    let head;
+    let tone = 'flat';
+    const bullEngulf = prev && dir > 0 && prev.c < prev.o && o <= prev.c && c >= prev.o;
+    const bearEngulf = prev && dir < 0 && prev.c > prev.o && o >= prev.c && c <= prev.o;
+
+    if (range / c < 0.002) {
+        head = '거의 움직이지 않은 하루';
+    } else if (lowerR >= 0.55 && upperR <= 0.15 && bodyR <= 0.4) {   // 꼬리 모양을 도지보다 먼저 본다(몸통이 아주 작은 망치형)
+        if (trend === 'down') { head = '망치형 — 하락 뒤 저가에서 되돌린 모양이에요'; tone = 'up'; }
+        else if (trend === 'up') { head = '교수형 — 상승 뒤 아래꼬리가 긴 모양, 주의가 필요해요'; tone = 'down'; }
+        else { head = '아래꼬리가 긴 봉 — 장중 하락을 되돌렸어요'; tone = 'up'; }
+    } else if (upperR >= 0.55 && lowerR <= 0.15 && bodyR <= 0.4) {
+        if (trend === 'up') { head = '유성형 — 상승 뒤 윗꼬리가 긴 모양, 주의가 필요해요'; tone = 'down'; }
+        else if (trend === 'down') { head = '역망치형 — 하락 뒤 위로 시도한 모양이에요'; tone = 'up'; }
+        else { head = '윗꼬리가 긴 봉 — 장중 상승이 밀렸어요'; tone = 'down'; }
+    } else if (bodyR < 0.1) {
+        head = '도지형 — 사려는 힘과 팔려는 힘이 팽팽했어요';
+    } else if (bullEngulf) {
+        head = '상승장악형 — 전날 음봉을 감싸는 양봉이에요'; tone = 'up';
+    } else if (bearEngulf) {
+        head = '하락장악형 — 전날 양봉을 감싸는 음봉이에요'; tone = 'down';
+    } else if (bodyR >= 0.7 && Math.abs(chg ?? 0) >= 3) {
+        head = dir > 0 ? '장대양봉 — 하루 내내 매수세가 강했어요' : '장대음봉 — 하루 내내 매도세가 강했어요';
+        tone = dir > 0 ? 'up' : 'down';
+    } else if (dir > 0) {
+        head = '양봉 — 시가보다 높게 마감했어요'; tone = 'up';
+    } else if (dir < 0) {
+        head = '음봉 — 시가보다 낮게 마감했어요'; tone = 'down';
+    } else {
+        head = '시가와 종가가 같은 봉이에요';
+    }
+
+    const lines = [];
+    if (range / c >= 0.002) {
+        if (closePos >= 0.8) lines.push('고가 근처에서 마감했어요. 장 막판까지 매수세가 이어졌다는 뜻이에요.');
+        else if (closePos <= 0.2) lines.push('저가 근처에서 마감했어요. 장 막판까지 매도세가 이어졌다는 뜻이에요.');
+    }
+    if (prev && prev.c > 0) {
+        const gap = pctDiff(o, prev.c);
+        if (gap >= 1) lines.push(`전일 종가보다 ${gap.toFixed(1)}% 높게 시작(갭 상승)했어요.`);
+        else if (gap <= -1) lines.push(`전일 종가보다 ${Math.abs(gap).toFixed(1)}% 낮게 시작(갭 하락)했어요.`);
+    }
+    // 오늘 포함 같은 방향 봉이 며칠째인지(3일 이상일 때만)
+    if (dir !== 0) {
+        let streak = 1;
+        for (let i = hist.length - 1; i >= 0; i--) {
+            const d = hist[i].c > hist[i].o ? 1 : (hist[i].c < hist[i].o ? -1 : 0);
+            if (d !== dir) break;
+            streak++;
+        }
+        if (streak >= 3) lines.push(`${streak}일 연속 ${dir > 0 ? '양봉' : '음봉'}이에요.`);
+    }
+    const vf = volumeFacts(item);
+    if (vf.avgRatio !== null) {
+        if (vf.avgRatio >= 2) lines.push(`거래량이 최근 20일 평균의 ${ratioText(vf.avgRatio)}예요. 움직임에 힘이 실렸어요.`);
+        else if (vf.avgRatio <= 0.5) lines.push('거래량이 최근 20일 평균의 절반 이하예요. 움직임을 크게 믿기는 어려워요.');
+    }
+    return { head, tone, lines: lines.slice(0, 4) };
+};
+
 export const hasValue = (v) => numOrNull(v) !== null;
 
 /* ── 장 상태 (KST) ──
