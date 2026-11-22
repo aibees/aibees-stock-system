@@ -309,7 +309,7 @@ const inviteSummary = () => ({ code: INVITE.code, reward: { inviter: 300, invite
     pending: INVITE.pending, monthLeft: 10 - INVITE.month, monthMax: 10, mine: INVITE.mine, canRedeem: !INVITE.mine });
 
 const ROUTES = [
-    ...chartQuizRoutes({ ok, body: (c) => mockBody(c), hasPass: () => honeyHasPass() }),
+    ...chartQuizRoutes({ ok, body: (c) => mockBody(c), hasPass: () => honeyHasPass(), honeyAdd: (a, k) => honeyAdd(a, k) }),
     ['GET', '/api/v1/honey', () => ok(honeySummary())],
     ['GET', '/api/v1/honey/ledger', () => ok(HONEY.ledger.slice(0, 50))],
     ['GET', '/api/v1/honey/invite', () => ok(inviteSummary())],

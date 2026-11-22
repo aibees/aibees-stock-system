@@ -86,7 +86,7 @@ const QS = [makeQuestion(9001, 1, 11, 0.45), makeQuestion(9002, 2, 23, -0.4), ma
 const STATE = { attempts: {}, hints: new Set(), setIds: [9001, 9002, 9003] };
 const byId = (id) => QS.find(q => q.id === Number(id));
 
-export const chartQuizRoutes = ({ ok, body, hasPass }) => {
+export const chartQuizRoutes = ({ ok, body, hasPass, honeyAdd }) => {
     const quota = () => {
         const used = STATE.setIds.filter(i => STATE.attempts[i]).length;
         return hasPass() ? { isSubscriber: true, dailyLimit: null, used, remaining: null }
@@ -127,12 +127,15 @@ export const chartQuizRoutes = ({ ok, body, hasPass }) => {
             const hintUsed = !!usedHint || STATE.hints.has(q.id);
             const score = retry || !isMatch ? 0 : Math.round(100 * (hintUsed ? 0.8 : 1));
             if (!retry) STATE.attempts[q.id] = { answer, isMatch, score, at: Date.now() };
+            const honeyToday = Object.values(STATE.attempts).filter(a => a.honey && new Date(a.at).toDateString() === new Date().toDateString()).length;
+            const honeyGained = !retry && isMatch && honeyToday < 3 ? honeyAdd(5, 'CHART_QUIZ') : 0;
+            if (honeyGained) STATE.attempts[q.id].honey = true;
             let next = null;
             if (STATE.setIds.includes(q.id)) {
                 next = STATE.setIds.find(i => !STATE.attempts[i]) ?? (hasPass() ? extend() : null);
             }
             return ok({
-                attemptId: q.id, isMatch, score, usedHint: hintUsed, matchStreak: isMatch ? 1 : 0, retry,
+                attemptId: q.id, isMatch, score, honeyGained, usedHint: hintUsed, matchStreak: isMatch ? 1 : 0, retry,
                 outcome: q.outcome, futureCandles: q.future, futureIndicators: q.futureIndicators, explanation: q.explanation,
                 pattern: { patternId: 1, name: '20일선 돌파 + 거래량 2배', stat: { windowMonths: 12, occurrences: 38, upCount: 21, downCount: 11, flatCount: 6 },
                     caseListLocked: !hasPass(), casePreview: hasPass() ? null : 3 },

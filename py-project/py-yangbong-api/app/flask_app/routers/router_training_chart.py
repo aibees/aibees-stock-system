@@ -21,6 +21,7 @@ import logging
 
 import simplejson as json
 from flask import Blueprint, Response, g, request
+from sqlalchemy import text
 
 from app.domains.dao.trainingQuizDao import TrainingQuizDao
 from app.services import honey_service as honey
@@ -248,6 +249,16 @@ def post_answer(qid: int):
                 prev = dao.attempt(g.db, uid, qid)
                 attempt_id = prev.id if prev else None
 
+        # 같은 방향을 봤으면 꿀(처음 풀 때만, 하루 honey.CHART_QUIZ_DAILY_MAX 번). 꿀 표가 없거나 실패해도 답 저장은 그대로 성공이다.
+        honey_gained = 0
+        if is_match and not retry:
+            try:
+                g.db.execute(text("SAVEPOINT chart_quiz_honey"))
+                honey_gained = honey.chart_quiz_credit(g.db, uid, qid)
+            except Exception as e:  # noqa: BLE001
+                g.db.execute(text("ROLLBACK TO SAVEPOINT chart_quiz_honey"))
+                logging.warning(f"[honey] 차트 퀴즈 꿀 지급 실패: {e}")
+
         next_id = None
         if qid in today_ids:
             done = dao.attempted_ids(g.db, uid, today_ids)
@@ -261,6 +272,7 @@ def post_answer(qid: int):
             "attemptId": attempt_id,
             "isMatch": is_match,
             "score": score,
+            "honeyGained": honey_gained,
             "usedHint": used_hint,
             "matchStreak": streak,
             "retry": retry,
