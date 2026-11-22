@@ -12,6 +12,7 @@ export const LICENSES_PATH = '/support/licenses';
 // 꿀(포인트) — docs/points-plan.md
 export const HONEY_PATH = '/honey';
 export const HONEY_HISTORY_PATH = '/honey/history';
+export const HONEY_INVITE_PATH = '/honey/invite';
 
 export const SUPPORT_EMAIL = 'chagoklabs@gmail.com';
 

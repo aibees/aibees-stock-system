@@ -113,7 +113,14 @@ def attend(session, user_id: int) -> dict:
     bonus = 0
     if got and days > 0 and days % STREAK_DAYS == 0:
         bonus = credit(session, user_id, 'STREAK', today, STREAK_BONUS)
-    return {"got": got, "bonus": bonus, "streak": days}
+    invite_gain = 0
+    if got:
+        try:
+            r = check_invite(session, user_id)   # 초대받은 사람이면 3일 출석 확인(표가 없으면 넘어간다)
+            invite_gain = (r or {}).get("gained", 0)
+        except Exception:
+            invite_gain = 0
+    return {"got": got, "bonus": bonus + invite_gain, "streak": days}
 
 
 def watch_ad(session, user_id: int, transaction_id: str) -> int:
@@ -223,3 +230,126 @@ def extra_features(session, user_id) -> list:
         return [DAY_PASS_FEATURE] if active_pass_until(session, user_id) else []
     except Exception:
         return []   # 표가 아직 없을 때(sql/012 적용 전)
+
+
+# ══════════════ 2단계: 친구 초대 (sql/yangbong/013) ══════════════
+import secrets
+
+INVITER_REWARD = 300
+INVITEE_REWARD = 100
+INVITE_DAYS = 3            # 코드를 넣은 뒤 서로 다른 날 출석 수
+INVITER_MONTHLY_MAX = 10   # 초대한 사람이 한 달에 꿀을 받는 인원
+INVITE_SIGNUP_DAYS = 14    # 가입하고 이 기간 안에만 코드를 넣을 수 있다
+_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'   # 헷갈리는 0·O·1·I 제외
+
+
+def invite_code(session, user_id: int) -> str:
+    """내 초대 코드. 없으면 만든다(커밋은 호출부)."""
+    row = session.execute(text("SELECT code FROM honey_invite_code WHERE user_id = :uid"), {"uid": user_id}).first()
+    if row:
+        return row[0]
+    for _ in range(8):
+        code = ''.join(secrets.choice(_CODE_CHARS) for _ in range(8))
+        result = session.execute(text(
+            "INSERT IGNORE INTO honey_invite_code (user_id, code, created_at) VALUES (:uid, :code, :now)"
+        ), {"uid": user_id, "code": code, "now": now_kst()})
+        if result.rowcount == 1:
+            return code
+        row = session.execute(text("SELECT code FROM honey_invite_code WHERE user_id = :uid"), {"uid": user_id}).first()
+        if row:
+            return row[0]
+    raise HoneyError("초대 코드를 만들지 못했어요. 잠시 후 다시 해 주세요.")
+
+
+def _signup_at(session, user_id: int):
+    """가입 시각 — 가입 때 만들어지는 권한 행(user_auth)의 가장 이른 생성일. 모르면 None."""
+    try:
+        row = session.execute(text("SELECT MIN(created_date) FROM user_auth WHERE user_id = :uid"), {"uid": user_id}).first()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+
+def _invite_days(session, invitee_id: int, since) -> int:
+    row = session.execute(text(
+        "SELECT COUNT(DISTINCT ref) FROM honey_ledger WHERE user_id = :uid AND kind = 'ATTEND' AND created_at >= :since"
+    ), {"uid": invitee_id, "since": since.replace(hour=0, minute=0, second=0)}).first()
+    return int(row[0] or 0)
+
+
+def redeem_invite(session, invitee_id: int, code: str, device_id: str = None) -> dict:
+    """친구 코드 넣기. 조건이 맞지 않으면 HoneyError(화면에 그대로 보인다). 커밋은 호출부."""
+    code = (code or '').strip().upper()
+    if not code or len(code) > 12:
+        raise HoneyError("초대 코드를 확인해 주세요.")
+    if session.execute(text("SELECT 1 FROM honey_invite WHERE invitee_id = :uid"), {"uid": invitee_id}).first():
+        raise HoneyError("이미 초대 코드를 등록했어요.")
+    owner = session.execute(text("SELECT user_id FROM honey_invite_code WHERE code = :c"), {"c": code}).first()
+    if not owner:
+        raise HoneyError("없는 초대 코드예요.")
+    inviter_id = int(owner[0])
+    if inviter_id == invitee_id:
+        raise HoneyError("내 초대 코드는 넣을 수 없어요.")
+    signup = _signup_at(session, invitee_id)
+    if signup and now_kst() - signup > timedelta(days=INVITE_SIGNUP_DAYS):
+        raise HoneyError(f"초대 코드는 가입하고 {INVITE_SIGNUP_DAYS}일 안에만 넣을 수 있어요.")
+    device = (device_id or '')[:64] or None
+    if device and session.execute(text("SELECT 1 FROM honey_invite WHERE device_id = :d"), {"d": device}).first():
+        raise HoneyError("이 기기에서는 이미 초대 코드를 등록했어요.")
+    now = now_kst()
+    session.execute(text(
+        "INSERT INTO honey_invite (invitee_id, user_id, inviter_id, code, device_id, redeemed_at) "
+        "VALUES (:uid, :uid, :inv, :code, :dev, :now)"
+    ), {"uid": invitee_id, "inv": inviter_id, "code": code, "dev": device, "now": now})
+    return check_invite(session, invitee_id)
+
+
+def check_invite(session, invitee_id: int) -> dict:
+    """초대받은 사람이 3일 출석을 채웠으면 양쪽에 꿀을 준다(출석할 때마다 부른다). {days, goal, completed, gained}"""
+    row = session.execute(text(
+        "SELECT inviter_id, redeemed_at, completed_at FROM honey_invite WHERE invitee_id = :uid FOR UPDATE"
+    ), {"uid": invitee_id}).first()
+    if not row:
+        return None
+    inviter_id, redeemed_at, completed_at = int(row[0]), row[1], row[2]
+    days = _invite_days(session, invitee_id, redeemed_at)
+    if completed_at or days < INVITE_DAYS:
+        return {"days": min(days, INVITE_DAYS), "goal": INVITE_DAYS, "completed": bool(completed_at), "gained": 0}
+    now = now_kst()
+    session.execute(text("UPDATE honey_invite SET completed_at = :now WHERE invitee_id = :uid"), {"now": now, "uid": invitee_id})
+    gained = credit(session, invitee_id, 'INVITED', 'invited', INVITEE_REWARD)
+    # 초대한 사람: 이번 달 완료 인원이 한도 안이면 꿀
+    month_start = now.replace(day=1, hour=0, minute=0, second=0)
+    done = session.execute(text(
+        "SELECT COUNT(*) FROM honey_ledger WHERE user_id = :inv AND kind = 'INVITE' AND created_at >= :ms"
+    ), {"inv": inviter_id, "ms": month_start}).first()[0]
+    if int(done or 0) < INVITER_MONTHLY_MAX:
+        credit(session, inviter_id, 'INVITE', str(invitee_id), INVITER_REWARD)
+    return {"days": INVITE_DAYS, "goal": INVITE_DAYS, "completed": True, "gained": gained}
+
+
+def invite_summary(session, user_id: int) -> dict:
+    code = invite_code(session, user_id)
+    now = now_kst()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0)
+    completed = session.execute(text(
+        "SELECT COUNT(*) FROM honey_invite WHERE inviter_id = :uid AND completed_at IS NOT NULL"), {"uid": user_id}).first()[0]
+    pending = session.execute(text(
+        "SELECT COUNT(*) FROM honey_invite WHERE inviter_id = :uid AND completed_at IS NULL"), {"uid": user_id}).first()[0]
+    month = session.execute(text(
+        "SELECT COUNT(*) FROM honey_ledger WHERE user_id = :uid AND kind = 'INVITE' AND created_at >= :ms"
+    ), {"uid": user_id, "ms": month_start}).first()[0]
+    mine = None
+    row = session.execute(text("SELECT code, redeemed_at, completed_at FROM honey_invite WHERE invitee_id = :uid"), {"uid": user_id}).first()
+    if row:
+        mine = {"code": row[0], "days": min(_invite_days(session, user_id, row[1]), INVITE_DAYS), "goal": INVITE_DAYS,
+                "completed": row[2] is not None}
+    signup = _signup_at(session, user_id)
+    can_redeem = mine is None and (not signup or now - signup <= timedelta(days=INVITE_SIGNUP_DAYS))
+    return {
+        "code": code,
+        "reward": {"inviter": INVITER_REWARD, "invitee": INVITEE_REWARD, "days": INVITE_DAYS},
+        "completed": int(completed or 0), "pending": int(pending or 0),
+        "monthLeft": max(0, INVITER_MONTHLY_MAX - int(month or 0)), "monthMax": INVITER_MONTHLY_MAX,
+        "mine": mine, "canRedeem": can_redeem,
+    }

@@ -8,6 +8,8 @@ router_honey.py — 꿀(포인트) 1단계 API. **양봉상회 전용**(2026-11-
     POST /api/v1/honey/start           처음 시작하기 완료(1번)
     POST /api/v1/honey/spend           body {item:'DAY_PASS'} — 프리미엄 하루 이용권
     GET  /api/v1/honey/admob-ssv       AdMob 보상형 광고 서버 측 확인(SSV) 콜백. 로그인 없이 Google 이 부른다.
+    GET  /api/v1/honey/invite          친구 초대(2단계): 내 코드·초대 현황·내가 넣은 코드 진행(sql/yangbong/013)
+    POST /api/v1/honey/invite/redeem   body {code, deviceId} — 친구 코드 넣기. 3일 출석하면 양쪽에 꿀
 
 수업 완료 꿀은 학습 기록 API(router_training POST /training/progress)가 단계를 저장할 때 함께 준다.
 위 POST 는 모두 로그인 필요. 응답은 언제나 갱신된 요약 + 이번에 받은 꿀(gained).
@@ -126,6 +128,32 @@ def post_spend():
     except Exception as e:
         logging.exception(e)
         return ApiResponse.error("꿀을 쓰지 못했어요.")
+
+
+@honey_bp.route("/honey/invite", methods=['GET'])
+@require_auth
+def get_invite():
+    try:
+        data = _write(lambda: honey.invite_summary(g.db, g.current_user_id))   # 코드가 없으면 만든다
+        return ApiResponse.success(data)
+    except Exception as e:
+        logging.exception(e)
+        return ApiResponse.error("초대 정보를 불러오지 못했어요.")
+
+
+@honey_bp.route("/honey/invite/redeem", methods=['POST'])
+@require_auth
+def post_invite_redeem():
+    body = request.get_json(silent=True) or {}
+    try:
+        r = _write(lambda: honey.redeem_invite(g.db, g.current_user_id, body.get('code'), body.get('deviceId')))
+        return ApiResponse.success({"invite": honey.invite_summary(g.db, g.current_user_id),
+                                    "summary": honey.summary(g.db, g.current_user_id), "gained": (r or {}).get("gained", 0)})
+    except honey.HoneyError as e:
+        return ApiResponse.error(str(e), status=409)
+    except Exception as e:
+        logging.exception(e)
+        return ApiResponse.error("초대 코드를 등록하지 못했어요.")
 
 
 # ── AdMob 서버 측 확인(SSV) ────────────────────────────────

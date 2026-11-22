@@ -288,10 +288,22 @@ const honeySummary = () => {
 };
 const honeyOk = (gained) => ok({ summary: honeySummary(), gained });
 const honeyHasPass = () => !!(HONEY.passUntil && HONEY.passUntil > Date.now());
+// 친구 초대(2단계) — 넣을 수 있는 친구 코드는 BEEFRIEND 하나(목업)
+const INVITE = { code: '7692B7FB', completed: 2, pending: 1, month: 2, mine: null };
+const inviteSummary = () => ({ code: INVITE.code, reward: { inviter: 300, invitee: 100, days: 3 }, completed: INVITE.completed,
+    pending: INVITE.pending, monthLeft: 10 - INVITE.month, monthMax: 10, mine: INVITE.mine, canRedeem: !INVITE.mine });
 
 const ROUTES = [
     ['GET', '/api/v1/honey', () => ok(honeySummary())],
     ['GET', '/api/v1/honey/ledger', () => ok(HONEY.ledger.slice(0, 50))],
+    ['GET', '/api/v1/honey/invite', () => ok(inviteSummary())],
+    ['POST', '/api/v1/honey/invite/redeem', (c) => {
+        const code = String(mockBody(c).code || '').toUpperCase();
+        if (code === INVITE.code) return { __error: 409, message: '내 초대 코드는 넣을 수 없어요.' };
+        if (code !== 'BEEFRIEND') return { __error: 409, message: '없는 초대 코드예요.' };
+        INVITE.mine = { code, days: 1, goal: 3, completed: false };
+        return ok({ invite: inviteSummary(), summary: honeySummary(), gained: 0 });
+    }],
     ['POST', '/api/v1/honey/attend', () => {
         if (honeySummary().attend.done) return honeyOk(0);
         HONEY.attendDays.push(new Date().toDateString());
@@ -382,6 +394,13 @@ export const mockAdapter = (config) => new Promise((resolve, reject) => {
     const hit = ROUTES.find(([m, p]) => m === method && (match = p instanceof RegExp ? path.match(p) : (p === path ? [] : null)));
     setTimeout(() => {
         const body = hit ? hit[2](config, match) : null;
+        if (body?.__error) {   // 목업 오류 응답: { __error: 상태코드, message }
+            const error = new Error(body.message);
+            error.config = config;
+            error.response = { status: body.__error, statusText: 'Error', data: { success: false, error: { message: body.message } }, headers: {}, config };
+            reject(error);
+            return;
+        }
         if (body) {
             resolve({ data: body, status: 200, statusText: 'OK', headers: {}, config, request: {} });
             return;

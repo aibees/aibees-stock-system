@@ -21,6 +21,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 export const HONEY_KIND_LABEL = {
     ATTEND: '출석 체크', STREAK: '7일 연속 출석', START: '처음 시작하기', LESSON: '수업 완료',
     QUIZ: '오늘의 한 문제', AD: '광고 보고 받기', SPEND_DAY_PASS: '프리미엄 하루 이용권',
+    INVITE: '친구 초대', INVITED: '초대 코드 등록',
 };
 
 export const useHoneyStore = defineStore('honey', () => {
@@ -29,6 +30,7 @@ export const useHoneyStore = defineStore('honey', () => {
     const failed = ref(false);
     const pop = ref(null);          // { amount, key } — 받은 꿀 연출
     const busy = ref(false);
+    const invite = ref(null);        // 친구 초대(2단계) 현황
 
     const loggedIn = () => !!assUserSession().user.accessToken;
     const available = computed(() => !!summary.value);
@@ -65,8 +67,8 @@ export const useHoneyStore = defineStore('honey', () => {
         return summary.value;
     };
 
-    const post = async (path, body) => {
-        const { data } = await aibeesApi.post(API + path, body ?? {});
+    const post = async (path, body, config) => {
+        const { data } = await aibeesApi.post(API + path, body ?? {}, config);
         const d = data?.data ?? {};
         if (d.summary) summary.value = d.summary;
         show(d.gained ?? 0);
@@ -84,11 +86,11 @@ export const useHoneyStore = defineStore('honey', () => {
     const buyDayPass = async () => {
         busy.value = true;
         try {
-            await post('/spend', { item: 'DAY_PASS' });
+            await post('/spend', { item: 'DAY_PASS' }, { silentError: true });
             await ensureAccess(true);
             return true;
         } catch (e) {
-            return e?.response?.data?.message || '꿀을 쓰지 못했어요.';
+            return e?.error?.message || e?.response?.data?.error?.message || '꿀을 쓰지 못했어요.';
         } finally {
             busy.value = false;
         }
@@ -135,12 +137,46 @@ export const useHoneyStore = defineStore('honey', () => {
         return Array.isArray(data?.data) ? data.data : [];
     };
 
-    const reset = () => { summary.value = null; };
+    // ── 친구 초대(2단계) ──
+    // 같은 기기 반복 가입을 막는 기기 표시: 이 기기 저장소의 무작위 값(앱을 지우면 바뀐다)
+    const deviceId = () => {
+        try {
+            let id = localStorage.getItem('yb-device-id');
+            if (!id) { id = (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`); localStorage.setItem('yb-device-id', id); }
+            return id;
+        } catch { return null; }
+    };
+    const loadInvite = async () => {
+        if (!loggedIn()) { invite.value = null; return null; }
+        try {
+            const { data } = await aibeesApi.get(API + '/invite');
+            invite.value = data?.data ?? null;
+        } catch { invite.value = null; }
+        return invite.value;
+    };
+    /** 친구 코드 넣기. 성공하면 true, 아니면 화면에 보일 이유 */
+    const redeemInvite = async (code) => {
+        busy.value = true;
+        try {
+            const { data } = await aibeesApi.post(API + '/invite/redeem', { code, deviceId: deviceId() }, { silentError: true });
+            const d = data?.data ?? {};
+            if (d.invite) invite.value = d.invite;
+            if (d.summary) summary.value = d.summary;
+            show(d.gained ?? 0);
+            return true;
+        } catch (e) {
+            return e?.error?.message || e?.response?.data?.error?.message || '초대 코드를 등록하지 못했어요.';
+        } finally {
+            busy.value = false;
+        }
+    };
+
+    const reset = () => { summary.value = null; invite.value = null; };
 
     return {
         summary, loading, failed, pop, busy, available, balance, todayEarned, todayTarget, todayLeft, allDone,
         adSupported, dayPassUntil, load, attend, quizCorrect, startDone, lessonGained, buyDayPass, watchAd, ledger, reset,
-        afterGateAd: collectAdReward,
+        afterGateAd: collectAdReward, invite, loadInvite, redeemInvite,
     };
 });
 

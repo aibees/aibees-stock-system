@@ -151,7 +151,8 @@ const attachAuthResponseInterceptor = (apiInstance) => {
             // 401 이외의 에러 처리 (기존 로직 유지)
             // RESET_REQUIRED 는 호출부(Login.vue)에서 직접 처리하므로 여기서 alert 하지 않음
             const errCode = error.response?.data?.error?.code;
-            if (error.response?.data?.error != null && errCode !== 'RESET_REQUIRED') {
+            // silentError: 화면이 이유를 직접 보여 주는 요청(예: 꿀 쓰기·초대 코드)은 alert 하지 않는다
+            if (error.response?.data?.error != null && errCode !== 'RESET_REQUIRED' && !originalRequest?.silentError) {
                 alert(error.response.data.error.message);
             }
             return Promise.reject(error.response?.data ?? error);

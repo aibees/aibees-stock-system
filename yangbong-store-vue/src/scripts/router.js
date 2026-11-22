@@ -34,6 +34,7 @@ import SupportDoc from '@/components/Support/SupportDoc.vue'
 import SupportLicenses from '@/components/Support/SupportLicenses.vue'
 import HoneyCollect from '@/components/Honey/HoneyCollect.vue'
 import HoneyHistory from '@/components/Honey/HoneyHistory.vue'
+import HoneyInvite from '@/components/Honey/HoneyInvite.vue'
 import TrainingQuizHome from '@/components/Training/TrainingQuizHome.vue'
 import TrainingQuizPlay from '@/components/Training/TrainingQuizPlay.vue'
 import TrainingLesson from '@/components/Training/TrainingLesson.vue'
@@ -122,6 +123,7 @@ const routes = [
     // 꿀(포인트): 비로그인도 열리고 화면 안에서 로그인을 안내한다(authPaths.GUEST_PREFIXES)
     { path: "/honey", name: "honey", component: HoneyCollect },
     { path: "/honey/history", name: "honey-history", component: HoneyHistory },
+    { path: "/honey/invite", name: "honey-invite", component: HoneyInvite },
     {
         path: "/training/glossary",
         name: "training-glossary",

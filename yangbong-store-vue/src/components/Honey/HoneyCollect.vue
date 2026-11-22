@@ -71,8 +71,8 @@
                     </div>
                     <div class="task">
                         <span class="ic">💌</span>
-                        <div class="tx"><b>친구 초대하기</b><small>곧 열려요 · 친구가 가입하고 3일 방문하면 +300</small></div>
-                        <button type="button" class="sm done" disabled>준비 중</button>
+                        <div class="tx"><b>친구 초대하기</b><small>친구가 가입하고 3일 방문하면 +300</small></div>
+                        <button type="button" class="sm" @click="router.push(HONEY_INVITE_PATH)">초대</button>
                     </div>
                 </section>
                 <p v-if="adMsg" class="msg small">{{ adMsg }}</p>
@@ -86,7 +86,7 @@
 /** 꿀 모으기 — 오늘의 한 문제, 벌집 출석판, 할 일 목록. 기획: docs/points-plan.md */
 import { useHoneyStore } from '@scripts/stores/honey-store.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
-import { HONEY_HISTORY_PATH } from '@scripts/support.js';
+import { HONEY_HISTORY_PATH, HONEY_INVITE_PATH } from '@scripts/support.js';
 import { LESSONS_PATH } from '@scripts/training.js';
 import { todayQuestion } from '@scripts/trainingQuiz.js';
 import { ONBOARDING_PATH } from '@scripts/authPaths.js';
