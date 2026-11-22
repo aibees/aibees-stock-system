@@ -173,11 +173,18 @@ def make_issue(session, ymd: str) -> dict:
     prompt = PROMPT.format(date=_date_text(ymd), sector_date=_date_text(sector_ymd) if sector_ymd else '최근', sectors=sector_lines)
     try:
         result = AnthropicService().chat(messages=[{'role': 'user', 'content': prompt}], system=SYSTEM,
-                                         max_tokens=2000, use_web_search=True)
-        data = _parse_json(result.get('content'))
+                                         max_tokens=4000, use_web_search=True)
+        raw_text = result.get('content') or ''
+        try:
+            data = _parse_json(raw_text)
+        except (ValueError, DailyIssueError) as pe:
+            raise DailyIssueError(f'AI 응답을 읽지 못함({pe}): {raw_text[:300]}') from pe
         title = str(data.get('title') or '').strip()[:200]
-        if not title:
-            raise DailyIssueError('제목이 비어 있습니다.')
+        what = str(data.get('what') or '').strip()
+        whys = [w for w in (data.get('why') or []) if str(w).strip()] if isinstance(data.get('why'), list) else []
+        # 2026-11-22 내용 빈 메일이 간 일 — 제목·무슨 일·왜 중요 중 하나라도 비면 실패로 보고 10분 뒤 다시 만든다(메일 안 보냄)
+        if not (title and what and whys):
+            raise DailyIssueError(f'내용이 비어 있음(title={bool(title)}, what={bool(what)}, why={len(whys)}): {raw_text[:300]}')
         why_by = {(str(x.get('market')), str(x.get('sector_cd'))): str(x.get('why') or '').strip()[:200]
                   for x in (data.get('sectors') or []) if isinstance(x, dict)}
         for s in sectors:
@@ -332,6 +339,9 @@ def review_mail_html(row: dict) -> str:
 
 
 def send_review_mail(session, row: dict) -> bool:
+    if not (row and row.get('title') and row.get('what') and row.get('why')):
+        log.error(f"검토 메일 건너뜀 — 내용이 비어 있음: {row and row.get('ymd')}")
+        return False
     to = _codes(session).get('REVIEW_EMAIL') or DEFAULT_REVIEW_EMAIL
     smtp = _smtp_settings()
     if smtp is None:
