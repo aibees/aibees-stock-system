@@ -29,6 +29,7 @@ from web_shared.auth.decorators import optional_auth
 from web_shared.constants.Literal import Literal
 from web_shared.dao.masterCodesDao import MasterCodesDao
 from web_shared.dao.roleMenuDao import RoleMenuDao
+from web_shared.auth.features import with_extra_features
 from web_shared.http.response import ApiResponse
 from web_shared.services.stocks import RecoLevel
 from web_shared.services.stocks.RecoPerformanceService import RecoPerformanceService
@@ -48,7 +49,7 @@ def buy_target_for_request(stock_service, ymd=None, lite=False):
     @optional_auth 아래에서 부른다(g.current_user_id 가 있어야 한다)."""
     user_id = g.current_user_id
     auth_ids = roleMenuDaoImpl.select_user_auth_ids(g.db, user_id) if user_id is not None else []
-    features = roleMenuDaoImpl.select_features_for_user(g.db, auth_ids)
+    features = with_extra_features(g.db, user_id, roleMenuDaoImpl.select_features_for_user(g.db, auth_ids))
     level = RecoLevel.user_level(auth_ids, features)
 
     results = stock_service.get_buy_target_stock_list(g.db, {Literal.YMD: ymd}, lite=lite)

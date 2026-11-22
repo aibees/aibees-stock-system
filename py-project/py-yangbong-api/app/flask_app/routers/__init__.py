@@ -7,6 +7,8 @@ from flask import Flask, request
 _BLUEPRINTS = [
     ("app.flask_app.routers.router_stocks",       "stocks_bp",       "/api/v1/stocks"),
     ("web_shared.routers.router_oauth",           "oauth_bp",        "/api/oauth"),
+    # 꿀(포인트) 1단계 — 양봉상회 전용(sql/yangbong/012). /api/v1/honey...
+    ("app.flask_app.routers.router_honey",       "honey_bp",        "/api/v1"),
     # 계정 삭제(회원 탈퇴) — 양봉상회 전용. DELETE /api/oauth/account
     ("app.flask_app.routers.router_account",     "account_bp",      "/api/oauth"),
     ("web_shared.routers.router_master",          "master_bp",       "/api/v1/master"),

@@ -18,6 +18,7 @@ import re
 from flask import Blueprint, g, request
 
 from app.domains.dao.userTrainingDao import UserTrainingDao
+from app.services import honey_service as honey
 from web_shared.auth.decorators import require_auth
 from web_shared.dao.socialLoginDao import SocialLoginDao
 from web_shared.http.response import ApiResponse
@@ -64,9 +65,20 @@ def add_training_progress():
         return ApiResponse.error("stage_keys 형식이 올바르지 않습니다.", status=400)
 
     try:
-        userTrainingDaoImpl.add_done(g.db, g.current_user_id, list(dict.fromkeys(keys)))
+        uniq = list(dict.fromkeys(keys))
+        userTrainingDaoImpl.add_done(g.db, g.current_user_id, uniq)
         g.db.commit()
-        return ApiResponse.success(_progress(g.current_user_id))
+        # 수업 완료 꿀(단계당 1번, 목록에 있는 단계만). 꿀 표가 없거나 실패해도 학습 기록 저장은 그대로 성공이다.
+        gained = 0
+        try:
+            for k in uniq:
+                if k in honey.LESSON_KEYS:
+                    gained += honey.credit(g.db, g.current_user_id, 'LESSON', k, honey.LESSON)
+            g.db.commit()
+        except Exception as e:
+            g.db.rollback()
+            logging.warning(f"[honey] 수업 꿀 지급 실패: {e}")
+        return ApiResponse.success({**_progress(g.current_user_id), "honeyGained": gained})
     except Exception as e:
         g.db.rollback()
         logging.exception(e)

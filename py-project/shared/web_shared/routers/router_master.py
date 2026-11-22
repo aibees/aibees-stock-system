@@ -13,6 +13,7 @@ from web_shared.dao.masterInfoDao import MasterInfosDao as MasterKeyDao
 from web_shared.dao.roleMenuDao import RoleMenuDao, ADMIN_AUTH_ID, is_super_user
 from web_shared.dao.masterCodesDao import MasterCodesDao
 from web_shared.auth.decorators import require_auth, require_admin, optional_auth, require_super
+from web_shared.auth.features import with_extra_features
 from web_shared.http.response import ApiResponse
 
 master_bp = Blueprint("master", __name__)
@@ -198,7 +199,7 @@ def select_my_menu_list():
 
     return ApiResponse.success({
         'menus': sorted(tree, key=lambda x: x['sort']),
-        'features': roleMenuDaoImpl.select_features_for_user(g.db, auth_ids),
+        'features': with_extra_features(g.db, user_id, roleMenuDaoImpl.select_features_for_user(g.db, auth_ids)),
         'roles': auth_ids,
         'settings': _app_settings(g.db),
     })
