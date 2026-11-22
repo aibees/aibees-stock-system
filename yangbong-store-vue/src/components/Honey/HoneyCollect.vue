@@ -75,7 +75,6 @@
                         <button type="button" class="sm" @click="router.push(HONEY_INVITE_PATH)">초대</button>
                     </div>
                 </section>
-                <p v-if="adMsg" class="msg small">{{ adMsg }}</p>
                 <p class="foot">꿀은 양봉상회 안에서만 쓸 수 있어요. 돈으로 바꾸거나 다른 사람에게 줄 수 없고, 모은 날로부터 1년 뒤 사라져요.</p>
             </template>
         </main>
@@ -85,6 +84,7 @@
 <script setup>
 /** 꿀 모으기 — 오늘의 한 문제, 벌집 출석판, 할 일 목록. 기획: docs/points-plan.md */
 import { useHoneyStore } from '@scripts/stores/honey-store.js';
+import { notifyAd } from '@scripts/useRewardedAd.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
 import { HONEY_HISTORY_PATH, HONEY_INVITE_PATH } from '@scripts/support.js';
 import { LESSONS_PATH } from '@scripts/training.js';
@@ -115,12 +115,12 @@ const answer = (i) => {
     if (i === today.answer) honey.quizCorrect();
 };
 
-const adMsg = ref('');
+// 광고 꿀: 덮개(불러오는 중 → 재생 → 꿀 확인 중)와 '꿀 +N' 은 공통(useRewardedAd·honey-store)이 띄운다.
+// 받은 꿀은 요약을 다시 받아 반영되므로 이 화면의 횟수·잔액도 같이 바뀐다. 실패·닫힘은 전역 안내 한 줄.
 const watchAd = async () => {
-    adMsg.value = '';
     const r = await honey.watchAd();
-    if (r === 'dismissed') adMsg.value = '광고를 끝까지 보면 꿀이 쌓여요.';
-    else if (r === 'failed') adMsg.value = '광고를 불러오지 못했어요. 잠시 후 다시 해 주세요.';
+    if (r === 'dismissed') notifyAd('광고를 끝까지 보면 꿀이 쌓여요.');
+    else if (r === 'failed') notifyAd('광고를 불러오지 못했어요. 잠시 후 다시 해 주세요.');
 };
 
 onMounted(() => { if (loggedIn.value) honey.load(); });

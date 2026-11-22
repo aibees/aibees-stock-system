@@ -79,8 +79,46 @@ def _bars_after(stock_service, session, code, sel_iso, today: date) -> list:
         return []
 
 
+FALLBACK_DAYS = 28          # 전 주가 비었을 때 어제부터 거슬러 찾는 범위(달력일)
+
+
+def _recent_days(today: date, skip: set) -> list:
+    """어제부터 FALLBACK_DAYS 일 거슬러 올라가는 평일(YYYYMMDD), skip 은 뺀다."""
+    out = []
+    for i in range(1, FALLBACK_DAYS + 1):
+        d = today - timedelta(days=i)
+        ymd = d.strftime("%Y%m%d")
+        if d.weekday() < 5 and ymd not in skip:
+            out.append(ymd)
+    return out
+
+
+def _build(stock_service, session, load_items, ymd, today):
+    items = load_items(ymd)
+    if not items:
+        return None
+    picked = pick_weekly(items)
+    if not picked:
+        return None
+    item, lines = picked
+    sel_iso = f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:]}"
+    before = [_bar(r) for r in (item.get("chart_data") or []) if str(r.get("date"))[:10] <= sel_iso][-_BARS_BEFORE:]
+    after = _bars_after(stock_service, session, item["stock_code"], sel_iso, today)
+    return {
+        "ymd": ymd,
+        "stock_code": item["stock_code"],
+        "stock_name": item["stock_name"],
+        "close": item.get("close"),     # 선정일 종가(당시 가격)
+        "lines": lines,
+        "bars": before + after,
+        "marker_date": sel_iso,
+    }
+
+
 def weekly_chart(stock_service, session, load_items, today: date = None) -> dict:
-    """load_items(ymd) → 그 날 추천 목록(요청자 열람 단계로 가공된 것). 전 주 금요일부터 거슬러 올라가 처음 나오는 날을 쓴다."""
+    """load_items(ymd) → 그 날 추천 목록(요청자 열람 단계로 가공된 것). 전 주 금요일부터 거슬러 올라가 처음 나오는 날을 쓴다.
+    전 주에 보여 줄 종목이 하나도 없으면 어제부터 거슬러 가장 최근에 종목이 있는 날을 쓴다(2026-11-22 사용자 결정 —
+    기본 단계 목록이 11-18 부터 쌓여 그 전 주는 비어 있었고, 그동안 홈에서 블록이 사라졌다)."""
     now_dt = datetime.now() if today is None else datetime(today.year, today.month, today.day)
     today = now_dt.date()
     days = week_days(now_dt)   # 월요일 08:00 에 주가 바뀐다
@@ -90,26 +128,9 @@ def weekly_chart(stock_service, session, load_items, today: date = None) -> dict
         return cached[1]
 
     result = None
-    for ymd in days:
-        items = load_items(ymd)
-        if not items:
-            continue
-        picked = pick_weekly(items)
-        if not picked:
-            continue
-        item, lines = picked
-        sel_iso = f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:]}"
-        before = [_bar(r) for r in (item.get("chart_data") or []) if str(r.get("date"))[:10] <= sel_iso][-_BARS_BEFORE:]
-        after = _bars_after(stock_service, session, item["stock_code"], sel_iso, today)
-        result = {
-            "ymd": ymd,
-            "stock_code": item["stock_code"],
-            "stock_name": item["stock_name"],
-            "close": item.get("close"),     # 선정일 종가(당시 가격)
-            "lines": lines,
-            "bars": before + after,
-            "marker_date": sel_iso,
-        }
-        break
+    for ymd in days + _recent_days(today, set(days)):
+        result = _build(stock_service, session, load_items, ymd, today)
+        if result:
+            break
     _CACHE[days[-1]] = (now, result)
     return result

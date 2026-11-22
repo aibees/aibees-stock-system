@@ -22,6 +22,8 @@ const showLnb = computed(() => !isFocusPath(route.path));
     <StockNoticeDialog />
     <!-- 꿀을 받는 순간의 연출(꿀단지 + '꿀 +30') -->
     <HoneyPop />
+    <!-- 보상형 광고 전체 덮개(불러오는 중·재생 중·꿀 확인 중)와 끝난 뒤 안내(useRewardedAd.js) -->
+    <RewardedAdOverlay />
     <!-- 목업 모드(npm run dev:mock)에서만: 화면의 종목·시황·성과가 가짜 값임을 알린다 -->
     <p v-if="MOCK_ENABLED" class="mock-note">목업 데이터</p>
   </div>

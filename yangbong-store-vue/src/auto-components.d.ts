@@ -22,6 +22,7 @@ declare module 'vue' {
     IndicatorMiniChart: typeof import('./components/common/comp/IndicatorMiniChart.vue')['default']
     LwStockChart: typeof import('./components/common/comp/LwStockChart.vue')['default']
     MiniCandles: typeof import('./components/common/comp/MiniCandles.vue')['default']
+    RewardedAdOverlay: typeof import('./components/common/comp/RewardedAdOverlay.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SAutoInput: typeof import('./components/common/comp/SAutoInput.vue')['default']
