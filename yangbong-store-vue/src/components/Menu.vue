@@ -106,7 +106,7 @@ const supportGroup = computed(() => ({
         { menu_code: 'SupportTerms', menu_path: 'terms', menu_name: '이용약관', menu_title: '이용약관', display_flag: 'Y' },
         { menu_code: 'SupportPrivacy', menu_path: 'privacy', menu_name: '개인정보 처리방침', menu_title: '개인정보 처리방침', display_flag: 'Y' },
         { menu_code: 'SupportLicenses', menu_path: 'licenses', menu_name: '오픈소스 라이선스', menu_title: '오픈소스 라이선스', display_flag: 'Y' },
-        ...(isLoggedIn.value ? [{ menu_code: 'SupportAccount', menu_path: '/user-option', menu_name: '계정 설정·삭제', menu_title: '계정 설정·삭제', display_flag: 'Y' }] : []),
+        ...(isLoggedIn.value ? [{ menu_code: 'SupportAccount', menu_path: '/user-option', menu_name: '계정 설정', menu_title: '계정 설정', display_flag: 'Y' }] : []),
     ],
 }));
 const presetItem = { menu_code: 'StockPreset', menu_path: 'preset', display_flag: 'Y', menu_name: '내 설정', menu_title: '내 설정' };

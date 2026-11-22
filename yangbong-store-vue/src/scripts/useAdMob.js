@@ -94,6 +94,17 @@ const getConfig = (kind = 'banner') => {
 export const isNativeAdsEnabled = () => getConfig().enabled;
 
 /**
+ * 화면 안 배너(앱 안 플러그인 InlineAd — AdInlineBanner.vue)에 넘길 광고 단위 ID.
+ * 그 플러그인은 isTesting 을 따로 받지 않으므로, 테스트 모드면 여기서 Google 테스트 단위로 바꿔 넘긴다.
+ * 비활성이면 null.
+ */
+export const getBannerAdUnitId = () => {
+    const cfg = getConfig('banner');
+    if (!cfg.enabled) return null;
+    return cfg.isTesting ? TEST_UNIT_ID.banner[Capacitor.getPlatform()] : cfg.adId;
+};
+
+/**
  * 배너 상태 — 호출부가 레이아웃을 맞추는 데 쓴다.
  *   idle     아직 요청 전
  *   loading  요청 중(예약 영역은 유지해서 레이아웃이 튀지 않게)

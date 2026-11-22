@@ -31,16 +31,16 @@ export const gateInterval = (settings) => {
     return Number.isInteger(n) && n >= 1 ? n : DEFAULT_GATE_INTERVAL;
 };
 
-const readCount = (userId) => {
+const readCount = (userId, prefix = COUNT_KEY_PREFIX) => {
     try {
-        const v = Number.parseInt(localStorage.getItem(COUNT_KEY_PREFIX + userId), 10);
+        const v = Number.parseInt(localStorage.getItem(prefix + userId), 10);
         if (Number.isInteger(v) && v >= 0) return v;
     } catch (_) { /* ignore */ }
-    return memoryCount[userId] ?? 0;
+    return memoryCount[prefix + userId] ?? 0;
 };
-const writeCount = (userId, v) => {
-    memoryCount[userId] = v;
-    try { localStorage.setItem(COUNT_KEY_PREFIX + userId, String(v)); } catch (_) { /* ignore */ }
+const writeCount = (userId, v, prefix = COUNT_KEY_PREFIX) => {
+    memoryCount[prefix + userId] = v;
+    try { localStorage.setItem(prefix + userId, String(v)); } catch (_) { /* ignore */ }
 };
 
 /** 게이트 대상 메뉴 진입 1회를 센다. 이번 진입에 광고를 보여야 하면 true. */
@@ -52,6 +52,33 @@ export const countGateEntry = (userId, interval) => {
 
 /** 광고를 다 본 뒤 카운트를 0 으로. */
 export const resetGateCount = (userId) => writeCount(userId, 0);
+
+/*
+ * ── 수업 학습 N개마다(2026-11-22) ──
+ * 트레이닝 수업 단계(확인 퀴즈 제외)에 들어갈 때마다 따로 센다(메뉴 카운터와 별개). N개를 본 뒤 다음 수업에 들어갈 때 게이트.
+ * N 은 공통코드 stock/setting/ad 의 LESSON_GATE_INTERVAL(없으면 DEFAULT_LESSON_GATE_INTERVAL).
+ * 게이트에서 광고를 보든 건너뛰든 다시 0 부터 센다(AdGate.pass) — 건너뛰기를 막지 않는다(보상형 광고는 이용자가 골라야 한다).
+ */
+export const DEFAULT_LESSON_GATE_INTERVAL = 5;
+const LESSON_COUNT_KEY_PREFIX = 'adGateLessonCount:';
+export const lessonGateInterval = (settings) => {
+    const n = Number.parseInt(settings?.LESSON_GATE_INTERVAL, 10);
+    return Number.isInteger(n) && n >= 1 ? n : DEFAULT_LESSON_GATE_INTERVAL;
+};
+/** 수업 단계 경로인가(/training/<장>/<단계>). 차트 퀴즈·퀴즈 모음(/training/chart/…, /training/quiz/…)은 아니다. */
+export const isLessonPath = (path) => {
+    const m = String(path ?? '').split(/[?#]/)[0].match(/^\/training\/([^/]+)\/([^/]+)\/?$/);
+    return !!m && !['chart', 'quiz'].includes(m[1]);
+};
+/** 수업 진입 1회를 센다. 이미 N개를 봤으면(이번이 N+1번째) true → 게이트. */
+export const countLessonEntry = (userId, interval) => {
+    const next = readCount(userId, LESSON_COUNT_KEY_PREFIX) + 1;
+    if (next > interval) return true;            // 게이트를 거친 뒤(pass) 0 으로 되돌린다
+    writeCount(userId, next, LESSON_COUNT_KEY_PREFIX);
+    return false;
+};
+/** 게이트를 지난 수업 진입: 이번 진입을 1번째로 센다. */
+export const resetLessonCount = (userId) => writeCount(userId, 1, LESSON_COUNT_KEY_PREFIX);
 
 /** 통과권 키로 쓰는 경로: 쿼리·해시 제거, 앞뒤 슬래시 정리(router.js 의 normPath 와 같은 규칙). */
 export const adPassPath = (fullPath) =>

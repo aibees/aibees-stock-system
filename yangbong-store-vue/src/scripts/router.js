@@ -3,7 +3,8 @@ import { loadComponent } from './utils/componentLoader.js'
 import aibeesApi from './aibeesApi.js'
 import { assUserSession } from "./stores/user-stores";
 import { ensureAccess } from "./useAccess.js";
-import { consumeAdPass, countGateEntry, gateInterval } from "./useAdGate.js";
+import { consumeAdPass, countGateEntry, gateInterval, countLessonEntry, isLessonPath, lessonGateInterval } from "./useAdGate.js";
+import { chapters as trainingChapters } from "./training.js";
 import { AD_GATE_MENU_CODES, AD_ENABLED } from "./adConfig.js";
 import { isAuthPath, isGuestPath, rememberAfterLogin, INTRO_PATH, ONBOARDING_PATH, PICKS_PATH } from "./authPaths.js";
 import { isIntroSeen } from "./introState.js";
@@ -228,6 +229,12 @@ let menuCodeByPath = new Map();
 // 접근 기록을 남기지 않는 화면(광고 게이트는 메뉴로 가는 중간 단계).
 const NO_ACCESS_LOG_ROUTES = new Set(['NotFound', 'ad-gate']);
 
+// 수업 광고 게이트에서 빼는 확인 퀴즈 단계(/training/<장>/<단계> 경로 집합)
+let quizStagePaths = null;
+const isQuizStage = (path) => {
+    quizStagePaths ??= new Set(trainingChapters().flatMap(ch => ch.stages.filter(st => st.isQuiz).map(st => `/training/${st.key}`)));
+    return quizStagePaths.has(path);
+};
 const normPath = (p) => '/' + String(p ?? '').replace(/^\/+/, '').replace(/\/+$/, '');
 
 const getRouteList = async () => {
@@ -396,6 +403,14 @@ export const setRouterToApp = async () => {
         if (AD_ENABLED && loggedIn && access?.loaded && allowed && adGatedPaths.has(target) && entering
             && !access.features.includes('AD_FREE') && !consumeAdPass(target)
             && countGateEntry(userSession.user.loginInfo.user_id, gateInterval(access.settings))) {
+            return { path: '/ad-gate', query: { next: to.fullPath } };
+        }
+
+        // 수업 학습 N개(기본 5)를 본 뒤 다음 수업에 들어갈 때 광고 게이트(2026-11-22). 확인 퀴즈 단계는 세지 않는다.
+        //   로그인 사용자만(게이트가 로그인 전용), AD_FREE 는 건너뛴다. 게이트를 지나 돌아온 진입은 통과권으로 넘어간다.
+        if (AD_ENABLED && loggedIn && access?.loaded && entering && isLessonPath(target) && !isQuizStage(target)
+            && !access.features.includes('AD_FREE') && !consumeAdPass(target)
+            && countLessonEntry(userSession.user.loginInfo.user_id, lessonGateInterval(access.settings))) {
             return { path: '/ad-gate', query: { next: to.fullPath } };
         }
     });

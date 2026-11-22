@@ -81,5 +81,6 @@ public class AppleSignInPlugin: CAPPlugin, CAPBridgedPlugin, ASAuthorizationCont
 class MainViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(AppleSignInPlugin())
+        bridge?.registerPluginInstance(InlineAdPlugin())   // 홈 '공지사항 위' AdMob 배너 — InlineAdPlugin.swift
     }
 }
