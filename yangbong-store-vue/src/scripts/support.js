@@ -7,6 +7,7 @@ export const FAQ_PATH = '/support/faq';
 export const CONTACT_PATH = '/support/contact';
 export const TERMS_PATH = '/support/terms';
 export const PRIVACY_PATH = '/support/privacy';
+export const LICENSES_PATH = '/support/licenses';
 
 export const SUPPORT_EMAIL = 'chagoklabs@gmail.com';
 

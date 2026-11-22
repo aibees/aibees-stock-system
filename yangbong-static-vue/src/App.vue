@@ -25,6 +25,7 @@
       </nav>
       <p>운영: 차곡랩스 · 문의 <a :href="`mailto:${CONTACT}`">{{ CONTACT }}</a></p>
       <p>© 2026 차곡랩스 (chagoklabs)</p>
+      <p class="credit">이모지: Google Noto Emoji (Apache License 2.0) · 글꼴: Pretendard (SIL OFL 1.1)</p>
     </div>
   </footer>
 </template>
@@ -54,4 +55,5 @@ import { CONTACT, CHAGOK_URL } from './site.js';
 .made em { font-style: normal; color: var(--sub); font-weight: 600; }
 .made:hover { border-color: var(--brand); }
 .site-foot p a { color: inherit; }
+.site-foot .credit { margin-top: 8px; font-size: 12px; color: var(--muted); }
 </style>

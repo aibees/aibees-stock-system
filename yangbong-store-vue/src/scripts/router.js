@@ -31,6 +31,7 @@ import TrainingGlossary from '@/components/Training/TrainingGlossary.vue'
 import SupportFaq from '@/components/Support/SupportFaq.vue'
 import SupportContact from '@/components/Support/SupportContact.vue'
 import SupportDoc from '@/components/Support/SupportDoc.vue'
+import SupportLicenses from '@/components/Support/SupportLicenses.vue'
 import TrainingQuizHome from '@/components/Training/TrainingQuizHome.vue'
 import TrainingQuizPlay from '@/components/Training/TrainingQuizPlay.vue'
 import TrainingLesson from '@/components/Training/TrainingLesson.vue'
@@ -115,6 +116,7 @@ const routes = [
     { path: "/support/contact", name: "support-contact", component: SupportContact },
     { path: "/support/terms", name: "support-terms", component: SupportDoc },
     { path: "/support/privacy", name: "support-privacy", component: SupportDoc },
+    { path: "/support/licenses", name: "support-licenses", component: SupportLicenses },
     {
         path: "/training/glossary",
         name: "training-glossary",

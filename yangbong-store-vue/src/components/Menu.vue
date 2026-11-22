@@ -93,6 +93,7 @@ const supportGroup = computed(() => ({
         { menu_code: 'SupportContact', menu_path: 'contact', menu_name: '문의하기', menu_title: '문의하기', display_flag: 'Y' },
         { menu_code: 'SupportTerms', menu_path: 'terms', menu_name: '이용약관', menu_title: '이용약관', display_flag: 'Y' },
         { menu_code: 'SupportPrivacy', menu_path: 'privacy', menu_name: '개인정보 처리방침', menu_title: '개인정보 처리방침', display_flag: 'Y' },
+        { menu_code: 'SupportLicenses', menu_path: 'licenses', menu_name: '오픈소스 라이선스', menu_title: '오픈소스 라이선스', display_flag: 'Y' },
         ...(isLoggedIn.value ? [{ menu_code: 'SupportAccount', menu_path: '/user-option', menu_name: '계정 설정·삭제', menu_title: '계정 설정·삭제', display_flag: 'Y' }] : []),
     ],
 }));
@@ -172,7 +173,7 @@ const ICON = {
 };
 const ICON_BY_CODE = {
     TrainingGlossary: 'book', TrainingQuiz: 'target',
-    SupportFaq: 'help', SupportContact: 'mail', SupportTerms: 'doc', SupportPrivacy: 'shield', SupportAccount: 'user',
+    SupportFaq: 'help', SupportContact: 'mail', SupportTerms: 'doc', SupportPrivacy: 'shield', SupportLicenses: 'book', SupportAccount: 'user',
     StockBuyTarget: 'star', StockPreset: 'sliders', StockInfo: 'list', StockSector: 'grid', ChartStock: 'chart', ChartTheme: 'chart', StockThemeDetail: 'list',
     WorldIndicators: 'globe',
     BatchSetting: 'history', BatchLogSetting: 'doc', RouteList: 'route',
