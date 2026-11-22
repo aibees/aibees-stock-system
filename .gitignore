@@ -30,3 +30,6 @@ google-services.json
 # 예: stock-system-822d0-firebase-adminsdk-fbsvc-34f02c1f16.json
 *-firebase-adminsdk-*.json
 serviceAccountKey.json
+
+# 더 이상 쓰지 않는 Capacitor 빌드 폴더 (android/dist 산출물)
+stock-vue/
