@@ -3,6 +3,7 @@
         <div class="gate-card">
             <!-- 2026-11-22 꿀 광고: 보면 꿀, 건너뛰면 바로 들어간다(보상형 광고는 이용자가 골라야 한다 — AdMob 정책) -->
             <img v-if="supported" class="jar" src="/img/emoji/honey.png" alt="" />
+            <p v-if="lessonGate" class="sub">수업 {{ lessonEvery }}개를 봤어요. 잠깐 쉬어 가요.</p>
             <h2>{{ title }}</h2>
             <p v-if="honeyNext" class="sub">광고를 끝까지 보면 꿀 {{ honeyNext }}을 드려요.</p>
             <p v-if="honeyLeft" class="left">오늘 {{ honeyLeft }}번 더 받을 수 있어요</p>
@@ -26,7 +27,7 @@
 
 <script setup>
 import AdSlot from './common/AdSlot.vue';
-import { adPassPath, grantAdPass, resetGateCount } from '@scripts/useAdGate.js';
+import { adPassPath, grantAdPass, resetGateCount, isLessonPath, resetLessonCount, lessonGateInterval } from '@scripts/useAdGate.js';
 import { assUserSession } from '@scripts/stores/user-stores';
 import { hasFeature } from '@scripts/useAccess.js';
 import { preloadRewardedAd, rewardedAdSupported, runRewardedAd } from '@scripts/useRewardedAd.js';
@@ -60,11 +61,17 @@ const title = computed(() => (supported
     ? (honeyNext.value ? `광고 보고 꿀 ${honeyNext.value} 받기` : '광고를 보고 이용해 보세요')
     : '광고 후 이용할 수 있어요'));
 const message = ref('');
+// 수업 학습 N개마다 오는 게이트인지(문구만 다르다)
+const lessonGate = computed(() => isLessonPath(next.value));
+const lessonEvery = computed(() => lessonGateInterval(userSession.access?.settings));
 const busy = ref(false);
 const failedOnce = ref(false);
 
 const pass = () => {
-    resetGateCount(userSession.user.loginInfo.user_id);   // 광고를 다 봤으니 N번 카운트를 처음부터
+    const uid = userSession.user.loginInfo.user_id;
+    // 수업 게이트(학습 N개마다)는 수업 카운터만, 메뉴 게이트는 메뉴 카운터만 처음부터 센다
+    if (isLessonPath(next.value)) resetLessonCount(uid);
+    else resetGateCount(uid);   // 광고를 다 봤으니 N번 카운트를 처음부터
     grantAdPass(adPassPath(next.value));   // 이동할 경로 하나에만 쓰는 1회용 통과권
     router.replace(next.value);
 };

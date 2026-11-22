@@ -144,9 +144,13 @@
                 <HoneyTodayCard />
             </section>
 
-            <!-- 광고 1자리: 이번 주의 차트와 공지 사이(AD_FREE·앱 네이티브 광고 환경에서는 비어 있다) -->
+            <!-- 광고 1자리: 공지사항 바로 위(AD_FREE 에게는 없다).
+                 웹은 AdSlot(자리표시·테스트·애드센스), 앱은 AdMob 배너를 이 칸에 끼워 넣는다(AdInlineBanner, 2026-11-22) -->
             <section v-if="heroAdVisible" class="sec hero-ad" aria-label="광고">
                 <AdSlot placement="homeHero" />
+            </section>
+            <section v-else-if="appAdVisible" class="sec hero-ad" aria-label="광고">
+                <AdInlineBanner header-selector=".home-header" />
             </section>
 
             <!-- ── 공지사항: 최신 1줄만. 나머지는 '전체 보기' ── -->
@@ -185,6 +189,7 @@
  *   - 내 설정(보조지표 수치)으로 거르고 설정한 순서로 정렬하는 일은 서버가 한다(/stocks/buy-target/home, 2026-11-18).
  */
 import AdSlot from '../common/AdSlot.vue';
+import AdInlineBanner from '../common/AdInlineBanner.vue';
 import WeeklyChart from './WeeklyChart.vue';
 // import MyCriteria from './MyCriteria.vue';   // 내 기준 카드 — 홈에서 뺌(2026-11-22). 다시 쓸 때 위 템플릿 주석과 함께 푼다
 import aibeesApi from '@scripts/aibeesApi.js';
@@ -214,8 +219,10 @@ const userInitial = computed(() => (userName.value?.[0] ?? '?').toUpperCase());
 const isWorker = computed(() => hasRole(WORKER_ROLE));
 const showAds = useShowAds();
 
-// 앱(AdMob)은 네이티브 광고가 화면 위에 겹쳐 그려져 스크롤되는 자리에 못 넣는다 → 하단 배너가 맡는다.
+// 웹 광고 칸(AdSlot). 앱은 AdSlot 이 자리표시만 그리므로 아래 appAdVisible 의 AdMob 배너가 대신한다.
 const heroAdVisible = computed(() => !isWorker.value && showAds.value && !isNativeAdsEnabled());
+// 앱은 화면 안 AdMob 배너(앱 안 플러그인 InlineAd)로 같은 자리를 채운다.
+const appAdVisible = computed(() => !isWorker.value && showAds.value && isNativeAdsEnabled());
 
 // 종목 상세(/stock/info)는 로그인 사용자만 쓴다(2026-11-20). 메뉴가 열려 있으면 비로그인에게도 행을 누를 수 있게 그리고,
 // 누르면 라우터 가드가 로그인 화면으로 안내한 뒤 로그인하면 그 종목으로 돌려보낸다(authPaths.rememberAfterLogin).

@@ -30,8 +30,18 @@
                 </button>
 
                 <ol v-if="isExpanded(ch)" :id="`ch-list-${ch.slug}`" class="tr-list">
-                    <li v-for="s in ch.stages" :key="s.key">
-                        <button type="button" class="tr-row" :class="rowCls(s)"
+                    <li v-for="s in ch.stages" :key="s.key" :class="{ 'tr-quiz-li': s.isQuiz }">
+                        <!-- 장 마무리 확인 퀴즈(2026-11-22 개편): 수업 줄과 구분되는 한 덩어리. 문제 수 · 맞힌 수 · 풀기 -->
+                        <button v-if="s.isQuiz" type="button" class="tr-quiz" :class="{ done: store.isDone(s.key), now: isNext(s) }"
+                            :aria-label="`${quizTitle(s)}, ${quizState(s)}`" @click="openStage(s)">
+                            <span class="tr-quiz-ic" aria-hidden="true"><img src="/img/emoji/target.png" alt="" /></span>
+                            <span class="tr-text">
+                                <b>{{ quizTitle(s) }}</b>
+                                <small>{{ quizSub(ch, s) }}</small>
+                            </span>
+                            <span class="tr-quiz-go" aria-hidden="true">{{ quizState(s) }}</span>
+                        </button>
+                        <button v-else type="button" class="tr-row" :class="rowCls(s)"
                             :aria-label="`${s.no}단계 ${s.title}${rowState(s).label ? `, ${rowState(s).label}` : ''}`"
                             @click="openStage(s)">
                             <span class="tr-no" aria-hidden="true">
@@ -68,10 +78,12 @@
  */
 import { chapters, soonItems, stagePath, TRAINING_PATH } from '@scripts/training.js';
 import { useTrainingStore } from '@scripts/stores/training-store.js';
+import { useQuizStore } from '@scripts/stores/quiz-store.js';
 
 const router = useRouter();
 const route = useRoute();
 const store = useTrainingStore();
+const quiz = useQuizStore();
 
 
 const chapterList = chapters();
@@ -116,6 +128,21 @@ const rowState = (s) => {
     if (isNext(s)) return { label: '지금 ›' };
     return { label: '' };
 };
+/* 확인 퀴즈 줄: '기초 확인 퀴즈' · 'N문제 · 수업 3/5 마침' · 맞힌 수 또는 풀기 */
+const quizTitle = (s) => { const t = shortOf(s); return t.includes('퀴즈') ? t : `${t} 퀴즈`; };
+const quizIds = (s) => (s.lesson?.quiz ?? []).map((_, i) => `${s.key}#${i}`);
+const quizSub = (ch, s) => {
+    const lessons = ch.stages.filter(x => !x.isQuiz);
+    const done = lessons.filter(x => store.isDone(x.key)).length;
+    return `${quizIds(s).length}문제 · 수업 ${done}/${lessons.length} 마침`;
+};
+const quizState = (s) => {
+    const ids = quizIds(s);
+    const tried = ids.filter(id => quiz.results[id]).length;
+    if (!tried) return '풀기 ›';
+    return `${ids.filter(id => quiz.results[id] === 'right').length}/${ids.length} 맞힘`;
+};
+
 const rowCls = (s) => ({
     done: store.isDone(s.key),
     now: isNext(s),
@@ -237,6 +264,51 @@ button { font: inherit; letter-spacing: inherit; }
     b { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     small { font-size: 13px; color: $sub; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
+/* ── 확인 퀴즈 ── */
+.tr-quiz-li { margin-top: 10px; }
+.tr-quiz {
+    width: 100%;
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 0;
+    border-radius: $radius;
+    background: $honey-strip;
+    color: $ink;
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    .tr-text b { font-weight: 700; }
+    .tr-text small { color: $sub-ink; }
+}
+.tr-quiz-ic {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: $radius;
+    background: $card;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    img { width: 30px; height: 30px; display: block; }
+}
+.tr-quiz-go {
+    flex: none;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 8px;
+    background: $honey-300;
+    color: $honey-ink;
+    display: inline-flex;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.tr-quiz.done .tr-quiz-go { background: $card; color: $amber-700; }
+
 .tr-state { flex: none; display: inline-flex; align-items: center; font-size: 13px; color: $sub; }
 
 .tr-row.done {

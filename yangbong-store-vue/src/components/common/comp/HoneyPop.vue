@@ -1,6 +1,7 @@
 <template>
     <!-- 꿀을 받는 순간: 꿀단지가 톡 튀어나오고 위에 '꿀 +30'. 움직임 줄이기 설정이면 알림만. App.vue 에 한 번 둔다 -->
-    <div v-if="shown" class="honey-pop" aria-live="polite">
+    <!-- data-cover-inline-ad: 떠 있는 동안 화면 안 AdMob 배너(AdInlineBanner)를 숨긴다 — 네이티브 배너는 웹 요소보다 위에 그려진다 -->
+    <div v-if="shown" class="honey-pop" aria-live="polite" data-cover-inline-ad>
         <p class="hp-toast"><img src="/img/emoji/honey.png" alt="" />꿀 +{{ shown.amount }}</p>
         <div v-if="!reduce" :key="shown.key" class="hp-jar" aria-hidden="true"><img src="/img/emoji/honey.png" alt="" /></div>
     </div>
