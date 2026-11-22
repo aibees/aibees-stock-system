@@ -1,0 +1,88 @@
+# 양봉상회 소개·정책 페이지(yangbong-static-vue) 배포 — CentOS 7.3 서버 (러너 → SSH)
+#   러너(현대 OS, 라벨 build)에서 이미지를 빌드해 SSH 로 CentOS 로 보내고 컨테이너만 교체한다.
+#   CentOS 는 sshd + docker 만 있으면 된다(Node·git 불필요). 러너는 GitHub 로 나가는 연결만 쓴다.
+#   SSH 키는 러너 머신(~/.ssh)에 있고 GitHub Secrets 를 거치지 않는다.
+#
+#   저장소 변수(Settings → Variables): CENTOS_HOST (예: 192.168.0.20 또는 호스트명)
+#   새 이미지 로드·기동이 성공한 뒤에만 옛 컨테이너를 버린다. 기동 실패 시 이전 이미지로 자동 복구.
+name: 배포 · 양봉 소개페이지 (CentOS)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "yangbong-static-vue/**"
+      - "!yangbong-static-vue/**/*.md"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-yangbong-static-centos
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, build]
+    timeout-minutes: 20
+    env:
+      TARGET: deploy@${{ vars.CENTOS_HOST }}
+      NAME: yangbong-static-app
+      TAG: ${{ github.sha }}
+    steps:
+      - name: 변수 확인
+        run: |
+          [ -n "${{ vars.CENTOS_HOST }}" ] || { echo "::error::저장소 변수 CENTOS_HOST 가 비었습니다"; exit 1; }
+          ssh -o BatchMode=yes -o ConnectTimeout=10 "$TARGET" 'echo "ssh ok: $(whoami)@$(hostname)"; docker version --format "docker {{.Server.Version}}"'
+
+      - uses: actions/checkout@v4
+
+      - name: 이미지 빌드 (러너)
+        run: docker build -t "$NAME:$TAG" yangbong-static-vue
+
+      - name: 이미지 전송 (SSH)
+        run: docker save "$NAME:$TAG" | gzip | ssh -o BatchMode=yes "$TARGET" 'gunzip | docker load'
+
+      - name: 컨테이너 교체
+        run: |
+          ssh -o BatchMode=yes "$TARGET" bash -s -- "$NAME" "$TAG" <<'REMOTE'
+          set -uo pipefail
+          NAME="$1"; TAG="$2"
+          NEW="$NAME:$TAG"
+
+          # 이전 이미지 기억(롤백용)
+          PREV="$(docker inspect -f '{{.Config.Image}}' "$NAME" 2>/dev/null || true)"
+
+          run_container() {
+            local img="$1" net=()
+            # aibees 네트워크가 있으면 기존 compose 와 같은 고정 IP 를 쓴다
+            if docker network inspect aibees >/dev/null 2>&1; then
+              net=(--network aibees --ip 172.23.0.4)
+            fi
+            docker run -d --name "$NAME" --restart unless-stopped \
+              -p 127.0.0.1:5557:5557 "${net[@]}" "$img"
+          }
+
+          docker rm -f "$NAME" >/dev/null 2>&1 || true
+          run_container "$NEW" >/dev/null
+
+          ok=0
+          for i in $(seq 1 10); do
+            case "$(docker ps --filter "name=^/${NAME}$" --format '{{.Status}}')" in
+              Up*) ok=1; break ;;
+            esac
+            sleep 2
+          done
+
+          if [ "$ok" != 1 ]; then
+            echo "::error::새 컨테이너 기동 실패"; docker logs --tail 50 "$NAME" 2>&1 || true
+            docker rm -f "$NAME" >/dev/null 2>&1 || true
+            if [ -n "$PREV" ]; then echo "이전 이미지($PREV)로 복구"; run_container "$PREV" >/dev/null; fi
+            exit 1
+          fi
+
+          # 응답 확인 + 오래된 이미지 정리(최근 3개 유지)
+          curl -fsS -o /dev/null http://127.0.0.1:5557/ && echo "HTTP ok"
+          docker images "$NAME" --format '{{.Tag}}' | tail -n +4 | xargs -r -I{} docker rmi "$NAME:{}" >/dev/null 2>&1 || true
+          REMOTE
+
+      - name: 요약
+        run: echo "### 양봉 소개페이지 배포 완료 — ${GITHUB_SHA::7} → ${{ vars.CENTOS_HOST }}" >> "$GITHUB_STEP_SUMMARY"
