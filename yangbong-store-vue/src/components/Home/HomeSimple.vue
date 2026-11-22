@@ -31,27 +31,6 @@
 
         <main class="home-main">
 
-            <!-- 내 관심 종목: 담은 종목이 있을 때만 맨 위에. 오늘 소식은 일봉으로 판단한다 -->
-            <section v-if="watchRows.length" class="sec my-watch" aria-labelledby="my-watch-title">
-                <div class="mw-box">
-                    <div class="mw-head">
-                        <h2 id="my-watch-title">내 관심 종목</h2>
-                        <span v-if="watchlist.alerts" class="mw-tag">알림 켜짐</span>
-                        <button v-else-if="canAskPush" type="button" class="mw-tag" @click="turnOnAlerts">알림 받기</button>
-                    </div>
-                    <ul>
-                        <li v-for="w in watchRows" :key="w.code">
-                            <span class="mw-text">
-                                <b>{{ w.name }}</b>
-                                <small :class="{ quiet: w.news.kind === 'quiet' || w.news.kind === 'none' }">{{ w.news.text }}</small>
-                            </span>
-                            <span class="mw-val"><b>{{ w.price }}</b><span v-if="w.pct" class="badge" :class="w.cls">{{ w.pct }}</span></span>
-                            <WatchStar :code="w.code" :name="w.name" />
-                        </li>
-                    </ul>
-                </div>
-            </section>
-
             <!-- ── 1. 시황: 시장 날씨 한 줄 + 코스피·코스닥·원/달러 리스트(2026-11-17 화이트 톤 개편) ── -->
             <section class="sec market" aria-labelledby="market-title">
                 <div class="sec-head">
@@ -95,6 +74,27 @@
                         <span class="badge" :class="fxItem.cls">{{ fxItem.pctText }}</span>
                     </li>
                 </ul>
+            </section>
+
+            <!-- 내 관심 종목: 담은 종목이 있을 때만 오늘 시장 바로 아래에(2026-11-22 오늘 시장을 맨 위로). 오늘 소식은 일봉으로 판단한다 -->
+            <section v-if="watchRows.length" class="sec my-watch" aria-labelledby="my-watch-title">
+                <div class="mw-box">
+                    <div class="mw-head">
+                        <h2 id="my-watch-title">내 관심 종목</h2>
+                        <span v-if="watchlist.alerts" class="mw-tag">알림 켜짐</span>
+                        <button v-else-if="canAskPush" type="button" class="mw-tag" @click="turnOnAlerts">알림 받기</button>
+                    </div>
+                    <ul>
+                        <li v-for="w in watchRows" :key="w.code">
+                            <span class="mw-text">
+                                <b>{{ w.name }}</b>
+                                <small :class="{ quiet: w.news.kind === 'quiet' || w.news.kind === 'none' }">{{ w.news.text }}</small>
+                            </span>
+                            <span class="mw-val"><b>{{ w.price }}</b><span v-if="w.pct" class="badge" :class="w.cls">{{ w.pct }}</span></span>
+                            <WatchStar :code="w.code" :name="w.name" />
+                        </li>
+                    </ul>
+                </div>
             </section>
 
             <!-- ── 2. 시장이 주목하는 종목(최대 3): 한 줄씩(순위 · 이름 · 가격 · 등락 배지). 줄을 누르면 AI 분석 ── -->
