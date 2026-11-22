@@ -18,6 +18,16 @@
                 <i>{{ store.doneCount ? '계속' : '시작' }}</i>
             </button>
 
+            <h2>차트 읽기</h2>
+            <button type="button" class="lesson-card" @click="router.push(CHART_QUIZ_PATH)">
+                <span class="emo"><img src="/img/emoji/chart.png" alt="" /></span>
+                <span class="lesson-text">
+                    <b>차트 퀴즈</b>
+                    <small>실제 과거 차트를 보고 20일 뒤를 예상해 보세요 · 하루 3문제</small>
+                </span>
+            </button>
+            <button type="button" class="review-link" @click="router.push(CHART_QUIZ_REVIEW_PATH)">다른 방향이었던 문제 다시 보기<i aria-hidden="true">›</i></button>
+
             <h2>배우기</h2>
             <button type="button" class="lesson-card" @click="router.push(LESSONS_PATH)">
                 <span class="emo"><img src="/img/emoji/books.png" alt="" /></span>
@@ -54,10 +64,11 @@
 </template>
 
 <script setup>
-/** 트레이닝 첫 화면: 이어서 하기 + 수업 듣기 · 퀴즈 · 용어 사전 입구 */
+/** 트레이닝 첫 화면: 이어서 하기 + 차트 퀴즈 + 수업 듣기 · 퀴즈 · 용어 사전 입구 */
 import { chapters, stagePath, LESSONS_PATH, GLOSSARY_PATH } from '@scripts/training.js';
 import { glossaryTerms } from '@scripts/glossary.js';
 import { QUIZ_PATH, quizSetPath, todayQuestion } from '@scripts/trainingQuiz.js';
+import { CHART_QUIZ_PATH, CHART_QUIZ_REVIEW_PATH } from '@scripts/trainingChart.js';
 import { useTrainingStore } from '@scripts/stores/training-store.js';
 import { useQuizStore } from '@scripts/stores/quiz-store.js';
 
@@ -125,6 +136,19 @@ h2 { margin: 24px 0 10px; font-size: 18px; font-weight: 700; letter-spacing: -0.
     small { display: block; margin-top: 4px; font-size: 13px; color: $sub-ink; }
 }
 .lesson-text { flex: 1; min-width: 0; }
+.review-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px;
+    margin-top: 2px;
+    padding: 0 4px;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 600;
+    color: $sub-ink;
+    i { font-style: normal; color: $sub-2; }
+}
 .bar { display: block; height: 6px; margin-top: 10px; border-radius: 3px; background: $card; overflow: hidden; span { display: block; height: 100%; border-radius: 3px; background: $honey-500; } }
 
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }

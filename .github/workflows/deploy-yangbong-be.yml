@@ -3,6 +3,7 @@
 #
 #   이미지 하나로 컨테이너 두 개:
 #     yangbong-web-flask-app  (app)       — 서버에 이미 떠 있을 때만 교체
+#     yangbong-training-worker (training-worker) — 서버에 이미 떠 있을 때만 교체(sql/yangbong/014 뒤 손으로 처음 기동)
 #     yangbong-ai-worker      (ai-worker) — 서버에 이미 떠 있을 때만 교체. 교체 때 돌던 AI 호출이 끝나길 최대 160초 기다린다
 #   아직 안 띄웠으면 이미지만 빌드하고 끝난다(sql 003 적용·시크릿·nginx 전환 같은 수동 단계가 먼저라서).
 #
@@ -78,6 +79,7 @@ jobs:
           # 둘 다 서버에 이미 떠 있을 때만 교체한다 — 처음 기동은 sql·시크릿·nginx 준비 뒤 손으로(py-yangbong-api/docker-compose.yml 머리말).
           recreate py-yangbong-api/docker-compose.yml app       yangbong-web-flask-app skip
           recreate py-yangbong-api/docker-compose.yml ai-worker yangbong-ai-worker     skip
+          recreate py-yangbong-api/docker-compose.yml training-worker yangbong-training-worker skip
 
       - name: 헬스체크
         run: |

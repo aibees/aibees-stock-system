@@ -13,6 +13,7 @@ import { evaluate, normalizeSettings, DEFAULT_SETTINGS } from '../indicators.js'
 import { orderForType } from '../persona.js';
 import { recoReasons } from '../recoReasons.js';
 import { parseRate } from '../stockSignals.js';
+import { chartQuizRoutes } from './mockChartQuiz.js';
 
 export const MOCK_ENABLED = import.meta.env.VITE_MOCK === 'true';
 
@@ -294,6 +295,7 @@ const inviteSummary = () => ({ code: INVITE.code, reward: { inviter: 300, invite
     pending: INVITE.pending, monthLeft: 10 - INVITE.month, monthMax: 10, mine: INVITE.mine, canRedeem: !INVITE.mine });
 
 const ROUTES = [
+    ...chartQuizRoutes({ ok, body: (c) => mockBody(c), hasPass: () => honeyHasPass() }),
     ['GET', '/api/v1/honey', () => ok(honeySummary())],
     ['GET', '/api/v1/honey/ledger', () => ok(HONEY.ledger.slice(0, 50))],
     ['GET', '/api/v1/honey/invite', () => ok(inviteSummary())],
@@ -397,7 +399,7 @@ export const mockAdapter = (config) => new Promise((resolve, reject) => {
         if (body?.__error) {   // 목업 오류 응답: { __error: 상태코드, message }
             const error = new Error(body.message);
             error.config = config;
-            error.response = { status: body.__error, statusText: 'Error', data: { success: false, error: { message: body.message } }, headers: {}, config };
+            error.response = { status: body.__error, statusText: 'Error', data: { success: false, error: { message: body.message, code: body.code } }, headers: {}, config };
             reject(error);
             return;
         }
