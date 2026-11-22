@@ -2,7 +2,7 @@
 -- yangbong/014_daily_issue.sql  (2026-11-22)
 --
 -- 오늘의 경제 이슈: 하루 1건. 홈 카드 + 상세 화면(/issue). 상세 안에 '오늘 강했던 업종 TOP 3'.
---   AI 워커(ai_job_worker)가 매일 06:30(KST)에 만든다.
+--   AI 워커(ai_job_worker)가 매일 07:40(KST)에 만든다(업종 수급 07:10 적재 뒤).
 --   공통코드 stock/setting/daily_issue 의 PUBLISH_MODE 로 공개 방식을 고른다.
 --     REVIEW(기본·값이 없을 때도) : 초안(DRAFT)을 만들고 REVIEW_EMAIL 로 검토 메일을 보낸다. 메일의 [확인]=공개, [보류]=보류.
 --     AUTO                       : 만들자마자 공개(PUBLISHED). 메일을 보내지 않는다.
@@ -12,7 +12,7 @@
 --   sources  : JSON [{title, press, url}] — 원문 기사 링크. 기사 문장은 옮기지 않는다.
 --   sectors  : JSON [{market, sector_cd, sector_name, chg_rate, leaders[], why}] — 만들 때의 업종 TOP 3(sector_ymd 종가 기준)
 --
--- 적용 순서: 이 SQL → 양봉상회 API·AI 워커 배포(.env.yangbong 에 SMTP_* 추가) → 화면 배포. 여러 번 실행해도 된다.
+-- 적용 순서: 이 SQL → 양봉상회 API·AI 워커 배포(메일은 회원가입 인증코드와 같은 계정을 쓴다) → 화면 배포. 여러 번 실행해도 된다.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS yangbong.daily_issue (

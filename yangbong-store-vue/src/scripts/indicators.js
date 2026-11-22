@@ -65,7 +65,7 @@ const snapChoice = (p, v) => (p.choices
     : v);
 
 export const ORDER_OPTIONS = [
-    { key: 'default',    label: '시장이 주목하는 순서', desc: '서버가 정한 순서 그대로' },
+    { key: 'default',    label: '종합 순위 순서', desc: '서버가 정한 종합 순위 그대로' },
     { key: 'market_cap', label: '큰 회사 먼저',         desc: '시가총액이 큰 회사부터' },
     { key: 'volatility', label: '크게 움직이는 회사 먼저', desc: '최근 가격 변동이 큰 회사부터' },
 ];

@@ -170,4 +170,17 @@ h2 { margin: 24px 0 10px; font-size: 18px; font-weight: 700; letter-spacing: -0.
     span { display: block; margin-top: 5px; font-size: 15px; font-weight: 600; line-height: 1.45; word-break: keep-all; }
 }
 .note { margin: 12px 0 0; font-size: 12px; line-height: 1.6; color: $sub-2; word-break: keep-all; }
+
+/* ══ 2026-11-22 간격 통일(8px 격자, 토큰: _home-tokens.scss — 홈과 같은 규칙) — 위의 값보다 이 블록이 우선 ══
+   섹션 위 24 · 제목→내용 12 · 카드 안쪽 16 · 카드·요소 사이 12 · 한 줄 56 */
+.hub-head { padding: $card-pad $pad-x $gap; }
+.hub-main { padding-bottom: $sec-pb; }
+.resume { padding: $card-pad; gap: $gap; }
+h2 { margin: $sec-pt 0 $head-gap; }
+.lesson-card { padding: $card-pad; gap: $gap; }
+.review-link { margin-top: 0; }
+.tiles { gap: $gap; margin-top: $gap; }
+.tile { padding: $card-pad; b { margin-top: $gap; } }
+.today { margin-top: $sec-pt; padding: $card-pad 0; }
+.note { margin-top: $gap; }
 </style>

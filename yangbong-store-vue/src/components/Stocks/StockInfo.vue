@@ -101,7 +101,7 @@
                         <p v-else class="muted">아직 충족한 신호가 없어요. 전체 조건은 분석내용 탭에서 볼 수 있어요.</p>
                     </section>
                     <section v-else-if="itemLoaded" class="ai-result-section">
-                        <p class="muted">이 날짜의 주목 종목에 없는 종목이라 차트 모양·신호 정보가 없어요.</p>
+                        <p class="muted">이 날짜의 AI 분석 종목에 없는 종목이라 차트 모양·신호 정보가 없어요.</p>
                     </section>
 
                     <!-- ② 현재 테마 (버튼 갱신, 주 1회 권장) -->
@@ -252,7 +252,7 @@
                                 <!-- 점수는 장 마감 후 산출된다 — 값이 있을 때만 보여준다 -->
                                 <p v-if="hasValue(item.score)" class="basis-note">종합 점수 {{ numOrNull(item.score) }} / 100</p>
                             </template>
-                            <p v-else class="muted card-empty">{{ itemLoaded ? '이 날짜의 주목 종목에 없는 종목이라 판별조건 정보가 없어요.' : '불러오는 중입니다…' }}</p>
+                            <p v-else class="muted card-empty">{{ itemLoaded ? '이 날짜의 AI 분석 종목에 없는 종목이라 판별조건 정보가 없어요.' : '불러오는 중입니다…' }}</p>
                         </section>
                     </div>
 

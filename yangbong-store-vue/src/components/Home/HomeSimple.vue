@@ -179,7 +179,7 @@
 <script setup>
 /**
  * 양봉상회 홈(2026-11-15 개편 1차, 2026-11-22 회의로 성과 삭제).
- * 순서: 시황 → 시장이 주목하는 종목(≤3) → 이번 주의 차트 → (내 기준: 주석 처리) → 공지.
+ * 순서: 시황 → AI 분석 종목 TOP(≤3) → 이번 주의 차트 → (내 기준: 주석 처리) → 공지.
  * 데이터는 기존 홈과 같은 API(전부 비로그인 허용)를 쓴다. 알고리즘·계산은 그대로다.
  *   - AI 분석 종목: 종목 이름·등락과 AI 분석·차트 확인 버튼만(근거·살 만한 가격·내 조건 충족은 2026-11-15 뺌).
  *   - 내 설정(보조지표 수치)으로 거르고 설정한 순서로 정렬하는 일은 서버가 한다(/stocks/buy-target/home, 2026-11-18).
@@ -408,7 +408,7 @@ const loadItems = async () => {
         pick.value = d && Array.isArray(d.items) ? { ...EMPTY_PICK, ...d } : EMPTY_PICK;
     } catch (e) {
         if (seq !== pickSeq) return;
-        console.error('[home] 주목 종목 조회 실패', e);
+        console.error('[home] AI 분석 종목 조회 실패', e);
         pick.value = EMPTY_PICK;
     } finally {
         if (seq === pickSeq) isLoading.value = false;

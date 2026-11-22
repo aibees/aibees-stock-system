@@ -359,4 +359,16 @@ const NOTE = {};
 .wallet .w-hint { margin: 2px 0 12px; font-size: 13px; color: #7A5A1E; }
 .wallet .w-btn { width: 100%; height: 44px; border: 0; border-radius: 10px; background: #5A3C08; color: #fff; font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; }
 @media (min-width: 900px) { .wallet { max-width: 640px; margin-left: auto; margin-right: auto; } }
+
+/* ══ 2026-11-22 간격 통일(8px 격자, 토큰: _home-tokens.scss — 홈과 같은 규칙) — 위의 값보다 이 블록이 우선 ══
+   섹션 위 24 · 제목→내용 12 · 카드 안쪽 16 · 카드·요소 사이 12 · 한 줄 56
+   메뉴 그룹 이름(회색 작은 글씨)은 목록과 한 덩어리라 8 */
+.menu-header { padding: $card-pad $pad-x; }
+.search { padding: 0 $card-pad; }
+.menu-main { padding-bottom: $sec-pb; }
+.group { padding: $sec-pt 0 $gap; h2 { margin-bottom: 8px; } }
+.item { gap: $gap; }
+.wallet { margin: $gap $pad-x; padding: $card-pad; }
+.wallet .w-hint { margin-bottom: $gap; }
+.empty { margin: $sec-pt 0; }
 </style>

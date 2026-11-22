@@ -56,7 +56,7 @@
             <template v-else>
             <!-- ── 2줄: 목록 머리 + 정렬·범위 선택(누르면 기기 기본 선택 창이 뜬다) ── -->
             <div class="list-head">
-                <h2>주목 종목<span v-if="!isLoading" class="count">{{ sortedData.length }}</span></h2>
+                <h2>AI 분석 종목<span v-if="!isLoading" class="count">{{ sortedData.length }}</span></h2>
                 <span class="basis">{{ priceLabel }} 기준</span>
             </div>
             <div class="filters">
@@ -112,7 +112,7 @@
                                 <span v-if="r.passTotal" class="rd-match">내 조건 {{ r.passTotal }}개 중 <b>{{ r.passCount }}개</b> 충족</span>
                             </p>
                             <template v-if="r.reasons.passed.length">
-                                <h4 class="rd-h">주목한 이유 {{ r.reasons.passed.length }}가지</h4>
+                                <h4 class="rd-h">고른 이유 {{ r.reasons.passed.length }}가지</h4>
                                 <ul class="rs">
                                     <li v-for="x in r.reasons.passed" :key="x.key">
                                         <span class="rs-k" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg></span>
@@ -220,7 +220,7 @@ import {
 } from '@scripts/marketFormat.js';
 
 const router = useRouter();
-const title = ref('주목 종목');
+const title = ref('AI 분석 종목');
 
 const goToStockInfo = (stock_code, stock_name) => {
     // ymd: 상세 화면이 같은 날짜의 매수타겟 행(근거·재무·조건)을 찾는 데 쓴다.
@@ -314,7 +314,7 @@ const ADVANCED_SORT_KEYS = ['composite_rank_no', 'shape_proba', 'frgn_amt', 'org
 const SORT_ALL = [
     { key: 'persona',    label: '내 성향 순서',  dir: 'asc',  ascLabel: '성향에 맞는 순',  descLabel: '거꾸로' },
     { key: 'composite_rank_no', label: '종합 순위(신규)', dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
-    { key: 'rank_no',     label: '주목 순위',     dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
+    { key: 'rank_no',     label: '종합 순위',     dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
     { key: 'score',       label: '점수',         dir: 'desc', ascLabel: '낮은 점수 먼저', descLabel: '높은 점수 먼저' },
     { key: 'volume',      label: '거래량',       dir: 'desc', ascLabel: '적은 순',        descLabel: '많은 순' },
     { key: 'shape_proba', label: '차트 패턴 점수', dir: 'desc', ascLabel: '낮은 점수 먼저', descLabel: '높은 점수 먼저' },
@@ -862,4 +862,18 @@ button { font: inherit; letter-spacing: inherit; }
 .reco-item { position: relative; }
 .reco-row { padding-right: 34px; }
 .row-star { position: absolute; top: 15px; right: -6px; }
+
+/* ══ 2026-11-22 간격 통일(8px 격자, 토큰: _home-tokens.scss — 홈과 같은 규칙) — 위의 값보다 이 블록이 우선 ══
+   섹션 위 24 · 제목→내용 12 · 카드 안쪽 16 · 카드·요소 사이 12 · 한 줄 56 */
+.top-bar { padding-top: 8px; padding-bottom: $card-pad; }
+.list-head { padding-top: $sec-pt; }
+.filters { padding-top: $head-gap; padding-bottom: 8px; }
+.reco-row { padding-top: $card-pad; padding-bottom: $card-pad; }   // 오른쪽 34px 는 관심 별 자리라 그대로
+.row-star { top: 11px; }   // 줄 위아래 20 → 16 에 맞춰 별도 4px 올림
+.reco-detail { padding-bottom: $card-pad; }
+.facts { margin-top: $gap; padding: $card-pad; gap: $gap 8px; }
+.mk, .mini-chart { margin-top: $gap; }
+.rs + .rd-h { margin-top: $gap; }
+.rd-actions { gap: $gap; margin-top: $gap; }
+.stage-locked { margin-top: $sec-pt; }
 </style>

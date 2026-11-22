@@ -2,7 +2,7 @@
 오늘의 경제 이슈(하루 1건) — sql/yangbong/014_daily_issue.sql. 2026-11-22.
 
 흐름
-  1) AI 워커가 매일 06:30(KST) run_due() → make_issue(): 업종 TOP 3(SectorService) + AI(웹 검색 1회)로 글을 만든다.
+  1) AI 워커가 매일 07:40(KST) run_due() → make_issue(): 업종 TOP 3(SectorService) + AI(웹 검색 1회)로 글을 만든다.
   2) 공통코드 stock/setting/daily_issue.PUBLISH_MODE
        REVIEW(기본) : DRAFT 로 저장하고 REVIEW_EMAIL 로 검토 메일. 메일의 [승인]/[반려] → router_daily_issue 의 콜백.
                       반려하면 REJECTED → 워커가 1분 안에 새 초안(반려된 제목·이유를 AI 에 함께 줌) → 메일 다시(sql/015).
@@ -34,7 +34,7 @@ from sqlalchemy import text
 log = logging.getLogger("daily_issue")
 
 KST = timezone(timedelta(hours=9))
-RUN_AT = (6, 30)                    # 매일 만드는 시각(KST)
+RUN_AT = (7, 40)                    # 매일 만드는 시각(KST). 업종 수급(STOCK_INVESTOR_JOB 평일 07:10)이 들어온 뒤라야 전 거래일 TOP 3
 MAX_ATTEMPTS = 5                    # 하루에 만드는 횟수(실패·반려 합산) — AI·검색 비용 상한
 RETRY_AFTER = timedelta(minutes=10)
 LINK_DAYS = 3
@@ -360,13 +360,23 @@ def send_review_mail(session, row: dict) -> bool:
         log.error(f"검토 메일 건너뜀 — 내용이 비어 있음: {row and row.get('ymd')}")
         return False
     to = _codes(session).get('REVIEW_EMAIL') or DEFAULT_REVIEW_EMAIL
+    subject = f"[양봉상회 검토] {row['title']}"
+    html = review_mail_html(row)
+    # 1) 회원가입 인증코드와 같은 메일 계정(web_shared.mailer: DB master_infos SMTP 또는 smtp.key) — 서버에 이미 있다
+    try:
+        from web_shared import mailer
+        mailer.send(session, to, subject, html)
+        return _mailed(session, row, to)
+    except Exception as e:  # noqa: BLE001 — 아래 환경변수 계정으로 한 번 더
+        log.warning(f"공용 메일 계정으로 못 보냄({e}) — SMTP_* 환경변수로 시도")
+    # 2) 환경변수 SMTP_* (따로 계정을 쓰고 싶을 때)
     smtp = _smtp_settings()
     if smtp is None:
-        log.error("SMTP_HOST·SMTP_USER·SMTP_PASSWORD 가 없어 검토 메일을 보내지 못했습니다(이슈는 DRAFT 로 남음).")
+        log.error("메일 계정이 없어 검토 메일을 보내지 못했습니다(이슈는 DRAFT 로 남음).")
         return False
     host, port, user, pw, sender = smtp
-    msg = MIMEText(review_mail_html(row), 'html', 'utf-8')
-    msg['Subject'] = f"[양봉상회 검토] {row['title']}"
+    msg = MIMEText(html, 'html', 'utf-8')
+    msg['Subject'] = subject
     msg['From'] = sender
     msg['To'] = to
     try:
@@ -383,6 +393,10 @@ def send_review_mail(session, row: dict) -> bool:
     except Exception as e:  # noqa: BLE001
         log.error(f"검토 메일 실패 {row['ymd']}: {e}")
         return False
+    return _mailed(session, row, to)
+
+
+def _mailed(session, row: dict, to: str) -> bool:
     session.execute(text("UPDATE daily_issue SET mailed_at = :now WHERE ymd = :ymd"), {'now': now_kst(), 'ymd': row['ymd']})
     session.commit()
     log.info(f"검토 메일 보냄 {row['ymd']} → {to}")
