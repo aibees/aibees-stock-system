@@ -27,7 +27,12 @@
 #   설계: meetings/설계_2026-11-18_AI분석-비동기화.md · sql/yangbong/008.
 #   KIS 를 부르는 곳은 이 컨테이너뿐이다(API 는 KIS 를 부르지 않는다).
 #   받는 요청이 없으므로 포트·고정 IP 가 없다. 한 개만 띄운다(scale 금지 — KIS 토큰을 나눠 쓰지 않게).
-#   DB 연결: API 최대 12 + 워커 최대 3 = 양봉 계정 한도 15.
+#   DB 연결: API 최대 12 + 워커 최대 3 + 트레이닝 워커 1 = 양봉 계정 한도 16(sql/yangbong/014 가 15 → 16).
+#
+# training-worker — 트레이닝 차트 퀴즈 문제 생성(app/workers/training_worker.py, sql/yangbong/014).
+#   매일 18:30(공통코드 stock/setting/training TRAINING_BUILD_TIME)에 전 종목 일봉을 읽어 문제·패턴 통계를 만든다.
+#   처음 한 번 선적재: docker compose -f py-yangbong-api/docker-compose.yml run --rm training-worker \
+#                        poetry run python -m app.workers.training_worker --once --backfill 40
 
 name: yangbong-api
 
@@ -89,6 +94,27 @@ services:
             - yangbong-pykis-cache:/root/.pykis
         # SIGTERM 뒤 진행 중 AI 호출이 끝나길 기다린다(워커 STOP_GRACE_SECONDS 150)
         stop_grace_period: 160s
+        logging:
+            driver: json-file
+            options:
+                max-size: "20m"
+                max-file: "5"
+        networks:
+            - aibees
+        restart: unless-stopped
+
+    training-worker:
+        image: py-yangbong-web
+        container_name: yangbong-training-worker
+        working_dir: /workdir
+        pull_policy: never
+        command: ["poetry", "run", "python", "-m", "app.workers.training_worker"]
+        env_file:
+            - .env.yangbong
+        environment:
+            - TZ=Asia/Seoul
+            - DB_POOL_SIZE=1
+            - DB_MAX_OVERFLOW=0
         logging:
             driver: json-file
             options:

@@ -39,6 +39,8 @@ import IssueDetail from '@/components/Issue/IssueDetail.vue'
 import TrainingQuizHome from '@/components/Training/TrainingQuizHome.vue'
 import TrainingQuizPlay from '@/components/Training/TrainingQuizPlay.vue'
 import TrainingLesson from '@/components/Training/TrainingLesson.vue'
+import TrainingChartQuiz from '@/components/Training/ChartQuiz/TrainingChartQuiz.vue'
+import TrainingChartReview from '@/components/Training/ChartQuiz/TrainingChartReview.vue'
 import Login from '@/components/Login.vue'
 import App from '@/components/App.vue'
 import UserOption from '@/components/UserOption.vue';
@@ -141,6 +143,18 @@ const routes = [
         path: "/training/quiz/:set",
         name: "training-quiz-play",
         component: TrainingQuizPlay
+    },
+    {
+        // 차트 퀴즈(meetings/설계_2026-11-22_트레이닝-화면.md). 화면은 비로그인에게 열고 안에서 로그인을 안내한다(GUEST_PREFIXES /training).
+        // ?q=<문제 id> 는 다시 풀기(구독). /training/:chapter 보다 앞에 둬야 'chart' 가 장 slug 로 잡히지 않는다.
+        path: "/training/chart",
+        name: "training-chart",
+        component: TrainingChartQuiz
+    },
+    {
+        path: "/training/chart/review",
+        name: "training-chart-review",
+        component: TrainingChartReview
     },
     {
         // 장 바로가기(전체 메뉴의 장 항목·단계 화면의 뒤로): 같은 목차 화면을 그 장 위치로 연다(scrollBehavior).

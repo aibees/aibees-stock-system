@@ -28,6 +28,8 @@ _BLUEPRINTS = [
     ("app.flask_app.routers.router_persona",      "persona_bp",      "/api/v1"),
     # 트레이닝 학습 기록(user_training_progress — sql/yangbong/011)·주식분석 유의사항 동의(user_consent STOCK_NOTICE)
     ("app.flask_app.routers.router_training",     "training_bp",     "/api/v1"),
+    # 트레이닝 차트 퀴즈(sql/yangbong/014) — /api/v1/training/today · /<qid>/hint · /<qid>/answer · /history · /questions/<qid>
+    ("app.flask_app.routers.router_training_chart", "training_chart_bp", "/api/v1"),
 ]
 
 
