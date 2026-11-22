@@ -11,8 +11,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
-import { MOCK_ENABLED } from '@scripts/mock/mockApi.js';
-import { isNativeAdsEnabled, loadRewardedAd, showRewardedAd } from '@scripts/useAdMob.js';
+import { notifyAd, rewardedAdSupported, runRewardedAd, setAdChecking } from '@scripts/useRewardedAd.js';
 import { ensureAccess } from '@scripts/useAccess.js';
 
 const API = '/api/v1/honey';
@@ -45,8 +44,8 @@ export const useHoneyStore = defineStore('honey', () => {
         return adLeft + (s.attend.done ? 0 : s.attend.amount) + (s.quiz.done ? 0 : s.quiz.amount);
     });
     const allDone = computed(() => !!summary.value && todayLeft.value === 0);
-    // 광고는 앱(네이티브)에서만 꿀이 쌓인다. 목업 모드는 화면 확인용으로 흉내 낸다.
-    const adSupported = computed(() => isNativeAdsEnabled() || MOCK_ENABLED);
+    // 광고는 앱(네이티브)에서만 꿀이 쌓인다. 목업 모드는 화면 확인용으로 흉내 낸다(useRewardedAd.js).
+    const adSupported = computed(() => rewardedAdSupported());
     const dayPassUntil = computed(() => summary.value?.dayPass?.until ?? null);
 
     const show = (amount) => { if (amount > 0) pop.value = { amount, key: Date.now() }; };
@@ -97,8 +96,8 @@ export const useHoneyStore = defineStore('honey', () => {
     };
 
     /**
-     * 광고 보고 꿀 받기. 결과: 'rewarded' | 'dismissed' | 'failed' | 'unavailable'
-     * 앱: 광고를 끝까지 보면 서버가 AdMob 확인을 받아 꿀을 넣는다 → 요약을 다시 불러 늘었는지 본다.
+     * 광고 보고 꿀 받기. 결과: 'rewarded' | 'dismissed' | 'failed' | 'unavailable' | 'busy'
+     * 로딩 덮개·결과는 useRewardedAd 가 맡고, 끝까지 봤으면 서버 반영을 확인한다(afterAdReward).
      */
     const watchAd = async () => {
         if (!adSupported.value) return 'unavailable';
@@ -106,30 +105,45 @@ export const useHoneyStore = defineStore('honey', () => {
         if (s && s.ad.count >= s.ad.max) return 'unavailable';
         busy.value = true;
         try {
-            if (MOCK_ENABLED && !isNativeAdsEnabled()) {
-                await wait(600);
-                await post('/mock-ad');
-                return 'rewarded';
-            }
-            const uid = assUserSession().user.loginInfo.user_id;
-            if (!(await loadRewardedAd({ ssvUserId: uid ? String(uid) : undefined }))) return 'failed';
-            const result = await showRewardedAd();
-            if (result === 'rewarded' && uid) await collectAdReward();
+            const result = await runRewardedAd({ customData: 'HONEY' });
+            if (result === 'rewarded') await afterAdReward({ before: s });
             return result;
         } finally {
             busy.value = false;
         }
     };
 
-    // AdMob → 서버 알림은 보통 몇 초 안에 온다. 광고 횟수가 늘 때까지 잠깐 다시 불러 본다.
-    const collectAdReward = async () => {
-        const before = summary.value?.ad?.count ?? 0;
-        const beforeBal = summary.value?.balance ?? 0;
-        for (let i = 0; i < 6; i++) {
-            await wait(1500);
-            const s = await load();
-            if (s && s.ad.count > before) { show(s.balance - beforeBal); return; }
+    /**
+     * 광고를 끝까지 본 뒤: 꿀은 Google → 서버(SSV) 알림으로 들어오므로, 광고 횟수가 늘 때까지 요약을 다시 받는다.
+     * 보통 몇 초 안에 온다. 처음 몇 번은 '꿀을 확인하고 있어요' 덮개를 띄우고(wait), 그 뒤로는 덮개 없이 조금 더 본다.
+     * 끝내 안 오면 안내만 한다(꿀은 서버가 받는 대로 쌓인다 — 다음에 요약을 받으면 보인다).
+     * @param {{ before?: object, wait?: boolean }} o  before: 광고 전 요약(없으면 지금 요약), wait: 확인 덮개를 띄울지
+     * @returns {Promise<number>} 늘어난 꿀(확인 못 하면 0)
+     */
+    const afterAdReward = async ({ before, wait: block = true } = {}) => {
+        if (!loggedIn()) { notifyAd('로그인하면 광고를 볼 때마다 꿀이 쌓여요.'); return 0; }
+        const base = before ?? summary.value ?? (await load());
+        if (!base) return 0;   // 꿀 서버를 못 받는 상태 — 꿀 영역 자체가 숨겨져 있다
+        if (base.ad.count >= base.ad.max) { notifyAd('오늘 광고 꿀은 다 받았어요.'); return 0; }
+        const tries = [800, 1200, 1500, 1500, 2500, 2500, 3000, 3000];   // 약 16초
+        const blockTries = block ? 4 : 0;   // 앞 4번(약 5초)만 덮개
+        try {
+            for (let i = 0; i < tries.length; i++) {
+                if (i === 0 && blockTries) setAdChecking(true);
+                if (i === blockTries && blockTries) setAdChecking(false);
+                await wait(tries[i]);
+                const s = await load();
+                if (s && s.ad.count > base.ad.count) {
+                    const gained = s.balance - base.balance;
+                    show(gained);
+                    return gained;
+                }
+            }
+        } finally {
+            setAdChecking(false);
         }
+        notifyAd('꿀이 조금 늦게 들어오고 있어요. 잠시 뒤 꿀 내역에서 확인해 주세요.');
+        return 0;
     };
 
     const ledger = async (before) => {
@@ -176,7 +190,7 @@ export const useHoneyStore = defineStore('honey', () => {
     return {
         summary, loading, failed, pop, busy, available, balance, todayEarned, todayTarget, todayLeft, allDone,
         adSupported, dayPassUntil, load, attend, quizCorrect, startDone, lessonGained, buyDayPass, watchAd, ledger, reset,
-        afterGateAd: collectAdReward, invite, loadInvite, redeemInvite,
+        afterAdReward, invite, loadInvite, redeemInvite,
     };
 });
 

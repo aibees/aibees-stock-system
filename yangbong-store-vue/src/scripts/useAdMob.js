@@ -254,33 +254,50 @@ export async function loadRewardedAd({ ssvUserId, ssvCustomData } = {}) {
 
 /**
  * 불러온 보상형 광고를 보여준다. 한 번 보여주면 그 광고는 소진되므로, 다시 보여주려면 loadRewardedAd 부터.
+ * 화면에서는 이 함수를 바로 부르지 말고 useRewardedAd.runRewardedAd 를 쓴다(로딩 덮개·끝난 뒤 처리 공통).
  * @returns {Promise<'rewarded'|'dismissed'|'failed'>}
- *   rewarded  끝까지 시청해 보상을 받음 / dismissed  보상 없이 닫음 / failed  재생 실패
+ *   rewarded  끝까지 시청해 보상을 받고 닫음 / dismissed  보상 없이 닫음 / failed  재생 실패·시간 초과
+ *
+ * 2026-11-22: iOS 플러그인은 '보상 받음'(Rewarded)을 광고가 아직 화면에 떠 있을 때 보낸다(닫기 전).
+ * 그때 바로 끝내면 광고 밑에서 화면이 넘어가 버리므로, 보상은 표시만 해 두고 '닫힘'(Dismissed)에서 결과를 낸다.
  */
+const REWARDED_SHOW_TIMEOUT_MS = 10000;      // 표시 요청 뒤 이 시간 안에 광고가 안 뜨면 실패로 본다
+const REWARDED_CLOSE_GRACE_MS = 90000;       // 보상 뒤 닫힘 이벤트가 끝내 안 오면 보상으로 마무리
 export async function showRewardedAd() {
     const { AdMob, RewardAdPluginEvents } = admob ?? {};
     if (!AdMob) return 'failed';
 
     const handles = [];
+    const timers = [];
     try {
         return await new Promise((resolve) => {
             let settled = false;
+            let earned = false;
+            let shown = false;
             const done = (result) => { if (!settled) { settled = true; resolve(result); } };
+            const earn = () => {
+                if (earned) return;
+                earned = true;
+                timers.push(setTimeout(() => done('rewarded'), REWARDED_CLOSE_GRACE_MS));
+            };
             (async () => {
-                handles.push(await AdMob.addListener(RewardAdPluginEvents.Rewarded, () => done('rewarded')));
-                handles.push(await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => done('dismissed')));
+                handles.push(await AdMob.addListener(RewardAdPluginEvents.Showed, () => { shown = true; }));
+                handles.push(await AdMob.addListener(RewardAdPluginEvents.Rewarded, earn));
+                handles.push(await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => done(earned ? 'rewarded' : 'dismissed')));
                 handles.push(await AdMob.addListener(RewardAdPluginEvents.FailedToShow, (e) => {
                     console.warn('[admob] 보상형 광고 재생 실패:', e?.code, e?.message);
                     done('failed');
                 }));
-                await AdMob.showRewardVideoAd();   // 보상 시 resolve(이미 Rewarded 이벤트로 처리됨), 재생 불가면 reject
-                done('rewarded');
+                timers.push(setTimeout(() => { if (!shown && !earned) done('failed'); }, REWARDED_SHOW_TIMEOUT_MS));
+                await AdMob.showRewardVideoAd();   // 보상 시 resolve(닫기 전), 재생 불가면 reject
+                earn();
             })().catch((e) => {
                 console.warn('[admob] 보상형 광고 표시 실패:', e?.message ?? e);
-                done('failed');
+                done(earned ? 'rewarded' : 'failed');
             });
         });
     } finally {
+        timers.forEach(clearTimeout);
         handles.forEach((h) => h?.remove?.());
     }
 }
