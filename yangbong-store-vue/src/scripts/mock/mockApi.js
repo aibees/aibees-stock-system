@@ -287,6 +287,20 @@ const honeySummary = () => {
         dayPass: { cost: 1000, until: HONEY.passUntil && HONEY.passUntil > Date.now() ? HONEY.passUntil : null } };
 };
 const honeyOk = (gained) => ok({ summary: honeySummary(), gained });
+// 오늘의 경제 이슈(목업 — 실제는 관리자 검토 후 공개된 것만 온다)
+const MOCK_ISSUE = {
+    ymd: '20261122', status: 'PUBLISHED', title: '미국 반도체 주식이 크게 떨어지며 코스피·코스닥도 함께 약했어요', keywords: ['반도체', '미국증시'],
+    what: '금요일 밤 미국에서 반도체 회사 주가가 한꺼번에 내렸어요. 우리 시장에서도 반도체 비중이 큰 대형주가 따라 내리면서 지수가 크게 떨어졌어요.',
+    why: ['코스피에서 반도체 회사가 차지하는 몫이 커서, 반도체가 흔들리면 지수 전체가 흔들려요.', '이런 날은 하루 움직임만 보기보다 며칠 흐름을 함께 보는 게 좋아요.'],
+    term: { name: '동반 약세', desc: '여러 시장이나 종목이 같은 날 함께 내리는 것을 말해요.' },
+    sources: [{ title: '미 반도체주 급락에 코스피 하락 마감', press: '목업경제', url: 'https://example.com/a' }, { title: '외국인 순매도 확대… 대형 반도체주 약세', press: '목업일보', url: 'https://example.com/b' }],
+    sectorYmd: '20261120',
+    sectors: [
+        { market: 'KOSPI', sector_cd: '0017', sector_name: '조선', chg_rate: 4.12, leaders: ['한빛조선', '동해중공업', '바다엔진'], why: '대형 선박 수주 소식이 이어지며 업종 전체가 함께 올랐어요.' },
+        { market: 'KOSPI', sector_cd: '0021', sector_name: '방산', chg_rate: 3.21, leaders: ['한결에어로', '대한방위', '미래시스템'], why: '해외 수출 계약 기대가 커지며 관련 회사들이 강했어요.' },
+        { market: 'KOSDAQ', sector_cd: '1009', sector_name: '전기·전자', chg_rate: 2.64, leaders: ['새빛전기', '한전설비', '그린케이블'], why: '' },
+    ],
+};
 const honeyHasPass = () => !!(HONEY.passUntil && HONEY.passUntil > Date.now());
 // 친구 초대(2단계) — 넣을 수 있는 친구 코드는 BEEFRIEND 하나(목업)
 const INVITE = { code: '7692B7FB', completed: 2, pending: 1, month: 2, mine: null };
@@ -335,6 +349,11 @@ const ROUTES = [
         MOCK_TRAINING.stock_notice = { version: String(mockBody(c).version), agreed_at: Date.now() };
         return okS(MOCK_TRAINING);
     }],
+    ['GET', '/api/v1/daily-issue', () => ok({ issue: MOCK_ISSUE, past: [
+        { ymd: '20261121', title: '원/달러 환율이 1,340원대로 올랐어요' },
+        { ymd: '20261120', title: '미국이 금리를 그대로 두고 다음 회의에 관심이 모였어요' },
+    ] })],
+    ['GET',/^\/api\/v1\/daily-issue\/(\d{8})$/, (c, m) => ok({ ...MOCK_ISSUE, ymd: m[1] })],
     ['GET', '/api/v1/indicators/market-snapshot', (c) => ok(marketSnapshot(c.params))],
     ['GET', '/api/v1/stocks/weekly-chart', () => ok(weeklyChart())],
     ['GET', '/api/v1/stocks/buy-target/home', (c) => ok(homePicks(c.params))],

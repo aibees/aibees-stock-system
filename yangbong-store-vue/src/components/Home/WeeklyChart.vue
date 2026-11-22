@@ -100,7 +100,7 @@ const ariaLabel = computed(() => `${data.value?.stock_name} 일봉 차트, ${pic
 <style scoped lang="scss">
 @use '@@/_home-tokens.scss' as *;
 
-.sec { background: $card; padding: 28px $pad-x 24px; }
+.sec { background: $card; padding: $sec-pt $pad-x $sec-pb; }   // 2026-11-22 홈 간격 통일
 .sec-head {
     display: flex;
     align-items: baseline;
@@ -109,11 +109,11 @@ const ariaLabel = computed(() => `${data.value?.stock_name} 일봉 차트, ${pic
     h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
     .meta { font-size: 13px; color: $sub; white-space: nowrap; }
 }
-.sec-sub { margin: 6px 0 0; font-size: 13px; color: $sub; }
+.sec-sub { margin: 4px 0 0; font-size: 13px; color: $sub; }
 
 .w-card {
-    margin-top: 16px;
-    padding: 14px 14px 12px;
+    margin-top: $head-gap;
+    padding: $card-pad;
     border-radius: $radius;
     background: $bg;
 }

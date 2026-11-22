@@ -9,6 +9,8 @@ _BLUEPRINTS = [
     ("web_shared.routers.router_oauth",           "oauth_bp",        "/api/oauth"),
     # 꿀(포인트) 1단계 — 양봉상회 전용(sql/yangbong/012). /api/v1/honey...
     ("app.flask_app.routers.router_honey",       "honey_bp",        "/api/v1"),
+    # 오늘의 경제 이슈(sql/yangbong/014) — /api/v1/daily-issue... 검토 메일 콜백 포함
+    ("app.flask_app.routers.router_daily_issue", "daily_issue_bp",  "/api/v1"),
     # 계정 삭제(회원 탈퇴) — 양봉상회 전용. DELETE /api/oauth/account
     ("app.flask_app.routers.router_account",     "account_bp",      "/api/oauth"),
     ("web_shared.routers.router_master",          "master_bp",       "/api/v1/master"),

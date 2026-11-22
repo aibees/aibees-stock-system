@@ -46,34 +46,26 @@
                         <b class="wx-desc">{{ weather.desc }}</b>
                     </span>
                 </div>
-                <!-- 달러 금리·코스피·코스닥·원/달러: 한 줄씩(이름 · 미니 차트 · 값 · 오늘 등락). 2026-11-17 v3 '숨 쉬는 버전' -->
-                <ul class="rows idx-rows">
-                    <!-- 달러 금리(미국 10년물 국채금리, 2026-11-22): 등락은 %p -->
-                    <li v-if="usRateItem" class="row idx-row">
-                        <span class="idx-name">달러 금리</span>
-                        <svg v-if="usRateItem.sparkPoints" class="idx-spark" :class="usRateItem.sparkCls" viewBox="0 0 64 24" preserveAspectRatio="none" aria-hidden="true">
-                            <polyline :points="usRateItem.sparkPoints" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                <!-- 달러 금리·코스피·코스닥·원/달러: 옆으로 넘기는 카드(이름 · 값 · 오늘 등락 · 흐름 차트). 2026-11-22 -->
+                <ul class="mkt-tiles" aria-label="오늘 시장 지표">
+                    <li v-for="t in marketTiles" :key="t.key" class="mkt-tile" :class="t.cls">
+                        <span class="mt-name">{{ t.label }}</span>
+                        <b class="mt-price">{{ t.priceText }}</b>
+                        <span class="mt-chg">{{ t.chgText }}</span>
+                        <svg v-if="t.chart" class="mt-chart" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+                            <polygon class="mt-area" :points="t.chart.area" />
+                            <line class="mt-base" x1="0" x2="100" :y1="t.chart.base" :y2="t.chart.base" vector-effect="non-scaling-stroke" />
+                            <polyline :points="t.chart.line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
                         </svg>
-                        <b class="idx-price">{{ usRateItem.priceText }}</b>
-                        <span class="badge" :class="usRateItem.cls">{{ usRateItem.chgText }}</span>
-                    </li>
-                    <li v-for="m in indexCards" :key="m.key" class="row idx-row">
-                        <span class="idx-name">{{ m.label }}</span>
-                        <svg v-if="m.sparkPoints" class="idx-spark" :class="m.sparkCls" viewBox="0 0 64 24" preserveAspectRatio="none" aria-hidden="true">
-                            <polyline :points="m.sparkPoints" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
-                        </svg>
-                        <b class="idx-price">{{ m.priceText }}</b>
-                        <span class="badge" :class="m.todayCls">{{ m.todayText }}</span>
-                    </li>
-                    <li v-if="fxItem" class="row idx-row">
-                        <span class="idx-name">원/달러</span>
-                        <svg v-if="fxItem.sparkPoints" class="idx-spark" :class="fxItem.sparkCls" viewBox="0 0 64 24" preserveAspectRatio="none" aria-hidden="true">
-                            <polyline :points="fxItem.sparkPoints" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
-                        </svg>
-                        <b class="idx-price">{{ fxItem.priceText }}</b>
-                        <span class="badge" :class="fxItem.cls">{{ fxItem.pctText }}</span>
                     </li>
                 </ul>
+                <!-- 오늘의 경제 이슈(2026-11-22): 공개된 것이 있을 때만. 누르면 상세(+ 오늘 강했던 업종 TOP 3) -->
+                <button v-if="issue" type="button" class="issue-card" @click="router.push(ISSUE_PATH)">
+                    <span class="ic-head"><b>오늘의 경제 이슈</b><span>{{ issueDate }}</span></span>
+                    <span v-if="issue.keywords.length" class="ic-kw"><span v-for="k in issue.keywords" :key="k">#{{ k }}</span></span>
+                    <span class="ic-title">{{ issue.title }}</span>
+                    <span class="ic-arrow" aria-hidden="true">›</span>
+                </button>
             </section>
 
             <!-- 내 관심 종목: 담은 종목이 있을 때만 오늘 시장 바로 아래에(2026-11-22 오늘 시장을 맨 위로). 오늘 소식은 일봉으로 판단한다 -->
@@ -97,10 +89,10 @@
                 </div>
             </section>
 
-            <!-- ── 2. 시장이 주목하는 종목(최대 3): 한 줄씩(순위 · 이름 · 가격 · 등락 배지). 줄을 누르면 AI 분석 ── -->
+            <!-- ── 2. AI 분석 종목 TOP(최대 3, 2026-11-22 '시장이 주목하는 종목'에서 이름 변경): 한 줄씩(순위 · 이름 · 가격 · 등락 배지). 줄을 누르면 AI 분석 ── -->
             <section class="sec watch" aria-labelledby="watch-title">
                 <div class="sec-head">
-                    <h2 id="watch-title">시장이 주목하는 종목</h2>
+                    <h2 id="watch-title">AI 분석 종목 TOP</h2>
                     <span v-if="basisText" class="meta">{{ basisText }}</span>
                 </div>
 
@@ -130,8 +122,9 @@
                         </component>
                     </li>
                 </ol>
-                <button v-if="canOpen(BUY_TARGET_PATH)" type="button" class="more" @click="router.push(BUY_TARGET_PATH)">주목 종목 전체 보기</button>
+                <button v-if="canOpen(BUY_TARGET_PATH)" type="button" class="more" @click="router.push(BUY_TARGET_PATH)">AI 분석 종목 전체 보기</button>
             </section>
+
 
             <!-- ── 3. 이번 주의 차트: 전 주 선정 종목 1개(2026-11-22 '성과' 섹션을 대체). 성과 숫자는 홈에 두지 않는다 ── -->
             <WeeklyChart />
@@ -206,7 +199,8 @@ import { numOrNull, formatNumber, changeInfo } from '@scripts/stockSignals.js';
 import { marketWeather, dailyRate } from '@scripts/persona.js';
 import { judgeStockNews, itemFromChart } from '@scripts/stockNews.js';
 import { useWatchlistStore } from '@scripts/stores/watchlist-store.js';
-import { HONEY_PATH } from '@scripts/support.js';
+import { HONEY_PATH, ISSUE_PATH } from '@scripts/support.js';
+import { issueDateText } from '@/components/Issue/issueText.js';
 import { enablePushNotifications } from '@scripts/usePushNotifications.js';
 import { Capacitor } from '@capacitor/core';
 
@@ -308,7 +302,7 @@ const fxItem = computed(() => {
     const rate = numOrNull(m.rate);
     const change = numOrNull(m.change);
     const dir = dirOf(rate ?? 0);
-    const chgPart = change !== null && dir !== 0 ? `${signed(change, 2)} ` : '';  // 예) −4.70 (0.34%)
+    const chgPart = change !== null && dir !== 0 ? `${signed(change, 2)} ` : (rate !== null && dir !== 0 ? `${dir > 0 ? '+' : '−'}` : '');  // 예) −4.70 (0.34%)
     return {
         priceText: priceText(m.price),
         // 미니 차트 색은 지수와 같이 20일 흐름 기준
@@ -335,6 +329,52 @@ const usRateItem = computed(() => {
     };
 });
 const weather = computed(() => marketWeather(marketData.value));
+
+/* ── 오늘의 경제 이슈 ── GET /api/v1/daily-issue (공개된 것만, 비로그인 허용). 없거나 실패하면 카드를 숨긴다 */
+const issue = ref(null);
+const loadIssue = async () => {
+    try {
+        const { data } = await aibeesApi.get('/api/v1/daily-issue');
+        issue.value = data?.data?.issue ?? null;
+    } catch { issue.value = null; }
+};
+const issueDate = computed(() => issueDateText(issue.value?.ymd));
+
+// 옆으로 넘기는 시장 카드용 차트: 선 + 옅은 면 + 기간 첫 값 점선(기준선). viewBox 100×40
+const tileChart = (values) => {
+    const vs = (values || []).map(numOrNull).filter(v => v !== null);
+    if (vs.length < 2) return null;
+    const min = Math.min(...vs);
+    const span = Math.max(...vs) - min || 1;
+    const y = (v) => (36 - (v - min) / span * 32).toFixed(1);
+    const pts = vs.map((v, i) => `${(i / (vs.length - 1) * 100).toFixed(1)},${y(v)}`);
+    return { line: pts.join(' '), area: `0,40 ${pts.join(' ')} 100,40`, base: y(vs[0]) };
+};
+// 지수 오늘 변동폭: 서버가 change 를 주지 않으면 현재가와 등락률로 계산한다
+const indexChange = (m, r1) => {
+    const c = numOrNull(m.change);
+    if (c !== null) return c;
+    const p = numOrNull(m.price);
+    return p === null || r1 === null ? null : p - p / (1 + r1 / 100);
+};
+const marketTiles = computed(() => {
+    const out = [];
+    const rate = marketData.value.find(x => x.key === 'us10y');
+    if (usRateItem.value) out.push({ key: 'us10y', label: '달러 금리', priceText: usRateItem.value.priceText, chgText: usRateItem.value.chgText, cls: usRateItem.value.cls, chart: tileChart(rate?.spark) });
+    for (const m of marketData.value.filter(x => !NON_INDEX_KEYS.includes(x.key))) {
+        const r1 = dailyRate(m);
+        const c = indexChange(m, r1);
+        out.push({
+            key: m.key, label: INDEX_LABEL[m.key] ?? m.label ?? m.code, priceText: priceText(m.price),
+            chgText: r1 === null ? '' : (c === null ? `${signed(r1, 2)}%` : `${signed(c, 2)} (${Math.abs(r1).toFixed(2)}%)`),
+            cls: clsOf(r1), chart: tileChart(m.spark),
+        });
+    }
+    const fx = marketData.value.find(x => x.key === 'usdkrw');
+    if (fxItem.value) out.push({ key: 'usdkrw', label: '원/달러', priceText: fxItem.value.priceText, chgText: fxItem.value.chgText, cls: fxItem.value.cls, chart: tileChart(fx?.spark) });
+    return out;
+});
+
 
 /* ── 2. AI 분석 종목 ── (날짜를 보내지 않으면 서버가 가장 최근 표시일을 고른다)
  *   2026-11-15 '시장이 주목하는 회사'(근거·살 만한 가격·내 조건 충족)에서 되돌림: 종목 이름·등락과 AI 분석·차트 확인 버튼만. */
@@ -461,6 +501,7 @@ onMounted(() => {
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
     loadMarketSnapshot();
+    loadIssue();
     marketTimer = setInterval(loadMarketSnapshot, 60 * 1000);
     loadItems();
     loadNotices();
@@ -851,6 +892,37 @@ button { font: inherit; letter-spacing: inherit; }
 .idx-price { flex: none; min-width: 84px; text-align: right; font-size: 16px; font-weight: 600; }
 // 오늘 등락은 TOP 3 와 같은 .badge(빨강·파랑 둥근 박스)로 통일
 
+// 오늘의 경제 이슈 카드(오늘 시장 안, 지표 카드 아래)
+.issue-card {
+    position: relative; display: block; width: 100%; box-sizing: border-box; margin-top: $gap;
+    padding: $card-pad 40px $card-pad $card-pad; border: 0; border-radius: $radius; background: $bg;
+    color: inherit; font: inherit; letter-spacing: inherit; text-align: left; cursor: pointer;
+}
+.ic-head { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: $sub; b { font-size: 13.5px; color: $amber-700; } }
+.ic-kw { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; span { padding: 2px 8px; border-radius: 8px; background: $card; border: 1px solid $line; font-size: 12px; font-weight: 700; color: $sub-ink; } }
+.ic-title { display: block; margin-top: 8px; font-size: 16px; font-weight: 700; line-height: 1.45; word-break: keep-all; }
+.ic-arrow { position: absolute; right: $card-pad; top: 50%; transform: translateY(-50%); font-size: 20px; color: $sub; }
+
+
+// 오늘 시장: 옆으로 넘기는 카드(2026-11-22). 폰은 2장 반이 보여 넘길 수 있다는 걸 알리고, 넓은 화면은 4장이 나란히 채운다
+.mkt-tiles {
+    display: flex; gap: 10px; margin: 4px (-$pad-x) 0; padding: 4px $pad-x 8px; list-style: none;
+    overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 $pad-x; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; &::-webkit-scrollbar { display: none; }
+}
+.mkt-tile {
+    flex: 1 0 128px; min-width: 128px; scroll-snap-align: start; box-sizing: border-box;
+    padding: 14px 14px 12px; border: 1px solid $line; border-radius: 14px; background: $card;
+    display: flex; flex-direction: column; color: $sub-ink;
+    &.up { color: $up; } &.down { color: $down; }
+}
+.mt-name { font-size: 14px; color: $sub-ink; }
+.mt-price { margin-top: 4px; font-size: 19px; font-weight: 700; color: $ink; letter-spacing: -0.4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mt-chg { margin-top: 2px; min-height: 18px; font-size: 13px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mt-chart { display: block; width: 100%; height: 44px; margin-top: 10px; }
+.mt-area { fill: currentColor; opacity: .08; }
+.mt-base { stroke: $sub; stroke-width: 1; stroke-dasharray: 2 3; opacity: .6; }
+
 // 한 줄 종목: 순위 · 이름 · 가격 · 배지
 .line-row {
     width: 100%;
@@ -931,10 +1003,11 @@ button { font: inherit; letter-spacing: inherit; }
     em { font-style: normal; margin-left: 4px; font-weight: 600; color: $amber-700; }
 }
 /* ── 내 관심 종목 ── */
-.my-watch { padding-top: 8px; padding-bottom: 16px; }
-.mw-box { padding: 15px; border-radius: $radius; background: $honey-strip; ul { margin: 8px 0 0; padding: 0; list-style: none; } li { min-height: 58px; display: flex; align-items: center; gap: 8px; } }
-.mw-head { display: flex; align-items: center; justify-content: space-between; h2 { margin: 0; font-size: 16px; } }
-.mw-tag { height: 24px; padding: 0 7px; border: 0; border-radius: $radius-sm; background: $card; color: $amber-700; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; }
+// 2026-11-22 노란 상자 제거: 다른 섹션처럼 흰 섹션 하나로(제목 크기도 통일)
+.my-watch { padding-bottom: 16px; }
+.mw-box { ul { margin: 8px 0 0; padding: 0; list-style: none; } li { min-height: 58px; display: flex; align-items: center; gap: 8px; } }
+.mw-head { display: flex; align-items: center; justify-content: space-between; h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; } }
+.mw-tag { height: 24px; padding: 0 7px; border: 0; border-radius: $radius-sm; background: $honey-100; color: $amber-700; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; }
 .mw-text { flex: 1; min-width: 0; b { display: block; font-size: 15px; font-weight: 600; } small { display: block; margin-top: 3px; font-size: 12.5px; color: $honey-ink; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; &.quiet { color: $sub; } } }
 .mw-val { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; b { font-size: 14px; font-weight: 600; } .badge { height: 21px; min-width: 56px; font-size: 12px; } }
 .w-li { position: relative; .line-row { padding-right: 32px; } }
@@ -944,4 +1017,17 @@ button { font: inherit; letter-spacing: inherit; }
 .honey .sec-head { display: flex; justify-content: space-between; align-items: center; }
 .honey .sec-head h2 { white-space: nowrap; }
 .honey-more { flex: none; border: 0; background: transparent; padding: 0; font: inherit; font-size: 13.5px; color: $sub; font-weight: 600; cursor: pointer; }
+
+/* ══ 2026-11-22 간격 통일(8px 격자, 토큰: _home-tokens.scss) — 위의 섹션별 값보다 이 블록이 우선 ══
+   섹션 위아래 24 · 제목→내용 12 · 한 줄 56 · 보조 줄이 붙는 줄 48(+보조 줄+12) · 카드 안쪽 16 · 사이 12 */
+.sec, .market, .my-watch, .notice, .hero-ad { padding-top: $sec-pt; padding-bottom: $sec-pb; }
+.sec-head, .mw-head, .notice .sec-head { margin-bottom: $head-gap; }
+.rows, .mw-box ul, .notice-list { margin: 0; }
+.weather { margin: 0 0 $gap; }
+.mkt-tiles { margin: 0 (-$pad-x); padding: 0 $pad-x; gap: $gap; }
+.mkt-tile { padding: $card-pad; }
+.line-row, .mw-box li, .notice-line { min-height: $row-h; }
+.w-li { padding: 0 0 $gap; .line-row { min-height: $row-h-sub; } &:last-child { padding-bottom: 0; } }
+.more { margin-top: $gap; margin-bottom: -$sec-pb; }
+.sec-head .meta-link { margin: -4px 0; }   // 누르기 쉬운 32px 링크가 제목 줄을 밀지 않게
 </style>

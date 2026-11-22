@@ -35,6 +35,7 @@ import SupportLicenses from '@/components/Support/SupportLicenses.vue'
 import HoneyCollect from '@/components/Honey/HoneyCollect.vue'
 import HoneyHistory from '@/components/Honey/HoneyHistory.vue'
 import HoneyInvite from '@/components/Honey/HoneyInvite.vue'
+import IssueDetail from '@/components/Issue/IssueDetail.vue'
 import TrainingQuizHome from '@/components/Training/TrainingQuizHome.vue'
 import TrainingQuizPlay from '@/components/Training/TrainingQuizPlay.vue'
 import TrainingLesson from '@/components/Training/TrainingLesson.vue'
@@ -124,6 +125,7 @@ const routes = [
     { path: "/honey", name: "honey", component: HoneyCollect },
     { path: "/honey/history", name: "honey-history", component: HoneyHistory },
     { path: "/honey/invite", name: "honey-invite", component: HoneyInvite },
+    { path: "/issue/:ymd(\\d{8})?", name: "issue", component: IssueDetail },
     {
         path: "/training/glossary",
         name: "training-glossary",

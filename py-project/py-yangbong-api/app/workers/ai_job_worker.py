@@ -37,6 +37,7 @@ log = logging.getLogger("ai_worker")
 POLL_SECONDS = 2
 CONCURRENCY_REFRESH_SECONDS = 60
 RECOVER_EVERY_SECONDS = 300
+DAILY_ISSUE_CHECK_SECONDS = 60     # 오늘의 경제 이슈: 1분마다 만들 차례인지 본다(daily_issue_service.run_due)
 STALE_AFTER = timedelta(minutes=10)
 MAX_ATTEMPTS = 2
 MAX_CONCURRENCY = 8                 # 공통코드에 큰 값을 넣어도 이 이상은 돌리지 않는다
@@ -85,6 +86,8 @@ class AiJobWorker:
         self._concurrency = DEFAULT_CONCURRENCY
         self._concurrency_read_at = 0.0
         self._recovered_at = 0.0
+        self._issue_checked_at = 0.0
+        self._issue_future = None
 
     # ── KIS (프로세스당 1개) ───────────────────────────────────
     @property
@@ -168,6 +171,7 @@ class AiJobWorker:
                 self._running = {jid: f for jid, f in self._running.items() if not f.done()}
                 if time.monotonic() - self._recovered_at >= RECOVER_EVERY_SECONDS:
                     self._recover_stale()
+                self._maybe_daily_issue(pool)
 
                 free = self._read_concurrency() - len(self._running)
                 claimed = self._claim(free) if free > 0 else []
@@ -184,6 +188,28 @@ class AiJobWorker:
                 except Exception:  # noqa: BLE001 — 남은 건 다음 기동 때 복구된다
                     pass
         log.info("AI 워커 종료")
+
+    # ── 오늘의 경제 이슈(sql/yangbong/014) ─────────────────────
+    def _maybe_daily_issue(self, pool):
+        """1분마다 한 번. AI 호출이 길어 작업 풀에서 돌리고, 돌고 있으면 다시 넣지 않는다."""
+        if time.monotonic() - self._issue_checked_at < DAILY_ISSUE_CHECK_SECONDS:
+            return
+        self._issue_checked_at = time.monotonic()
+        if self._issue_future is not None and not self._issue_future.done():
+            return
+        self._issue_future = pool.submit(self._run_daily_issue)
+
+    def _run_daily_issue(self):
+        from app.services import daily_issue_service
+        session = self._db.get_session()
+        try:
+            if daily_issue_service.run_due(session):
+                log.info("오늘의 경제 이슈 만들기 완료")
+        except Exception as e:  # noqa: BLE001 — FAILED 로 남고 10분 뒤 다시(하루 3번까지)
+            session.rollback()
+            log.error(f"오늘의 경제 이슈 만들기 실패: {e}")
+        finally:
+            session.remove()
 
     def stop(self, *_):
         self._stop.set()

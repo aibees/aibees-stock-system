@@ -26,7 +26,7 @@ export const PICKS_PATH = '/start';
 export const GUEST_PATHS = ['/home', INTRO_PATH, ONBOARDING_PATH, PICKS_PATH, '/menu', '/stock', '/stock/preset', '/stock/persona', '/stock/buy-target', '/stock/chart', '/board/notice', '/board/notice/detail'];
 
 /** 트레이닝(/training, /training/<장>, /training/<장>/<단계>)도 가입 없이 연다. 메뉴 권한과 무관한 정적 라우트다. */
-export const GUEST_PREFIXES = ['/training', '/support', '/honey'];
+export const GUEST_PREFIXES = ['/training', '/support', '/honey', '/issue'];
 
 export const isGuestPath = (path) =>
     GUEST_PATHS.includes(path) || GUEST_PREFIXES.some(p => path === p || path.startsWith(p + '/'));
