@@ -23,7 +23,7 @@ export const PICKS_PATH = '/start';
  */
 // 홈에서 이어지는 화면(매수추천·공지)도 연다 — 안 그러면 홈의 "전체 보기"·공지를 누른 비로그인이 로그인 화면으로 튕긴다.
 // 종목 상세(/stock/info)는 넣지 않는다(2026-11-20) — 재무·뉴스·AI 분석이 로그인 사용자용이라 비로그인은 로그인 화면으로 안내한다.
-export const GUEST_PATHS = ['/home', INTRO_PATH, ONBOARDING_PATH, PICKS_PATH, '/menu', '/stock', '/stock/preset', '/stock/buy-target', '/stock/chart', '/board/notice', '/board/notice/detail'];
+export const GUEST_PATHS = ['/home', INTRO_PATH, ONBOARDING_PATH, PICKS_PATH, '/menu', '/stock', '/stock/preset', '/stock/persona', '/stock/buy-target', '/stock/chart', '/board/notice', '/board/notice/detail'];
 
 /** 트레이닝(/training, /training/<장>, /training/<장>/<단계>)도 가입 없이 연다. 메뉴 권한과 무관한 정적 라우트다. */
 export const GUEST_PREFIXES = ['/training', '/support'];

@@ -24,6 +24,7 @@ import Onboarding from '@/components/Home/Onboarding.vue'
 import IntroPage from '@/components/Home/IntroPage.vue'
 import FirstPicks from '@/components/Home/FirstPicks.vue'
 import StockPreset from '@/components/Stocks/StockPreset.vue'
+import StockPersona from '@/components/Stocks/StockPersona.vue'
 import TrainingHub from '@/components/Training/TrainingHub.vue'
 import TrainingHome from '@/components/Training/TrainingHome.vue'
 import TrainingGlossary from '@/components/Training/TrainingGlossary.vue'
@@ -86,6 +87,12 @@ const routes = [
         path: "/stock/preset",
         name: "stock-preset",
         component: StockPreset
+    },
+    {
+        // 내 성향 변경(2026-11-22 내 설정에서 분리). 성향은 여기서 바꾸고 보조지표 수치는 내 설정에서 고친다.
+        path: "/stock/persona",
+        name: "stock-persona",
+        component: StockPersona
     },
     {
         // 트레이닝 첫 화면: 수업 듣기 · 퀴즈 · 용어 사전 입구. 비로그인 접근 가능(authPaths.GUEST_PREFIXES).

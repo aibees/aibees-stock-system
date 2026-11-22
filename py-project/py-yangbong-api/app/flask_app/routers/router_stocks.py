@@ -3,7 +3,8 @@
 
     GET /api/v1/stocks/id/<stock_code>/finance   재무지표 — API 는 KIS 를 부르지 않는다. AI 워커가 채운 캐시
                                                   (stock_finance_snapshot)를 읽고, 없거나 10분 지났으면 finance 작업을 넣는다.
-    GET /api/v1/stocks/buy-target/home           홈 'AI 분석 종목 TOP 3' — 서버가 내 설정으로 판정·정렬해 몇 줄만 준다.
+    GET /api/v1/stocks/buy-target/home           홈 '시장이 주목하는 종목' — 서버가 내 설정으로 판정·정렬해 몇 줄만 준다.
+    GET /api/v1/stocks/weekly-chart              홈 '이번 주의 차트' — 전 주 선정 종목 중 신호가 가장 선명한 1개(2026-11-22).
 시세 출처는 DB 일봉(StockService 기본값). 최우선타겟(매매)은 없다.
 """
 import json
@@ -18,6 +19,7 @@ from web_shared.routers.router_stocks import create_stocks_blueprint, buy_target
 from web_shared.services.stocks.StockService import StockService
 from app.flask_app.routers.router_ai_job import aiJobServiceImpl
 from app.services.stocks.HomePickService import home_picks
+from app.services.stocks.WeeklyChartService import weekly_chart
 
 stockServiceImpl = StockService()
 
@@ -69,3 +71,18 @@ def select_buy_target_home():
         logging.error(str(e))
         traceback.print_exc()
         return ApiResponse.error("추천 종목을 불러오지 못했습니다.")
+
+
+# 홈 '이번 주의 차트' — 전 주에 양봉상회가 실제로 고른 종목 중 신호가 가장 선명한 1개와 봉(선정 이후 봉 포함).
+#   GET /weekly-chart   로그인 없이 열린다. 응답: {ymd, stock_code, stock_name, close, lines[≤3], bars[], marker_date} 또는 null
+#   수익률 등 성과 숫자는 내리지 않는다. 선정 규칙·사후 각색 금지는 WeeklyChartService 머리말 참고.
+@stocks_bp.route('/weekly-chart')
+@optional_auth
+def select_weekly_chart():
+    try:
+        return ApiResponse.success(weekly_chart(
+            stockServiceImpl, g.db, lambda ymd: buy_target_for_request(stockServiceImpl, ymd=ymd, lite=True)))
+    except Exception as e:
+        logging.error(str(e))
+        traceback.print_exc()
+        return ApiResponse.error("이번 주의 차트를 불러오지 못했습니다.")

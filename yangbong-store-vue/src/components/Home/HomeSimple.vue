@@ -97,10 +97,10 @@
                 </ul>
             </section>
 
-            <!-- ── 2. AI 분석 종목 TOP 3: 한 줄씩(순위 · 이름 · 가격 · 등락 배지). 줄을 누르면 AI 분석 ── -->
+            <!-- ── 2. 시장이 주목하는 종목(최대 3): 한 줄씩(순위 · 이름 · 가격 · 등락 배지). 줄을 누르면 AI 분석 ── -->
             <section class="sec watch" aria-labelledby="watch-title">
                 <div class="sec-head">
-                    <h2 id="watch-title">AI 분석 종목 TOP 3</h2>
+                    <h2 id="watch-title">시장이 주목하는 종목</h2>
                     <span v-if="basisText" class="meta">{{ basisText }}</span>
                 </div>
 
@@ -133,48 +133,16 @@
                 <button v-if="canOpen(BUY_TARGET_PATH)" type="button" class="more" @click="router.push(BUY_TARGET_PATH)">주목 종목 전체 보기</button>
             </section>
 
-            <!-- ── 3. 지난달 성과: 큰 숫자 하나 + 1위 종목. 계산 기준 안내는 ⓘ 뒤로, 나머지 종목은 '전체 보기'로 펼친다 ── -->
-            <section v-if="perf && perf.evaluated_count" class="sec perf" aria-labelledby="perf-title">
-                <div class="sec-head">
-                    <h2 id="perf-title">
-                        {{ perfMonthLabel }} 양봉상회 성과
-                        <button type="button" class="info-btn" :aria-expanded="perfInfo ? 'true' : 'false'" aria-label="성과 계산 기준 보기"
-                            @click="perfInfo = !perfInfo">i</button>
-                    </h2>
-                </div>
-                <p v-if="perfInfo" class="foot-note">
-                    표시일 종가 대비 이후 {{ perf.hold_days }}거래일 중 가장 높았던 가격 기준이며, 실제로 판 가격과 다를 수 있습니다.
-                    같은 종목은 그 달 처음 표시된 1건만 셉니다.
-                </p>
+            <!-- ── 3. 이번 주의 차트: 전 주 선정 종목 1개(2026-11-22 '성과' 섹션을 대체). 성과 숫자는 홈에 두지 않는다 ── -->
+            <WeeklyChart />
 
-                <div class="hero">
-                    <span class="hero-label">상위 {{ perf.top_pct }}% 평균 · {{ perf.top_count }}종목</span>
-                    <b class="hero-big" :class="clsOf(perf.top_avg_return)">{{ pctText(perf.top_avg_return) }}</b>
-                    <span class="hero-sub">전체 평균 <b :class="clsOf(perf.avg_return)">{{ pctText(perf.avg_return) }}</b> · {{ perf.evaluated_count }}종목</span>
-                </div>
+            <!-- ── 4. 내 기준: 로그인·기준 상태별 3분기 — 2026-11-22 당분간 홈에서 뺌(컴포넌트·import 는 그대로 두고 주석 처리) ──
+            <MyCriteria :is-logged-in="isLoggedIn" :has-criteria="persona.decided" :type="type"
+                :matched-count="pick.matched_count || 0" :first-name="pick.items[0]?.stock_name || ''"
+                :backtest-open="canOpen('/stock/backtest')" />
+            -->
 
-                <component v-if="!perfAll && perf.top_list.length" :is="canOpenDetail ? 'button' : 'div'" :type="canOpenDetail ? 'button' : undefined"
-                    class="best" :class="{ link: canOpenDetail }" @click="canOpenDetail && goToPerfStock(perf.top_list[0])">
-                    <span class="best-tag">1위</span>
-                    <span class="line-name">{{ perf.top_list[0].stock_name }}</span>
-                    <span class="badge" :class="clsOf(perf.top_list[0].max_return)">{{ pctText(perf.top_list[0].max_return) }}</span>
-                </component>
-                <ol v-else-if="perfAll" class="rows">
-                    <li v-for="(p, i) in perf.top_list" :key="p.stock_code">
-                        <component :is="canOpenDetail ? 'button' : 'div'" :type="canOpenDetail ? 'button' : undefined"
-                            class="row line-row" :class="{ link: canOpenDetail }" @click="canOpenDetail && goToPerfStock(p)">
-                            <span class="r-rank">{{ i + 1 }}</span>
-                            <span class="line-name">{{ p.stock_name }}</span>
-                            <span class="line-sub">{{ mdText(p.ymd) }} → {{ mdText(p.peak_ymd) }}</span>
-                            <span class="badge" :class="clsOf(p.max_return)">{{ pctText(p.max_return) }}</span>
-                        </component>
-                    </li>
-                </ol>
-                <button v-if="perf.top_list.length > 1" type="button" class="more" :aria-expanded="perfAll ? 'true' : 'false'"
-                    @click="perfAll = !perfAll">{{ perfAll ? '접기' : '상위 종목 전체 보기' }}</button>
-            </section>
-
-            <!-- 광고 1자리: 성과와 공지 사이(AD_FREE·앱 네이티브 광고 환경에서는 비어 있다) -->
+            <!-- 광고 1자리: 이번 주의 차트와 공지 사이(AD_FREE·앱 네이티브 광고 환경에서는 비어 있다) -->
             <section v-if="heroAdVisible" class="sec hero-ad" aria-label="광고">
                 <AdSlot placement="homeHero" />
             </section>
@@ -208,12 +176,15 @@
 
 <script setup>
 /**
- * 양봉상회 홈(2026-11-15 개편 1차). 순서: 시황 → AI 분석 종목(≤3) → 지난달 성과 → 공지.
+ * 양봉상회 홈(2026-11-15 개편 1차, 2026-11-22 회의로 성과 삭제).
+ * 순서: 시황 → 시장이 주목하는 종목(≤3) → 이번 주의 차트 → (내 기준: 주석 처리) → 공지.
  * 데이터는 기존 홈과 같은 API(전부 비로그인 허용)를 쓴다. 알고리즘·계산은 그대로다.
  *   - AI 분석 종목: 종목 이름·등락과 AI 분석·차트 확인 버튼만(근거·살 만한 가격·내 조건 충족은 2026-11-15 뺌).
  *   - 내 설정(보조지표 수치)으로 거르고 설정한 순서로 정렬하는 일은 서버가 한다(/stocks/buy-target/home, 2026-11-18).
  */
 import AdSlot from '../common/AdSlot.vue';
+import WeeklyChart from './WeeklyChart.vue';
+// import MyCriteria from './MyCriteria.vue';   // 내 기준 카드 — 홈에서 뺌(2026-11-22). 다시 쓸 때 위 템플릿 주석과 함께 푼다
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
 import { usePersonaStore } from '@scripts/stores/persona-store.js';
@@ -459,27 +430,7 @@ const goToStock = (item) => router.push({
     query: { stock_code: item.stock_code, stock_name: item.stock_name, ymd: String(item.ymd ?? '').replaceAll('-', '') },
 });
 
-/* ── 3. 지난달 성과 ── (서버가 표시일 종가 → 5거래일 내 최고가를 계산, 6시간 캐시) */
-const perf = ref(null);
-const loadPerformance = async () => {
-    try {
-        const { data } = await aibeesApi.get('/api/v1/stocks/buy-target/performance');
-        perf.value = data?.data ?? null;
-    } catch (e) { perf.value = null; }
-};
-const perfMonthLabel = computed(() => (perf.value ? `${Number(perf.value.ym.slice(4, 6))}월` : ''));
-// 성과 리스트: 상위 3종목만 먼저, 나머지는 '더 보기'로 펼친다.
-const PERF_COUNT = 3;
-const perfAll = ref(false);
-const perfInfo = ref(false);   // ⓘ: 성과 계산 기준 안내 펼침
-const perfRows = computed(() => {
-    const list = perf.value?.top_list ?? [];
-    return perfAll.value ? list : list.slice(0, PERF_COUNT);
-});
-const goToPerfStock = (p) => router.push({
-    path: '/stock/info',
-    query: { stock_code: p.stock_code, stock_name: p.stock_name, ymd: String(p.ymd).replaceAll('-', '') },
-});
+/* '지난달 성과'는 2026-11-22 회의로 홈에서 뺐다(성과 숫자는 백테스트 안의 비교로만 남긴다). */
 
 /* ── 공지 ── */
 const notices = ref([]);
@@ -502,7 +453,6 @@ onMounted(() => {
     loadMarketSnapshot();
     marketTimer = setInterval(loadMarketSnapshot, 60 * 1000);
     loadItems();
-    loadPerformance();
     loadNotices();
 });
 
@@ -811,18 +761,6 @@ button { font: inherit; letter-spacing: inherit; }
 @keyframes pulse { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .w-skeleton i { animation: none; } }
 
-/* ── 3. 성과 ── */
-.hero {
-    display: flex;
-    flex-direction: column;
-    margin: 18px 0 6px;
-    .hero-label { font-size: 14px; color: $sub-ink; }
-    .hero-big { font-size: 34px; font-weight: 700; letter-spacing: -1px; line-height: 1.25; color: $ink; &.up { color: $up; } &.down { color: $down; } }
-    .hero-sub { margin-top: 4px; font-size: 14px; color: $sub; b { font-weight: 600; } }
-}
-.perf-rows { margin-top: 16px; padding-top: 4px; border-top: 1px solid $line; }
-.foot-note { margin: 6px 0 16px; font-size: 12px; line-height: 1.55; color: $sub-2; word-break: keep-all; }
-
 .hero-ad { padding: 12px $pad-x; }
 
 /* ── 공지 ── */
@@ -879,13 +817,6 @@ button { font: inherit; letter-spacing: inherit; }
 }
 .row { min-height: 68px; }
 .r-val { gap: 4px; align-items: flex-end; }
-.hero {
-    margin: 16px 0 4px;
-    padding: 18px;
-    border-radius: $radius;
-    background: $honey-50;
-}
-.perf-rows { margin-top: 8px; padding-top: 0; border-top: 0; }
 .notice-list li:last-child .notice-row { border-bottom: 0 !important; }
 .notice-row {
     .notice-title { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -928,45 +859,6 @@ button { font: inherit; letter-spacing: inherit; }
 .line-price { flex: none; font-size: 16px; font-weight: 600; }
 .line-sub { flex: none; font-size: 13px; color: $sub; }
 .badge { height: 24px; min-width: 62px; justify-content: center; }
-
-// 성과
-.info-btn {
-    width: 18px;
-    height: 18px;
-    padding: 0;
-    border: 1.5px solid $sub-2;
-    border-radius: 9px;
-    background: transparent;
-    color: $sub-2;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    &[aria-expanded="true"] { border-color: $ink; color: $ink; }
-}
-.perf .foot-note { margin: -4px 0 12px; }
-.hero { margin: 0; padding: 0; background: transparent; border-radius: 0; .hero-big { font-size: 36px; margin-top: 4px; } }
-.best {
-    width: 100%;
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 20px;
-    padding: 14px 16px;
-    border: 0;
-    border-radius: $radius;
-    background: $honey-50;
-    color: inherit;
-    text-align: left;
-    &.link { cursor: pointer; }
-    .best-tag { flex: none; font-size: 13px; font-weight: 700; color: $amber-700; }
-    .line-name { font-size: 15px; }
-}
-.perf .rows { margin-top: 12px; }
 
 // 공지: 최신 1줄
 .notice { padding-top: 24px; padding-bottom: 8px; .sec-head { margin-bottom: 4px; } }
@@ -1028,8 +920,6 @@ button { font: inherit; letter-spacing: inherit; }
     text-overflow: ellipsis;
     em { font-style: normal; margin-left: 4px; font-weight: 600; color: $amber-700; }
 }
-.best { background: $honey-strip; }
-
 /* ── 내 관심 종목 ── */
 .my-watch { padding-top: 8px; padding-bottom: 16px; }
 .mw-box { padding: 15px; border-radius: $radius; background: $honey-strip; ul { margin: 8px 0 0; padding: 0; list-style: none; } li { min-height: 58px; display: flex; align-items: center; gap: 8px; } }

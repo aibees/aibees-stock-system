@@ -131,23 +131,28 @@ const base = () => [
     { key: 'usdkrw', label: '원/달러', price: 1382.5, rate: -0.34, change: -4.7, rate_5d: -0.4, rate_20d: 0.9, spark: spark(3, 1370, 0.009) },
 ];
 
-/* ── 지난달 성과 ── */
-const performance = () => ({
-    ym: '202610',
-    hold_days: 5,
-    top_pct: 20,
-    top_count: 6,
-    top_avg_return: 14.8,
-    evaluated_count: 31,
-    avg_return: 6.2,
-    top_list: [
-        { stock_code: '900110', stock_name: '은하디스플레이', ymd: '20261008', entry_price: 15200, peak_ymd: '20261013', peak_price: 18950, max_return: 24.7 },
-        { stock_code: '900120', stock_name: '청솔제약', ymd: '20261015', entry_price: 53800, peak_ymd: '20261020', peak_price: 64100, max_return: 19.1 },
-        { stock_code: '900130', stock_name: '태양전기', ymd: '20261006', entry_price: 8420, peak_ymd: '20261008', peak_price: 9850, max_return: 17.0 },
-        { stock_code: '900140', stock_name: '누리네트웍스', ymd: '20261022', entry_price: 31400, peak_ymd: '20261027', peak_price: 36200, max_return: 15.3 },
-        { stock_code: '900150', stock_name: '바다조선', ymd: '20261012', entry_price: 77100, peak_ymd: '20261016', peak_price: 86500, max_return: 12.2 },
-    ],
-});
+/* ── 이번 주의 차트(/stocks/weekly-chart) ──
+ * 운영은 서버(WeeklyChartService)가 전 주 추천 중 신호가 가장 선명한 종목을 고른다. 목업은 신호 3개가 걸린 푸른로보틱스를
+ * 선정 시점 6거래일 전으로 두고, 선정 이후 봉까지 그대로 내려준다. 주소에 ?weekly=none 을 붙이면 블록이 숨는 경우(null)를 본다. */
+const weeklyChart = () => {
+    if (new URLSearchParams(location.search).get('weekly') === 'none') return null;
+    const s = STOCKS[3];
+    const chart = makeCandles(1003, s.close, s.vol, 1);   // 선정일 이후도 평범한 봉으로(성과를 꾸미지 않는다)
+    const pickIdx = chart.length - 6;
+    return {
+        ymd: chart[pickIdx].date.replaceAll('-', ''),
+        stock_code: s.code,
+        stock_name: s.name,
+        close: chart[pickIdx].close,
+        lines: [
+            '거래량이 전날보다 3.2배 늘었어요',
+            '오르는 흐름으로 바뀌는 신호예요',
+            '사려는 돈이 들어오고 있어요',
+        ],
+        bars: chart.slice(pickIdx - 39),
+        marker_date: chart[pickIdx].date,
+    };
+};
 
 /* ── 메뉴(권한 반영본과 라우트 등록용 전체 목록이 같다) ──
  * 주식 그룹(매수추천·개별주식·개별차트)과 공지(/board/notice). 개별주식·개별차트는 목업 데이터가 일부만 있다. */
@@ -271,7 +276,7 @@ const ROUTES = [
         return okS(MOCK_TRAINING);
     }],
     ['GET', '/api/v1/indicators/market-snapshot', (c) => ok(marketSnapshot(c.params))],
-    ['GET', '/api/v1/stocks/buy-target/performance', () => ok(performance())],
+    ['GET', '/api/v1/stocks/weekly-chart', () => ok(weeklyChart())],
     ['GET', '/api/v1/stocks/buy-target/home', (c) => ok(homePicks(c.params))],
     ['GET', '/api/v1/stocks/buy-target', () => ok(buyTargets())],
     ['GET', '/api/v1/charts/stock', (c) => {
