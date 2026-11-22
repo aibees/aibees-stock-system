@@ -19,6 +19,8 @@ STREAK_BONUS = 50              # 7일 연속 출석한 날
 START = 100                    # 처음 시작하기(질문 3개 → 종목 담기) 1번
 LESSON = 20                    # 트레이닝 단계 1개(단계당 1번)
 QUIZ = 10                      # 오늘의 한 문제 정답(하루 1번)
+CHART_QUIZ = 5                 # 차트 퀴즈에서 같은 방향을 봤을 때(문제당 1번, 처음 풀 때만)
+CHART_QUIZ_DAILY_MAX = 3       # 하루에 차트 퀴즈 꿀을 받는 횟수(구독자가 문제를 끝없이 풀어 꿀을 찍어 내지 못하게)
 AD_REWARDS = (20, 30, 40)      # 광고 1·2·3번째, 그 뒤로는 AD_AFTER
 AD_AFTER = 30
 AD_DAILY_MAX = 10
@@ -145,6 +147,16 @@ def buy_day_pass(session, user_id: int) -> datetime:
 
 
 # ── 읽기 ──────────────────────────────────────────────
+def chart_quiz_credit(session, user_id: int, question_id: int) -> int:
+    """차트 퀴즈 일치 꿀. 같은 문제는 1번, 하루 CHART_QUIZ_DAILY_MAX 번까지. 받은 양(0 이면 못 받음). 커밋은 호출부."""
+    n = session.execute(text(
+        "SELECT COUNT(*) FROM honey_ledger WHERE user_id = :uid AND kind = 'CHART_QUIZ' AND ymd = :ymd"
+    ), {"uid": user_id, "ymd": ymd_of(now_kst())}).first()[0]
+    if int(n or 0) >= CHART_QUIZ_DAILY_MAX:
+        return 0
+    return credit(session, user_id, 'CHART_QUIZ', str(int(question_id)), CHART_QUIZ)
+
+
 def ad_count_today(session, user_id: int) -> int:
     row = session.execute(text(
         "SELECT COUNT(*) FROM honey_ledger WHERE user_id = :uid AND kind = 'AD' AND ymd = :ymd"

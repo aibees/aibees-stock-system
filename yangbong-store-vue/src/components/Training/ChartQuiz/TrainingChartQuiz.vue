@@ -71,7 +71,7 @@
                         <p>내 선택 {{ choiceLabel(picked) }} · 20일 뒤 실제 {{ signed(result.outcome.returnRate) }}</p>
                         <p v-if="result.isMatch && !result.usedHint" class="sub">힌트 없이 맞춤</p>
                     </div>
-                    <span v-if="!result.retry" class="pts">+{{ result.score }}점</span>
+                    <span v-if="result.honeyGained > 0" class="pts">+{{ result.honeyGained }}꿀</span>
                 </section>
 
                 <section class="cq-card">
@@ -156,6 +156,7 @@
  * 구독: 결제가 아직 없어 꿀의 프리미엄 하루 이용권이 구독을 대신한다(서버 router_training_chart._is_subscriber) — "구독하기"는 꿀 화면으로 간다.
  */
 import { assUserSession } from '@scripts/stores/user-stores';
+import { useHoneyStore } from '@scripts/stores/honey-store.js';
 import { rememberAfterLogin } from '@scripts/authPaths.js';
 import { TRAINING_PATH } from '@scripts/training.js';
 import {
@@ -184,7 +185,7 @@ const hint = ref('');
 const hintLoading = ref(false);
 const submitting = ref(false);
 const sheet = ref(null);        // 'quota' | 'cases'
-const sessionScore = ref(0);
+const sessionScore = ref(0);      // 이번에 받은 꿀 합
 const sessionMatch = ref(0);
 const sessionCount = ref(0);
 
@@ -255,7 +256,8 @@ const answer = async (key) => {
         totalScore.value = r.totalScore ?? totalScore.value;
         if (!r.retry) {
             sessionCount.value += 1;
-            sessionScore.value += r.score;
+            sessionScore.value += r.honeyGained ?? 0;
+            if (r.honeyGained > 0) useHoneyStore().gainedElsewhere(r.honeyGained);
             if (r.isMatch) sessionMatch.value += 1;
         }
         queue.value = queue.value.filter(x => x.questionId !== q.value.questionId);
@@ -292,8 +294,9 @@ const openCases = () => {
 };
 
 const summaryText = computed(() => {
-    if (!sessionCount.value) return `지금까지 모은 점수는 ${totalScore.value.toLocaleString()}점이에요. 내일 새 문제가 기다리고 있어요.`;
-    return `${sessionCount.value}문제 중 ${sessionMatch.value}번 같은 방향을 봤어요. 오늘 ${sessionScore.value}점, 지금까지 ${totalScore.value.toLocaleString()}점이에요.`;
+    if (!sessionCount.value) return '내일 새 문제가 기다리고 있어요.';
+    const honey = sessionScore.value > 0 ? ` 꿀 ${sessionScore.value}개를 모았어요.` : '';
+    return `${sessionCount.value}문제 중 ${sessionMatch.value}번 같은 방향을 봤어요.${honey}`;
 });
 
 const dirCls = (n) => (n > 0 ? 'up' : n < 0 ? 'down' : 'flat');

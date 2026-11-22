@@ -19,7 +19,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export const HONEY_KIND_LABEL = {
     ATTEND: '출석 체크', STREAK: '7일 연속 출석', START: '처음 시작하기', LESSON: '수업 완료',
-    QUIZ: '오늘의 한 문제', AD: '광고 보고 받기', SPEND_DAY_PASS: '프리미엄 하루 이용권',
+    QUIZ: '오늘의 한 문제', CHART_QUIZ: '차트 퀴즈', AD: '광고 보고 받기', SPEND_DAY_PASS: '프리미엄 하루 이용권',
     INVITE: '친구 초대', INVITED: '초대 코드 등록',
 };
 
@@ -80,6 +80,8 @@ export const useHoneyStore = defineStore('honey', () => {
 
     /** 학습 기록 API 가 돌려준 수업 꿀을 반영한다(training-store 가 부른다). */
     const lessonGained = (amount) => { if (amount > 0) { show(amount); load(); } };
+    /** 다른 API 가 함께 지급한 꿀(차트 퀴즈 등)을 반영한다 — 연출 + 요약 다시 받기. */
+    const gainedElsewhere = lessonGained;
 
     /** 프리미엄 하루 이용권. 성공하면 권한을 다시 받아 프리미엄 단계가 바로 열린다. */
     const buyDayPass = async () => {
@@ -189,7 +191,7 @@ export const useHoneyStore = defineStore('honey', () => {
 
     return {
         summary, loading, failed, pop, busy, available, balance, todayEarned, todayTarget, todayLeft, allDone,
-        adSupported, dayPassUntil, load, attend, quizCorrect, startDone, lessonGained, buyDayPass, watchAd, ledger, reset,
+        adSupported, dayPassUntil, load, attend, quizCorrect, startDone, lessonGained, gainedElsewhere, buyDayPass, watchAd, ledger, reset,
         afterAdReward, invite, loadInvite, redeemInvite,
     };
 });
