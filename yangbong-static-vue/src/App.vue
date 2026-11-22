@@ -15,6 +15,10 @@
 
   <footer class="site-foot">
     <div class="wrap">
+      <a class="made" :href="CHAGOK_URL" rel="noopener">
+        <svg width="22" height="16" viewBox="0 0 104 76" aria-hidden="true"><rect x="2" y="56" width="100" height="18" rx="3" fill="#11213A" opacity=".22"/><rect x="6" y="30" width="100" height="18" rx="3" fill="#11213A" opacity=".48"/><rect x="0" y="4" width="100" height="18" rx="3" fill="#E8A33D"/></svg>
+        Chagok Labs<em>가 만듭니다 →</em>
+      </a>
       <nav>
         <RouterLink to="/terms">이용약관</RouterLink>
         <RouterLink to="/privacy"><strong>개인정보 처리방침</strong></RouterLink>
@@ -26,7 +30,7 @@
 </template>
 
 <script setup>
-import { CONTACT } from './site.js';
+import { CONTACT, CHAGOK_URL } from './site.js';
 </script>
 
 <style scoped>
@@ -43,5 +47,11 @@ import { CONTACT } from './site.js';
 .site-foot nav a:hover { color: var(--ink); }
 .site-foot nav strong { color: var(--ink); font-weight: 600; }
 .site-foot p { margin: 2px 0; }
+.made {
+  display: inline-flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 9px 13px;
+  border: 1px solid var(--line); border-radius: 10px; color: var(--ink); font-size: 14px; font-weight: 700; text-decoration: none;
+}
+.made em { font-style: normal; color: var(--sub); font-weight: 600; }
+.made:hover { border-color: var(--brand); }
 .site-foot p a { color: inherit; }
 </style>
