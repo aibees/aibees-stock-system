@@ -20,9 +20,17 @@ _CACHE_SECONDS = 6 * 3600
 _BARS_BEFORE = 40           # 선정일 이전 표시 봉 수
 
 
-def week_days(today: date) -> list:
-    """전 주 금→월 순 날짜(YYYYMMDD). 오늘이 속한 주의 월요일 직전 주."""
-    this_monday = today - timedelta(days=today.weekday())
+SWITCH_HOUR = 8             # 월요일 이 시각에 '전 주'가 막 끝난 주로 바뀐다(2026-11-22 사용자 결정)
+
+
+def week_days(now) -> list:
+    """전 주 금→월 순 날짜(YYYYMMDD). now 는 datetime(date 면 그날 0시로 본다).
+    주는 월요일 08:00 에 바뀐다 — 월요일 08:00 전(토·일·월 새벽)까지는 그 전 주를 계속 보여 준다.
+    예) 11-22(일)·11-23(월) 07:59 → 11-09~13 주, 11-23(월) 08:00 부터 → 11-16~20 주."""
+    if not isinstance(now, datetime):
+        now = datetime(now.year, now.month, now.day)
+    ref = (now - timedelta(hours=SWITCH_HOUR)).date()
+    this_monday = ref - timedelta(days=ref.weekday())
     prev_monday = this_monday - timedelta(days=7)
     return [(prev_monday + timedelta(days=i)).strftime("%Y%m%d") for i in (4, 3, 2, 1, 0)]
 
@@ -73,8 +81,9 @@ def _bars_after(stock_service, session, code, sel_iso, today: date) -> list:
 
 def weekly_chart(stock_service, session, load_items, today: date = None) -> dict:
     """load_items(ymd) → 그 날 추천 목록(요청자 열람 단계로 가공된 것). 전 주 금요일부터 거슬러 올라가 처음 나오는 날을 쓴다."""
-    today = today or date.today()
-    days = week_days(today)
+    now_dt = datetime.now() if today is None else datetime(today.year, today.month, today.day)
+    today = now_dt.date()
+    days = week_days(now_dt)   # 월요일 08:00 에 주가 바뀐다
     cached = _CACHE.get(days[-1])
     now = datetime.now().timestamp()
     if cached and now - cached[0] < _CACHE_SECONDS:
