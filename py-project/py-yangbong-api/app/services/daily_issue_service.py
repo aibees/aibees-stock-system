@@ -4,11 +4,12 @@
 흐름
   1) AI 워커가 매일 06:30(KST) run_due() → make_issue(): 업종 TOP 3(SectorService) + AI(웹 검색 1회)로 글을 만든다.
   2) 공통코드 stock/setting/daily_issue.PUBLISH_MODE
-       REVIEW(기본) : DRAFT 로 저장하고 REVIEW_EMAIL 로 검토 메일. 메일의 [확인]/[보류] → router_daily_issue 의 콜백.
+       REVIEW(기본) : DRAFT 로 저장하고 REVIEW_EMAIL 로 검토 메일. 메일의 [승인]/[반려] → router_daily_issue 의 콜백.
+                      반려하면 REJECTED → 워커가 1분 안에 새 초안(반려된 제목·이유를 AI 에 함께 줌) → 메일 다시(sql/015).
        AUTO         : 바로 PUBLISHED.
   3) 화면은 PUBLISHED 만 본다(GET /api/v1/daily-issue).
 
-검토 링크: /api/v1/daily-issue/review?ymd=&action=publish|hold&exp=&sig=
+검토 링크: /api/v1/daily-issue/review?ymd=&action=publish|reject&exp=&sig=   (예전 메일의 hold 는 reject 로 본다)
   sig = HMAC-SHA256(JWT_SECRET + ':daily-issue', f"{ymd}|{action}|{exp}"). 3일 뒤 만료.
   링크를 열면 확인 화면만 보이고, 그 화면의 버튼(POST)을 눌러야 바뀐다 — 메일 프로그램이 링크를 미리 열어도 공개되지 않게.
 
@@ -34,7 +35,7 @@ log = logging.getLogger("daily_issue")
 
 KST = timezone(timedelta(hours=9))
 RUN_AT = (6, 30)                    # 매일 만드는 시각(KST)
-MAX_ATTEMPTS = 3
+MAX_ATTEMPTS = 5                    # 하루에 만드는 횟수(실패·반려 합산) — AI·검색 비용 상한
 RETRY_AFTER = timedelta(minutes=10)
 LINK_DAYS = 3
 SECTOR_MIN_STOCKS = 5
@@ -171,6 +172,11 @@ def make_issue(session, ymd: str) -> dict:
         f"{i + 1}. [{s['market']} {s['sector_cd']}] {s['sector_name']} {s['chg_rate']:+.1f}% (대표 종목: {', '.join(s['leaders'])})"
         for i, s in enumerate(sectors)) or '(업종 자료 없음)'
     prompt = PROMPT.format(date=_date_text(ymd), sector_date=_date_text(sector_ymd) if sector_ymd else '최근', sectors=sector_lines)
+    feedback = session.execute(text("SELECT feedback FROM daily_issue WHERE ymd = :ymd"), {'ymd': ymd}).scalar()
+    session.commit()
+    if feedback:   # 반려된 초안이 있으면: 같은 글을 다시 쓰지 않게 제목·이유를 함께 준다
+        prompt += ("\n\n같은 날 앞서 만든 초안을 편집자가 반려했어. 아래를 참고해서 다른 이슈를 고르거나, 지적한 점을 고쳐 새로 써. "
+                   "같은 제목·같은 문장을 다시 쓰지 마.\n" + feedback[-1500:])
     try:
         result = AnthropicService().chat(messages=[{'role': 'user', 'content': prompt}], system=SYSTEM,
                                          max_tokens=4000, use_web_search=True)
@@ -241,7 +247,9 @@ def run_due(session) -> str | None:
         st, attempts, updated = r
         # MAKING 이 오래 남았으면(워커가 죽었던 흔적) 실패로 보고 다시
         stuck = st == 'MAKING' and updated and now - updated > RETRY_AFTER
-        if not ((st == 'FAILED' or stuck) and attempts < MAX_ATTEMPTS and now - updated >= RETRY_AFTER):
+        retry = (st == 'FAILED' or stuck) and now - updated >= RETRY_AFTER
+        rejected = st == 'REJECTED'          # 반려: 기다리지 않고 바로 새 초안
+        if not ((retry or rejected) and attempts < MAX_ATTEMPTS):
             return None
     make_issue(session, ymd)
     return 'ok'
@@ -281,25 +289,34 @@ def review_link(ymd: str, action: str) -> str:
 
 
 def verify(ymd: str, action: str, exp: str, sig: str) -> bool:
-    if action not in ('publish', 'hold') or not re.fullmatch(r'\d{8}', ymd or '') or not (exp or '').isdigit():
+    if action not in ('publish', 'reject', 'hold') or not re.fullmatch(r'\d{8}', ymd or '') or not (exp or '').isdigit():
         return False
     if int(exp) < time.time():
         return False
     return hmac.compare_digest(sign(ymd, action, int(exp)), sig or '')
 
 
-def apply_review(session, ymd: str, action: str) -> dict:
+def attempts_left(session, ymd: str) -> int:
+    n = session.execute(text("SELECT attempts FROM daily_issue WHERE ymd = :ymd"), {'ymd': ymd}).scalar() or 0
+    return max(0, MAX_ATTEMPTS - n)
+
+
+def apply_review(session, ymd: str, action: str, reason: str = '') -> dict:
+    """publish = 승인(공개). reject(예전 hold) = 반려 → REJECTED. 반려된 제목·이유를 feedback 에 쌓고 워커가 새 초안을 만든다."""
     row = get(session, ymd, any_status=True)
     if row is None:
         raise DailyIssueError('없는 이슈예요.')
     if row['status'] not in ('DRAFT', 'HELD', 'PUBLISHED'):
-        raise DailyIssueError('아직 만들어지지 않았거나 만들기에 실패한 이슈예요.')
+        raise DailyIssueError('이미 반려됐거나 새 글을 만드는 중이에요. 새 검토 메일을 기다려 주세요.')
     now = now_kst()
     if action == 'publish':
         session.execute(text("""UPDATE daily_issue SET status = 'PUBLISHED', published_at = COALESCE(published_at, :now),
                                  updated_at = :now WHERE ymd = :ymd"""), {'now': now, 'ymd': ymd})
     else:
-        session.execute(text("UPDATE daily_issue SET status = 'HELD', updated_at = :now WHERE ymd = :ymd"), {'now': now, 'ymd': ymd})
+        note = f"- 반려된 제목: {row['title']}" + (f" / 이유: {reason.strip()[:300]}" if reason and reason.strip() else '')
+        session.execute(text("""UPDATE daily_issue SET status = 'REJECTED', published_at = NULL, updated_at = :now,
+                                 feedback = CONCAT_WS(:nl, feedback, :note) WHERE ymd = :ymd"""),
+                        {'now': now, 'nl': '\n', 'note': note, 'ymd': ymd})
     session.commit()
     return get(session, ymd, any_status=True)
 
@@ -331,9 +348,9 @@ def review_mail_html(row: dict) -> str:
 <h4 style="margin:16px 0 4px">오늘 강했던 업종 TOP 3 ({e(row['sectorYmd'] or '')} 종가)</h4><ol style="padding-left:18px">{sec}</ol>
 <h4 style="margin:16px 0 4px">관련 기사</h4><ul style="padding-left:18px">{src}</ul>
 <hr style="border:0;border-top:1px solid #ECEBE6;margin:24px 0">
-<p style="margin:0 0 12px">이대로 앱에 공개할까요? 버튼을 누르면 확인 화면이 열려요.</p>
-<a href="{e(review_link(row['ymd'], 'publish'))}" style="{btn};background:#5A3C08;color:#fff">확인 (공개)</a>
-<a href="{e(review_link(row['ymd'], 'hold'))}" style="{btn};background:#F2F1ED;color:#4E5968">보류</a>
+<p style="margin:0 0 12px">이대로 앱에 공개할까요? <b>승인</b>하면 앱 홈에 나오고, <b>반려</b>하면 새 글을 만들어 메일을 다시 보내드려요. 버튼을 누르면 확인 화면이 열려요.</p>
+<a href="{e(review_link(row['ymd'], 'publish'))}" style="{btn};background:#5A3C08;color:#fff">승인</a>
+<a href="{e(review_link(row['ymd'], 'reject'))}" style="{btn};background:#F2F1ED;color:#4E5968">반려</a>
 <p style="color:#8B95A1;font-size:12px;margin-top:20px">링크는 {LINK_DAYS}일 동안 쓸 수 있어요. 바로 게시로 바꾸려면 공통코드 stock/setting/daily_issue 의 PUBLISH_MODE 를 AUTO 로 바꾸세요.</p>
 </div>"""
 
