@@ -75,7 +75,10 @@ export const useTrainingStore = defineStore('training', () => {
 
     const pushToAccount = async (uid, keys) => {
         if (!keys.length) return;
-        await aibeesApi.post(API_PATH, { stage_keys: keys });
+        const { data } = await aibeesApi.post(API_PATH, { stage_keys: keys });
+        // 수업 완료 꿀(서버가 단계마다 1번 준다)
+        const gained = Number(data?.data?.honeyGained ?? 0);
+        if (gained > 0) import('@scripts/stores/honey-store.js').then(({ useHoneyStore }) => useHoneyStore().lessonGained(gained));
         owner.value = uid;
         persist();
     };

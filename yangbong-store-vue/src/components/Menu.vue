@@ -24,6 +24,14 @@
             </label>
         </header>
 
+        <!-- 꿀 지갑(로그인했을 때) -->
+        <section v-if="isLoggedIn && honey.available" class="wallet" aria-label="내 꿀">
+            <button type="button" class="w-top" @click="goTo(HONEY_HISTORY_PATH)"><span><img src="/img/emoji/honey.png" alt="" /> 내 꿀</span><span class="w-more">내역 ›</span></button>
+            <p class="w-bal">{{ honey.balance.toLocaleString() }}<span>꿀</span></p>
+            <p class="w-hint">{{ honey.allDone ? '오늘 꿀을 다 모았어요' : `오늘 ${honey.todayLeft.toLocaleString()}꿀 더 모을 수 있어요` }}</p>
+            <button type="button" class="w-btn" @click="goTo(HONEY_PATH)">꿀 모으기</button>
+        </section>
+
         <main class="menu-main">
             <!-- 그룹 = 최상위 메뉴, 항목 = 하위 메뉴. 권한이 없는 메뉴는 서버가 내려주지 않아 나오지 않는다. -->
             <section v-for="m in filteredMenuList" :key="m.menu_code" class="group">
@@ -50,6 +58,8 @@
 
 <script setup>
 import { menuLabel } from '@scripts/menuLabel.js';
+import { useHoneyStore } from '@scripts/stores/honey-store.js';
+import { HONEY_PATH, HONEY_HISTORY_PATH } from '@scripts/support.js';
 import { ensureAccess } from '@scripts/useAccess.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
 import { chapters } from '@scripts/training.js';
@@ -60,6 +70,8 @@ const userStore = assUserSession();
 
 /* ── 계정 ── */
 const isLoggedIn  = computed(() => !!userStore.user.accessToken);
+const honey = useHoneyStore();
+onMounted(() => { if (isLoggedIn.value) honey.load(); });
 const userName    = computed(() => userStore.getUserInfo || '');
 const userInitial = computed(() => (userName.value?.[0] ?? '?').toUpperCase());
 
@@ -339,4 +351,12 @@ const NOTE = {};
 
 /* 2026-11-17 꿀빛 톤: 아바타·메뉴 아이콘 칸 꿀색 */
 .who-link { color: $amber-700; font-weight: 600; }
+
+/* ── 꿀 지갑 ── */
+.wallet { margin: 4px 20px 8px; padding: 16px 18px; border-radius: 14px; background: #FFF8E8; border: 1px solid #FFEBC2; text-align: left; }
+.wallet .w-top { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 0; border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 700; color: #B76E00; cursor: pointer; img { width: 20px; height: 20px; vertical-align: -5px; } }
+.wallet .w-bal { margin: 6px 0 0; font-size: 28px; font-weight: 800; letter-spacing: -.7px; color: #4A2F00; span { font-size: 16px; margin-left: 2px; } }
+.wallet .w-hint { margin: 2px 0 12px; font-size: 13px; color: #7A5A1E; }
+.wallet .w-btn { width: 100%; height: 44px; border: 0; border-radius: 10px; background: #5A3C08; color: #fff; font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; }
+@media (min-width: 900px) { .wallet { max-width: 640px; margin-left: auto; margin-right: auto; } }
 </style>

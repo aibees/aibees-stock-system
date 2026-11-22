@@ -84,6 +84,8 @@ const pick = (i) => {
     const isRight = i === current.value.answer;
     if (isRight) score.value += 1;
     quiz.record(current.value.id, isRight);
+    // 오늘의 한 문제를 맞히면 꿀(하루 1번, 서버가 판단)
+    if (isRight && setName.value === 'today') import('@scripts/stores/honey-store.js').then(({ useHoneyStore }) => useHoneyStore().quizCorrect());
 };
 const goNext = () => {
     if (index.value + 1 >= questions.value.length) { finished.value = true; return; }

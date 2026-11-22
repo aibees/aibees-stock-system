@@ -42,7 +42,9 @@
                     stroke-linecap="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></svg>
                 <p class="stage-locked-title">{{ activeStage.name }} 종목이 따로 있어요</p>
                 <p class="stage-locked-desc">{{ activeStage.desc }}</p>
-                <p v-if="activeStage.unlock" class="stage-locked-unlock">{{ activeStage.unlock }}</p>
+                <p v-if="activeStage.unlock && activeStage.code !== 'ADVANCED'" class="stage-locked-unlock">{{ activeStage.unlock }}</p>
+                <!-- 프리미엄: 꿀로 오늘 하루 열기(docs/points-plan.md). 열리면 권한을 다시 받아 목록을 새로 부른다 -->
+                <HoneyUnlock v-if="activeStage.code === 'ADVANCED'" @opened="getStockMainData" />
             </section>
 
             <!-- 아직 알고리즘이 확정되지 않은 단계(실전): 빈 목록 대신 준비 중 안내 -->

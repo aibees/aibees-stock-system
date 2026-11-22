@@ -90,7 +90,11 @@ const title = computed(() => (matched.value.length
 
 const needsPick = computed(() => !isLoading.value && rows.value.length > 0 && !watch.count);
 const goHome = () => router.replace('/home');
-const onAdded = (r) => { if (isNative && !watch.alerts && !sheetFor.value) sheetFor.value = r; };
+const onAdded = (r) => {
+    // 처음 시작하기 완료 꿀(1번, 로그인했을 때만 — 서버가 중복을 막는다)
+    import('@scripts/stores/honey-store.js').then(({ useHoneyStore }) => useHoneyStore().startDone());
+    if (isNative && !watch.alerts && !sheetFor.value) sheetFor.value = r;
+};
 const allow = async () => {
     asking.value = true;
     watch.setAlerts(await enablePushNotifications());

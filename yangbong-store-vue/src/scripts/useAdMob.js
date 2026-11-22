@@ -231,7 +231,7 @@ const REWARDED_LOAD_TIMEOUT_MS = 10000;
  * 보상형 광고를 미리 불러온다. 광고는 로드에 몇 초 걸리므로 보여주기 전에 호출해 둔다.
  * @returns {Promise<boolean>} 불러왔으면 true. 비활성/초기화 실패/로드 실패/시간 초과는 false.
  */
-export async function loadRewardedAd() {
+export async function loadRewardedAd({ ssvUserId, ssvCustomData } = {}) {
     const cfg = getConfig('rewarded');
     if (!cfg.enabled) return false;
 
@@ -239,7 +239,9 @@ export async function loadRewardedAd() {
         // 푸시 팝업 뒤로 미뤄 둔 초기화가 아직 시작 전일 수 있다. 멱등이라 여기서 불러도 안전하다.
         if (!(await initAdMob())) return false;
         try {
-            await admob.AdMob.prepareRewardVideoAd({ adId: cfg.adId, isTesting: cfg.isTesting });
+            // 꿀 지급용 서버 측 확인(SSV): AdMob 이 이 userId 로 양봉 서버(/api/v1/honey/admob-ssv)에 시청 완료를 알린다
+            const ssv = ssvUserId ? { userId: ssvUserId, ...(ssvCustomData ? { customData: ssvCustomData } : {}) } : undefined;
+            await admob.AdMob.prepareRewardVideoAd({ adId: cfg.adId, isTesting: cfg.isTesting, ...(ssv ? { ssv } : {}) });
             return true;
         } catch (e) {
             console.warn('[admob] 보상형 광고 로드 실패:', e?.code, e?.message ?? e);

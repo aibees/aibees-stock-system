@@ -263,13 +263,61 @@ const mockLogin = (userId, userName) => {
 };
 // 계정의 학습 기록·주식분석 동의(목업 서버 메모리 — 새로고침하면 비워진다). 처음엔 계정에만 있는 단계 하나를 넣어 둔다.
 const MOCK_TRAINING = { done: [{ stage_key: 'chart-basic/candle', done_at: Date.now() - 86400000 }], stock_notice: null };
+// 꿀(포인트) 서버 흉내 — 규칙은 py-yangbong-api honey_service.py 와 같다(목업 메모리, 새로고침하면 처음으로).
+const HONEY = { ledger: [{ id: 3, amount: 300, kind: 'LESSON', ref: 'seed', at: Date.now() - 2 * 86400000 },
+    { id: 2, amount: 930, kind: 'START', ref: 'seed', at: Date.now() - 3 * 86400000 }],
+    attendDays: [1, 2, 3, 4].map(d => new Date(Date.now() - d * 86400000).toDateString()), passUntil: null, nextId: 10, lessons: 1 };
+const honeyToday = () => HONEY.ledger.filter(r => new Date(r.at).toDateString() === new Date().toDateString());
+const honeyAdReward = (n) => [20, 30, 40][n] ?? 30;
+const honeyAdd = (amount, kind) => { HONEY.ledger.unshift({ id: HONEY.nextId++, amount, kind, ref: '', at: Date.now() }); return amount; };
+const honeyStreak = () => {
+    let n = 0; const d = new Date();
+    if (!HONEY.attendDays.includes(d.toDateString())) d.setDate(d.getDate() - 1);
+    while (HONEY.attendDays.includes(d.toDateString())) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+};
+const honeySummary = () => {
+    const t = honeyToday();
+    const ad = t.filter(r => r.kind === 'AD').length;
+    return { balance: HONEY.ledger.reduce((a, r) => a + r.amount, 0), expiringSoon: 0,
+        today: { earned: t.filter(r => r.amount > 0).reduce((a, r) => a + r.amount, 0), target: 360 },
+        attend: { done: t.some(r => r.kind === 'ATTEND'), amount: 10 }, streak: { days: honeyStreak(), goal: 7, bonus: 50 },
+        quiz: { done: t.some(r => r.kind === 'QUIZ'), amount: 10 }, ad: { count: ad, max: 10, next: ad < 10 ? honeyAdReward(ad) : 0 },
+        lesson: { done: HONEY.lessons, total: 37, amount: 20 }, start: { done: true, amount: 100 },
+        dayPass: { cost: 1000, until: HONEY.passUntil && HONEY.passUntil > Date.now() ? HONEY.passUntil : null } };
+};
+const honeyOk = (gained) => ok({ summary: honeySummary(), gained });
+const honeyHasPass = () => !!(HONEY.passUntil && HONEY.passUntil > Date.now());
+
 const ROUTES = [
+    ['GET', '/api/v1/honey', () => ok(honeySummary())],
+    ['GET', '/api/v1/honey/ledger', () => ok(HONEY.ledger.slice(0, 50))],
+    ['POST', '/api/v1/honey/attend', () => {
+        if (honeySummary().attend.done) return honeyOk(0);
+        HONEY.attendDays.push(new Date().toDateString());
+        let g = honeyAdd(10, 'ATTEND');
+        if (honeyStreak() % 7 === 0) g += honeyAdd(50, 'STREAK');
+        return honeyOk(g);
+    }],
+    ['POST', '/api/v1/honey/quiz', () => honeyOk(honeySummary().quiz.done ? 0 : honeyAdd(10, 'QUIZ'))],
+    ['POST', '/api/v1/honey/start', () => honeyOk(0)],
+    ['POST', '/api/v1/honey/mock-ad', () => { const s = honeySummary(); return honeyOk(s.ad.count < 10 ? honeyAdd(s.ad.next, 'AD') : 0); }],
+    ['POST', '/api/v1/honey/spend', () => {
+        if (honeySummary().balance < 1000) return null;
+        honeyAdd(-1000, 'SPEND_DAY_PASS');
+        HONEY.passUntil = Math.max(HONEY.passUntil ?? 0, Date.now()) + 24 * 3600 * 1000;
+        return honeyOk(-1000);
+    }],
     ['GET', '/api/v1/training/progress', () => okS(MOCK_TRAINING)],
     ['POST', '/api/v1/training/progress', (c) => {
+        let honeyGained = 0;
         for (const k of mockBody(c).stage_keys || []) {
-            if (!MOCK_TRAINING.done.some(r => r.stage_key === k)) MOCK_TRAINING.done.push({ stage_key: k, done_at: Date.now() });
+            if (!MOCK_TRAINING.done.some(r => r.stage_key === k)) {
+                MOCK_TRAINING.done.push({ stage_key: k, done_at: Date.now() });
+                honeyGained += honeyAdd(20, 'LESSON'); HONEY.lessons += 1;
+            }
         }
-        return okS(MOCK_TRAINING);
+        return okS({ ...MOCK_TRAINING, honeyGained });
     }],
     ['POST', '/api/v1/training/stock-notice', (c) => {
         MOCK_TRAINING.stock_notice = { version: String(mockBody(c).version), agreed_at: Date.now() };
@@ -320,7 +368,7 @@ const ROUTES = [
     ['GET', '/api/v1/anthropic/stock-analysis/theme', () => ok(AI_ANALYSIS.theme)],
     ['GET', '/api/v1/anthropic/stock-analysis/news', () => ok(AI_ANALYSIS.news)],
     // 라우트 등록용 전체 메뉴·내 권한(홈·온보딩·트레이닝·메뉴는 정적 라우트).
-    ['GET', '/api/v1/master/menus/my', () => ok({ menus: MENUS, features: [], roles: [], settings: {} })],
+    ['GET', '/api/v1/master/menus/my', () => ok({ menus: MENUS, features: honeyHasPass() ? ['RECO_ADVANCED'] : [], roles: [], settings: {} })],
     ['GET', '/api/v1/master/menus', () => ok(MENUS)],
 ];
 

@@ -20,6 +20,8 @@ const showLnb = computed(() => !isFocusPath(route.path));
     <router-view />
     <!-- 주식분석 첫 진입 유의사항(내비에서 처음 누를 때) -->
     <StockNoticeDialog />
+    <!-- 꿀을 받는 순간의 연출(꿀단지 + '꿀 +30') -->
+    <HoneyPop />
     <!-- 목업 모드(npm run dev:mock)에서만: 화면의 종목·시황·성과가 가짜 값임을 알린다 -->
     <p v-if="MOCK_ENABLED" class="mock-note">목업 데이터</p>
   </div>

@@ -142,6 +142,15 @@
                 :backtest-open="canOpen('/stock/backtest')" />
             -->
 
+            <!-- ── 오늘의 꿀: 광고 자리와 공지사항 위(docs/points-plan.md) ── -->
+            <section class="sec honey" aria-labelledby="honey-title">
+                <div class="sec-head">
+                    <h2 id="honey-title">오늘의 꿀</h2>
+                    <button type="button" class="honey-more" @click="router.push(HONEY_PATH)">꿀 모으기 ›</button>
+                </div>
+                <HoneyTodayCard />
+            </section>
+
             <!-- 광고 1자리: 이번 주의 차트와 공지 사이(AD_FREE·앱 네이티브 광고 환경에서는 비어 있다) -->
             <section v-if="heroAdVisible" class="sec hero-ad" aria-label="광고">
                 <AdSlot placement="homeHero" />
@@ -197,6 +206,7 @@ import { numOrNull, formatNumber, changeInfo } from '@scripts/stockSignals.js';
 import { marketWeather, dailyRate } from '@scripts/persona.js';
 import { judgeStockNews, itemFromChart } from '@scripts/stockNews.js';
 import { useWatchlistStore } from '@scripts/stores/watchlist-store.js';
+import { HONEY_PATH } from '@scripts/support.js';
 import { enablePushNotifications } from '@scripts/usePushNotifications.js';
 import { Capacitor } from '@capacitor/core';
 
@@ -929,4 +939,9 @@ button { font: inherit; letter-spacing: inherit; }
 .mw-val { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; b { font-size: 14px; font-weight: 600; } .badge { height: 21px; min-width: 56px; font-size: 12px; } }
 .w-li { position: relative; .line-row { padding-right: 32px; } }
 .row-star { position: absolute; top: 7px; right: -6px; }
+
+/* ── 오늘의 꿀 ── */
+.honey .sec-head { display: flex; justify-content: space-between; align-items: center; }
+.honey .sec-head h2 { white-space: nowrap; }
+.honey-more { flex: none; border: 0; background: transparent; padding: 0; font: inherit; font-size: 13.5px; color: $sub; font-weight: 600; cursor: pointer; }
 </style>
