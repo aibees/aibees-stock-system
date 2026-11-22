@@ -99,6 +99,21 @@ TERMS_VERSION = '2026-10-10'              # 프런트 termsOfService.js 와 같�
 AGE14_VERSION = '1'
 # 로그인에 필요한 동의 {consent_type: 현재 버전}
 REQUIRED_CONSENTS = {CONSENT_TERMS: TERMS_VERSION, CONSENT_PRIVACY: PRIVACY_POLICY_VERSION, CONSENT_AGE14: AGE14_VERSION}
+
+
+def configure_consent_versions(terms_version: str = None, privacy_version: str = None) -> None:
+    """서버마다 약관·개인정보 처리방침 버전을 따로 쓴다(만드는 쪽이 넣는다).
+
+    위 기본값은 비밀상회(py-secret-api) 기준이다. 양봉상회(py-yangbong-api)는 앱을 만들 때 자기 버전을 넣는다
+    (app/flask_app/runner.py). 요청을 받기 전에 한 번만 부른다. 두 서버는 프로세스가 달라 서로 영향을 주지 않는다.
+    """
+    global TERMS_VERSION, PRIVACY_POLICY_VERSION
+    if terms_version:
+        TERMS_VERSION = terms_version
+    if privacy_version:
+        PRIVACY_POLICY_VERSION = privacy_version
+    REQUIRED_CONSENTS[CONSENT_TERMS] = TERMS_VERSION
+    REQUIRED_CONSENTS[CONSENT_PRIVACY] = PRIVACY_POLICY_VERSION
 # 동의 화면용 임시 토큰. accessToken 과 다른 키로 서명해 require_auth 를 통과하지 못하게 한다.
 CONSENT_TOKEN_SECRET = JWT_SECRET + ':naver-consent'
 CONSENT_TOKEN_EXPIRE_MINUTES = 10

@@ -13,14 +13,14 @@
 
 <script setup>
 /** 이용약관 · 개인정보 처리방침 보기(가입 동의 화면과 같은 원문). */
-import { TERMS_SECTIONS, TERMS_VERSION } from '@scripts/termsOfService.js';
+import { TERMS_SECTIONS, TERMS_EFFECTIVE } from '@scripts/termsOfService.js';
 import * as privacy from '@scripts/privacyPolicy.js';
 import { PRIVACY_PATH } from '@scripts/support.js';
 
 const route = useRoute();
 const doc = computed(() => (route.path === PRIVACY_PATH
-    ? { title: '개인정보 처리방침', sections: privacy.PRIVACY_POLICY_SECTIONS, version: privacy.PRIVACY_POLICY_VERSION }
-    : { title: '이용약관', sections: TERMS_SECTIONS, version: TERMS_VERSION }));
+    ? { title: '개인정보 처리방침', sections: privacy.PRIVACY_POLICY_SECTIONS, version: privacy.PRIVACY_POLICY_EFFECTIVE }
+    : { title: '이용약관', sections: TERMS_SECTIONS, version: TERMS_EFFECTIVE }));
 </script>
 
 <style scoped lang="scss">

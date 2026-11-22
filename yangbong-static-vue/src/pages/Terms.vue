@@ -9,10 +9,11 @@
       </ol>
       <p v-else>{{ s.body[0] }}</p>
     </section>
+    <p v-for="line in OPERATOR_INFO" :key="line" class="meta">{{ line }}</p>
   </main>
 </template>
 
 <script setup>
 // 앱 가입 화면에서 동의받는 약관과 같은 문구(data/termsOfService.js 는 앱 원본의 사본).
-import { TERMS_VERSION, TERMS_SECTIONS } from '@/data/termsOfService.js';
+import { TERMS_VERSION, TERMS_SECTIONS, OPERATOR_INFO } from '@/data/termsOfService.js';
 </script>
