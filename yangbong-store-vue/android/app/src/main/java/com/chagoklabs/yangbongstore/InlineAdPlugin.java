@@ -31,6 +31,7 @@ import com.google.android.gms.ads.LoadAdError;
 public class InlineAdPlugin extends Plugin {
     private FrameLayout container;
     private AdView banner;
+    private AdSize adSize = AdSize.BANNER;
     private boolean hiddenByWeb = false;
 
     // 웹 쪽 자리(CSS px)
@@ -60,8 +61,12 @@ public class InlineAdPlugin extends Plugin {
             container.setFocusable(false);
             parent.addView(container, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
+            // 칸 너비를 꽉 채우는 적응형 배너(2026-11-23). 높이는 너비에 따라 SDK 가 정하고, 웹이 그 높이로 칸을 맞춘다.
+            float density = getContext().getResources().getDisplayMetrics().density;
+            int widthDp = slotW > 0 ? (int) Math.round(slotW) : Math.round(webView.getWidth() / density);
+            adSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(getContext(), widthDp);
             banner = new AdView(getContext());
-            banner.setAdSize(AdSize.BANNER);   // 320×50. 웹 자리 높이와 맞춘다(AdInlineBanner.vue)
+            banner.setAdSize(adSize);
             banner.setAdUnitId(adId);
             banner.setVisibility(View.INVISIBLE);
             banner.setAdListener(new AdListener() {
@@ -85,7 +90,10 @@ public class InlineAdPlugin extends Plugin {
             webView.setOnScrollChangeListener((v, x, y, oldX, oldY) -> layout());
             container.post(this::layout);
             banner.loadAd(new AdRequest.Builder().build());
-            call.resolve();
+            JSObject res = new JSObject();
+            res.put("width", adSize.getWidth());
+            res.put("height", adSize.getHeight());
+            call.resolve(res);
         });
     }
 
@@ -149,8 +157,8 @@ public class InlineAdPlugin extends Plugin {
         container.setVisibility(hiddenByWeb ? View.GONE : View.VISIBLE);
 
         // 배너: 자리의 가운데(문서 좌표 − 스크롤 − 칸 위치)
-        int bw = AdSize.BANNER.getWidthInPixels(getContext());
-        int bh = AdSize.BANNER.getHeightInPixels(getContext());
+        int bw = adSize.getWidthInPixels(getContext());
+        int bh = adSize.getHeightInPixels(getContext());
         float cx = (float) ((slotX + slotW / 2) * d) - webView.getScrollX();
         float cy = (float) ((slotY + slotH / 2) * d) - webView.getScrollY() - top;
         banner.setX(cx - bw / 2f);
