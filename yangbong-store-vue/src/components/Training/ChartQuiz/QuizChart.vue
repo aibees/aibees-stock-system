@@ -101,7 +101,8 @@ const props = defineProps({
 });
 
 const W = 358, L = 4, R = 30;
-const MAIN_H = 220, VOL_H = 44, SUB_H = 56, GAP = 10;
+// 아래 패널(거래량·RSI·MACD)이 작아 읽기 어렵다는 의견으로 2026-11-23 키웠다(거래량 44→84, RSI·MACD 56→92).
+const MAIN_H = 220, VOL_H = 84, SUB_H = 92, GAP = 12;
 const FUTURE_SLOTS = 20;
 const STEP_MS = 35;               // 20봉 × 35ms ≈ 700ms
 
@@ -188,10 +189,22 @@ const panelTop = computed(() => {
 });
 const totalH = computed(() => panelTop.value.end);
 
+/**
+ * 거래량 막대 높이의 기준(꼭대기). 최댓값으로 잡으면 급증한 하루 이틀 때문에 나머지 막대가 바닥에 붙어 안 보인다.
+ * 그래서 상위 5% 값의 1.3배를 꼭대기로 잡고, 그보다 큰 날은 꼭대기까지 채운다(잘린 막대) — 2026-11-23.
+ * 급증한 날이 '꽉 찬 막대'로 보이는 건 그대로라 거래량 급증 신호는 그대로 읽힌다.
+ */
+const volTop = (vals) => {
+    const pos = vals.filter(v => v > 0).sort((a, b) => a - b);
+    if (!pos.length) return 1;
+    const max = pos[pos.length - 1];
+    const p95 = pos[Math.min(pos.length - 1, Math.floor(pos.length * 0.95))];
+    return Math.max(1, Math.min(max, p95 * 1.3));
+};
 const volBars = computed(() => {
-    const vmax = Math.max(1, ...all.value.map(c => c.v ?? 0));
+    const vmax = volTop(all.value.map(c => c.v ?? 0));
     return all.value.map((c, i) => {
-        const h = ((c.v ?? 0) / vmax) * (VOL_H - 12);
+        const h = Math.min(1, (c.v ?? 0) / vmax) * (VOL_H - 12);
         return { x: xAt(i), y: VOL_H - h, h, cls: candleCls(c), fut: i >= past.value.length, k: i - past.value.length };
     });
 });

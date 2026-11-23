@@ -9,6 +9,15 @@
         </header>
 
         <main class="hub-main">
+            <!-- 오늘의 한 문제: 맨 위 카드(2026-11-23, 맨 아래 줄에서 옮김) -->
+            <button v-if="today" type="button" class="today" @click="router.push(quizSetPath('today'))">
+                <span class="today-text">
+                    <small>오늘의 한 문제</small>
+                    <span>{{ today.q }}</span>
+                </span>
+                <i>풀기</i>
+            </button>
+
             <button v-if="next" type="button" class="resume" @click="router.push(stagePath(next))">
                 <span class="emo"><img src="/img/emoji/honey.png" alt="" /></span>
                 <span class="resume-text">
@@ -18,7 +27,7 @@
                 <i>{{ store.doneCount ? '계속' : '시작' }}</i>
             </button>
 
-            <h2>차트 읽기</h2>
+            <h2>차트 트레이닝</h2>
             <button type="button" class="lesson-card" @click="router.push(CHART_QUIZ_PATH)">
                 <span class="emo"><img src="/img/emoji/chart.png" alt="" /></span>
                 <span class="lesson-text">
@@ -28,7 +37,7 @@
             </button>
             <button type="button" class="review-link" @click="router.push(CHART_QUIZ_REVIEW_PATH)">다른 방향이었던 문제 다시 보기<i aria-hidden="true">›</i></button>
 
-            <h2>배우기</h2>
+            <h2>기본기 트레이닝</h2>
             <button type="button" class="lesson-card" @click="router.push(LESSONS_PATH)">
                 <span class="emo"><img src="/img/emoji/books.png" alt="" /></span>
                 <span class="lesson-text">
@@ -53,18 +62,13 @@
                 </button>
             </div>
 
-            <button v-if="today" type="button" class="today" @click="router.push(quizSetPath('today'))">
-                <small>오늘의 한 문제</small>
-                <span>{{ today.q }}</span>
-            </button>
-
             <p class="note">설명용 자료이며 특정 종목의 매수·매도를 권하지 않습니다. 투자 판단과 책임은 본인에게 있습니다.</p>
         </main>
     </div>
 </template>
 
 <script setup>
-/** 트레이닝 첫 화면: 이어서 하기 + 차트 퀴즈 + 수업 듣기 · 퀴즈 · 용어 사전 입구 */
+/** 트레이닝 첫 화면: 오늘의 한 문제 + 이어서 하기 + 차트 트레이닝(차트 퀴즈) + 기본기 트레이닝(수업 듣기 · 퀴즈 · 용어 사전) */
 import { chapters, stagePath, LESSONS_PATH, GLOSSARY_PATH } from '@scripts/training.js';
 import { glossaryTerms } from '@scripts/glossary.js';
 import { QUIZ_PATH, quizSetPath, todayQuestion } from '@scripts/trainingQuiz.js';
@@ -161,14 +165,20 @@ h2 { margin: 24px 0 10px; font-size: 18px; font-weight: 700; letter-spacing: -0.
     b { display: block; margin-top: 14px; font-size: 17px; font-weight: 700; }
     small { display: block; margin-top: 3px; font-size: 13px; color: $sub-ink; }
 }
+/* 오늘의 한 문제 카드(맨 위). 이어서 하기 카드와 같은 모양 — 2026-11-23 */
 .today {
-    margin-top: 24px;
-    padding: 14px 0;
-    border-top: 1px solid $line;
-    background: transparent;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border-radius: $radius;
+    background: $honey-100;
     small { display: block; font-size: 12px; font-weight: 600; color: $amber-700; }
-    span { display: block; margin-top: 5px; font-size: 15px; font-weight: 600; line-height: 1.45; word-break: keep-all; }
+    .today-text > span { display: block; margin-top: 5px; font-size: 15px; font-weight: 600; line-height: 1.45; word-break: keep-all; }
+    i { flex: none; margin-left: auto; height: 34px; padding: 0 12px; border-radius: 8px; background: $honey-300; color: $honey-ink; font-size: 13px; font-style: normal; font-weight: 700; display: flex; align-items: center; }
 }
+.today-text { flex: 1; min-width: 0; }
+.today + .resume { margin-top: 12px; }
 .note { margin: 12px 0 0; font-size: 12px; line-height: 1.6; color: $sub-2; word-break: keep-all; }
 
 /* ══ 2026-11-22 간격 통일(8px 격자, 토큰: _home-tokens.scss — 홈과 같은 규칙) — 위의 값보다 이 블록이 우선 ══
@@ -181,6 +191,7 @@ h2 { margin: $sec-pt 0 $head-gap; }
 .review-link { margin-top: 0; }
 .tiles { gap: $gap; margin-top: $gap; }
 .tile { padding: $card-pad; b { margin-top: $gap; } }
-.today { margin-top: $sec-pt; padding: $card-pad 0; }
+.today { padding: $card-pad; gap: $gap; }
+.today + .resume { margin-top: $gap; }
 .note { margin-top: $gap; }
 </style>

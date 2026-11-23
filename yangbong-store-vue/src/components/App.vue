@@ -142,6 +142,25 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 
+/* 텍스트 선택·길게 눌러 복사·드래그 막기(2026-11-23, 앱 전체).
+ *   user-select       : 드래그·길게 눌러 글자 선택(복사 메뉴) 막기
+ *   -webkit-touch-callout : iOS 에서 길게 누를 때 뜨는 복사·링크·이미지 저장 메뉴 막기
+ *   -webkit-user-drag : 이미지·링크를 끌어 옮기는 동작 막기
+ * 입력칸(input·textarea·contenteditable)은 그대로 선택·붙여넣기가 되어야 하므로 되살린다.
+ * 꼭 복사하게 둘 글자가 생기면 그 요소에 class="selectable" 을 붙인다. */
+/* #app 이 아니라 body 기준 — Login.vue 처럼 <Teleport to="body"> 로 #app 밖에 그리는 팝업도 같이 막는다. */
+body, body * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+body img, body a, body svg { -webkit-user-drag: none; }
+body input, body textarea, body [contenteditable]:not([contenteditable="false"]), body .selectable, body .selectable * {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 /* 입력 요소(select·input·textarea·button)는 브라우저 기본 글꼴(Arial 등)을 따로 쓰므로
  * 앱 글꼴(Pretendard)을 물려받게 한다 — 2026-11-17 글꼴 통일 */
 #app button, #app input, #app select, #app textarea, #app optgroup { font-family: inherit; }

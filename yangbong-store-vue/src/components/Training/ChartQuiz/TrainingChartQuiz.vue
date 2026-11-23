@@ -4,7 +4,7 @@
             <button type="button" class="cq-close" aria-label="닫기" @click="close">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
             </button>
-            <span class="cq-brand">TRAINING</span>
+            <span class="cq-brand">차트 퀴즈</span>
             <span v-if="!retryId && quota" class="cq-progress" role="img" :aria-label="`오늘 ${progressFilled}문제 풀었어요`">
                 <HexMark v-for="i in progressCount" :key="i" :size="13" :fill="i <= progressFilled ? 'var(--honey)' : '#E2DACA'" />
                 <small v-if="quota.isSubscriber && quota.used > 3">+{{ quota.used - 3 }}</small>
@@ -367,7 +367,7 @@ button { border: 0; background: none; color: inherit; font: inherit; letter-spac
     display: inline-flex; align-items: center; justify-content: center;
     svg { width: 20px; height: 20px; fill: none; stroke: var(--text-strong); stroke-width: 2.2; stroke-linecap: round; }
 }
-.cq-brand { flex: 1; font-size: 12px; font-weight: 800; letter-spacing: 1.4px; color: var(--text-strong); }
+.cq-brand { flex: 1; font-size: 16px; font-weight: 800; letter-spacing: -0.2px; color: var(--text-strong); }   // 2026-11-23 TRAINING → 차트 퀴즈
 .cq-progress { display: inline-flex; align-items: center; gap: 4px; small { font-size: 11px; font-weight: 700; color: var(--text-muted); } }
 
 .cq-main { max-width: 520px; margin: 0 auto; padding: 4px 18px 32px; box-sizing: border-box; }
