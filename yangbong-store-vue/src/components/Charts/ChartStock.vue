@@ -60,8 +60,13 @@
                             <span class="stock-name">{{ searchParam.name || searchParam.code }}</span>
                             <span class="stock-code">{{ searchParam.code }}</span>
                         </div>
+                        <!-- 쉬운 보기(초보자) / 자세히(기존 전문가 화면) -->
+                        <div class="mode-seg" role="group" aria-label="보기 방식">
+                            <button :class="{ active: viewMode === 'simple' }" @click="viewMode = 'simple'">쉬운 보기</button>
+                            <button :class="{ active: viewMode === 'pro' }" @click="viewMode = 'pro'">자세히</button>
+                        </div>
                         <!-- 분석 레이어 표시 ON/OFF(일봉 + 서버가 계산한 모듈만 나온다) -->
-                        <div v-if="availableLayers.length" class="layer-menu" ref="layerMenuEl">
+                        <div v-if="viewMode === 'pro' && availableLayers.length" class="layer-menu" ref="layerMenuEl">
                             <button class="layer-btn" :aria-expanded="layerMenuOpen" @click="layerMenuOpen = !layerMenuOpen">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
                                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -93,10 +98,21 @@
                         <p v-if="summary.investor" class="summary-note">{{ summary.investor.dateLabel }} 종가·순매수 기준</p>
                     </dl>
                     <!-- 휠/핀치로 확대, 드래그로 이동, 마우스를 올리면 위 범례가 그 봉 값으로 바뀐다 -->
-                    <div class="chart-wrap">
-                        <LwStockChart :data="chartData" :layers="layers" :layer-options="layerOptions" />
+                    <!-- 쉬운 보기: 보고 싶은 지표만 눌러서 켠다. 켠 지표는 한 줄 설명이 아래에 나온다 -->
+                    <div v-if="viewMode === 'simple'" class="ind-chips">
+                        <button v-for="c in INDICATOR_CHIPS" :key="c.key" class="ind-chip"
+                            :class="{ on: simpleInd.includes(c.key) }" :aria-pressed="simpleInd.includes(c.key)"
+                            @click="toggleInd(c.key)">
+                            <i v-if="c.color" :style="{ background: c.color }"></i>{{ c.label }}
+                        </button>
                     </div>
-                    <ChartAnalysisSummary :analysis="chartData.analysis" :layers="layers"
+                    <p v-if="viewMode === 'simple' && indHint" class="ind-hint">{{ indHint }}</p>
+                    <div class="chart-wrap">
+                        <LwStockChart :data="chartData" :mode="viewMode"
+                            :indicators="simpleInd"
+                            :layers="viewMode === 'pro' ? layers : []" :layer-options="layerOptions" />
+                    </div>
+                    <ChartAnalysisSummary v-if="viewMode === 'pro'" :analysis="chartData.analysis" :layers="layers"
                         :pick-index="elliottPick" @pick="k => elliottPick = k" />
                 </div>
 
@@ -145,6 +161,29 @@ const searchParam = reactive({
 
 const chartData    = ref(null);
 const isLoading    = ref(false);
+
+// ── 쉬운 보기(초보자) ────────────────────────────────────────────────
+// 처음엔 캔들 + 거래량만 보이고, 보조지표는 눌러서 켠다. 켠 지표의 뜻은 아래 한 줄로 알려준다.
+const VIEW_KEY   = 'chartViewMode.v1';
+const loadView   = () => { try { return localStorage.getItem(VIEW_KEY) === 'pro' ? 'pro' : 'simple'; } catch { return 'simple'; } };
+const viewMode   = ref(loadView());
+watch(viewMode, (v) => { try { localStorage.setItem(VIEW_KEY, v); } catch { /* 저장 못 해도 동작 */ } });
+
+const INDICATOR_CHIPS = [
+    { key: 'volume', label: '거래량',     color: null,      hint: '거래량: 그날 거래된 주식 수예요. 평소보다 크게 늘면 관심이 몰렸다는 신호예요.' },
+    { key: 'ma5',    label: '5일선',      color: '#f38980', hint: '5일선: 최근 5일 종가의 평균이에요. 아주 짧은 흐름을 보여줘요.' },
+    { key: 'ma20',   label: '20일선',     color: '#efa55b', hint: '20일선: 최근 한 달 정도의 평균 가격이에요. 가격이 이 선 위면 한 달 흐름이 좋다고 봐요.' },
+    { key: 'ma60',   label: '60일선',     color: '#8bb400', hint: '60일선: 최근 3개월 평균이에요. 중기 흐름을 볼 때 써요.' },
+    { key: 'ma120',  label: '120일선',    color: '#01b6f3', hint: '120일선: 최근 6개월 평균이에요. 큰 흐름이 오르는지 내리는지 봐요.' },
+    { key: 'bb',     label: '볼린저밴드', color: '#a78bfa', hint: '볼린저밴드: 가격이 보통 움직이는 범위예요. 띠 위·아래 끝에 닿으면 많이 올랐거나 내렸다는 뜻이에요.' },
+];
+const simpleInd = ref(['volume']);
+const lastInd   = ref(null);
+const toggleInd = (k) => {
+    if (simpleInd.value.includes(k)) { simpleInd.value = simpleInd.value.filter(x => x !== k); lastInd.value = null; }
+    else { simpleInd.value = [...simpleInd.value, k]; lastInd.value = k; }
+};
+const indHint = computed(() => INDICATOR_CHIPS.find(c => c.key === lastInd.value)?.hint ?? '');
 
 // ── 분석 레이어 ON/OFF ───────────────────────────────────────────────
 // 서버가 계산해 준 모듈(analysis 의 key)만 메뉴에 나오고, 켜고 끈 상태는 이 브라우저에 기억한다
@@ -463,6 +502,63 @@ $cream:   #FFF8E1;
         height: 66vh;
     }
 
+    // 쉬운 보기 / 자세히 전환
+    .mode-seg {
+        display: flex;
+        gap: 2px;
+        padding: 3px;
+        background: $chip;
+        border-radius: 10px;
+        button {
+            min-height: 30px;
+            padding: 0 12px;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            color: $brown;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            &.active { background: $hero; color: $cream; }
+        }
+    }
+
+    // 보조지표 칩
+    .ind-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 0 0 8px;
+    }
+    .ind-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 34px;
+        padding: 0 14px;
+        border: 1px solid $line-2;
+        border-radius: 999px;
+        background: $white;
+        color: $sub;
+        font-size: 13px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        transition: background .12s, color .12s, border-color .12s;
+        i { width: 10px; height: 3px; border-radius: 2px; }
+        &.on { background: $cream; color: $ink; border-color: $brown; }
+    }
+    .ind-hint {
+        margin: 0 0 8px;
+        padding: 8px 12px;
+        background: $cream;
+        border-radius: 10px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: $sub;
+    }
+
     // 차트 설정: 버튼은 글자+아이콘, 펼친 목록은 ✓ 표시 행
     .layer-menu { position: relative; }
     .layer-btn {
@@ -580,12 +676,27 @@ $cream:   #FFF8E1;
     .search-btn   { padding: 0 12px; }
     .search-btn svg { display: none; }
 
+    // 종목명(왼쪽) + 보기 전환(오른쪽)을 한 줄에 두어 세로 공간을 아낀다
     .chart-card .chart-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
+        flex-wrap: wrap;
+        gap: 6px 8px;
+        padding-bottom: 6px;
     }
-    .chart-card .chart-wrap { height: 56vh; }
+    .chart-card .mode-seg button { min-height: 28px; padding: 0 10px; font-size: 12px; }
+    // 지표 칩은 한 줄로 두고 옆으로 밀어서 본다(여러 줄로 쌓여 차트를 밀어내지 않게)
+    .chart-card .ind-chips {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        margin-right: -16px;
+        padding-right: 16px;
+        scrollbar-width: none;
+        &::-webkit-scrollbar { display: none; }
+    }
+    .chart-card .ind-chip { flex: none; min-height: 32px; padding: 0 12px; }
+    .chart-card .ind-hint { padding: 6px 10px; font-size: 12px; }
+    .chart-card .stock-summary { margin-bottom: 6px; }
+    // 화면 높이에서 위쪽 영역·하단 탭바를 뺀 나머지를 차트에 준다(주소창 변화에 맞는 dvh)
+    .chart-card .chart-wrap { height: calc(100dvh - 370px); min-height: 340px; }
     .chart-skeleton { height: 46vh; }
     // 헤더가 세로로 쌓이면 설정 버튼이 왼쪽에 붙는다 — 목록도 왼쪽 기준으로 펼쳐 화면 밖으로 나가지 않게
     .chart-card .layer-list { left: 0; right: auto; }

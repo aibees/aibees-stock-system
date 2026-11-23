@@ -27,7 +27,7 @@ export const LICENSE_GROUPS = [
     {
         title: '차트',
         items: [
-            { name: 'TradingView Lightweight Charts™', by: 'TradingView, Inc.', license: 'Apache License 2.0', text: 'Apache-2.0', url: 'https://www.tradingview.com/', note: '차트 화면에 TradingView 표시가 함께 보입니다' },
+            { name: 'TradingView Lightweight Charts™', by: 'TradingView, Inc.', license: 'Apache License 2.0', text: 'Apache-2.0', url: 'https://www.tradingview.com/', note: '이 앱의 차트는 TradingView Lightweight Charts™를 사용합니다. Copyright © TradingView, Inc. https://www.tradingview.com/' },
             { name: 'Chart.js', by: 'Chart.js Contributors', license: 'MIT License', url: 'https://github.com/chartjs/Chart.js' },
             { name: 'chartjs-chart-financial · chartjs-plugin-zoom · chartjs-plugin-datalabels', by: 'Chart.js Contributors', license: 'MIT License', url: 'https://github.com/chartjs' },
             { name: 'Hammer.js', by: 'Jorik Tangelder', license: 'MIT License', url: 'https://github.com/hammerjs/hammer.js' },
