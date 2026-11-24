@@ -1,6 +1,6 @@
 <template>
     <div id="training-home">
-        <BrandHeader title="수업 듣기" :back="TRAINING_PATH" />
+        <BrandHeader title="재테크 학습하기" :back="TRAINING_PATH" />
 
         <main class="tr-main">
             <!-- 코스 고르기 + 코스 진행(장별 막대). 2026-11-24 코스 도입 -->

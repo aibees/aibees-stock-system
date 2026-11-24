@@ -6,6 +6,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { allQuestions, findQuestion } from '../trainingQuiz.js';
 import { useReviewStore } from './review-store.js';
+import { markStudied } from '../studyLog.js';
 
 const STORAGE_KEY = 'yb-training-quiz';
 
@@ -31,6 +32,7 @@ export const useQuizStore = defineStore('training-quiz', () => {
         const review = useReviewStore();
         if (isRight) review.solvedAgain(id);
         else review.addWrong(id, findQuestion(id)?.chapterName ?? '');
+        markStudied();   // 홈 '이번 주 학습'
     };
 
     const rightCount = computed(() => questions.filter(q => results.value[q.id] === 'right').length);

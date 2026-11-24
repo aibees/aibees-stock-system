@@ -375,6 +375,13 @@ const ROUTES = [
         const s = STOCKS.find(x => x.code === m[1]);
         return s ? ok({ stock_code: s.code, stock_name: s.name, market_cap: Math.round(s.cap / 100), investor: null }) : null;
     }],
+    // 홈 '오늘의 업종 순위' 확인용(실제 응답은 시장별 업종 요약 — 등락률은 시가총액 가중)
+    ['GET', '/api/v1/stocks/sectors', () => ok({ ymd: '20261124', base_ymd: '20261123', markets: {}, sectors: [
+        ['KOSPI', '0017', '조선', 4.12], ['KOSPI', '0021', '방산', 3.21], ['KOSPI', '0005', '화학', 1.84], ['KOSPI', '0009', '제약', 1.12],
+        ['KOSPI', '0013', '철강·금속', 0.46], ['KOSPI', '0003', '음식료', -0.28], ['KOSPI', '0011', '전기·전자', -1.35], ['KOSPI', '0000', '미분류', 9.9],
+        ['KOSDAQ', '1009', '전기·전자', 2.64], ['KOSDAQ', '1004', '제약·바이오', 1.97], ['KOSDAQ', '1012', '소프트웨어', 1.31],
+        ['KOSDAQ', '1006', '반도체', 0.88], ['KOSDAQ', '1002', '2차전지', 0.35], ['KOSDAQ', '1008', '게임', -0.77],
+    ].map(([market, sector_cd, sector_name, chg_rate]) => ({ market, sector_cd, sector_name, chg_rate })) })],
     ['GET', '/api/v1/stocks/weekly-chart', () => ok(weeklyChart())],
     ['GET', '/api/v1/stocks/buy-target/home', (c) => ok(homePicks(c.params))],
     ['GET', '/api/v1/stocks/buy-target', () => ok(buyTargets())],

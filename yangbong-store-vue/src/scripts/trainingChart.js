@@ -6,6 +6,7 @@
  *   isMatch → "같은 방향을 봤어요 / 다른 방향이었어요". 방향 라벨(UP 등)은 보여 주지 않고 실제 수익률로만 쓴다.
  */
 import aibeesApi from './aibeesApi.js';
+import { markStudied } from './studyLog.js';
 
 export const CHART_QUIZ_PATH = '/training/chart';
 export const CHART_QUIZ_REVIEW_PATH = '/training/chart/review';
@@ -55,5 +56,6 @@ export const fetchToday = () => aibeesApi.get('/api/v1/training/today', opt).the
 export const fetchQuestion = (id) => aibeesApi.get(`/api/v1/training/questions/${id}`, opt).then(unwrap);
 export const fetchHint = (id) => aibeesApi.post(`/api/v1/training/${id}/hint`, {}, opt).then(unwrap);
 export const submitAnswer = (id, answer, usedHint) =>
-    aibeesApi.post(`/api/v1/training/${id}/answer`, { answer, usedHint }, opt).then(unwrap);
+    aibeesApi.post(`/api/v1/training/${id}/answer`, { answer, usedHint }, opt).then(unwrap)
+        .then((res) => { markStudied(); return res; });   // 답이 접수된 날 = 학습한 날(홈 '이번 주 학습')
 export const fetchHistory = () => aibeesApi.get('/api/v1/training/history', opt).then(unwrap);

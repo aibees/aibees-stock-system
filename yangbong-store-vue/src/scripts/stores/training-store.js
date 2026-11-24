@@ -24,6 +24,7 @@ import aibeesApi from '../aibeesApi.js';
 import { assUserSession } from './user-stores.js';
 import { allStages, DEFAULT_COURSE, findCourse } from '../training.js';
 import { applyAccountStockNotice } from '../stockNotice.js';
+import { markStudied } from '../studyLog.js';
 
 const STORAGE_KEY = 'yb-training';
 const API_PATH = '/api/v1/training/progress';
@@ -138,6 +139,7 @@ export const useTrainingStore = defineStore('training', () => {
         done.value = [...done.value, key];
         updatedAt.value = Date.now();
         persist();
+        markStudied();   // 홈 '이번 주 학습'
         const uid = currentUserId();
         if (uid) pushToAccount(uid, [key]).catch(e => console.warn('[training] 계정 저장 실패 — 기기에는 저장됨', e?.message ?? e));
         return true;

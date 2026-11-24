@@ -196,12 +196,16 @@
                 </div>
             </section>
             </template>
+
+            <!-- 화면 안 광고 1칸(앱 전용, 하단 탭 화면마다 하나 — AdInlineSlot). 목록 아래, 위쪽 고정 헤더(BrandHeader) 아래로만 보이게 자른다 -->
+            <AdInlineSlot header-selector=".brand-header" />
         </div>
     </div>
 </template>
 
 <script setup>
 import CandlestickChart from '../common/comp/CandlestickChart.vue';
+import AdInlineSlot from '../common/AdInlineSlot.vue';
 import { buyTargetCandleData, miniCandleOptions } from '@scripts/miniCandle.js';
 import aibeesApi from '@scripts/aibeesApi.js';
 import { recoLevel } from '@scripts/useAccess.js';

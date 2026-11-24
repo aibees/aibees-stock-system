@@ -24,14 +24,7 @@
                 <i>풀기</i>
             </button>
 
-            <button v-if="next" type="button" class="resume" @click="router.push(stagePath(next))">
-                <span class="emo"><img src="/img/emoji/honey.png" alt="" /></span>
-                <span class="resume-text">
-                    <small>{{ store.doneCount ? '이어서 하기' : '처음 시작하기' }} · {{ courseName(next.course) }}</small>
-                    <b>{{ next.short || next.title }}</b>
-                </span>
-                <i>{{ store.doneCount ? '계속' : '시작' }}</i>
-            </button>
+            <!-- '이어서 하기'는 2026-11-24 홈(트레이닝 탭)으로 옮겼다 -->
 
             <!-- 다시 보기(2026-11-24): 복습하기 + 오답노트 · 헷갈린 용어 -->
             <h2>다시 보기</h2>
@@ -54,26 +47,15 @@
                 </button>
             </div>
 
-            <h2>차트 트레이닝</h2>
-            <button type="button" class="lesson-card" @click="router.push(CHART_QUIZ_PATH)">
-                <span class="emo"><img src="/img/emoji/chart.png" alt="" /></span>
-                <span class="lesson-text">
-                    <b>차트 퀴즈</b>
-                    <small>실제 과거 차트를 보고 20일 뒤를 예상해 보세요 · 하루 3문제</small>
-                </span>
-            </button>
-            <button type="button" class="review-link" @click="router.push(CHART_QUIZ_REVIEW_PATH)">다른 방향이었던 문제 다시 보기<i aria-hidden="true">›</i></button>
-
             <h2>기본기 트레이닝</h2>
-            <button v-for="c in courseList" :key="c.slug" type="button" class="lesson-card course" :class="c.slug"
-                @click="router.push(coursePath(c))">
-                <span class="emo"><img :src="`/img/emoji/${c.emoji}.png`" alt="" /></span>
+            <!-- 재테크 학습하기(2026-11-24): 경제 기초(무료)와 투자 실전 두 카드를 한 카드로 합쳤다. 두 코스는 열리는 화면 위쪽 탭으로 고른다 -->
+            <button type="button" class="lesson-card" @click="router.push(LESSONS_PATH)">
+                <span class="emo"><img src="/img/emoji/books.png" alt="" /></span>
                 <span class="lesson-text">
-                    <span class="course-k">{{ c.name }}<span v-if="c.free" class="free">무료</span></span>
-                    <b>{{ c.title }}</b>
-                    <small>{{ courseSub(c) }}</small>
-                    <span class="bar" role="progressbar" :aria-label="`${c.name} 진행`" :aria-valuenow="store.doneIn(c.slug)" aria-valuemin="0" :aria-valuemax="c.stages.length">
-                        <span :style="{ width: `${coursePct(c)}%` }"></span>
+                    <b>재테크 학습하기</b>
+                    <small>{{ learnSub }}</small>
+                    <span class="bar" role="progressbar" aria-label="완료한 단계" :aria-valuenow="store.doneCount" aria-valuemin="0" :aria-valuemax="store.total">
+                        <span :style="{ width: `${pct}%` }"></span>
                     </span>
                 </span>
             </button>
@@ -91,14 +73,29 @@
                 </button>
             </div>
 
+            <!-- 차트 트레이닝: 기본기 트레이닝 아래(2026-11-24) -->
+            <h2>차트 트레이닝</h2>
+            <button type="button" class="lesson-card" @click="router.push(CHART_QUIZ_PATH)">
+                <span class="emo"><img src="/img/emoji/chart.png" alt="" /></span>
+                <span class="lesson-text">
+                    <b>차트 퀴즈</b>
+                    <small>실제 과거 차트를 보고 20일 뒤를 예상해 보세요 · 하루 3문제</small>
+                </span>
+            </button>
+            <button type="button" class="review-link" @click="router.push(CHART_QUIZ_REVIEW_PATH)">다른 방향이었던 문제 다시 보기<i aria-hidden="true">›</i></button>
+
+            <!-- 화면 안 광고 1칸(앱 전용, 하단 탭 화면마다 하나 — AdInlineSlot). 트레이닝 헤더는 고정이 아니라 자를 헤더가 없다 -->
+            <AdInlineSlot />
+
             <p class="note">설명용 자료이며 특정 종목의 매수·매도를 권하지 않습니다. 투자 판단과 책임은 본인에게 있습니다.</p>
         </main>
     </div>
 </template>
 
 <script setup>
-/** 트레이닝 첫 화면: 용어 검색 · 오늘의 한 문제 · 이어서 하기 · 다시 보기 · 차트 트레이닝 · 기본기 트레이닝(코스 2개 · 퀴즈 · 용어 사전) */
-import { courses, findCourse, coursePath, stagePath, GLOSSARY_PATH } from '@scripts/training.js';
+/** 트레이닝 첫 화면: 용어 검색 · 오늘의 한 문제 · 다시 보기 · 기본기 트레이닝(재테크 학습하기 · 퀴즈 · 용어 사전) · 차트 트레이닝. 이어서 하기는 홈의 트레이닝 탭에 있다. */
+import AdInlineSlot from '../common/AdInlineSlot.vue';
+import { courses, LESSONS_PATH, GLOSSARY_PATH } from '@scripts/training.js';
 import { glossaryTerms } from '@scripts/glossary.js';
 import { QUIZ_PATH, quizSetPath, todayQuestion } from '@scripts/trainingQuiz.js';
 import { CHART_QUIZ_PATH, CHART_QUIZ_REVIEW_PATH } from '@scripts/trainingChart.js';
@@ -111,19 +108,17 @@ const store = useTrainingStore();
 const quiz = useQuizStore();
 
 const review = useReviewStore();
+// 재테크 학습하기 카드: 두 코스(경제 기초 · 투자 실전)를 합쳐서 한 줄로 요약
 const courseList = courses();
-const courseName = (slug) => findCourse(slug)?.name ?? '';
-const courseSub = (c) => {
-    const done = store.doneIn(c.slug);
-    const size = c.slug === 'econ' ? `${c.chapters.length}단계 · ${c.stages.length}강` : `${c.chapters.length}개 장 · ${c.stages.length}단계`;
-    return done ? `${size} · ${done}/${c.stages.length} 들음` : size;
-};
-const coursePct = (c) => (c.stages.length ? Math.round(store.doneIn(c.slug) / c.stages.length * 100) : 0);
+const learnSub = computed(() => {
+    const size = courseList.map(c => `${c.name}${c.free ? '(무료)' : ''} ${c.stages.length}${c.unit}`).join(' · ');
+    return store.doneCount ? `${size} · ${store.doneCount}/${store.total} 들음` : size;
+});
 const q = ref('');
 const searchTerm = () => router.push({ path: GLOSSARY_PATH, query: q.value.trim() ? { q: q.value.trim() } : {} });
 const termCount = glossaryTerms().length;
 const today = todayQuestion();
-const next = computed(() => store.nextStage);
+const pct = computed(() => (store.total ? Math.round(store.doneCount / store.total * 100) : 0));
 </script>
 
 <style scoped lang="scss">
@@ -152,19 +147,6 @@ button { width: 100%; border: 0; color: inherit; font: inherit; letter-spacing: 
 .hub-main { padding: 0 $pad-x 24px; }
 .emo { flex: none; display: flex; align-items: center; justify-content: center; border-radius: $radius; background: $card; img { display: block; } }
 
-.resume {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px;
-    border-radius: $radius;
-    background: $honey-strip;
-    .emo { width: 44px; height: 44px; img { width: 30px; height: 30px; } }
-    small { display: block; font-size: 12px; font-weight: 600; color: $amber-700; }
-    b { display: block; margin-top: 2px; font-size: 16px; font-weight: 600; }
-    i { margin-left: auto; height: 34px; padding: 0 12px; border-radius: 8px; background: $honey-300; color: $honey-ink; font-size: 13px; font-style: normal; font-weight: 700; display: flex; align-items: center; }
-}
-.resume-text { min-width: 0; }
 h2 { margin: 24px 0 10px; font-size: 18px; font-weight: 700; letter-spacing: -0.4px; }
 
 .lesson-card {
@@ -217,7 +199,6 @@ h2 { margin: 24px 0 10px; font-size: 18px; font-weight: 700; letter-spacing: -0.
     i { flex: none; margin-left: auto; height: 34px; padding: 0 12px; border-radius: 8px; background: $honey-300; color: $honey-ink; font-size: 13px; font-style: normal; font-weight: 700; display: flex; align-items: center; }
 }
 .today-text { flex: 1; min-width: 0; }
-.today + .resume { margin-top: 12px; }
 .note { margin: 12px 0 0; font-size: 12px; line-height: 1.6; color: $sub-2; word-break: keep-all; }
 
 /* ══ 2026-11-22 간격 통일(8px 격자, 토큰: _home-tokens.scss — 홈과 같은 규칙) — 위의 값보다 이 블록이 우선 ══

@@ -51,12 +51,16 @@
 
             <p v-if="!filteredMenuList.length" class="empty">{{ searchQuery ? '검색 결과가 없어요.' : '이용할 수 있는 메뉴가 없어요.' }}</p>
 
+            <!-- 화면 안 광고 1칸(앱 전용, 하단 탭 화면마다 하나 — AdInlineSlot). 메뉴 헤더는 sticky 라 그 아래로만 보이게 자른다 -->
+            <AdInlineSlot header-selector=".menu-header" />
+
             <button v-if="isLoggedIn" type="button" class="logout" @click="handleLogout">로그아웃</button>
         </main>
     </div>
 </template>
 
 <script setup>
+import AdInlineSlot from './common/AdInlineSlot.vue';
 import { menuLabel } from '@scripts/menuLabel.js';
 import { useHoneyStore } from '@scripts/stores/honey-store.js';
 import { HONEY_PATH, HONEY_HISTORY_PATH } from '@scripts/support.js';

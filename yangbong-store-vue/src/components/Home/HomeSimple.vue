@@ -29,12 +29,24 @@
             </div>
         </header>
 
+        <!-- ════════ 탭(시장 · 트레이닝 · 백테스트): 눌러서, 또는 화면을 옆으로 밀어서 바꾼다(2026-11-24) ════════ -->
+        <nav class="home-tabs" role="tablist" aria-label="홈 구분">
+            <button v-for="(t, i) in TABS" :id="`home-tab-${t.key}`" :key="t.key" type="button" role="tab" class="ht-btn"
+                :class="{ on: i === tab }" :aria-selected="i === tab ? 'true' : 'false'" :aria-controls="`home-pane-${t.key}`"
+                @click="selectTab(i)">{{ t.label }}</button>
+            <span class="ht-ind" aria-hidden="true" :style="{ transform: `translateX(${progress * 100}%)` }"><i></i></span>
+        </nav>
+
+        <div ref="pagerRef" class="home-pager" :style="pagerStyle" @scroll.passive="onPagerScroll">
+
+        <!-- ═══ 1. 시장: 오늘의 시장 → 오늘의 경제 이슈 → 오늘의 업종 순위 ═══ -->
+        <div :ref="el => setPane(0, el)" id="home-pane-market" class="pane" role="tabpanel" aria-labelledby="home-tab-market">
         <main class="home-main">
 
             <!-- ── 1. 시황: 시장 날씨 한 줄 + 코스피·코스닥·원/달러 리스트(2026-11-17 화이트 톤 개편) ── -->
             <section class="sec market" aria-labelledby="market-title">
                 <div class="sec-head">
-                    <h2 id="market-title">오늘 시장</h2>
+                    <h2 id="market-title">오늘의 시장</h2>
                 </div>
                 <div v-if="weather" class="weather" :class="weather.key" role="status">
                     <!-- 날씨 그림: 이모지 스타일 3D 그림(Microsoft Fluent Emoji, MIT — public/img/weather/LICENSE-fluentui-emoji.txt) -->
@@ -67,6 +79,17 @@
                     <span class="ic-arrow" aria-hidden="true">›</span>
                 </button>
             </section>
+
+            <!-- 오늘의 업종 순위(신규, 2026-11-24): 코스피·코스닥 등락률 TOP 5 -->
+            <HomeSectorRank />
+
+            <!-- 웹 광고 칸(앱은 홈에 화면 안 광고가 없다) -->
+            <section v-if="heroAdVisible" class="sec hero-ad" aria-label="광고">
+                <AdSlot placement="homeHero" />
+            </section>
+
+            <!-- ── 아래 영역은 2026-11-24 홈 3탭 개편으로 화면에서 뺐다(코드는 남김). 자리가 정해지면 LEGACY_SECTIONS 를 풀거나 옮겨 붙인다 ── -->
+            <template v-if="LEGACY_SECTIONS">
 
             <!-- 내 관심 종목: 담은 종목이 있을 때만 오늘 시장 바로 아래에(2026-11-22 오늘 시장을 맨 위로). 오늘 소식은 일봉으로 판단한다 -->
             <section v-if="watchRows.length" class="sec my-watch" aria-labelledby="my-watch-title">
@@ -144,15 +167,7 @@
                 <HoneyTodayCard />
             </section>
 
-            <!-- 광고 1자리: 공지사항 바로 위(AD_FREE 에게는 없다).
-                 웹은 AdSlot(자리표시·테스트·애드센스), 앱은 AdMob 배너를 이 칸에 끼워 넣는다(AdInlineBanner, 2026-11-22) -->
-            <section v-if="heroAdVisible" class="sec hero-ad" aria-label="광고">
-                <AdSlot placement="homeHero" />
-            </section>
-            <!-- 앱 배너는 섹션 너비를 꽉 채운다(좌우 여백 없음, 2026-11-23) -->
-            <section v-else-if="appAdVisible" class="sec hero-ad app-ad" aria-label="광고">
-                <AdInlineBanner header-selector=".home-header" />
-            </section>
+            <!-- (광고: 웹 AdSlot 은 위 시장 탭으로 옮겼다. 앱의 화면 안 배너 AdInlineBanner 는 2026-11-24 홈에서 뺐다 — 하단 탭 화면(트레이닝·주식분석·메뉴)의 AdInlineSlot) -->
 
             <!-- ── 공지사항: 최신 1줄만. 나머지는 '전체 보기' ── -->
             <section class="sec notice" aria-labelledby="notice-title">
@@ -168,16 +183,36 @@
                 </button>
             </section>
 
-            <!-- ── 고지: 연회색 바탕 맨 아래 ── -->
-            <footer class="simple-foot">
-                <ul class="notes">
-                    <li>투자 판단과 그 결과의 책임은 이용자 본인에게 있습니다.</li>
-                    <li>주식 투자는 원금 손실이 날 수 있습니다.</li>
-                    <li>과거 성과는 앞으로의 수익을 보장하지 않습니다.</li>
-                    <li>화면의 시세는 실제보다 몇 분 늦을 수 있습니다.</li>
-                </ul>
-            </footer>
+            </template>
         </main>
+        </div>
+
+        <!-- ═══ 2. 트레이닝: 이어서 하기(큰 카드) + 이번 주 학습(일~토) ═══ -->
+        <div :ref="el => setPane(1, el)" id="home-pane-training" class="pane" role="tabpanel" aria-labelledby="home-tab-training">
+            <main class="home-main"><HomeTrainingTab /></main>
+        </div>
+
+        <!-- ═══ 3. 백테스트: 자리만(내용은 따로 정한다) ═══ -->
+        <div :ref="el => setPane(2, el)" id="home-pane-backtest" class="pane" role="tabpanel" aria-labelledby="home-tab-backtest">
+            <main class="home-main">
+                <section class="sec bt-empty" aria-label="백테스트">
+                    <h2>백테스트</h2>
+                    <p>이곳은 준비 중이에요.</p>
+                </section>
+            </main>
+        </div>
+
+        </div>
+
+        <!-- ── 고지: 연회색 바탕 맨 아래(탭 공통) ── -->
+        <footer class="simple-foot">
+            <ul class="notes">
+                <li>투자 판단과 그 결과의 책임은 이용자 본인에게 있습니다.</li>
+                <li>주식 투자는 원금 손실이 날 수 있습니다.</li>
+                <li>과거 성과는 앞으로의 수익을 보장하지 않습니다.</li>
+                <li>화면의 시세는 실제보다 몇 분 늦을 수 있습니다.</li>
+            </ul>
+        </footer>
     </div>
 </template>
 
@@ -190,8 +225,9 @@
  *   - 내 설정(보조지표 수치)으로 거르고 설정한 순서로 정렬하는 일은 서버가 한다(/stocks/buy-target/home, 2026-11-18).
  */
 import AdSlot from '../common/AdSlot.vue';
-import AdInlineBanner from '../common/AdInlineBanner.vue';
 import WeeklyChart from './WeeklyChart.vue';
+import HomeSectorRank from './HomeSectorRank.vue';
+import HomeTrainingTab from './HomeTrainingTab.vue';
 // import MyCriteria from './MyCriteria.vue';   // 내 기준 카드 — 홈에서 뺌(2026-11-22). 다시 쓸 때 위 템플릿 주석과 함께 푼다
 import aibeesApi from '@scripts/aibeesApi.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
@@ -220,10 +256,8 @@ const userInitial = computed(() => (userName.value?.[0] ?? '?').toUpperCase());
 const isWorker = computed(() => hasRole(WORKER_ROLE));
 const showAds = useShowAds();
 
-// 웹 광고 칸(AdSlot). 앱은 AdSlot 이 자리표시만 그리므로 아래 appAdVisible 의 AdMob 배너가 대신한다.
+// 웹 광고 칸(AdSlot). 앱은 홈에 화면 안 광고를 두지 않는다(하단 고정 배너만).
 const heroAdVisible = computed(() => !isWorker.value && showAds.value && !isNativeAdsEnabled());
-// 앱은 화면 안 AdMob 배너(앱 안 플러그인 InlineAd)로 같은 자리를 채운다.
-const appAdVisible = computed(() => !isWorker.value && showAds.value && isNativeAdsEnabled());
 
 // 종목 상세(/stock/info)는 로그인 사용자만 쓴다(2026-11-20). 메뉴가 열려 있으면 비로그인에게도 행을 누를 수 있게 그리고,
 // 누르면 라우터 가드가 로그인 화면으로 안내한 뒤 로그인하면 그 종목으로 돌려보낸다(authPaths.rememberAfterLogin).
@@ -246,6 +280,67 @@ const logout = () => {
 };
 
 const scrolled = ref(false);
+
+/* ── 3탭 슬라이드(2026-11-24): 시장 · 트레이닝 · 백테스트 ──
+ * 가로 스크롤 + scroll-snap 이라 밀기는 브라우저/앱 웹뷰가 처리한다. 여기서는 (1) 눌러서 이동 (2) 미는 동안 밑줄이 따라가게
+ * (3) 세로 길이를 지금 탭에 맞춘다 — 탭마다 길이가 달라서 짧은 탭 아래에 빈 칸이 남지 않게.
+ * 미는 중에는 가장 긴 탭 높이로 열어 두고(잘리지 않게), 멈추면 지금 탭 높이로 줄인다. */
+const TABS = [
+    { key: 'market', label: '시장' },
+    { key: 'training', label: '트레이닝' },
+    { key: 'backtest', label: '백테스트' },
+];
+// 2026-11-24 홈에서 뺀 영역(내 관심 종목 · AI 분석 종목 TOP · 이번 주의 차트 · 오늘의 꿀 · 공지). 코드는 남겼고, 자리가 정해지면 true 로.
+const LEGACY_SECTIONS = false;
+
+const tab = ref(0);
+const progress = ref(0);          // 0~2: 미는 동안의 연속 위치(밑줄용)
+const dragging = ref(false);
+const pagerRef = ref(null);
+const paneEls = [null, null, null];
+const paneH = ref([0, 0, 0]);
+let paneRo = null;
+let settleTimer = null;
+let settledTab = 0;
+
+const setPane = (i, el) => {
+    if (paneEls[i] === el) return;
+    if (paneEls[i] && paneRo) paneRo.unobserve(paneEls[i]);
+    paneEls[i] = el;
+    if (el && paneRo) paneRo.observe(el);
+};
+const measurePanes = () => { paneH.value = paneEls.map(el => (el ? el.offsetHeight : 0)); };
+const pagerStyle = computed(() => {
+    const hs = paneH.value;
+    const h = dragging.value ? Math.max(...hs) : hs[tab.value];
+    return h > 0 ? { height: `${h}px` } : {};
+});
+
+const onPagerScroll = () => {
+    const el = pagerRef.value;
+    if (!el) return;
+    const w = el.clientWidth || 1;
+    progress.value = Math.min(TABS.length - 1, Math.max(0, el.scrollLeft / w));
+    tab.value = Math.round(progress.value);
+    dragging.value = true;
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+        dragging.value = false;
+        // 다른 탭에 멈췄으면 맨 위에서 시작(짧은 탭으로 가며 스크롤이 어정쩡하게 남지 않게)
+        if (settledTab !== tab.value) { settledTab = tab.value; window.scrollTo({ top: 0 }); }
+    }, 140);
+};
+const selectTab = (i) => {
+    const el = pagerRef.value;
+    if (!el) return;
+    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
+};
+// 화면 너비가 바뀌면(회전 등) 지금 탭 위치를 다시 맞춘다
+const onResize = () => {
+    const el = pagerRef.value;
+    if (el) el.scrollLeft = tab.value * el.clientWidth;
+    measurePanes();
+};
 
 const onScroll = () => {
     const next = window.scrollY > 8;
@@ -404,6 +499,7 @@ const watchlist = useWatchlistStore();
 const watchCodes = computed(() => watchlist.items.map(w => w.code).join());
 let pickSeq = 0;   // 설정을 빠르게 바꿀 때 늦게 온 옛 응답이 덮어쓰지 않게
 const loadItems = async () => {
+    if (!LEGACY_SECTIONS) return;   // 홈에서 뺀 영역 — 보이지 않는 데이터를 받지 않는다
     const seq = ++pickSeq;
     isLoading.value = true;
     try {
@@ -493,6 +589,7 @@ const goToStock = (item) => router.push({
 /* ── 공지 ── */
 const notices = ref([]);
 const loadNotices = async () => {
+    if (!LEGACY_SECTIONS) return;
     try {
         const { data } = await aibeesApi.get('/api/v1/notices', { params: { page: 0, size: 3 } });
         notices.value = Array.isArray(data?.data) ? data.data : [];
@@ -507,7 +604,12 @@ onMounted(() => {
     document.addEventListener('click', onDocClick, true);
     document.addEventListener('keydown', onKeyDown);
     window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize);
     onScroll();
+    // 탭 높이: 각 탭 안 내용이 바뀔 때(데이터가 들어올 때)마다 다시 잰다
+    paneRo = new ResizeObserver(measurePanes);
+    paneEls.forEach(el => el && paneRo.observe(el));
+    measurePanes();
     loadMarketSnapshot();
     loadIssue();
     marketTimer = setInterval(loadMarketSnapshot, 60 * 1000);
@@ -520,6 +622,9 @@ onBeforeUnmount(() => {
     document.removeEventListener('click', onDocClick, true);
     document.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('scroll', onScroll);
+    window.removeEventListener('resize', onResize);
+    clearTimeout(settleTimer);
+    paneRo?.disconnect();
 });
 </script>
 
@@ -821,7 +926,67 @@ button { font: inherit; letter-spacing: inherit; }
 @media (prefers-reduced-motion: reduce) { .w-skeleton i { animation: none; } }
 
 .hero-ad { padding: 12px $pad-x; }
-.hero-ad.app-ad { padding-left: 0; padding-right: 0; }
+
+/* ── 3탭 슬라이드(2026-11-24) ── */
+.home-tabs {
+    position: sticky;
+    top: calc(56px + env(safe-area-inset-top, 0px));   // 헤더(.hh-row 56px) 바로 아래에 붙는다
+    z-index: 45;
+    display: flex;
+    max-width: 640px;
+    margin: 0 auto;
+    background: $bar;
+    box-shadow: 0 1px 0 $line;
+}
+.ht-btn {
+    flex: 1;
+    height: 46px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: $sub;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    &.on { color: $ink; font-weight: 800; }
+}
+// 밑줄: 미는 동안 손가락을 따라 움직인다(translateX = 탭 한 칸 × 진행도)
+.ht-ind {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: calc(100% / 3);
+    height: 3px;
+    pointer-events: none;
+    will-change: transform;
+    i { display: block; width: 44px; height: 3px; margin: 0 auto; border-radius: 2px; background: $honey-500; }
+}
+.home-pager {
+    display: flex;
+    align-items: flex-start;
+    max-width: 640px;
+    margin: 0 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;   // 첫·끝 탭에서 더 밀어도 화면 전체가 뒤로 가지 않게
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    &::-webkit-scrollbar { display: none; }
+}
+.pane { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; }
+.bt-empty {
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+    h2 { margin: 0; font-size: 20px; font-weight: 700; }
+    p { margin: 0; font-size: 14px; color: $sub; }
+}
 
 /* ── 공지 ── */
 .notice { padding-bottom: 12px; }
