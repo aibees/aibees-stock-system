@@ -20,20 +20,15 @@
                 </div>
             </section>
 
-            <!-- ── 정렬 (홈과 동일: 기준 select + 방향 버튼) ── -->
-            <div v-if="!isLoading && resultData.length > 0" class="list-head">
-                <h2>추천 종목 <span class="count">{{ sortedData.length }}</span></h2>
-                <div class="list-tools">
-                    <button type="button" class="dir-btn" @click="toggleSortDir"
-                        :aria-label="`정렬 방향: ${sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel}`"
-                        :title="sortDir === 'desc' ? currentSort.descLabel : currentSort.ascLabel">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
-                            :style="{ transform: sortDir === 'desc' ? 'rotate(180deg)' : 'none' }" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg>
-                    </button>
-                </div>
+            <!-- ── 베이직 · 프리미엄: 각각 자기 테이블에서 조회(2026-11-25, 정렬 조건 칩은 없앰) ──
+                 베이직 = trade_buy_target_basic(기본 알고리즘) / 프리미엄 = trade_buy_target_stock(2파 종합순위, 워커가 사는 목록) -->
+            <div class="src-tabs" role="tablist" aria-label="추천 종류">
+                <button v-for="t in TABS" :key="t.key" type="button" role="tab" class="src-tab"
+                    :class="{ on: source === t.key }" :aria-selected="source === t.key ? 'true' : 'false'"
+                    @click="selectSource(t.key)">
+                    {{ t.label }}<span v-if="!isLoading && source === t.key" class="count">{{ sortedData.length }}</span>
+                </button>
             </div>
-            <!-- 정렬 기준: 가로로 넘기는 칩(방향은 위 ↑ 버튼) -->
-            <SortChips v-if="!isLoading && resultData.length > 0" v-model="sortKey" :options="SORT_OPTIONS" @change="onSortKeyChange" />
 
             <section class="buy-target reco">
                 <!-- 열 머리글: 아래 윗줄과 같은 칸 나눔(종목 | 현재가 | 봉) -->
@@ -152,7 +147,8 @@
                 </div>
 
                 <div v-else class="empty-box">
-                    <p>분석된 데이터가 없습니다. 날짜를 변경해 보세요.</p>
+                    <p v-if="source === 'premium'">이 날짜에는 프리미엄 추천이 없어요. 시장 상황에 따라 매수를 쉬는 날일 수 있어요.</p>
+                    <p v-else>분석된 데이터가 없습니다. 날짜를 변경해 보세요.</p>
                 </div>
             </section>
         </div>
@@ -210,16 +206,13 @@ onBeforeUnmount(() => clearInterval(clock));
 const getStockMainData = async () => {
     isLoading.value = true;
     try {
-        const searchParam = { 'ymd': selectedDate.value.replaceAll('-', '') };
-        const { data } = await aibeesApi.get('/api/v1/stocks/buy-target', { params: searchParam });
-
-        if (data.data.length == 0) {
-            resultData.value = [];
-        } else {
-            resultData.value = data.data;
-        }
+        // 탭마다 자기 테이블만 읽는다(비밀 API /buy-target/table — router_stocks.py)
+        const searchParam = { ymd: selectedDate.value.replaceAll('-', ''), source: source.value };
+        const { data } = await aibeesApi.get('/api/v1/stocks/buy-target/table', { params: searchParam });
+        resultData.value = Array.isArray(data?.data) ? data.data : [];
     } catch (e) {
         console.error(e);
+        resultData.value = [];
     }
     finally {
         isLoading.value = false;
@@ -229,16 +222,12 @@ const getStockMainData = async () => {
 const handleDateChange = () => getStockMainData();
 const openDatePicker = () => dateInput.value?.showPicker();
 
-/* ══════════════ 매수타겟 정렬 ══════════════
- * 조회는 하루치 전체를 한 번에 받아오므로 클라이언트에서 정렬한다(재조회 없음).
- *
- * 규칙은 worker(trade_worker/repository.py _ORDER_FIELDS)와 맞춘다:
- *   · 필드별 기본 방향 — rank_no 는 작을수록 상위(asc), score/volume 은 클수록 상위(desc)
- *   · 값이 없는(null) 종목은 정렬 방향과 무관하게 항상 뒤
- *   · 전부 동점이면 stock_code 로 최종 결정 (매 조회마다 순서가 흔들리지 않도록)
+/* ══════════════ 베이직 · 프리미엄 탭(2026-11-25) ══════════════
+ * 정렬 조건 칩은 없앴다. 목록 순서는 각 테이블의 순위 그대로다.
+ *   베이직   : rank_no 오름차순(기본 알고리즘 추천순위)
+ *   프리미엄 : composite_rank_no 오름차순(2파 종합순위 — 워커가 사는 순서)
+ * 프리미엄은 고급 단계 이상(RECO_ADVANCED·WORKER_USER)만 열린다 — 서버가 같은 기준으로 막고(403), 여기는 탭만 숨긴다.
  */
-// 열람 가능한 최고 단계. 실전 = WORKER_USER 권한(운영자 부여), 고급 = RECO_ADVANCED 기능 플래그(광고·구독으로 부여 예정).
-// 서버(/buy-target)가 같은 기준으로 권한 밖 정보를 응답에서 지운다 — 여기는 화면 구성용일 뿐 보안이 아니다.
 const route = useRoute();
 const userLevel = computed(() => {
     if (import.meta.env.DEV) {   // 개발 중 미리보기 전용(?level=1|2|3)
@@ -248,79 +237,35 @@ const userLevel = computed(() => {
     return recoLevel();
 });
 
-// 고급 단계 이상에서만 값이 내려오는 정렬 기준(기본 단계에는 서버가 이 필드를 주지 않는다)
-const ADVANCED_SORT_KEYS = ['composite_rank_no', 'shape_proba', 'frgn_amt', 'orgn_amt'];
-const SORT_ALL = [
-    { key: 'composite_rank_no', label: '종합 순위(신규)', dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
-    { key: 'rank_no',     label: '추천순위',     dir: 'asc',  ascLabel: '높은 순위 먼저', descLabel: '낮은 순위 먼저' },
-    { key: 'score',       label: '점수',         dir: 'desc', ascLabel: '낮은 점수 먼저', descLabel: '높은 점수 먼저' },
-    { key: 'volume',      label: '거래량',       dir: 'desc', ascLabel: '적은 순',        descLabel: '많은 순' },
-    { key: 'shape_proba', label: '급등패턴 순위', dir: 'desc', ascLabel: '낮은 확률 먼저', descLabel: '높은 확률 먼저' },
-    // 시가총액·수급(/buy-target 응답의 market_cap, frgn_amt, orgn_amt — StockService.attach_market_info)
-    { key: 'market_cap',  label: '시가총액',     dir: 'desc', ascLabel: '작은 순',        descLabel: '큰 순' },
-    { key: 'frgn_amt',    label: '외국인 순매수', dir: 'desc', ascLabel: '순매도 큰 순',   descLabel: '순매수 큰 순' },
-    { key: 'orgn_amt',    label: '기관 순매수',   dir: 'desc', ascLabel: '순매도 큰 순',   descLabel: '순매수 큰 순' },
-];
-// 단계마다 알고리즘이 달라 쓸 수 있는 정렬 기준도 다르다.
-//   기본 단계: 옛 알고리즘이 채우는 추천순위·점수 / 고급 단계: 2파 알고리즘의 종합순위·모델 확률·수급
-const BASIC_ONLY_SORT_KEYS = ['rank_no', 'score'];
-const SORT_OPTIONS = computed(() => (activeStage.value.rank >= 2
-    ? SORT_ALL.filter(o => !BASIC_ONLY_SORT_KEYS.includes(o.key))
-    : SORT_ALL.filter(o => !ADVANCED_SORT_KEYS.includes(o.key))));
-
-// 2026-09 세션 후속: 2단계(top10→모멘텀 재정렬) 방식이 우수해 고급 단계 기본 정렬은 composite_rank_no. 기본 단계는 추천순위.
-const sortKey = ref('rank_no');
-const sortDir = ref('asc');
-
-const currentSort = computed(
-    () => SORT_OPTIONS.value.find(o => o.key === sortKey.value) ?? SORT_OPTIONS.value[0]);
-
-// select 의 v-model 이 sortKey 를 이미 바꿔 놓은 뒤에 불린다. 기준을 바꾸면 그 필드의 기본 방향으로 되돌린다.
-// (거래량을 고르고 '적은 순'이 남아 있으면 의도와 반대 결과가 나온다)
-const onSortKeyChange = () => {
-    sortDir.value = SORT_OPTIONS.value.find(o => o.key === sortKey.value)?.dir ?? 'desc';
+const TABS = computed(() => [
+    { key: 'basic', label: '베이직' },
+    ...(userLevel.value >= 2 ? [{ key: 'premium', label: '프리미엄' }] : []),
+]);
+const source = ref('basic');
+const selectSource = (key) => {
+    if (source.value === key) return;
+    source.value = key;
+    getStockMainData();
 };
-const toggleSortDir = () => { sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc'; };
 
-// 카드 번호: 정렬 기준의 "기본 방향"일 때만 1위부터 매기고, 방향을 뒤집으면
-// 목록을 새로 매기는 게 아니라 같은 순위를 거꾸로 보여준다(마지막 번호부터 역순).
-const rankNumber = (index) => (
-    sortDir.value === currentSort.value.dir ? index + 1 : sortedData.value.length - index
-);
-
+const RANK_KEY = { basic: 'rank_no', premium: 'composite_rank_no' };
 const sortNum = (v) => {
     if (v === null || v === undefined || v === '') return null;
     const n = Number(v);
     return Number.isNaN(n) ? null : n;
 };
-
-/* ══════════════ 추천 목록(단계 탭 없음) ══════════════
- * 비밀상회는 기본/고급/실전 탭을 나누지 않고 '매수추천' 목록 하나만 보여준다(2026-11-17).
- * 목록 = 사용자가 볼 수 있는 단계 중 가장 높은 단계(실전은 아직 준비 중이라 고급까지) — 홈(Home.vue)과 같은 규칙.
- * 서버(RecoLevel.py)가 행마다 reco_stages 를 주고, 권한 밖 종목·정보는 응답에서 지운다.
- */
-const STAGE_RANK = computed(() => Math.min(userLevel.value, 2));
-const activeStage = computed(() => ({ rank: STAGE_RANK.value }));
-const stageItems = (rank) => resultData.value.filter(it => (it.reco_stages ?? [1]).includes(rank));
-watch(STAGE_RANK, (r) => {
-    sortKey.value = r >= 2 ? 'composite_rank_no' : 'rank_no';
-    sortDir.value = 'asc';
-}, { immediate: true });
-
 const sortedData = computed(() => {
-    const key = sortKey.value;
-    const desc = sortDir.value === 'desc';
-    const base = stageItems(activeStage.value.rank);
-    return base.sort((a, b) => {
+    const key = RANK_KEY[source.value];
+    return [...resultData.value].sort((a, b) => {
         const va = sortNum(a[key]);
         const vb = sortNum(b[key]);
-        if (va === null && vb === null) return 0;
-        if (va === null) return 1;      // null 은 방향 무관 항상 뒤
+        if (va === null && vb === null) return String(a.stock_code ?? '').localeCompare(String(b.stock_code ?? ''));
+        if (va === null) return 1;      // 순위 없는 종목은 뒤
         if (vb === null) return -1;
-        if (va !== vb) return desc ? vb - va : va - vb;
-        return String(a.stock_code ?? '').localeCompare(String(b.stock_code ?? ''));
+        return va - vb;
     });
 });
+const rankNumber = (index) => index + 1;
 
 // 좁은 화면용 등락: 기호 + 퍼센트만(절대값은 PC 폭에서만 보인다)
 const shortChange = (chg) => {
@@ -362,7 +307,7 @@ const rows = computed(() =>
             recentBars: (item.chart_data || []).slice(-RECENT_BARS),
             facts: [
                 // 수급은 고급 정보 — 기본 단계는 서버가 값을 주지 않으므로 칸도 그리지 않는다
-                ...(userLevel.value >= 2 && activeStage.value.rank >= 2 ? [
+                ...(userLevel.value >= 2 ? [
                     { name: '외국인', value: formatNetAmtShort(item.frgn_amt), cls: signClass(item.frgn_amt) },
                     { name: '기관',   value: formatNetAmtShort(item.orgn_amt), cls: signClass(item.orgn_amt) },
                 ] : []),
@@ -375,7 +320,7 @@ const rows = computed(() =>
 /* ── 아코디언: 한 번에 하나만 펼침 ── */
 const expandedCode = ref(null);
 const toggleRow = (code) => { expandedCode.value = expandedCode.value === code ? null : code; };
-watch([sortKey, sortDir, selectedDate], () => { expandedCode.value = null; });
+watch([source, selectedDate], () => { expandedCode.value = null; });
 
 /* ── 매수타겟 카드 간이차트 (최근 120영업일 봉차트 + 5/20/60/120일선) ──
  * 기본 숨김 — "차트보기" 버튼으로 종목별 개별 토글. ChartStock.vue(전체 차트 페이지)와
@@ -447,6 +392,33 @@ const toggleChart = (code) => {
         opacity: 0;
         width: 0;
         height: 0;
+    }
+}
+
+/* ── 베이직 · 프리미엄 탭(2026-11-25): 글자 탭 + 밑줄. 선택된 탭 옆에 종목 수 ── */
+.src-tabs {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--sc-border);
+}
+.src-tab {
+    position: relative;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--sc-text-sub);
+    font: inherit;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    .count { margin-left: 6px; color: var(--sc-point-ink); }
+    &.on {
+        color: var(--sc-text);
+        font-weight: 700;
+        &::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--sc-text); }
     }
 }
 

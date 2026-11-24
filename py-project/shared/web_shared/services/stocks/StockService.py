@@ -48,7 +48,7 @@ class StockService:
     def _bars_between(self, session, stock_code, date_from, date_to):
         return self.bar_source.bars_between(session, stock_code, date_from, date_to)
 
-    def get_buy_target_stock_list(self, session, ymd, lite: bool = False):
+    def get_buy_target_stock_list(self, session, ymd, lite: bool = False, source: str | None = None):
         """매수추천 목록. 두 테이블을 종목당 한 줄로 합치고 행마다 algos(걸린 알고리즘)를 붙인다.
 
           · trade_buy_target_stock : 2파 종합순위(PREMIUM). 워커가 읽는 테이블.
@@ -59,15 +59,23 @@ class StockService:
         chart_data 는 응답용으로 줄인다(compact_bars, 2026-11-18). 봉 개수(120)는 그대로다 —
         화면이 120일선·MACD(EMA)를 이 봉으로 다시 계산하므로 봉을 자르면 추천 판정이 달라진다.
         lite=True(홈)면 이동평균(ma20·ma60·ma120)도 뺀다. 홈은 미니 차트를 그리지 않는다.
+
+        source 로 한 테이블만 읽을 수 있다(비밀상회 매수추천 화면의 베이직·프리미엄 탭, 2026-11-25).
+          'basic'   → trade_buy_target_basic 만 / 'premium' → trade_buy_target_stock 만 / None → 둘 다 합침(기존)
+        ymd 미지정이면 그 테이블의 가장 최근 영업일을 쓴다.
         """
+        if source not in (None, 'basic', 'premium'):
+            raise ValueError(f"source 는 basic·premium 중 하나여야 합니다: {source}")
+        use_main = source in (None, 'premium')
+        use_basic = source in (None, 'basic')
         # ymd 미지정이면 두 테이블 중 더 최근 영업일을 쓴다(한쪽만 비는 날에도 다른 쪽이 나오게).
         if not ymd.get(Literal.YMD):
-            latest = [y for y in (self.buyTargetStockDaoImpl.select_latest_ymd(session),
-                                  self.buyTargetBasicDaoImpl.select_latest_ymd(session)) if y]
+            latest = [y for y in ((self.buyTargetStockDaoImpl.select_latest_ymd(session) if use_main else None),
+                                  (self.buyTargetBasicDaoImpl.select_latest_ymd(session) if use_basic else None)) if y]
             ymd = {**ymd, Literal.YMD: max(latest) if latest else None}
 
-        main_rows = self.buyTargetStockDaoImpl.select_trade_buy_target_daily(session, ymd)
-        basic_rows = self.buyTargetBasicDaoImpl.select_daily(session, ymd.get(Literal.YMD))
+        main_rows = self.buyTargetStockDaoImpl.select_trade_buy_target_daily(session, ymd) if use_main else []
+        basic_rows = self.buyTargetBasicDaoImpl.select_daily(session, ymd.get(Literal.YMD)) if use_basic else []
         results = merge_reco_sources(main_rows, basic_rows)
         if not results:
             return results
