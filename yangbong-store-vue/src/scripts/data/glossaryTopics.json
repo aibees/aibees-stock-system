@@ -1,0 +1,33 @@
+{
+  "topics": ["경제 기초", "돈과 금융", "주식과 채권", "세금과 절세"],
+  "categoryGroups": {
+    "차트·지표": ["차트", "보조지표"],
+    "시세·거래": ["시세", "시장·거래", "수급"],
+    "기업분석": ["기업분석"],
+    "투자관리": ["투자관리"],
+    "계좌·세금": ["계좌·세금"],
+    "경제·금융": ["경제", "금융"]
+  },
+  "defaultTopic": "주식과 채권",
+  "byCategory": {
+    "계좌·세금": "세금과 절세",
+    "경제": "경제 기초",
+    "금융": "돈과 금융"
+  },
+  "byTerm": {
+    "securities-account": "돈과 금융",
+    "non-face-to-face": "돈과 금융",
+    "deposit-cash": "돈과 금융",
+    "buying-power": "돈과 금융",
+    "settlement": "돈과 금융",
+    "brokerage-fee": "돈과 금융",
+    "account-transfer": "돈과 금융",
+    "margin-trading": "돈과 금융",
+    "margin-deposit": "돈과 금융",
+    "unsettled-purchase": "돈과 금융",
+    "forced-liquidation": "돈과 금융",
+    "general-account": "주식과 채권",
+    "stock-transfer-in": "주식과 채권",
+    "fractional-shares": "주식과 채권"
+  }
+}
