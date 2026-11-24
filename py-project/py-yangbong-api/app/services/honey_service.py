@@ -42,6 +42,8 @@ LESSON_KEYS = frozenset([
     'supply-demand/trap', 'supply-demand/check',
     'risk-management/why-loss', 'risk-management/position-size', 'risk-management/exit-price',
     'risk-management/split-buy', 'risk-management/journal', 'risk-management/check',
+    # 계좌 · 시작하기(투자 실전 첫 장)
+    'account-start/open', 'account-start/types', 'account-start/transfer', 'account-start/tax', 'account-start/check',
     # 경제 기초(무료) 19강 — 2026-11-24
     'econ-money/deposit', 'econ-money/card-credit', 'econ-money/loan', 'econ-money/isa', 'econ-money/pension',
     'econ-money/tax', 'econ-money/rate-basics',

@@ -9,27 +9,39 @@
             <button v-if="query" type="button" class="gl-clear" aria-label="검색어 지우기" @click="query = ''">×</button>
         </label>
 
-        <div class="gl-chips" role="group" aria-label="용어 분류">
+        <div class="gl-views" role="tablist" aria-label="보기 방식">
+            <button v-for="v in VIEWS" :key="v.key" type="button" role="tab" :class="{ on: v.key === view }"
+                :aria-selected="v.key === view ? 'true' : 'false'" @click="setView(v.key)">{{ v.label }}</button>
+        </div>
+
+        <div class="gl-chips" role="group" :aria-label="view === 'topic' ? '용어 주제' : view === 'mine' ? '내 표시' : '용어 분류'">
             <button v-for="c in chips" :key="c" type="button" :class="{ on: c === category }"
-                :aria-pressed="c === category ? 'true' : 'false'" @click="category = c">{{ c }}</button>
+                :aria-pressed="c === category ? 'true' : 'false'" @click="category = c">
+                {{ c }}<em v-if="view === 'topic' && c !== ALL">{{ topicCount[c] || 0 }}</em>
+            </button>
         </div>
 
         <p class="gl-count">{{ countText }}</p>
 
-        <p v-if="!groups.length" class="gl-empty">찾는 용어가 없어요. 다른 말로 검색해 보세요.</p>
+        <p v-if="!groups.length" class="gl-empty">{{ emptyText }}</p>
 
         <div v-for="g in groups" :key="g.name">
             <h2 class="gl-group">{{ g.name }}</h2>
             <article v-for="t in g.items" :id="`term-${t.id}`" :key="t.id" class="gl-term" :class="{ open: openId === t.id }">
                 <button type="button" class="gl-row" :aria-expanded="openId === t.id ? 'true' : 'false'"
                     :aria-controls="`term-body-${t.id}`" @click="toggle(t.id)">
-                    <span class="gl-text"><b>{{ t.term }}</b><small>{{ t.short }}</small></span>
+                    <span class="gl-text">
+                        <b>{{ t.term }}
+                            <i v-if="notes.isFav(t.id)" class="mk fav" title="즐겨찾기">★</i>
+                            <i v-if="notes.isConfused(t.id)" class="mk confused" title="헷갈려요">?</i>
+                            <i v-if="notes.isKnown(t.id)" class="mk known" title="알아요">✓</i>
+                        </b>
+                        <small>{{ t.short }}</small>
+                    </span>
                     <svg class="gl-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
                 </button>
 
                 <div v-if="openId === t.id" :id="`term-body-${t.id}`" class="gl-body">
-                    <button type="button" class="gl-conf" :class="{ on: review.isConfusing(t.term) }" :aria-pressed="review.isConfusing(t.term)"
-                        @click="review.toggleTerm(t.term, t.easy || t.short, '용어 사전')">? 헷갈려요</button>
                     <h3>쉽게 말하면</h3>
                     <p>{{ t.easy }}</p>
                     <h3>예시</h3>
@@ -68,6 +80,16 @@
                     <button v-if="lessonOf(t)" type="button" class="gl-lesson" @click="router.push(stagePath(lessonOf(t)))">
                         {{ lessonOf(t).short || lessonOf(t).title }} 강의 보기 <i aria-hidden="true">›</i>
                     </button>
+
+                    <!-- 내 표시: 이 기기에만 저장 -->
+                    <div class="gl-mine" role="group" aria-label="내 표시">
+                        <button type="button" :class="{ on: notes.isFav(t.id) }" :aria-pressed="notes.isFav(t.id) ? 'true' : 'false'"
+                            @click="notes.toggleFav(t.id)"><span aria-hidden="true">{{ notes.isFav(t.id) ? '★' : '☆' }}</span>즐겨찾기</button>
+                        <button type="button" :class="{ on: notes.isConfused(t.id), warn: true }" :aria-pressed="notes.isConfused(t.id) ? 'true' : 'false'"
+                            @click="notes.toggleConfused(t.id); syncReview(t)"><span aria-hidden="true">?</span>헷갈려요</button>
+                        <button type="button" :class="{ on: notes.isKnown(t.id) }" :aria-pressed="notes.isKnown(t.id) ? 'true' : 'false'"
+                            @click="notes.toggleKnown(t.id); syncReview(t)"><span aria-hidden="true">✓</span>알아요</button>
+                    </div>
                 </div>
             </article>
         </div>
@@ -76,24 +98,65 @@
 </template>
 
 <script setup>
-/** 트레이닝 > 용어 사전: 검색 · 분류 · 가나다 목록. 항목은 한 번에 하나만 펼친다. */
+/**
+ * 트레이닝 > 용어 사전: 검색 · 분류/주제/내 단어장 · 가나다 목록. 항목은 한 번에 하나만 펼친다.
+ *   분류 = 용어의 성격(차트·기업분석 …), 주제 = 배우는 갈래(경제 첫걸음 · 세금과 절세 …) — glossaryTopics.json
+ *   내 단어장 = 즐겨찾기 · 헷갈려요 · 알아요. 이 기기에만 저장된다(glossaryNotes.js).
+ */
 import { allStages, stagePath, TRAINING_PATH } from '@scripts/training.js';
-import { glossaryCategories, glossaryTerms, groupOf, matchesTerm } from '@scripts/glossary.js';
+import { glossaryCategories, categoryGroupOf, glossaryTerms, glossaryTopics, topicOf, groupOf, matchesTerm } from '@scripts/glossary.js';
+import { useGlossaryNotes } from '@scripts/glossaryNotes.js';
 import { useReviewStore } from '@scripts/stores/review-store.js';
 
 const ALL = '전체';
+const VIEWS = [
+    { key: 'category', label: '분류' },
+    { key: 'topic', label: '주제' },
+    { key: 'mine', label: '내 단어장' },
+];
+const MINE = ['즐겨찾기', '헷갈려요', '알아요'];
+
 const router = useRouter();
 const terms = glossaryTerms();
-const chips = [ALL, ...glossaryCategories()];
+const notes = useGlossaryNotes();
 
+const view = ref('category');
 // 트레이닝 첫 화면의 용어 검색(?q=)으로 들어오면 그 말로 찾아 둔다(2026-11-24)
 const query = ref(String(useRoute().query.q ?? ''));
+const category = ref(ALL);      // 현재 보기(view)에서 고른 칩
 const review = useReviewStore();
-const category = ref(ALL);
+/** 내 단어장의 '헷갈려요'를 트레이닝 다시 보기(복습)와 맞춘다 — 켜면 복습 목록에 담고, 끄거나 '알아요'면 뺀다 */
+const syncReview = (t) => {
+    if (notes.isConfused(t.id) !== review.isConfusing(t.term)) review.toggleTerm(t.term, t.easy || t.short, '용어 사전');
+};
 const openId = ref(null);
 
-const filtered = computed(() => terms.filter(t =>
-    (category.value === ALL || t.category === category.value) && matchesTerm(t, query.value)));
+const topicCount = computed(() => {
+    const m = {};
+    terms.forEach((t) => { const k = topicOf(t); m[k] = (m[k] ?? 0) + 1; });
+    return m;
+});
+const chips = computed(() => {
+    // 용어가 아직 없는 주제는 칩에서 숨긴다(첫 용어를 넣으면 저절로 나타난다)
+    if (view.value === 'topic') return [ALL, ...glossaryTopics().filter(k => topicCount.value[k])];
+    if (view.value === 'mine') return [ALL, ...MINE];
+    return [ALL, ...glossaryCategories()];
+});
+const isMarked = (id) => notes.isFav(id) || notes.isConfused(id) || notes.isKnown(id);
+const fitsPick = (t) => {
+    const c = category.value;
+    if (view.value === 'topic') return c === ALL || topicOf(t) === c;
+    if (view.value === 'mine') {
+        if (c === '즐겨찾기') return notes.isFav(t.id);
+        if (c === '헷갈려요') return notes.isConfused(t.id);
+        if (c === '알아요') return notes.isKnown(t.id);
+        return isMarked(t.id);
+    }
+    return c === ALL || categoryGroupOf(t) === c;
+};
+const setView = (key) => { view.value = key; category.value = ALL; openId.value = null; };
+
+const filtered = computed(() => terms.filter(t => fitsPick(t) && matchesTerm(t, query.value)));
 
 const groups = computed(() => {
     const out = [];
@@ -105,9 +168,17 @@ const groups = computed(() => {
     return out;
 });
 
-const countText = computed(() => (query.value.trim()
-    ? `검색 결과 ${filtered.value.length}개`
-    : `${category.value} ${filtered.value.length}개 · 가나다순`));
+const countText = computed(() => {
+    if (query.value.trim()) return `검색 결과 ${filtered.value.length}개`;
+    const base = view.value === 'mine' && category.value === ALL ? '내 표시' : category.value;
+    return `${base} ${filtered.value.length}개 · 가나다순`;
+});
+
+const emptyText = computed(() => {
+    if (query.value.trim()) return '찾는 용어가 없어요. 다른 말로 검색해 보세요.';
+    if (view.value === 'mine') return '아직 표시한 용어가 없어요. 용어를 펼쳐 맨 아래 버튼으로 표시해 보세요.';
+    return '용어가 없어요.';
+});
 
 // 검색 결과가 하나면 바로 펼친다
 watch(filtered, (list) => {
@@ -120,6 +191,7 @@ const lessonOf = (t) => (t.lesson ? allStages().find(s => s.key === t.lesson) ??
 
 const openRelated = async (t) => {
     query.value = '';
+    view.value = 'category';
     category.value = ALL;
     openId.value = t.id;
     await nextTick();
@@ -163,10 +235,29 @@ button { font: inherit; letter-spacing: inherit; }
 }
 .gl-clear { width: 32px; height: 32px; border: 0; background: transparent; color: $sub; font-size: 19px; cursor: pointer; }
 
+.gl-views {
+    display: flex;
+    gap: 4px;
+    margin: 12px $pad-x 0;
+    padding: 3px;
+    border-radius: $radius;
+    background: $band;
+    button {
+        flex: 1;
+        height: 34px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: $sub;
+        font-size: 14px;
+        cursor: pointer;
+        &.on { background: $card; color: $ink; font-weight: 700; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+    }
+}
 .gl-chips {
     display: flex;
     gap: 4px;
-    padding: 12px $pad-x;
+    padding: 10px $pad-x;
     overflow-x: auto;
     scrollbar-width: none;
     &::-webkit-scrollbar { display: none; }
@@ -181,6 +272,7 @@ button { font: inherit; letter-spacing: inherit; }
         font-size: 14px;
         cursor: pointer;
         &.on { background: $honey-300; color: $honey-ink; font-weight: 700; }
+        em { margin-left: 4px; font-style: normal; font-size: 12px; opacity: .7; }
     }
 }
 .gl-count { margin: 0; padding: 2px $pad-x 4px; font-size: 13px; color: $sub; }
@@ -245,6 +337,41 @@ button { font: inherit; letter-spacing: inherit; }
     gap: 6px;
     button { height: 32px; padding: 0 10px; border: 1px solid $line; border-radius: 8px; background: $card; color: $sub-ink; font-size: 13px; cursor: pointer; }
 }
+.gl-text b .mk {
+    margin-left: 4px;
+    font-style: normal;
+    font-size: 12px;
+    font-weight: 700;
+    &.fav { color: #E0A100; }
+    &.confused { color: $amber-700; }
+    &.known { color: #2E8B57; }
+}
+.gl-mine {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid $line;
+    button {
+        min-height: 52px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 4px 2px;
+        border: 1px solid $line;
+        border-radius: 10px;
+        background: $card;
+        color: $sub-ink;
+        font-size: 12px;
+        cursor: pointer;
+        span { font-size: 16px; line-height: 1; }
+        &.on { background: $honey-300; border-color: $honey-300; color: $honey-ink; font-weight: 700; }
+        &.warn.on { background: $honey-strip; border-color: $amber-700; color: $amber-700; }
+    }
+}
 .gl-lesson {
     width: 100%;
     min-height: 44px;
@@ -263,7 +390,4 @@ button { font: inherit; letter-spacing: inherit; }
     i { font-style: normal; font-weight: 400; color: $sub; }
 }
 
-/* 2026-11-24 헷갈려요 — 누르면 다시 보기(복습)에 담긴다 */
-.gl-conf { float: right; height: 30px; margin: 0 0 6px 8px; padding: 0 10px; border: 1px solid #FFE0A3; border-radius: 9px; background: $card; color: $amber-700;
-    font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; &.on { background: $honey-300; border-color: $honey-300; color: $honey-ink; } }
 </style>

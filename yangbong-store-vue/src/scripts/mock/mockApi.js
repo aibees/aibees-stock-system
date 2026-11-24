@@ -365,6 +365,16 @@ const ROUTES = [
     ] })],
     ['GET',/^\/api\/v1\/daily-issue\/(\d{8})$/, (c, m) => ok({ ...MOCK_ISSUE, ymd: m[1] })],
     ['GET', '/api/v1/indicators/market-snapshot', (c) => ok(marketSnapshot(c.params))],
+    // 개별차트 화면 확인용: 종목 검색 자동완성 + 종목 기본 정보
+    ['GET', '/api/v1/stocks/search', (c) => {
+        const q = String(c.params?.searchTxt || '');
+        return ok(STOCKS.filter(s => s.name.includes(q) || s.code.includes(q))
+            .map(s => ({ stock_code: s.code, stock_name: s.name, stock_type_yf: 'KS' })));
+    }],
+    ['GET', /^\/api\/v1\/stocks\/id\/(\d+)$/, (c, m) => {
+        const s = STOCKS.find(x => x.code === m[1]);
+        return s ? ok({ stock_code: s.code, stock_name: s.name, market_cap: Math.round(s.cap / 100), investor: null }) : null;
+    }],
     ['GET', '/api/v1/stocks/weekly-chart', () => ok(weeklyChart())],
     ['GET', '/api/v1/stocks/buy-target/home', (c) => ok(homePicks(c.params))],
     ['GET', '/api/v1/stocks/buy-target', () => ok(buyTargets())],

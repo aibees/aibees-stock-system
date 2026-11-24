@@ -149,7 +149,8 @@
             <section v-if="heroAdVisible" class="sec hero-ad" aria-label="광고">
                 <AdSlot placement="homeHero" />
             </section>
-            <section v-else-if="appAdVisible" class="sec hero-ad" aria-label="광고">
+            <!-- 앱 배너는 섹션 너비를 꽉 채운다(좌우 여백 없음, 2026-11-23) -->
+            <section v-else-if="appAdVisible" class="sec hero-ad app-ad" aria-label="광고">
                 <AdInlineBanner header-selector=".home-header" />
             </section>
 
@@ -820,6 +821,7 @@ button { font: inherit; letter-spacing: inherit; }
 @media (prefers-reduced-motion: reduce) { .w-skeleton i { animation: none; } }
 
 .hero-ad { padding: 12px $pad-x; }
+.hero-ad.app-ad { padding-left: 0; padding-right: 0; }
 
 /* ── 공지 ── */
 .notice { padding-bottom: 12px; }

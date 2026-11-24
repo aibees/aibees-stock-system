@@ -10,6 +10,8 @@ import GoogleMobileAds
 ///
 ///   show({ adId, x, y, width, height, clipTop, clipBottom })
 ///       x, y        : 자리의 문서 좌표(CSS px, getBoundingClientRect + scrollX/Y). 배너는 그 칸 가운데에 놓인다.
+///       width       : 칸 너비. 배너는 이 너비를 꽉 채우는 적응형(anchored adaptive)으로 만든다(2026-11-23).
+///                     resolve 값 { width, height } 로 SDK 가 정한 크기를 돌려준다 — 웹이 칸 높이를 맞춘다.
 ///       clipTop     : 화면 위쪽에서 가려야 하는 높이(고정 헤더 아래 끝, CSS px). 배너가 헤더 위로 올라오지 않게 자른다.
 ///       clipBottom  : 화면 아래쪽에서 가려야 하는 높이(하단 탭바). 같은 이유.
 ///   update({ x, y, width, height, clipTop, clipBottom }) : 자리가 바뀌었을 때(레이아웃 변화) 다시 맞춘다.
@@ -61,7 +63,10 @@ public class InlineAdPlugin: CAPPlugin, CAPBridgedPlugin, BannerViewDelegate {
             webView.addSubview(box)
             self.container = box
 
-            let banner = BannerView(adSize: AdSizeBanner)   // 320×50. 웹 자리 높이와 맞춘다(AdInlineBanner.vue)
+            // 칸 너비를 꽉 채우는 적응형 배너. 높이는 너비에 따라 SDK 가 정한다(보통 50~60pt).
+            let width = self.slot.width > 0 ? self.slot.width : webView.bounds.width
+            let adSize = currentOrientationAnchoredAdaptiveBanner(width: width)
+            let banner = BannerView(adSize: adSize)
             banner.adUnitID = adId
             banner.rootViewController = self.bridge?.viewController
             banner.delegate = self
@@ -74,7 +79,7 @@ public class InlineAdPlugin: CAPPlugin, CAPBridgedPlugin, BannerViewDelegate {
             }
             self.layout()
             banner.load(Request())
-            call.resolve()
+            call.resolve(["width": adSize.size.width, "height": adSize.size.height])
         }
     }
 

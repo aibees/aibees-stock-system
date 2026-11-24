@@ -41,6 +41,18 @@
       ]
     },
     {
+      "slug": "account-start",
+      "name": "계좌 · 시작하기",
+      "summary": "증권 계좌를 만들고, 계좌 종류와 옮기는 방법, 세금의 기본을 짚습니다.",
+      "stages": [
+        { "id": "open", "title": "증권 계좌 만들기", "short": "계좌 만들기", "sub": "증권사 고르기와 개설 순서" },
+        { "id": "types", "title": "계좌 종류 한눈에 보기 (일반·ISA·연금저축·IRP)", "short": "계좌 종류", "sub": "일반·ISA·연금저축·IRP" },
+        { "id": "transfer", "title": "계좌 옮기기와 갈아타기", "short": "옮기기와 갈아타기", "sub": "증권사 이동과 계좌 전환" },
+        { "id": "tax", "title": "세금 기초: 계좌에 따라 달라지는 점", "short": "세금 기초", "sub": "배당·양도세와 계좌별 차이" },
+        { "id": "check", "title": "계좌 시작하기 확인", "short": "계좌 확인", "sub": "문제로 한 번 더 짚기" }
+      ]
+    },
+    {
       "slug": "chart-basic",
       "name": "차트 보는 법 · 기초",
       "summary": "캔들과 거래량, 이동평균선처럼 차트를 처음 볼 때 필요한 것만 짚습니다.",
@@ -122,7 +134,7 @@
   ],
   "courses": [
     { "slug": "econ", "name": "경제 기초", "title": "내 돈부터 시장까지", "free": true, "unit": "강", "emoji": "honey", "basis": "2026-11-24", "chapters": ["econ-money", "econ-market", "econ-read"] },
-    { "slug": "invest", "name": "투자 실전", "title": "차트·기업·수급 읽기", "unit": "단계", "emoji": "books", "chapters": ["chart-basic", "chart-advanced", "chart-deep", "company-analysis", "supply-demand", "risk-management"] }
+    { "slug": "invest", "name": "투자 실전", "title": "차트·기업·수급 읽기", "unit": "단계", "emoji": "books", "chapters": ["account-start", "chart-basic", "chart-advanced", "chart-deep", "company-analysis", "supply-demand", "risk-management"] }
   ],
   "soon": []
 }
