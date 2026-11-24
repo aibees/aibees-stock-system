@@ -289,6 +289,11 @@ const honeySummary = () => {
 };
 const honeyOk = (gained) => ok({ summary: honeySummary(), gained });
 // 오늘의 경제 이슈(목업 — 실제는 관리자 검토 후 공개된 것만 온다)
+// 다시 보기 목업: 오늘 볼 오답 1 · 헷갈린 용어 1(어제 담은 것처럼)
+const MOCK_REVIEW = { items: {
+    'q:econ-money/deposit~0': { kind: 'wrong', ref: 'econ-money/deposit~0', label: '내 돈 관리 기초', step: 0, due: Date.now() - 3600000, addedAt: Date.now() - 86400000, updatedAt: 1, done: false },
+    't:복리': { kind: 'term', ref: '복리', desc: '이자에도 다시 이자가 붙는 방식', label: '1강 예금·적금·파킹통장', step: 1, due: Date.now() - 3600000, addedAt: Date.now() - 4 * 86400000, updatedAt: 1, done: false },
+} };
 const MOCK_ISSUE = {
     ymd: '20261122', status: 'PUBLISHED', title: '미국 반도체 주식이 크게 떨어지며 코스피·코스닥도 함께 약했어요', keywords: ['반도체', '미국증시'],
     what: '금요일 밤 미국에서 반도체 회사 주가가 한꺼번에 내렸어요. 우리 시장에서도 반도체 비중이 큰 대형주가 따라 내리면서 지수가 크게 떨어졌어요.',
@@ -337,6 +342,9 @@ const ROUTES = [
         return honeyOk(-1000);
     }],
     ['GET', '/api/v1/training/progress', () => okS(MOCK_TRAINING)],
+    // 다시 보기(오답노트·헷갈린 용어·복습) — 목업은 메모리에만
+    ['GET', '/api/v1/training/review', () => okS({ items: MOCK_REVIEW.items, updated_at: null })],
+    ['PUT', '/api/v1/training/review', (c) => { MOCK_REVIEW.items = mockBody(c).items ?? {}; return okS({ saved: Object.keys(MOCK_REVIEW.items).length }); }],
     ['POST', '/api/v1/training/progress', (c) => {
         let honeyGained = 0;
         for (const k of mockBody(c).stage_keys || []) {

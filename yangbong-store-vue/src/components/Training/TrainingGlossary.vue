@@ -28,6 +28,8 @@
                 </button>
 
                 <div v-if="openId === t.id" :id="`term-body-${t.id}`" class="gl-body">
+                    <button type="button" class="gl-conf" :class="{ on: review.isConfusing(t.term) }" :aria-pressed="review.isConfusing(t.term)"
+                        @click="review.toggleTerm(t.term, t.easy || t.short, '용어 사전')">? 헷갈려요</button>
                     <h3>쉽게 말하면</h3>
                     <p>{{ t.easy }}</p>
                     <h3>예시</h3>
@@ -77,13 +79,16 @@
 /** 트레이닝 > 용어 사전: 검색 · 분류 · 가나다 목록. 항목은 한 번에 하나만 펼친다. */
 import { allStages, stagePath, TRAINING_PATH } from '@scripts/training.js';
 import { glossaryCategories, glossaryTerms, groupOf, matchesTerm } from '@scripts/glossary.js';
+import { useReviewStore } from '@scripts/stores/review-store.js';
 
 const ALL = '전체';
 const router = useRouter();
 const terms = glossaryTerms();
 const chips = [ALL, ...glossaryCategories()];
 
-const query = ref('');
+// 트레이닝 첫 화면의 용어 검색(?q=)으로 들어오면 그 말로 찾아 둔다(2026-11-24)
+const query = ref(String(useRoute().query.q ?? ''));
+const review = useReviewStore();
 const category = ref(ALL);
 const openId = ref(null);
 
@@ -107,7 +112,7 @@ const countText = computed(() => (query.value.trim()
 // 검색 결과가 하나면 바로 펼친다
 watch(filtered, (list) => {
     if (query.value.trim() && list.length === 1) openId.value = list[0].id;
-});
+}, { immediate: true });   // 트레이닝 첫 화면 검색(?q=)으로 들어올 때도
 
 const toggle = (id) => { openId.value = openId.value === id ? null : id; };
 const relatedOf = (t) => (t.related ?? []).map(name => terms.find(x => x.term === name)).filter(Boolean);
@@ -257,4 +262,8 @@ button { font: inherit; letter-spacing: inherit; }
     cursor: pointer;
     i { font-style: normal; font-weight: 400; color: $sub; }
 }
+
+/* 2026-11-24 헷갈려요 — 누르면 다시 보기(복습)에 담긴다 */
+.gl-conf { float: right; height: 30px; margin: 0 0 6px 8px; padding: 0 10px; border: 1px solid #FFE0A3; border-radius: 9px; background: $card; color: $amber-700;
+    font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; &.on { background: $honey-300; border-color: $honey-300; color: $honey-ink; } }
 </style>

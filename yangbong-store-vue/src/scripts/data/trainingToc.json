@@ -1,6 +1,46 @@
 {
   "chapters": [
     {
+      "slug": "econ-money",
+      "name": "내 돈 관리 기초",
+      "summary": "투자 전에 알아야 할 돈의 구조를 숫자로 배워요.",
+      "stages": [
+        { "id": "deposit", "title": "예금·적금·파킹통장", "short": "예금·적금·파킹통장", "sub": "단리·복리, 세후 이자, 예금자보호", "basis": true },
+        { "id": "card-credit", "title": "카드와 신용", "short": "카드와 신용", "sub": "리볼빙의 실제 비용, 신용점수" },
+        { "id": "loan", "title": "대출의 구조", "short": "대출의 구조", "sub": "고정·변동금리, 상환 방식, DSR" },
+        { "id": "isa", "title": "절세 계좌 ① ISA", "short": "절세 계좌 ① ISA", "sub": "한도·비과세·분리과세, 개편안", "basis": true },
+        { "id": "pension", "title": "절세 계좌 ② 연금저축·IRP", "short": "절세 계좌 ② 연금저축·IRP", "sub": "세액공제와 연금 수령", "basis": true },
+        { "id": "tax", "title": "투자 세금 한눈에", "short": "투자 세금 한눈에", "sub": "배당·양도·금융소득 종합과세", "basis": true },
+        { "id": "rate-basics", "title": "금리·물가·환율 기초", "short": "금리·물가·환율 기초", "sub": "실질금리, 함께 움직이는 방식" }
+      ]
+    },
+    {
+      "slug": "econ-market",
+      "name": "시장을 움직이는 경제",
+      "summary": "경제 지표가 움직일 때 주식시장에 무슨 일이 생기는지 실제 과거 흐름으로 배워요.",
+      "stages": [
+        { "id": "rate-stock", "title": "금리와 주가", "short": "금리와 주가", "sub": "할인율, 성장주와 가치주" },
+        { "id": "fx-flow", "title": "환율과 외국인 수급", "short": "환율과 외국인 수급", "sub": "원화 약세와 외국인 자금" },
+        { "id": "cpi-jobs", "title": "물가·고용 지표와 발표날의 시장", "short": "물가·고용 지표", "sub": "CPI·고용보고서, 예상보다" },
+        { "id": "bond", "title": "채권 금리와 주식", "short": "채권 금리와 주식", "sub": "미국채 10년물, 금리 역전" },
+        { "id": "cycle", "title": "경기 사이클과 업종 순환", "short": "경기 사이클과 업종 순환", "sub": "국면별로 강했던 업종" },
+        { "id": "oil", "title": "유가·원자재와 산업", "short": "유가·원자재와 산업", "sub": "업종별 민감도, 구리·금" }
+      ]
+    },
+    {
+      "slug": "econ-read",
+      "name": "실전 해석",
+      "summary": "발표문·실적·재무제표·수급을 직접 읽고 해석하는 힘을 길러요.",
+      "stages": [
+        { "id": "fomc", "title": "FOMC·금통위 결정 읽기", "short": "FOMC·금통위 읽기", "sub": "점도표, 매파·비둘기파" },
+        { "id": "earnings", "title": "실적 시즌 읽기", "short": "실적 시즌 읽기", "sub": "컨센서스, 가이던스" },
+        { "id": "statements", "title": "재무제표 3종으로 기업 체력 보기", "short": "재무제표 3종", "sub": "손익·재무상태·현금흐름" },
+        { "id": "valuation", "title": "밸류에이션 지표의 함정", "short": "밸류에이션의 함정", "sub": "PER·PBR·ROE, 저PER의 함정" },
+        { "id": "flow-liquidity", "title": "수급과 유동성", "short": "수급과 유동성", "sub": "신용잔고·반대매매, 사이드카" },
+        { "id": "crisis", "title": "위기 사례 복기", "short": "위기 사례 복기", "sub": "2008·2020·2022, 먼저 움직인 지표" }
+      ]
+    },
+    {
       "slug": "chart-basic",
       "name": "차트 보는 법 · 기초",
       "summary": "캔들과 거래량, 이동평균선처럼 차트를 처음 볼 때 필요한 것만 짚습니다.",
@@ -79,6 +119,10 @@
         { "id": "check", "title": "손실 관리 확인", "short": "손실 관리 확인", "sub": "문제로 한 번 더 짚기" }
       ]
     }
+  ],
+  "courses": [
+    { "slug": "econ", "name": "경제 기초", "title": "내 돈부터 시장까지", "free": true, "unit": "강", "emoji": "honey", "basis": "2026-11-24", "chapters": ["econ-money", "econ-market", "econ-read"] },
+    { "slug": "invest", "name": "투자 실전", "title": "차트·기업·수급 읽기", "unit": "단계", "emoji": "books", "chapters": ["chart-basic", "chart-advanced", "chart-deep", "company-analysis", "supply-demand", "risk-management"] }
   ],
   "soon": []
 }

@@ -62,7 +62,7 @@ import { useHoneyStore } from '@scripts/stores/honey-store.js';
 import { HONEY_PATH, HONEY_HISTORY_PATH } from '@scripts/support.js';
 import { ensureAccess } from '@scripts/useAccess.js';
 import { assUserSession } from '@scripts/stores/user-stores.js';
-import { chapters } from '@scripts/training.js';
+import { courses, coursePath } from '@scripts/training.js';
 import { requireStockNotice } from '@scripts/stockNotice.js';
 
 const router    = useRouter();
@@ -80,15 +80,18 @@ const userInitial = computed(() => (userName.value?.[0] ?? '?').toUpperCase());
  * 여기서 다시 거르지 않는다. */
 const searchQuery = ref('');
 
-// 트레이닝은 정적 화면이라 서버 메뉴와 무관하게 맨 위에 둔다. 항목은 장(chapter) — 누르면 목차의 그 장으로 간다
-// (/training/<장>, 장·단계 목록은 scripts/training.js).
+// 트레이닝은 정적 화면이라 서버 메뉴와 무관하게 맨 위에 둔다. 항목은 코스(2026-11-24: 장 9개 → 코스 2개) — 누르면 그 코스의 수업 목록
+// (/training/lessons?course=, 코스·장·단계 목록은 scripts/training.js) + 복습하기 · 퀴즈 · 용어 사전.
 const trainingGroup = {
     menu_code: 'TrainingGroup', menu_name: '트레이닝', menu_title: '트레이닝', display_flag: 'Y',
     menu_path: 'training',
-    children: chapters().map(ch => ({
-        menu_code: `Training_${ch.slug}`, menu_path: ch.slug, display_flag: 'Y',
-        menu_name: ch.name, menu_title: ch.name,
+    children: courses().map(c => ({
+        menu_code: `Training_${c.slug}`, menu_path: coursePath(c), display_flag: 'Y',
+        menu_name: c.name, menu_title: c.free ? `${c.name} (무료)` : c.name,
     })).concat({
+        menu_code: 'TrainingReview', menu_path: 'review', display_flag: 'Y',
+        menu_name: '복습하기 · 오답노트', menu_title: '복습하기 · 오답노트',
+    }, {
         menu_code: 'TrainingQuiz', menu_path: 'quiz', display_flag: 'Y',
         menu_name: '퀴즈', menu_title: '퀴즈',
     }, {

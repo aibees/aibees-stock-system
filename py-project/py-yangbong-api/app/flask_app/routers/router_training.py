@@ -4,6 +4,8 @@ router_training.py — 트레이닝 학습 기록·주식분석 유의사항 동
     GET  /api/v1/training/progress     {done:[{stage_key, done_at(ms)}], stock_notice:{version, agreed_at(ms)}|null}
     POST /api/v1/training/progress     body {stage_keys:[...]} — 마친 단계를 더한다(이미 있는 건 그대로). 응답은 GET 과 같다.
     POST /api/v1/training/stock-notice body {version} — 주식분석 유의사항 동의. 응답은 GET 과 같다.
+    GET  /api/v1/training/review       {items:{...}, updated_at(ms)|null} — 다시 보기(오답노트·헷갈린 용어·복습, sql/016)
+    PUT  /api/v1/training/review       body {items:{...}} — 화면이 합친 결과를 통째로 저장(256KB 이하)
 
 모두 로그인 필요. 화면(training-store.js · stockNotice.js)이 로그인할 때 기기 기록과 합치고(합집합),
 로그인 중에 단계를 마치거나 동의하면 바로 올린다.
@@ -12,10 +14,13 @@ router_training.py — 트레이닝 학습 기록·주식분석 유의사항 동
 유의사항 동의: 기존 동의 표(user_consent + user_consent_history)에 consent_type 'STOCK_NOTICE' 로 남긴다.
   로그인 필수 동의(REQUIRED_CONSENTS)가 아니라 로그인 흐름에는 영향이 없다.
 """
+import json
 import logging
 import re
+from datetime import datetime
 
 from flask import Blueprint, g, request
+from sqlalchemy import text
 
 from app.domains.dao.userTrainingDao import UserTrainingDao
 from app.services import honey_service as honey
@@ -101,3 +106,52 @@ def agree_stock_notice():
         g.db.rollback()
         logging.exception(e)
         return ApiResponse.error("동의를 저장하지 못했어요.")
+
+
+# ── 다시 보기(2026-11-24, sql/yangbong/016) ────────────────────────────
+_REVIEW_MAX_BYTES = 256 * 1024
+_REVIEW_KEY_RE = re.compile(r'^[qt]:.{1,120}$')
+
+
+@training_bp.route("/training/review", methods=['GET'])
+@require_auth
+def get_training_review():
+    try:
+        row = g.db.execute(text("SELECT items, updated_at FROM user_training_review WHERE user_id = :u"),
+                           {'u': g.current_user_id}).first()
+        if row is None:
+            return ApiResponse.success({"items": {}, "updated_at": None})
+        try:
+            items = json.loads(row[0] or '{}')
+        except ValueError:
+            items = {}
+        return ApiResponse.success({"items": items if isinstance(items, dict) else {},
+                                    "updated_at": int(row[1].timestamp() * 1000) if row[1] else None})
+    except Exception as e:  # noqa: BLE001 — 표가 없으면 빈 값(화면은 기기 기록으로)
+        g.db.rollback()
+        logging.warning(f"[training/review] {e}")
+        return ApiResponse.success({"items": {}, "updated_at": None})
+
+
+@training_bp.route("/training/review", methods=['PUT'])
+@require_auth
+def put_training_review():
+    body = request.get_json(silent=True) or {}
+    items = body.get('items')
+    if not isinstance(items, dict) or not all(isinstance(k, str) and _REVIEW_KEY_RE.match(k) and isinstance(v, dict)
+                                              for k, v in items.items()):
+        return ApiResponse.error("다시 보기 항목 형식이 올바르지 않습니다.", status=400)
+    raw = json.dumps(items, ensure_ascii=False, separators=(',', ':'))
+    if len(raw.encode('utf-8')) > _REVIEW_MAX_BYTES:
+        return ApiResponse.error("다시 보기 항목이 너무 많아요.", status=400)
+    try:
+        g.db.execute(text("""
+            INSERT INTO user_training_review (user_id, items, updated_at) VALUES (:u, :i, :now)
+            ON DUPLICATE KEY UPDATE items = :i, updated_at = :now"""),
+            {'u': g.current_user_id, 'i': raw, 'now': datetime.now()})
+        g.db.commit()
+        return ApiResponse.success({"saved": len(items)})
+    except Exception as e:  # noqa: BLE001
+        g.db.rollback()
+        logging.exception(e)
+        return ApiResponse.error("다시 보기 기록을 저장하지 못했어요.")

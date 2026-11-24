@@ -6,7 +6,7 @@
             </button>
             <div class="tl-head-text">
                 <p v-if="stage" class="tl-crumb">{{ chapter.name }} · {{ stage.indexInChapter }}/{{ chapter.stages.length }}</p>
-                <h1>{{ stage ? `${stage.no}. ${stage.title}` : '찾을 수 없는 단계' }}</h1>
+                <h1>{{ stage ? `${stageNoText(stage)}. ${stage.title}` : '찾을 수 없는 단계' }}</h1>
             </div>
         </header>
 
@@ -47,13 +47,55 @@
 
             <!-- 읽는 단계 -->
             <article v-else class="tl-body">
+                <!-- 제도·세율·한도가 나오는 강의: 기준일 · 시행 중/개편안 (2026-11-24 경제 기초) -->
+                <div v-if="basisTags.length" class="tl-basis">
+                    <span v-for="t in basisTags" :key="t.text" class="tl-chip" :class="t.cls">{{ t.text }}</span>
+                </div>
                 <template v-for="(b, bi) in stage.lesson.body" :key="bi">
                     <h2 v-if="b.h" class="tl-h">{{ b.h }}</h2>
                     <p v-else-if="b.p" class="tl-p">{{ b.p }}</p>
                     <p v-else-if="b.note" class="tl-note">{{ b.note }}</p>
                     <dl v-else-if="b.terms" class="tl-terms">
-                        <div v-for="([term, desc], ti) in b.terms" :key="ti"><dt>{{ term }}</dt><dd>{{ desc }}</dd></div>
+                        <div v-for="([term, desc], ti) in b.terms" :key="ti"><dt>{{ term }}</dt><dd>{{ desc }}</dd>
+                            <button type="button" class="tl-conf" :class="{ on: review.isConfusing(term) }" :aria-pressed="review.isConfusing(term)"
+                                @click="review.toggleTerm(term, desc, stageLabel)">? 헷갈려요</button>
+                        </div>
                     </dl>
+                    <!-- 계산 상자: rows [[이름, 값]...] + sum -->
+                    <div v-else-if="b.calc" class="tl-calc">
+                        <p v-if="b.calc.title" class="tl-calc-t">{{ b.calc.title }}</p>
+                        <table><tbody>
+                            <tr v-for="(r, ri) in b.calc.rows" :key="ri"><td>{{ r[0] }}</td><td>{{ r[1] }}</td></tr>
+                            <tr v-if="b.calc.sum" class="sum"><td>{{ b.calc.sum[0] }}</td><td>{{ b.calc.sum[1] }}</td></tr>
+                        </tbody></table>
+                        <p v-if="b.calc.note" class="tl-calc-n">{{ b.calc.note }}</p>
+                    </div>
+                    <!-- 비교 표 -->
+                    <div v-else-if="b.table" class="tl-table-wrap">
+                        <table class="tl-table">
+                            <thead><tr><th v-for="(h, hi) in b.table.head" :key="hi">{{ h }}</th></tr></thead>
+                            <tbody><tr v-for="(r, ri) in b.table.rows" :key="ri"><td v-for="(c, ci) in r" :key="ci">{{ c }}</td></tr></tbody>
+                        </table>
+                    </div>
+                    <!-- 제도: 시행 중 / 개편안 -->
+                    <ul v-else-if="b.policy" class="tl-policy">
+                        <li v-for="([kind, text], pi) in b.policy" :key="pi">
+                            <span class="tl-chip" :class="kind">{{ kind === 'plan' ? '개편안' : '시행 중' }}</span><span>{{ text }}</span>
+                        </li>
+                    </ul>
+                    <!-- 수업 안 상황형 퀴즈: 고르면 바로 정답·해설, 틀리면 오답노트 -->
+                    <section v-else-if="b.ask" class="tl-ask">
+                        <p class="tl-ask-k">상황형 퀴즈 {{ askIndex(bi) + 1 }} / {{ askCount }}</p>
+                        <p class="tl-ask-q">{{ b.ask.q }}</p>
+                        <button v-for="(opt, oi) in b.ask.options" :key="oi" type="button" class="tl-opt"
+                            :class="askCls(bi, oi)" :disabled="askPicked[bi] != null" @click="pickAsk(bi, oi)">
+                            <span>{{ opt }}</span><span aria-hidden="true">{{ askMark(bi, oi) }}</span>
+                        </button>
+                        <p v-if="askPicked[bi] != null" class="tl-ask-fb" :class="{ right: askPicked[bi] === b.ask.answer }" aria-live="polite">
+                            <b>{{ askPicked[bi] === b.ask.answer ? '맞았어요.' : '아쉬워요.' }}</b> {{ b.ask.explain }}
+                            <span v-if="askPicked[bi] !== b.ask.answer" class="tl-ask-saved">오답노트에 담았어요 · 내일 다시 나와요</span>
+                        </p>
+                    </section>
                     <TrainingPlay v-else-if="b.play" :name="b.play" />
                     <figure v-else-if="b.figure" class="tl-figure">
                         <TrainingFigure :name="b.figure" />
@@ -61,13 +103,15 @@
                     </figure>
                 </template>
                 <p v-if="hasExampleChart" class="tl-fineprint">예시 차트는 설명을 위해 만든 가상 시세입니다.</p>
+                <p v-if="stage.basis" class="tl-fineprint">숫자·한도는 기준일의 제도예요. 개편안은 바뀔 수 있어요. 특정 상품 가입을 권하는 내용이 아니에요.</p>
             </article>
 
             <!-- 하단: 마치기 / 다음 단계 -->
             <div v-if="stage && stage.lesson" class="tl-foot">
                 <template v-if="!store.isDone(stage.key)">
                     <p v-if="stage.isQuiz" class="tl-count">{{ stage.lesson.quiz.length }}문제 중 {{ rightCount }}문제 맞힘</p>
-                    <button type="button" class="tl-cta" :disabled="stage.isQuiz && !allRight" @click="finish">
+                    <p v-if="!stage.isQuiz && askCount && !allAsked" class="tl-count">상황형 퀴즈 {{ askCount }}문제를 풀면 마칠 수 있어요</p>
+                    <button type="button" class="tl-cta" :disabled="(stage.isQuiz && !allRight) || (!stage.isQuiz && !allAsked)" @click="finish">
                         {{ stage.isQuiz ? '확인 마치기' : '다 읽었어요' }}
                     </button>
                 </template>
@@ -84,18 +128,60 @@
 <script setup>
 import TrainingFigure from './TrainingFigure.vue';
 import TrainingPlay from './TrainingPlay.vue';
-import { findChapter, findStage, followingStage, chapterPath, stagePath, TRAINING_PATH } from '@scripts/training.js';
+import { findChapter, findStage, followingStage, chapterPath, stagePath, stageNoText, findCourse, TRAINING_PATH } from '@scripts/training.js';
 import { useTrainingStore } from '@scripts/stores/training-store.js';
+import { useReviewStore } from '@scripts/stores/review-store.js';
+import { useQuizStore } from '@scripts/stores/quiz-store.js';
+import { askId } from '@scripts/trainingQuiz.js';
 
 const router = useRouter();
 const route = useRoute();
 const store = useTrainingStore();
+const review = useReviewStore();
+const quiz = useQuizStore();
 
 const stage = computed(() => findStage(String(route.params.chapter ?? ''), String(route.params.stage ?? '')));
 const chapter = computed(() => (stage.value ? findChapter(stage.value.chapterSlug) : null));
 const following = computed(() => followingStage(stage.value));
 const hasExampleChart = computed(() =>
     (stage.value?.lesson?.body ?? []).some(b => ['volume', 'ma', 'sr'].includes(b.figure)));
+
+// 이 단계를 열면 그 코스를 '마지막으로 연 코스'로(이어서 하기)
+watch(() => stage.value?.course, (c) => { if (c) store.useCourse(c); }, { immediate: true });
+const stageLabel = computed(() => (stage.value ? `${stageNoText(stage.value)} ${stage.value.short || stage.value.title}` : ''));
+
+/* ── 기준일 표시(단계 basis:true): 코스의 기준일 + 본문에 있는 시행 중/개편안 ── */
+const basisTags = computed(() => {
+    const s = stage.value;
+    if (!s?.basis) return [];
+    const ymd = findCourse(s.course)?.basis ?? '';
+    const tags = ymd ? [{ text: `${ymd.replaceAll('-', '.')} 기준`, cls: 'date' }] : [];
+    const kinds = new Set((s.lesson?.body ?? []).flatMap(b => (b.policy ?? []).map(p => p[0])));
+    if (kinds.has('live')) tags.push({ text: '시행 중', cls: 'live' });
+    if (kinds.has('plan')) tags.push({ text: '개편안 포함', cls: 'plan' });
+    return tags;
+});
+
+/* ── 수업 안 상황형 퀴즈 {ask}: 한 번 고르면 끝(정답·해설 표시). 틀리면 오답노트, 퀴즈 기록에도 남긴다 ── */
+const askBlocks = computed(() => (stage.value?.lesson?.body ?? []).map((b, bi) => (b.ask ? bi : -1)).filter(i => i >= 0));
+const askCount = computed(() => askBlocks.value.length);
+const askIndex = (bi) => askBlocks.value.indexOf(bi);
+const askPicked = ref({});
+watch(() => stage.value?.key, () => { askPicked.value = {}; });
+const allAsked = computed(() => askBlocks.value.every(bi => askPicked.value[bi] != null));
+const pickAsk = (bi, oi) => {
+    if (askPicked.value[bi] != null) return;
+    askPicked.value = { ...askPicked.value, [bi]: oi };
+    const b = stage.value.lesson.body[bi];
+    quiz.record(askId(stage.value.key, askIndex(bi)), oi === b.ask.answer);   // 틀리면 quiz-store 가 오답노트에 담는다
+};
+const askCls = (bi, oi) => {
+    const p = askPicked.value[bi];
+    if (p == null) return {};
+    const ans = stage.value.lesson.body[bi].ask.answer;
+    return { right: oi === ans, wrong: p === oi && oi !== ans };
+};
+const askMark = (bi, oi) => { const c = askCls(bi, oi); return c.right ? '✓' : c.wrong ? '✕' : ''; };
 
 /* ── 확인 문제: 틀리면 다시 고를 수 있고, 맞힌 문항은 그대로 둔다 ── */
 const picked = ref([]);
@@ -106,6 +192,7 @@ const pick = (qi, oi) => {
     const copy = [...picked.value];
     copy[qi] = oi;
     picked.value = copy;
+    if (oi !== stage.value.lesson.quiz[qi].answer) review.addWrong(`${stage.value.key}#${qi}`, chapter.value?.name ?? '');
 };
 const rightCount = computed(() => (stage.value?.lesson?.quiz ?? []).filter((_, qi) => isRight(qi)).length);
 const allRight = computed(() => stage.value?.isQuiz && rightCount.value === stage.value.lesson.quiz.length);
@@ -234,4 +321,39 @@ const finish = () => {
 .tl-crumb { color: $amber-700; }
 .tq-option.right { color: $amber-700; }
 .tq-explain.right { color: $honey-ink; }
+
+/* ══ 2026-11-24 경제 기초 블록: 기준일·시행/개편안 · 계산 상자 · 비교 표 · 헷갈려요 · 상황형 퀴즈 ══ */
+.tl-basis { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+.tl-chip { flex: none; white-space: nowrap; padding: 3px 8px; border-radius: 7px; font-size: 12px; font-weight: 700;
+    &.date { background: $band; color: $sub-ink; } &.live { background: #E8F5EC; color: #1E7A3C; } &.plan { background: #FFF1E0; color: #B35400; } }
+.tl-terms div { align-items: flex-start; }
+.tl-terms dd { flex: 1; min-width: 0; }
+.tl-conf { flex: none; height: 30px; padding: 0 10px; border: 1px solid #FFE0A3; border-radius: 9px; background: $card; color: $amber-700;
+    font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
+    &.on { background: $honey-300; border-color: $honey-300; color: $honey-ink; } }
+.tl-calc { margin: 0 0 16px; padding: $card-pad; border-radius: $radius; background: $honey-50; border: 1px solid #FFEBC2;
+    table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+    td { padding: 5px 0; color: $sub-ink; vertical-align: top; }
+    td:last-child { text-align: right; color: $ink; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 12px; }
+    tr.sum td { border-top: 1px solid #FFE0A3; padding-top: 9px; font-weight: 800; color: $ink; } }
+.tl-calc-t { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: $amber-700; }
+.tl-calc-n { margin: 8px 0 0; font-size: 12.5px; color: $sub; line-height: 1.5; }
+.tl-table-wrap { margin: 0 0 16px; overflow-x: auto; }
+.tl-table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid $line; border-radius: 12px; overflow: hidden; font-size: 14px;
+    th { background: $band; padding: 9px 10px; text-align: left; font-weight: 700; color: $sub-ink; white-space: nowrap; }
+    td { padding: 9px 10px; border-top: 1px solid $line; color: $sub-ink; vertical-align: top; line-height: 1.45; }
+    td:first-child { color: $sub; white-space: nowrap; } }
+.tl-policy { list-style: none; margin: 0 0 16px; padding: 14px $card-pad; border: 1px solid $line; border-radius: 12px;
+    li { display: flex; gap: 8px; align-items: flex-start; font-size: 14.5px; line-height: 1.55; color: $sub-ink; }
+    li + li { margin-top: 8px; } }
+.tl-ask { margin: 0 0 16px; padding: $card-pad; border: 1.5px solid $line; border-radius: $radius; }
+.tl-ask-k { margin: 0; font-size: 12px; font-weight: 700; color: $amber-700; }
+.tl-ask-q { margin: 4px 0 4px; font-size: 15.5px; font-weight: 700; line-height: 1.5; }
+.tl-opt { width: 100%; display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; padding: 12px 14px; border: 1.5px solid $line; border-radius: 10px;
+    background: $card; color: $ink; font: inherit; font-size: 14.5px; text-align: left; cursor: pointer; line-height: 1.45;
+    &:disabled { cursor: default; }
+    &.wrong { border-color: #F5B5BC; background: #FFF5F6; } &.right { border-color: #9BD6AE; background: #F2FBF5; } }
+.tl-ask-fb { margin: 10px 0 0; padding: 12px 14px; border-radius: 10px; background: #FFF5F6; font-size: 13.5px; line-height: 1.6; color: $sub-ink;
+    b { color: $up; } &.right { background: #F2FBF5; b { color: #1E7A3C; } } }
+.tl-ask-saved { display: block; margin-top: 6px; font-size: 12.5px; font-weight: 700; color: $up; }
 </style>

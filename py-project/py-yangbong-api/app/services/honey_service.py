@@ -42,6 +42,13 @@ LESSON_KEYS = frozenset([
     'supply-demand/trap', 'supply-demand/check',
     'risk-management/why-loss', 'risk-management/position-size', 'risk-management/exit-price',
     'risk-management/split-buy', 'risk-management/journal', 'risk-management/check',
+    # 경제 기초(무료) 19강 — 2026-11-24
+    'econ-money/deposit', 'econ-money/card-credit', 'econ-money/loan', 'econ-money/isa', 'econ-money/pension',
+    'econ-money/tax', 'econ-money/rate-basics',
+    'econ-market/rate-stock', 'econ-market/fx-flow', 'econ-market/cpi-jobs', 'econ-market/bond', 'econ-market/cycle',
+    'econ-market/oil',
+    'econ-read/fomc', 'econ-read/earnings', 'econ-read/statements', 'econ-read/valuation', 'econ-read/flow-liquidity',
+    'econ-read/crisis',
 ])
 
 DAY_PASS_FEATURE = 'RECO_ADVANCED'   # 하루 이용권이 여는 기능(프리미엄 단계, RecoLevel.ADVANCED_FEATURE)

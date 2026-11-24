@@ -22,7 +22,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import aibeesApi from '../aibeesApi.js';
 import { assUserSession } from './user-stores.js';
-import { allStages } from '../training.js';
+import { allStages, DEFAULT_COURSE, findCourse } from '../training.js';
 import { applyAccountStockNotice } from '../stockNotice.js';
 
 const STORAGE_KEY = 'yb-training';
@@ -49,10 +49,12 @@ export const useTrainingStore = defineStore('training', () => {
     const done = ref(Array.isArray(saved.done) ? saved.done.filter(k => typeof k === 'string') : []);
     const updatedAt = ref(Number(saved.updatedAt) || 0);
     const owner = ref(saved.owner ?? null);
+    // 마지막으로 연 코스(2026-11-24 코스 도입) — '이어서 하기'가 이 코스의 다음 단계를 보여 준다. 기기에만 둔다.
+    const lastCourse = ref(findCourse(saved.lastCourse) ? saved.lastCourse : DEFAULT_COURSE);
 
     const persist = () => {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ done: done.value, updatedAt: updatedAt.value, owner: owner.value }));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ done: done.value, updatedAt: updatedAt.value, owner: owner.value, lastCourse: lastCourse.value }));
         } catch { /* 저장 실패 — 이번 실행 동안만 기억한다 */ }
     };
 
@@ -63,8 +65,17 @@ export const useTrainingStore = defineStore('training', () => {
     // 모든 단계가 처음부터 열려 있다(2026-11-18, 순서대로 잠금 폐지). 없는 단계만 닫힌 것으로 본다.
     const isOpen = (key) => stages.some(s => s.key === key);
 
-    /** 지금 할 차례: 아직 안 마쳤고 열려 있는 첫 단계. 다 마쳤으면 null. */
-    const nextStage = computed(() => stages.find(s => !isDone(s.key) && isOpen(s.key)) ?? null);
+    /** 코스 안에서 지금 할 차례: 아직 안 마쳤고 본문이 있는 첫 단계(준비 중 단계는 건너뛴다). 다 마쳤으면 null. */
+    const nextIn = (course) => stages.find(s => s.course === course && !isDone(s.key) && s.lesson) ?? null;
+    /** 이어서 하기: 마지막으로 연 코스의 다음 단계. 그 코스를 다 마쳤으면 다른 코스에서. */
+    const nextStage = computed(() => nextIn(lastCourse.value) ?? stages.find(s => !isDone(s.key) && s.lesson) ?? null);
+    const doneIn = (course) => stages.filter(s => s.course === course && isDone(s.key)).length;
+    const totalIn = (course) => stages.filter(s => s.course === course).length;
+    const useCourse = (course) => {
+        if (!findCourse(course) || lastCourse.value === course) return;
+        lastCourse.value = course;
+        persist();
+    };
 
     // 지금 목차에 있는 단계만 센다(없어진 단계의 기록은 세지 않는다).
     const doneCount = computed(() => stages.filter(s => isDone(s.key)).length);
@@ -132,5 +143,6 @@ export const useTrainingStore = defineStore('training', () => {
         return true;
     };
 
-    return { done, updatedAt, owner, isDone, isOpen, nextStage, doneCount, total, complete, syncWithAccount };
+    return { done, updatedAt, owner, isDone, isOpen, nextStage, doneCount, total, complete, syncWithAccount,
+        lastCourse, nextIn, doneIn, totalIn, useCourse };
 });

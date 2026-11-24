@@ -3,14 +3,19 @@
         <BrandHeader title="수업 듣기" :back="TRAINING_PATH" />
 
         <main class="tr-main">
-            <!-- 전체 진행(이어서 하기는 트레이닝 첫 화면에 있다) -->
-            <section class="tr-card tr-top" aria-label="진행 상황">
-                <div class="tr-prog">
-                    <div class="tr-bar" role="progressbar" aria-label="완료한 단계"
-                        :aria-valuenow="store.doneCount" aria-valuemin="0" :aria-valuemax="store.total">
-                        <span :style="{ width: `${pct}%` }"></span>
+            <!-- 코스 고르기 + 코스 진행(장별 막대). 2026-11-24 코스 도입 -->
+            <section class="tr-card tr-top" aria-label="코스와 진행 상황">
+                <div class="tr-courses" role="tablist">
+                    <button v-for="c in courseList" :key="c.slug" type="button" role="tab" class="tr-course"
+                        :class="{ on: c.slug === course.slug }" :aria-selected="c.slug === course.slug ? 'true' : 'false'"
+                        @click="pickCourse(c)">{{ c.name }}<template v-if="c.free"> · 무료</template></button>
+                </div>
+                <div class="tr-sum">
+                    <div class="tr-sum-top"><b>{{ store.doneIn(course.slug) }} / {{ course.stages.length }}{{ course.unit }}</b><span>{{ course.title }}</span></div>
+                    <div v-for="ch in chapterList" :key="ch.slug" class="tr-sum-row">
+                        <div class="tr-sum-name"><span>{{ chapterMeta(ch, true) }} · {{ ch.name }}</span><em>{{ doneOf(ch) }}/{{ ch.stages.length }}</em></div>
+                        <span class="tr-sum-bar"><span :style="{ width: `${ch.stages.length ? doneOf(ch) / ch.stages.length * 100 : 0}%` }"></span></span>
                     </div>
-                    <span class="tr-prog-count"><b>{{ store.doneCount }}</b> / {{ store.total }} 단계</span>
                 </div>
             </section>
 
@@ -20,7 +25,7 @@
                 <button type="button" class="tr-ch-head" :aria-expanded="isExpanded(ch) ? 'true' : 'false'"
                     :aria-controls="`ch-list-${ch.slug}`" @click="toggleChapter(ch)">
                     <span class="tr-ch-text">
-                        <span class="tr-ch-meta">{{ ch.no }}장 · 단계 {{ ch.first }}–{{ ch.last }}</span>
+                        <span class="tr-ch-meta">{{ chapterMeta(ch) }}</span>
                         <span class="tr-ch-name">{{ ch.name }}</span>
                     </span>
                     <span class="tr-ch-state" :class="chapterState(ch).cls">
@@ -42,7 +47,7 @@
                             <span class="tr-quiz-go" aria-hidden="true">{{ quizState(s) }}</span>
                         </button>
                         <button v-else type="button" class="tr-row" :class="rowCls(s)"
-                            :aria-label="`${s.no}단계 ${s.title}${rowState(s).label ? `, ${rowState(s).label}` : ''}`"
+                            :aria-label="`${stageNoText(s)} ${s.title}${rowState(s).label ? `, ${rowState(s).label}` : ''}`"
                             @click="openStage(s)">
                             <span class="tr-no" aria-hidden="true">
                                 <svg v-if="store.isDone(s.key)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg>
@@ -52,6 +57,7 @@
                                 <b>{{ shortOf(s) }}</b>
                                 <small v-if="s.sub">{{ s.sub }}</small>
                             </span>
+                            <span v-if="s.basis && course.basis" class="tr-basis" aria-hidden="true">{{ basisShort }} 기준</span>
                             <span class="tr-state" aria-hidden="true">{{ rowState(s).label }}</span>
                         </button>
                     </li>
@@ -76,7 +82,7 @@
  *   - 목록 줄은 짧은 제목(short) + 회색 한 줄 설명(sub). 긴 원래 제목(title)은 레슨 화면에서만 쓴다.
  *   - 기본으로 지금 차례인 장(또는 /training/:chapter 로 들어온 장)만 펼친다. 다른 장은 한 줄로 접혀 있고 누르면 펼친다.
  */
-import { chapters, soonItems, stagePath, TRAINING_PATH } from '@scripts/training.js';
+import { courses, findCourse, findChapter, stageNoText, soonItems, stagePath, TRAINING_PATH } from '@scripts/training.js';
 import { useTrainingStore } from '@scripts/stores/training-store.js';
 import { useQuizStore } from '@scripts/stores/quiz-store.js';
 
@@ -86,10 +92,22 @@ const store = useTrainingStore();
 const quiz = useQuizStore();
 
 
-const chapterList = chapters();
+/* ── 코스: ?course= → /training/<장> 의 장이 속한 코스 → 마지막으로 연 코스 ── */
+const courseList = courses();
+const course = computed(() => findCourse(String(route.query.course ?? ''))
+    ?? findCourse(findChapter(String(route.params.chapter ?? ''))?.course)
+    ?? findCourse(store.lastCourse) ?? courseList[0]);
+watch(() => course.value.slug, (c) => store.useCourse(c), { immediate: true });
+const pickCourse = (c) => router.replace({ path: '/training/lessons', query: { course: c.slug } });
+const chapterList = computed(() => course.value.chapters);
 const soon = soonItems();
-const next = computed(() => store.nextStage);
-const pct = computed(() => (store.total ? Math.round(store.doneCount / store.total * 100) : 0));
+const next = computed(() => store.nextIn(course.value.slug));
+const doneOf = (ch) => ch.stages.filter(s => store.isDone(s.key)).length;
+/** 장 머리글: 경제 기초 '1단계 · 1–7강', 투자 실전 '1장 · 단계 1–6' */
+const chapterMeta = (ch, short = false) => (course.value.unit === '강'
+    ? (short ? `${ch.no}단계` : `${ch.no}단계 · ${ch.first}–${ch.last}강`)
+    : (short ? `${ch.no}장` : `${ch.no}장 · 단계 ${ch.first}–${ch.last}`));
+const basisShort = computed(() => { const [, m, d] = (course.value.basis ?? '').split('-'); return m ? `${Number(m)}.${Number(d)}` : ''; });
 
 const shortOf = (s) => s.short || s.title;
 const isNext = (s) => next.value?.key === s.key;
@@ -99,11 +117,12 @@ const openStage = (s) => router.push(stagePath(s));
 const defaultOpen = () => {
     const set = new Set();
     if (next.value) set.add(next.value.chapterSlug);
-    else if (chapterList.length) set.add(chapterList.at(-1).slug);
+    else if (chapterList.value.length) set.add(chapterList.value[0].slug);
     if (route.params.chapter) set.add(String(route.params.chapter));
     return set;
 };
 const expanded = ref(defaultOpen());
+watch(() => course.value.slug, () => { expanded.value = defaultOpen(); });
 const isExpanded = (ch) => expanded.value.has(ch.slug);
 const toggleChapter = (ch) => {
     const s = new Set(expanded.value);
@@ -125,6 +144,7 @@ const chapterState = (ch) => {
 // 단계 줄 상태: 마침 / 지금(안 마친 첫 단계) / 그 밖에는 표시 없음
 const rowState = (s) => {
     if (store.isDone(s.key)) return { label: '마침' };
+    if (!s.lesson) return { label: '준비 중' };
     if (isNext(s)) return { label: '지금 ›' };
     return { label: '' };
 };
@@ -334,4 +354,16 @@ button { font: inherit; letter-spacing: inherit; }
 
 .tr-note { margin: 0; padding: 12px $pad-x 8px; font-size: 12px; line-height: 1.6; color: $sub-2; }
 
+
+/* ══ 2026-11-24 코스 고르기 · 장별 진행 막대 · 기준일 ══ */
+.tr-courses { display: flex; gap: 8px; }
+.tr-course { height: 36px; padding: 0 14px; border: 0; border-radius: 10px; background: $band; color: $sub-ink; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+    &.on { background: $honey-300; color: $honey-ink; } }
+.tr-sum { margin-top: $gap; padding: $card-pad; border: 1px solid $line; border-radius: $radius; }
+.tr-sum-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; b { font-size: 15px; } span { font-size: 13px; color: $sub; } }
+.tr-sum-row { margin-top: $gap; }
+.tr-sum-name { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; color: $sub-ink; em { font-style: normal; font-size: 13px; color: $sub; font-variant-numeric: tabular-nums; } }
+.tr-sum-bar { display: block; height: 6px; margin-top: 6px; border-radius: 3px; background: $band; overflow: hidden; span { display: block; height: 100%; border-radius: 3px; background: $honey-500; } }
+.tr-basis { flex: none; margin-left: auto; padding: 2px 6px; border-radius: 6px; background: $down-bg; color: $down; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.tr-basis + .tr-state { margin-left: 8px; }
 </style>

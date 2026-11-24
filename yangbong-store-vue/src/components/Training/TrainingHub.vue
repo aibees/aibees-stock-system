@@ -9,13 +9,55 @@
         </header>
 
         <main class="hub-main">
+            <!-- 용어 검색(2026-11-24): 누르면 용어 사전 검색으로 -->
+            <form class="search" role="search" @submit.prevent="searchTerm">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+                <label class="sr-only" for="hub-q">용어 검색</label>
+                <input id="hub-q" v-model="q" type="search" placeholder="용어 검색 (DSR, ISA, 점도표…)" autocomplete="off" enterkeyhint="search" />
+            </form>
+
             <button v-if="next" type="button" class="resume" @click="router.push(stagePath(next))">
                 <span class="emo"><img src="/img/emoji/honey.png" alt="" /></span>
                 <span class="resume-text">
-                    <small>{{ store.doneCount ? '이어서 하기' : '처음 시작하기' }}</small>
+                    <small>{{ store.doneCount ? '이어서 하기' : '처음 시작하기' }} · {{ courseName(next.course) }}</small>
                     <b>{{ next.short || next.title }}</b>
                 </span>
                 <i>{{ store.doneCount ? '계속' : '시작' }}</i>
+            </button>
+
+            <!-- 다시 보기(2026-11-24): 복습하기 + 오답노트 · 헷갈린 용어 -->
+            <h2>다시 보기</h2>
+            <button type="button" class="review" @click="router.push(REVIEW_PATH)">
+                <span class="emo"><img src="/img/emoji/repeat.png" alt="" /></span>
+                <span class="resume-text">
+                    <b>복습하기</b>
+                    <small v-if="review.dueList.length">오늘 다시 볼 때가 된 것 <em>{{ review.dueList.length }}개</em></small>
+                    <small v-else-if="review.wrongList.length || review.termList.length">오늘 볼 것은 다 했어요</small>
+                    <small v-else>틀린 문제와 헷갈린 용어가 여기 모여요</small>
+                </span>
+                <i v-if="review.dueList.length">시작</i>
+            </button>
+            <div class="minis">
+                <button type="button" class="mini" @click="router.push(`${REVIEW_PATH}?tab=wrong`)">
+                    <span class="ic wrong" aria-hidden="true">✕</span><b>오답노트</b><em>{{ review.wrongList.length }}</em>
+                </button>
+                <button type="button" class="mini" @click="router.push(`${REVIEW_PATH}?tab=term`)">
+                    <span class="ic conf" aria-hidden="true">?</span><b>헷갈린 용어</b><em>{{ review.termList.length }}</em>
+                </button>
+            </div>
+
+            <h2>배우기</h2>
+            <button v-for="c in courseList" :key="c.slug" type="button" class="lesson-card course" :class="c.slug"
+                @click="router.push(coursePath(c))">
+                <span class="emo"><img :src="`/img/emoji/${c.emoji}.png`" alt="" /></span>
+                <span class="lesson-text">
+                    <span class="course-k">{{ c.name }}<span v-if="c.free" class="free">무료</span></span>
+                    <b>{{ c.title }}</b>
+                    <small>{{ courseSub(c) }}</small>
+                    <span class="bar" role="progressbar" :aria-label="`${c.name} 진행`" :aria-valuenow="store.doneIn(c.slug)" aria-valuemin="0" :aria-valuemax="c.stages.length">
+                        <span :style="{ width: `${coursePct(c)}%` }"></span>
+                    </span>
+                </span>
             </button>
 
             <h2>차트 읽기</h2>
@@ -27,18 +69,6 @@
                 </span>
             </button>
             <button type="button" class="review-link" @click="router.push(CHART_QUIZ_REVIEW_PATH)">다른 방향이었던 문제 다시 보기<i aria-hidden="true">›</i></button>
-
-            <h2>배우기</h2>
-            <button type="button" class="lesson-card" @click="router.push(LESSONS_PATH)">
-                <span class="emo"><img src="/img/emoji/books.png" alt="" /></span>
-                <span class="lesson-text">
-                    <b>수업 듣기</b>
-                    <small>{{ chapterCount }}개 장 · {{ store.total }}단계</small>
-                    <span class="bar" role="progressbar" aria-label="완료한 단계" :aria-valuenow="store.doneCount" aria-valuemin="0" :aria-valuemax="store.total">
-                        <span :style="{ width: `${pct}%` }"></span>
-                    </span>
-                </span>
-            </button>
 
             <div class="tiles">
                 <button type="button" class="tile" @click="router.push(QUIZ_PATH)">
@@ -64,23 +94,33 @@
 </template>
 
 <script setup>
-/** 트레이닝 첫 화면: 이어서 하기 + 차트 퀴즈 + 수업 듣기 · 퀴즈 · 용어 사전 입구 */
-import { chapters, stagePath, LESSONS_PATH, GLOSSARY_PATH } from '@scripts/training.js';
+/** 트레이닝 첫 화면: 용어 검색 · 이어서 하기 · 다시 보기 · 코스(경제 기초·투자 실전) · 차트 퀴즈 · 퀴즈 · 용어 사전 */
+import { courses, findCourse, coursePath, stagePath, GLOSSARY_PATH } from '@scripts/training.js';
 import { glossaryTerms } from '@scripts/glossary.js';
 import { QUIZ_PATH, quizSetPath, todayQuestion } from '@scripts/trainingQuiz.js';
 import { CHART_QUIZ_PATH, CHART_QUIZ_REVIEW_PATH } from '@scripts/trainingChart.js';
 import { useTrainingStore } from '@scripts/stores/training-store.js';
 import { useQuizStore } from '@scripts/stores/quiz-store.js';
+import { useReviewStore, REVIEW_PATH } from '@scripts/stores/review-store.js';
 
 const router = useRouter();
 const store = useTrainingStore();
 const quiz = useQuizStore();
 
-const chapterCount = chapters().length;
+const review = useReviewStore();
+const courseList = courses();
+const courseName = (slug) => findCourse(slug)?.name ?? '';
+const courseSub = (c) => {
+    const done = store.doneIn(c.slug);
+    const size = c.slug === 'econ' ? `${c.chapters.length}단계 · ${c.stages.length}강` : `${c.chapters.length}개 장 · ${c.stages.length}단계`;
+    return done ? `${size} · ${done}/${c.stages.length} 들음` : size;
+};
+const coursePct = (c) => (c.stages.length ? Math.round(store.doneIn(c.slug) / c.stages.length * 100) : 0);
+const q = ref('');
+const searchTerm = () => router.push({ path: GLOSSARY_PATH, query: q.value.trim() ? { q: q.value.trim() } : {} });
 const termCount = glossaryTerms().length;
 const today = todayQuestion();
 const next = computed(() => store.nextStage);
-const pct = computed(() => (store.total ? Math.round(store.doneCount / store.total * 100) : 0));
 </script>
 
 <style scoped lang="scss">
@@ -183,4 +223,25 @@ h2 { margin: $sec-pt 0 $head-gap; }
 .tile { padding: $card-pad; b { margin-top: $gap; } }
 .today { margin-top: $sec-pt; padding: $card-pad 0; }
 .note { margin-top: $gap; }
+
+/* ══ 2026-11-24 용어 검색 · 다시 보기 · 코스 카드 ══ */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.search { display: flex; align-items: center; gap: 8px; height: 44px; margin-bottom: $gap; padding: 0 $card-pad; border-radius: $radius; background: $band; color: $sub;
+    input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; color: $ink; font: inherit; font-size: 16px; outline: none;
+        &::placeholder { color: $sub; } &::-webkit-search-cancel-button { -webkit-appearance: none; } } }
+.review { display: flex; align-items: center; gap: $gap; padding: $card-pad; border-radius: $radius; background: $honey-strip;
+    .emo { width: 44px; height: 44px; img { width: 30px; height: 30px; } }
+    b { display: block; font-size: 16px; font-weight: 700; }
+    small { display: block; margin-top: 2px; font-size: 13px; color: $sub-ink; em { font-style: normal; font-weight: 700; color: $amber-700; } }
+    i { margin-left: auto; height: 34px; padding: 0 12px; border-radius: 8px; background: $honey-300; color: $honey-ink; font-size: 13px; font-style: normal; font-weight: 700; display: flex; align-items: center; } }
+.minis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: $gap; margin-top: $gap; }
+.mini { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 14px; border: 1px solid $line; border-radius: $radius; background: $card;
+    b { font-size: 14.5px; font-weight: 600; white-space: nowrap; } em { margin-left: auto; font-style: normal; font-size: 15px; font-weight: 700; color: $ink; } }
+.ic { flex: none; width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800;
+    &.wrong { background: $up-bg; color: $up; } &.conf { background: $honey-100; color: $amber-700; } }
+.course + .course { margin-top: $gap; }
+.course.invest { background: $honey-50; box-shadow: inset 0 0 0 1px #FFEBC2; }
+.course-k { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: $amber-700; }
+.free { padding: 1px 6px; border-radius: 6px; background: $card; box-shadow: inset 0 0 0 1px #FFE0A3; font-size: 11px; }
+.course b { margin-top: 2px; }
 </style>

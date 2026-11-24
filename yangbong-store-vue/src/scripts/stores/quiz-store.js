@@ -4,7 +4,8 @@
  */
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { allQuestions } from '../trainingQuiz.js';
+import { allQuestions, findQuestion } from '../trainingQuiz.js';
+import { useReviewStore } from './review-store.js';
 
 const STORAGE_KEY = 'yb-training-quiz';
 
@@ -26,6 +27,10 @@ export const useQuizStore = defineStore('training-quiz', () => {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(results.value));
         } catch { /* 저장 실패 — 이번 실행 동안만 기억한다 */ }
+        // 다시 보기(2026-11-24): 틀리면 오답노트에, 오답노트 문제를 다시 맞히면 복습 한 칸 앞으로
+        const review = useReviewStore();
+        if (isRight) review.solvedAgain(id);
+        else review.addWrong(id, findQuestion(id)?.chapterName ?? '');
     };
 
     const rightCount = computed(() => questions.filter(q => results.value[q.id] === 'right').length);

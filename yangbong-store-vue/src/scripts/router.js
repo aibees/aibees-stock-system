@@ -10,6 +10,7 @@ import { isAuthPath, isGuestPath, rememberAfterLogin, INTRO_PATH, ONBOARDING_PAT
 import { isIntroSeen } from "./introState.js";
 import { usePersonaStore } from "./stores/persona-store.js";
 import { useTrainingStore } from "./stores/training-store.js";
+import { useReviewStore } from "./stores/review-store.js";
 import { NOTICE_DETAIL_PATH, NOTICE_LIST_PATH } from "./notice.js";
 import AdGate from '@/components/AdGate.vue';
 import NaverCallback from '@/components/NaverCallback.vue';
@@ -40,6 +41,7 @@ import IssueDetail from '@/components/Issue/IssueDetail.vue'
 import TrainingQuizHome from '@/components/Training/TrainingQuizHome.vue'
 import TrainingQuizPlay from '@/components/Training/TrainingQuizPlay.vue'
 import TrainingLesson from '@/components/Training/TrainingLesson.vue'
+import TrainingReview from '@/components/Training/TrainingReview.vue'
 import TrainingChartQuiz from '@/components/Training/ChartQuiz/TrainingChartQuiz.vue'
 import TrainingChartReview from '@/components/Training/ChartQuiz/TrainingChartReview.vue'
 import Login from '@/components/Login.vue'
@@ -156,6 +158,12 @@ const routes = [
         path: "/training/chart/review",
         name: "training-chart-review",
         component: TrainingChartReview
+    },
+    {
+        // 다시 보기(오답노트·헷갈린 용어·복습하기, 2026-11-24). /training/:chapter 보다 앞에 둔다.
+        path: "/training/review",
+        name: "training-review",
+        component: TrainingReview
     },
     {
         // 장 바로가기(전체 메뉴의 장 항목·단계 화면의 뒤로): 같은 목차 화면을 그 장 위치로 연다(scrollBehavior).
@@ -388,6 +396,8 @@ export const setRouterToApp = async () => {
         if (loggedIn) await persona.syncWithAccount();
         // 트레이닝 학습 기록·주식분석 유의사항 동의도 같은 때 계정과 맞춘다(기기 기록과 합집합). 실패해도 기기 기록으로 진행한다.
         if (loggedIn) await useTrainingStore().syncWithAccount();
+        // 다시 보기(오답노트·헷갈린 용어·복습) — 기다리지 않는다(실패해도 기기 기록으로 동작)
+        if (loggedIn) useReviewStore().syncWithAccount();
 
         // 처음 실행: 홈으로 들어올 때 앱 소개 → 성향 질문 순서로 한 번 연다(권한을 받은 뒤라 매매 사용자는 제외된다).
         if (target === '/home' && persona.needsOnboarding()) {
